@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -138,7 +139,7 @@ var DefaultReservedCloudNames = []string{
 // created on this JAAS system an error with a code of CodeIncompatibleClouds
 // will be returned. If there is an error returned by the controller when
 // creating the cloud then that error code will be preserved.
-func (j *JujuManager) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
+func (j *JujuManager) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddCloudToController")
 
 	controller, err := j.getControllerByName(ctx, controllerName)
@@ -234,7 +235,7 @@ func (j *JujuManager) determineHostCloudRegion(ctx context.Context, hostCloudReg
 //     code of CodeIncompatibleClouds will be returned.
 //   - If there is an error returned by the controller when creating the cloud
 //     then that error code will be preserved.
-func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
+func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
 	const op = errors.Op("jimm.AddHostedCloud")
 
 	// NOTE (alesstimec) The default JIMM access right for every user is
@@ -334,10 +335,9 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 // jujuparams cloud definition. Admin access to the cloud will be granted
 // to the user identified by the given user tag. On success
 // addControllerCloud returns the definition of the cloud retrieved from
-// the controller. If the cloud already exists on the controller or the user
-// already has access to the cloud, then no error will be thrown and the
-// method will continue and return the desired cloud.
-func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (*jujuparams.Cloud, error) {
+// the controller. No error will be returned if the cloud already exists on
+// the controller or the user already has access to the cloud.
+func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (*jujucloud.Cloud, error) {
 	const op = errors.Op("jimm.addControllerCloud")
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
@@ -345,19 +345,13 @@ func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Contr
 		return nil, errors.E(op, err)
 	}
 	defer api.Close()
-	if err := api.AddCloud(ctx, tag, cloud, force); err != nil {
-		if errors.ErrorCode(err) != errors.CodeAlreadyExists {
+	if err := api.AddCloud(tag, cloud, force); err != nil {
+		if !jujuparams.IsCodeAlreadyExists(err) {
 			return nil, errors.E(op, err)
 		}
 	}
-	// TODO (alesstimec) This will no longer be needed.
-	if err := api.GrantCloudAccess(ctx, tag, ut, "admin"); err != nil {
-		if !strings.Contains(err.Error(), "already has") {
-			return nil, errors.E(op, err)
-		}
-	}
-	var result jujuparams.Cloud
-	if err := api.Cloud(ctx, tag, &result); err != nil {
+	var result jujucloud.Cloud
+	if err := api.Cloud(tag, &result); err != nil {
 		return nil, errors.E(op, err)
 	}
 
@@ -428,7 +422,7 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 		// used by any models before attempting to remove it. JIMM
 		// relies on the controller failing the RemoveClouds API
 		// request if the cloud is in use.
-		if err := api.RemoveCloud(ctx, ct); err != nil {
+		if err := api.RemoveCloud(ct); err != nil {
 			return err
 		}
 
@@ -452,7 +446,7 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 // an admin on the cloud an error is returned with a code of
 // CodeUnauthorized. If the cloud with the given name cannot be found then
 // an error with the code CodeNotFound is returned.
-func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error {
+func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct names.CloudTag, cloud jujucloud.Cloud) error {
 	const op = errors.Op("jimm.UpdateCloud")
 
 	var c dbmodel.Cloud
@@ -484,7 +478,7 @@ func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct na
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
-		return api.UpdateCloud(ctx, ct, cloud)
+		return api.UpdateCloud(ct, cloud)
 	})
 	if err != nil {
 		return errors.E(op, err)
@@ -567,7 +561,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	// used by any models before attempting to remove it. JIMM
 	// relies on the controller failing the RemoveClouds API
 	// request if the cloud is in use.
-	if err := api.RemoveCloud(ctx, ct); err != nil {
+	if err := api.RemoveCloud(ct); err != nil {
 		return errors.E(op, err)
 	}
 
@@ -620,7 +614,7 @@ func (j *JujuManager) addCloudControllerRelation(ctx context.Context, cloud dbmo
 // - The user can add models using this cloud
 // - The host cloud region is set
 // - The controller we wish to add a cloud to is in the region
-func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.User, cloud jujuparams.Cloud, controllerName string) error {
+func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.User, cloud jujucloud.Cloud, controllerName string) error {
 	if cloud.HostCloudRegion == "" {
 		return nil
 	}
@@ -675,7 +669,7 @@ func checkReservedCloudNames(tag names.CloudTag, reservedCloudNames []string) er
 
 // addCloudToDatabase adds the cloud to the database for this controller.
 // Additionally, it sets the cloud to controller access relation.
-func (j *JujuManager) addCloudToDatabase(ctx context.Context, controller *dbmodel.Controller, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) (dbmodel.Cloud, error) {
+func (j *JujuManager) addCloudToDatabase(ctx context.Context, controller *dbmodel.Controller, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (dbmodel.Cloud, error) {
 	const op = errors.Op("jimm.addCloudToDatabase")
 
 	var dbCloud dbmodel.Cloud

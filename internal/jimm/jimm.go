@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
+	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -238,8 +239,8 @@ type JujuManager interface {
 
 	// Other methods
 
-	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
-	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error
+	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
+	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
 	CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
 	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
 	FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
@@ -261,7 +262,7 @@ type JujuManager interface {
 	RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
 	RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error
 	RevokeOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
-	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujuparams.Cloud) error
+	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujucloud.Cloud) error
 	UpdateCloudCredential(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
 

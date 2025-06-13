@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuclient
 
@@ -6,10 +6,10 @@ import (
 	"context"
 
 	jujuerrors "github.com/juju/errors"
+	cloudapi "github.com/juju/juju/api/client/cloud"
+	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 )
@@ -131,181 +131,40 @@ func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCreden
 
 // Cloud retrieves information about the given cloud. Cloud uses the
 // Cloud procedure on the Cloud facade.
-func (c Connection) Cloud(ctx context.Context, tag names.CloudTag, cloud *jujuparams.Cloud) error {
-	const op = errors.Op("jujuclient.Cloud")
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: tag.String(),
-		}},
+func (c Connection) Cloud(tag names.CloudTag, cloud *jujucloud.Cloud) error {
+	cloudAPI := cloudapi.NewClient(&c)
+	res, err := cloudAPI.Cloud(tag)
+	if err != nil {
+		return err
 	}
-	resp := jujuparams.CloudResults{
-		Results: []jujuparams.CloudResult{{
-			Cloud: cloud,
-		}},
-	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 1}, "", "Cloud", &args, &resp); err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
-	}
+	*cloud = res
 	return nil
 }
 
 // Clouds retrieves information about all available clouds. Clouds uses the
 // Clouds procedure on the Cloud facade.
-func (c Connection) Clouds(ctx context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
-	const op = errors.Op("jujuclient.Clouds")
-	var resp jujuparams.CloudsResult
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 1}, "", "Clouds", nil, &resp); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
-	}
-
-	clouds := make(map[names.CloudTag]jujuparams.Cloud, len(resp.Clouds))
-	for cloudTag, cloud := range resp.Clouds {
-		tag, err := names.ParseCloudTag(cloudTag)
-		if err != nil {
-			zapctx.Warn(ctx, "controller returned invalid cloud tag", zap.String("tag", cloudTag))
-			continue
-		}
-		clouds[tag] = cloud
-	}
-	return clouds, nil
+func (c Connection) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {
+	cloudAPI := cloudapi.NewClient(&c)
+	return cloudAPI.Clouds()
 }
 
 // AddCloud adds the given cloud to a controller with the given name.
 // AddCloud uses the AddCloud procedure on the Cloud facade.
-func (c Connection) AddCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud, force bool) error {
-	const op = errors.Op("jujuclient.AddCloud")
-	args := jujuparams.AddCloudArgs{
-		Cloud: cloud,
-		Name:  tag.Id(),
-		Force: &force,
-	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 2}, "", "AddCloud", &args, nil); err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	return nil
+func (c Connection) AddCloud(tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
+	cloudAPI := cloudapi.NewClient(&c)
+	return cloudAPI.AddCloud(cloud, force)
 }
 
 // RemoveCloud removes the given cloud from the controller. RemoveCloud
 // uses the RemoveClouds procedure on the Cloud facade.
-func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
-	const op = errors.Op("jujuclient.RemoveCloud")
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: tag.String(),
-		}},
-	}
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 2}, "", "RemoveClouds", &args, &resp); err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
-	}
-	return nil
-}
-
-// GrantCloudAccess gives the given user the given access level on the
-// given cloud. GrantCloudAccess uses the ModifyCloudAccess procedure on
-// the Cloud facade.
-func (c Connection) GrantCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
-	const op = errors.Op("jujuclient.GrantCloudAccess")
-	args := jujuparams.ModifyCloudAccessRequest{
-		Changes: []jujuparams.ModifyCloudAccess{{
-			UserTag:  userTag.String(),
-			Action:   jujuparams.GrantCloudAccess,
-			Access:   access,
-			CloudTag: cloudTag.String(),
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "ModifyCloudAccess", &args, &resp)
-	if err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
-	}
-	return nil
-}
-
-// RevokeCloudAccess revokes the given access level on the given cloud from
-// the given user. RevokeCloudAccess uses the ModifyCloudAccess procedure
-// on the Cloud facade.
-func (c Connection) RevokeCloudAccess(ctx context.Context, cloudTag names.CloudTag, userTag names.UserTag, access string) error {
-	const op = errors.Op("jujuclient.RevokeCloudAccess")
-	args := jujuparams.ModifyCloudAccessRequest{
-		Changes: []jujuparams.ModifyCloudAccess{{
-			UserTag:  userTag.String(),
-			Action:   jujuparams.RevokeCloudAccess,
-			Access:   access,
-			CloudTag: cloudTag.String(),
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 3}, "", "ModifyCloudAccess", &args, &resp)
-	if err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
-	}
-	return nil
-}
-
-// CloudInfo retrieves information about the cloud with the given name.
-// CloudInfo uses the CloudInfo procedure on the Cloud facade.
-func (c Connection) CloudInfo(ctx context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
-	const op = errors.Op("jujuclient.CloudInfo")
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{Tag: tag.String()}},
-	}
-
-	resp := jujuparams.CloudInfoResults{
-		Results: []jujuparams.CloudInfoResult{{
-			Result: ci,
-		}},
-	}
-	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 2}, "", "CloudInfo", &args, &resp)
-	if err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
-	}
-	return nil
+func (c Connection) RemoveCloud(tag names.CloudTag) error {
+	cloudAPI := cloudapi.NewClient(&c)
+	return cloudAPI.RemoveCloud(tag.Id())
 }
 
 // UpdateCloud updates the given cloud with the given cloud definition.
 // UpdateCloud uses the UpdateCloud procedure on the cloud facade.
-func (c Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujuparams.Cloud) error {
-	const op = errors.Op("jujuclient.UpdateCloud")
-
-	args := jujuparams.UpdateCloudArgs{
-		Clouds: []jujuparams.AddCloudArgs{{
-			Cloud: cloud,
-			Name:  tag.Id(),
-		}},
-	}
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7, 4}, "", "UpdateCloud", &args, &resp)
-	if err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(op, resp.Results[0].Error)
-	}
-	return nil
+func (c Connection) UpdateCloud(tag names.CloudTag, cloud jujucloud.Cloud) error {
+	cloudAPI := cloudapi.NewClient(&c)
+	return cloudAPI.UpdateCloud(cloud)
 }

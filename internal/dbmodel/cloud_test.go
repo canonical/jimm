@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
@@ -136,14 +137,14 @@ func TestToJujuCloud(t *testing.T) {
 func TestFromJujuCloud(t *testing.T) {
 	c := qt.New(t)
 
-	jcld := jujuparams.Cloud{
+	jcld := jujucloud.Cloud{
 		Type:             "test-provider",
 		HostCloudRegion:  "test-cloud/test-region",
-		AuthTypes:        []string{"empty"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType},
 		Endpoint:         "https://cloud.example.com",
 		IdentityEndpoint: "https://identity.cloud.example.com",
 		StorageEndpoint:  "https://storage.cloud.example.com",
-		Regions: []jujuparams.CloudRegion{{
+		Regions: []jujucloud.Region{{
 			Name:             "test-region",
 			Endpoint:         "https://region.example.com",
 			IdentityEndpoint: "https://identity.region.example.com",
@@ -155,7 +156,7 @@ func TestFromJujuCloud(t *testing.T) {
 			"k2": "A",
 			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
 		},
-		RegionConfig: map[string]map[string]interface{}{
+		RegionConfig: jujucloud.RegionConfig{
 			"test-region": {
 				"k1": float64(2),
 				"k2": "B",

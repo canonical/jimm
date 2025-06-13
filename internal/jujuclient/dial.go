@@ -181,7 +181,6 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		dialer:             d,
 		ctl:                ctl,
 		mt:                 modelTag,
-		redialCount:        new(atomic.Int32),
 	}, nil
 }
 
@@ -235,11 +234,10 @@ type Connection struct {
 	monitorC chan struct{}
 	broken   *uint32
 
-	dialer      *Dialer
-	user        *openfga.User
-	redialCount *atomic.Int32
-	ctl         *dbmodel.Controller
-	mt          names.ModelTag
+	dialer *Dialer
+	user   *openfga.User
+	ctl    *dbmodel.Controller
+	mt     names.ModelTag
 }
 
 // Close closes the connection.
@@ -266,41 +264,6 @@ func (c *Connection) hasFacadeVersion(facade string, version int) bool {
 	return c.facadeVersions[fmt.Sprintf("%s\x1f%d", facade, version)]
 }
 
-func (c *Connection) redial(ctx context.Context, requiredPermissions map[string]string) error {
-	const op = errors.Op("jujuclient.redial")
-
-	dialCount := c.redialCount.Add(1)
-	if dialCount > 10 {
-		return errors.E(op, "dial count exceeded")
-	}
-
-	// redial is called when juju returns a "permission required" error so we
-	// must check if the user has required permissions and dial again.
-	grantedPermission := make(map[string]string)
-	for resource, permission := range requiredPermissions {
-		err := c.user.CheckPermission(ctx, resource, permission)
-		if err != nil {
-			return err
-		}
-		grantedPermission[resource] = permission
-	}
-
-	api, err := c.dialer.Dial(ctx, c.ctl, c.mt, c.user, grantedPermission)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	if err = c.Close(); err != nil {
-		return errors.E(op, err)
-	}
-	conn := api.(*Connection)
-	c.client = conn.client
-	c.user = conn.user
-	c.facadeVersions = conn.facadeVersions
-	c.monitorC = conn.monitorC
-	c.broken = conn.broken
-	return nil
-}
-
 // Call makes an RPC call to the server. Call sends the request message to
 // the server and waits for the response to be returned or the context to
 // be canceled.
@@ -315,26 +278,6 @@ func (c *Connection) Call(ctx context.Context, facade string, version int, id, m
 
 	err = c.client.Call(ctx, facade, version, id, method, args, resp)
 	if err != nil {
-		if rpcErr, ok := err.(*rpc.Error); ok {
-			// if we get a permission check required error, we redial the controller
-			// and amend permissions to include any required permissions as
-			// JIMM should be allowed to access anything in the JIMM system.
-			if rpcErr.Code == rpc.PermissionCheckRequiredErrorCode {
-				requiredPermissions := make(map[string]string)
-				for k, v := range rpcErr.Info {
-					vString, ok := v.(string)
-					if !ok {
-						return errors.E(fmt.Sprintf("expected %T, received %T", vString, v))
-					}
-					requiredPermissions[k] = vString
-				}
-				if err = c.redial(ctx, requiredPermissions); err != nil {
-					return err
-				}
-
-				return c.Call(ctx, facade, version, id, method, args, resp)
-			}
-		}
 		return err
 	}
 	return nil

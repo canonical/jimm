@@ -159,7 +159,8 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 	if req.Force != nil && *req.Force {
 		force = true
 	}
-	if err := r.jimm.JujuManager().AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), req.Cloud, force); err != nil {
+	cloud := cloudFromParams(req.Name, req.Cloud)
+	if err := r.jimm.JujuManager().AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), cloud, force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil

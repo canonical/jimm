@@ -210,7 +210,7 @@ func (r *controllerRoot) AddCloud(ctx context.Context, args jujuparams.AddCloudA
 	if args.Force != nil && *args.Force {
 		force = true
 	}
-	if err := r.jimm.JujuManager().AddHostedCloud(ctx, r.user, names.NewCloudTag(args.Name), args.Cloud, force); err != nil {
+	if err := r.jimm.JujuManager().AddHostedCloud(ctx, r.user, names.NewCloudTag(args.Name), cloudFromParams(args.Name, args.Cloud), force); err != nil {
 		return errors.E(op, err)
 	}
 	return nil

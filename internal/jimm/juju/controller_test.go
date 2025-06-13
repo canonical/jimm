@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/controller/controller"
+	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -36,15 +37,15 @@ func TestAddController(t *testing.T) {
 	c := qt.New(t)
 
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
-			clouds := map[names.CloudTag]jujuparams.Cloud{
+		Clouds_: func() (map[names.CloudTag]jujucloud.Cloud, error) {
+			clouds := map[names.CloudTag]jujucloud.Cloud{
 				names.NewCloudTag("aws"): {
 					Type:             "ec2",
-					AuthTypes:        []string{"userpass"},
+					AuthTypes:        jujucloud.AuthTypes{jujucloud.UserPassAuthType},
 					Endpoint:         "https://example.com",
 					IdentityEndpoint: "https://identity.example.com",
 					StorageEndpoint:  "https://storage.example.com",
-					Regions: []jujuparams.CloudRegion{{
+					Regions: []jujucloud.Region{{
 						Name:             "eu-west-1",
 						Endpoint:         "https://eu-west-1.example.com",
 						IdentityEndpoint: "https://eu-west-1.identity.example.com",
@@ -60,7 +61,7 @@ func TestAddController(t *testing.T) {
 						"A": "a",
 						"B": 0xb,
 					},
-					RegionConfig: map[string]map[string]interface{}{
+					RegionConfig: jujucloud.RegionConfig{
 						"eu-west-1": {
 							"B": 0xb0,
 							"C": "C",
@@ -73,38 +74,14 @@ func TestAddController(t *testing.T) {
 				},
 				names.NewCloudTag("k8s"): {
 					Type:      "kubernetes",
-					AuthTypes: []string{"userpass"},
+					AuthTypes: jujucloud.AuthTypes{jujucloud.UserPassAuthType},
 					Endpoint:  "https://k8s.example.com",
-					Regions: []jujuparams.CloudRegion{{
+					Regions: []jujucloud.Region{{
 						Name: "default",
 					}},
 				},
 			}
 			return clouds, nil
-		},
-		CloudInfo_: func(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
-			if tag.Id() != "k8s" {
-				c.Errorf("CloudInfo called for unexpected cloud %q", tag)
-				return errors.E("unexpected cloud")
-			}
-			ci.Type = "kubernetes"
-			ci.AuthTypes = []string{"userpass"}
-			ci.Endpoint = "https://k8s.example.com"
-			ci.Regions = []jujuparams.CloudRegion{{
-				Name: "default",
-			}}
-			// TODO(Kian) We can remove these returned users, we ignore them when importing a
-			// controller into JIMM.
-			ci.Users = []jujuparams.CloudUserInfo{{
-				UserName:    "alice@canonical.com",
-				DisplayName: "Alice",
-				Access:      "admin",
-			}, {
-				UserName:    "bob@canonical.com",
-				DisplayName: "Bob",
-				Access:      "add-model",
-			}}
-			return nil
 		},
 		ControllerModelSummary_: func(_ context.Context, ms *jujuparams.ModelSummary) error {
 			ms.Name = "controller"
@@ -180,25 +157,15 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 	c := qt.New(t)
 
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
-			clouds := map[names.CloudTag]jujuparams.Cloud{
+		Clouds_: func() (map[names.CloudTag]jujucloud.Cloud, error) {
+			clouds := map[names.CloudTag]jujucloud.Cloud{
 				names.NewCloudTag("k8s"): {
 					Type:      "kubernetes",
-					AuthTypes: []string{"userpass"},
+					AuthTypes: jujucloud.AuthTypes{jujucloud.UserPassAuthType},
 					Endpoint:  "https://k8s.example.com",
 				},
 			}
 			return clouds, nil
-		},
-		CloudInfo_: func(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
-			if tag.Id() != "k8s" {
-				c.Errorf("CloudInfo called for unexpected cloud %q", tag)
-				return errors.E("unexpected cloud")
-			}
-			ci.Type = "kubernetes"
-			ci.AuthTypes = []string{"userpass"}
-			ci.Endpoint = "https://k8s.example.com"
-			return nil
 		},
 		ControllerModelSummary_: func(_ context.Context, ms *jujuparams.ModelSummary) error {
 			ms.Name = "controller"
@@ -281,15 +248,15 @@ func TestAddControllerWithVault(t *testing.T) {
 	}
 
 	api := &jimmtest.API{
-		Clouds_: func(context.Context) (map[names.CloudTag]jujuparams.Cloud, error) {
-			clouds := map[names.CloudTag]jujuparams.Cloud{
+		Clouds_: func() (map[names.CloudTag]jujucloud.Cloud, error) {
+			clouds := map[names.CloudTag]jujucloud.Cloud{
 				names.NewCloudTag("aws"): {
 					Type:             "ec2",
-					AuthTypes:        []string{"userpass"},
+					AuthTypes:        jujucloud.AuthTypes{jujucloud.UserPassAuthType},
 					Endpoint:         "https://example.com",
 					IdentityEndpoint: "https://identity.example.com",
 					StorageEndpoint:  "https://storage.example.com",
-					Regions: []jujuparams.CloudRegion{{
+					Regions: []jujucloud.Region{{
 						Name:             "eu-west-1",
 						Endpoint:         "https://eu-west-1.example.com",
 						IdentityEndpoint: "https://eu-west-1.identity.example.com",
@@ -305,7 +272,7 @@ func TestAddControllerWithVault(t *testing.T) {
 						"A": "a",
 						"B": 0xb,
 					},
-					RegionConfig: map[string]map[string]interface{}{
+					RegionConfig: jujucloud.RegionConfig{
 						"eu-west-1": {
 							"B": 0xb0,
 							"C": "C",
@@ -318,38 +285,14 @@ func TestAddControllerWithVault(t *testing.T) {
 				},
 				names.NewCloudTag("k8s"): {
 					Type:      "kubernetes",
-					AuthTypes: []string{"userpass"},
+					AuthTypes: jujucloud.AuthTypes{jujucloud.UserPassAuthType},
 					Endpoint:  "https://k8s.example.com",
-					Regions: []jujuparams.CloudRegion{{
+					Regions: []jujucloud.Region{{
 						Name: "default",
 					}},
 				},
 			}
 			return clouds, nil
-		},
-		CloudInfo_: func(_ context.Context, tag names.CloudTag, ci *jujuparams.CloudInfo) error {
-			if tag.Id() != "k8s" {
-				c.Errorf("CloudInfo called for unexpected cloud %q", tag)
-				return errors.E("unexpected cloud")
-			}
-			ci.Type = "kubernetes"
-			ci.AuthTypes = []string{"userpass"}
-			ci.Endpoint = "https://k8s.example.com"
-			ci.Regions = []jujuparams.CloudRegion{{
-				Name: "default",
-			}}
-			// TODO(Kian) We can remove these returned users, we ignore them when importing a
-			// controller into JIMM.
-			ci.Users = []jujuparams.CloudUserInfo{{
-				UserName:    "alice@canonical.com",
-				DisplayName: "Alice",
-				Access:      "admin",
-			}, {
-				UserName:    "bob@canonical.com",
-				DisplayName: "Bob",
-				Access:      "add-model",
-			}}
-			return nil
 		},
 		ControllerModelSummary_: func(_ context.Context, ms *jujuparams.ModelSummary) error {
 			ms.Name = "controller"

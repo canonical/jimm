@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	jujuparams "github.com/juju/juju/rpc/params"
+	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -349,48 +349,44 @@ users:
 `
 
 var addHostedCloudTests = []struct {
-	name             string
-	dialError        error
-	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
-	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
-	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
-	username         string
-	cloudName        string
-	cloud            jujuparams.Cloud
-	expectCloud      dbmodel.Cloud
-	expectError      string
-	expectErrorCode  errors.Code
+	name            string
+	dialError       error
+	addCloud        func(names.CloudTag, jujucloud.Cloud, bool) error
+	cloud_          func(names.CloudTag, *jujucloud.Cloud) error
+	username        string
+	cloudName       string
+	cloud           jujucloud.Cloud
+	expectCloud     dbmodel.Cloud
+	expectError     string
+	expectErrorCode errors.Code
 }{{
 	name: "Success",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
-		return nil
-	},
-	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-provider/test-region"
-		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
 		cld.Endpoint = "https://example.com"
 		cld.IdentityEndpoint = "https://example.com/identity"
 		cld.StorageEndpoint = "https://example.com/storage"
-		cld.Regions = []jujuparams.CloudRegion{{
+		cld.Regions = []jujucloud.Region{{
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
 		cld.Config = map[string]interface{}{"A": "a"}
-		cld.RegionConfig = map[string]map[string]interface{}{
+		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
 		return nil
 	},
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -421,35 +417,32 @@ var addHostedCloudTests = []struct {
 	},
 }, {
 	name: "Success - with cloud name and region",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
-		return nil
-	},
-	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-cloud/test-region"
-		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
 		cld.Endpoint = "https://example.com"
 		cld.IdentityEndpoint = "https://example.com/identity"
 		cld.StorageEndpoint = "https://example.com/storage"
-		cld.Regions = []jujuparams.CloudRegion{{
+		cld.Regions = []jujucloud.Region{{
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
 		cld.Config = map[string]interface{}{"A": "a"}
-		cld.RegionConfig = map[string]map[string]interface{}{
+		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
 		return nil
 	},
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-cloud/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -480,35 +473,32 @@ var addHostedCloudTests = []struct {
 	},
 }, {
 	name: "Success - with cloud name",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
-		return nil
-	},
-	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-cloud/test-region"
-		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
 		cld.Endpoint = "https://example.com"
 		cld.IdentityEndpoint = "https://example.com/identity"
 		cld.StorageEndpoint = "https://example.com/storage"
-		cld.Regions = []jujuparams.CloudRegion{{
+		cld.Regions = []jujucloud.Region{{
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
 		cld.Config = map[string]interface{}{"A": "a"}
-		cld.RegionConfig = map[string]map[string]interface{}{
+		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
 		return nil
 	},
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-cloud",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -541,10 +531,10 @@ var addHostedCloudTests = []struct {
 	name:      "CloudWithReservedName",
 	username:  "bob@canonical.com",
 	cloudName: "aws",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -555,10 +545,10 @@ var addHostedCloudTests = []struct {
 	name:      "ExistingCloud",
 	username:  "bob@canonical.com",
 	cloudName: "existing-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -569,10 +559,10 @@ var addHostedCloudTests = []struct {
 	name:      "InvalidCloudType",
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "ec2",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -583,10 +573,10 @@ var addHostedCloudTests = []struct {
 	name:      "HostCloudRegionNotFound",
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "ec2/default",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -597,10 +587,10 @@ var addHostedCloudTests = []struct {
 	name:      "InvalidHostCloudRegion",
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "ec2/eu-central-1/2",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -611,10 +601,10 @@ var addHostedCloudTests = []struct {
 	name:      "HostCloudIsHosted",
 	username:  "alice@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "kubernetes/default",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -626,10 +616,10 @@ var addHostedCloudTests = []struct {
 	dialError: errors.E("dial error"),
 	username:  "alice@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -637,15 +627,15 @@ var addHostedCloudTests = []struct {
 	expectError: `dial error`,
 }, {
 	name: "AddCloudError",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
 	username:  "alice@canonical.com",
 	cloudName: "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -661,9 +651,8 @@ func TestAddHostedCloud(t *testing.T) {
 			ctx := context.Background()
 
 			api := &jimmtest.API{
-				AddCloud_:         test.addCloud,
-				GrantCloudAccess_: test.grantCloudAccess,
-				Cloud_:            test.cloud_,
+				AddCloud_: test.addCloud,
+				Cloud_:    test.cloud_,
 			}
 			dialer := &jimmtest.Dialer{
 				Err: test.dialError,
@@ -704,39 +693,35 @@ func TestAddHostedCloud(t *testing.T) {
 }
 
 var addHostedCloudToControllerTests = []struct {
-	name             string
-	dialError        error
-	addCloud         func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error
-	grantCloudAccess func(context.Context, names.CloudTag, names.UserTag, string) error
-	cloud_           func(context.Context, names.CloudTag, *jujuparams.Cloud) error
-	username         string
-	controllerName   string
-	cloudName        string
-	cloud            jujuparams.Cloud
-	expectCloud      dbmodel.Cloud
-	expectError      string
-	expectErrorCode  errors.Code
+	name            string
+	dialError       error
+	addCloud        func(names.CloudTag, jujucloud.Cloud, bool) error
+	cloud_          func(names.CloudTag, *jujucloud.Cloud) error
+	username        string
+	controllerName  string
+	cloudName       string
+	cloud           jujucloud.Cloud
+	expectCloud     dbmodel.Cloud
+	expectError     string
+	expectErrorCode errors.Code
 }{{
 	name: "Success",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
-		return nil
-	},
-	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
 		cld.Type = "maas"
 		cld.HostCloudRegion = "test-provider/test-region"
-		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
 		cld.Endpoint = "https://example.com"
 		cld.IdentityEndpoint = "https://example.com/identity"
 		cld.StorageEndpoint = "https://example.com/storage"
-		cld.Regions = []jujuparams.CloudRegion{{
+		cld.Regions = []jujucloud.Region{{
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
 		cld.Config = map[string]interface{}{"A": "a"}
-		cld.RegionConfig = map[string]map[string]interface{}{
+		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
 		return nil
@@ -744,9 +729,9 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "maas",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -777,25 +762,22 @@ var addHostedCloudToControllerTests = []struct {
 	},
 }, {
 	name: "Controller not found",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	grantCloudAccess: func(context.Context, names.CloudTag, names.UserTag, string) error {
-		return nil
-	},
-	cloud_: func(_ context.Context, _ names.CloudTag, cld *jujuparams.Cloud) error {
+	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-provider/test-region"
-		cld.AuthTypes = []string{"empty", "userpass"}
+		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
 		cld.Endpoint = "https://example.com"
 		cld.IdentityEndpoint = "https://example.com/identity"
 		cld.StorageEndpoint = "https://example.com/storage"
-		cld.Regions = []jujuparams.CloudRegion{{
+		cld.Regions = []jujucloud.Region{{
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
 		cld.Config = map[string]interface{}{"A": "a"}
-		cld.RegionConfig = map[string]map[string]interface{}{
+		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
 		return nil
@@ -803,10 +785,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "no-such-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -818,10 +800,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "aws",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -833,10 +815,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "ec2/default",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -848,10 +830,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "ec2",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -863,10 +845,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider3/test-region-3",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -878,10 +860,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "kubernetes/default",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -894,10 +876,10 @@ var addHostedCloudToControllerTests = []struct {
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -905,16 +887,16 @@ var addHostedCloudToControllerTests = []struct {
 	expectError: `dial error`,
 }, {
 	name: "AddCloudError",
-	addCloud: func(context.Context, names.CloudTag, jujuparams.Cloud, bool) error {
+	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return errors.E("addcloud error")
 	},
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
 	cloudName:      "new-cloud",
-	cloud: jujuparams.Cloud{
+	cloud: jujucloud.Cloud{
 		Type:             "kubernetes",
 		HostCloudRegion:  "test-provider/test-region",
-		AuthTypes:        []string{"empty", "userpass"},
+		AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 		Endpoint:         "https://example.com",
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
@@ -930,9 +912,8 @@ func TestAddCloudToController(t *testing.T) {
 			ctx := context.Background()
 
 			api := &jimmtest.API{
-				AddCloud_:         test.addCloud,
-				GrantCloudAccess_: test.grantCloudAccess,
-				Cloud_:            test.cloud_,
+				AddCloud_: test.addCloud,
+				Cloud_:    test.cloud_,
 			}
 
 			dialer := &jimmtest.Dialer{
@@ -1007,7 +988,7 @@ controllers:
 var removeCloudTests = []struct {
 	name            string
 	env             string
-	removeCloud     func(context.Context, names.CloudTag) error
+	removeCloud     func(names.CloudTag) error
 	dialError       error
 	username        string
 	cloud           string
@@ -1022,7 +1003,7 @@ var removeCloudTests = []struct {
 }, {
 	name: "Success",
 	env:  removeCloudTestEnv,
-	removeCloud: func(_ context.Context, ct names.CloudTag) error {
+	removeCloud: func(ct names.CloudTag) error {
 		if ct.Id() != "test" {
 			return errors.E("bad cloud tag")
 		}
@@ -1047,7 +1028,7 @@ var removeCloudTests = []struct {
 }, {
 	name: "APIError",
 	env:  removeCloudTestEnv,
-	removeCloud: func(_ context.Context, mt names.CloudTag) error {
+	removeCloud: func(mt names.CloudTag) error {
 		return errors.E("test error")
 	},
 	username:    "alice@canonical.com",
@@ -1133,11 +1114,11 @@ users:
 var updateCloudTests = []struct {
 	name            string
 	env             string
-	updateCloud     func(context.Context, names.CloudTag, jujuparams.Cloud) error
+	updateCloud     func(names.CloudTag, jujucloud.Cloud) error
 	dialError       error
 	username        string
 	cloud           string
-	update          jujuparams.Cloud
+	update          jujucloud.Cloud
 	expectError     string
 	expectErrorCode errors.Code
 	expectCloud     dbmodel.Cloud
@@ -1153,7 +1134,7 @@ var updateCloudTests = []struct {
 			{
 					name: "SuccessPublicCloud",
 					env:  updateCloudTestEnv,
-					updateCloud: func(_ context.Context, ct names.CloudTag, c jujuparams.Cloud) error {
+					updateCloud: func(_ context.Context, ct names.CloudTag, c jujucloud.Cloud) error {
 						if ct.Id() != "test-cloud" {
 							return errors.E("bad cloud tag")
 						}
@@ -1161,13 +1142,13 @@ var updateCloudTests = []struct {
 					},
 					username: "alice@canonical.com",
 					cloud:    "test-cloud",
-					update: jujuparams.Cloud{
+					update: jujucloud.Cloud{
 						Type:             "test-provider",
-						AuthTypes:        []string{"empty", "userpass"},
+						AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 						Endpoint:         "https://example.com",
 						IdentityEndpoint: "https://identity.example.com",
 						StorageEndpoint:  "https://storage.example.com",
-						Regions: []jujuparams.CloudRegion{{
+						Regions: []jujucloud.Region{{
 							Name:             "test-cloud-region",
 							Endpoint:         "https://region.example.com",
 							IdentityEndpoint: "https://identity.region.example.com",
@@ -1220,7 +1201,7 @@ var updateCloudTests = []struct {
 	{
 		name: "SuccessHostedCloud",
 		env:  updateCloudTestEnv,
-		updateCloud: func(_ context.Context, ct names.CloudTag, c jujuparams.Cloud) error {
+		updateCloud: func(ct names.CloudTag, c jujucloud.Cloud) error {
 			if ct.Id() != "test" {
 				return errors.E("bad cloud tag")
 			}
@@ -1228,14 +1209,14 @@ var updateCloudTests = []struct {
 		},
 		username: "bob@canonical.com",
 		cloud:    "test",
-		update: jujuparams.Cloud{
+		update: jujucloud.Cloud{
 			Type:             "kubernetes",
 			HostCloudRegion:  "test-cloud/test-cloud-region",
-			AuthTypes:        []string{"empty", "userpass"},
+			AuthTypes:        jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType},
 			Endpoint:         "https://k8s.example.com",
 			IdentityEndpoint: "https://k8s.identity.example.com",
 			StorageEndpoint:  "https://k8s.storage.example.com",
-			Regions: []jujuparams.CloudRegion{{
+			Regions: []jujucloud.Region{{
 				Name: "default",
 			}},
 		},
@@ -1277,7 +1258,7 @@ var updateCloudTests = []struct {
 	}, {
 		name: "APIError",
 		env:  updateCloudTestEnv,
-		updateCloud: func(context.Context, names.CloudTag, jujuparams.Cloud) error {
+		updateCloud: func(names.CloudTag, jujucloud.Cloud) error {
 			return errors.E("test error")
 		},
 		username:    "alice@canonical.com",
@@ -1387,7 +1368,7 @@ controllers:
 var removeCloudFromControllerTests = []struct {
 	name            string
 	env             string
-	removeCloud     func(context.Context, names.CloudTag) error
+	removeCloud     func(names.CloudTag) error
 	dialError       error
 	username        string
 	cloud           string
@@ -1405,7 +1386,7 @@ var removeCloudFromControllerTests = []struct {
 }, {
 	name: "Success - with other controllers for the cloud",
 	env:  removeCloudFromControllerTestEnv,
-	removeCloud: func(_ context.Context, ct names.CloudTag) error {
+	removeCloud: func(ct names.CloudTag) error {
 		if ct.Id() != "test" {
 			return errors.E("bad cloud tag")
 		}
@@ -1429,7 +1410,7 @@ var removeCloudFromControllerTests = []struct {
 }, {
 	name: "Success - the only controller for the cloud",
 	env:  removeCloudFromControllerTestEnv,
-	removeCloud: func(_ context.Context, ct names.CloudTag) error {
+	removeCloud: func(ct names.CloudTag) error {
 		if ct.Id() != "test-cloud-2" {
 			return errors.E("bad cloud tag")
 		}
@@ -1464,7 +1445,7 @@ var removeCloudFromControllerTests = []struct {
 }, {
 	name: "APIError",
 	env:  removeCloudFromControllerTestEnv,
-	removeCloud: func(_ context.Context, mt names.CloudTag) error {
+	removeCloud: func(mt names.CloudTag) error {
 		return errors.E("test error")
 	},
 	username:       "alice@canonical.com",

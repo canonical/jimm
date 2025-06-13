@@ -10,6 +10,7 @@ import (
 
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/controller/controller"
+	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -44,7 +45,7 @@ var (
 
 // convertJujuCloudsToDbClouds converts all of the incoming Juju clouds (from a map) into
 // a slice of dbmodel Clouds.
-func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujuparams.Cloud) []dbmodel.Cloud {
+func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujucloud.Cloud) []dbmodel.Cloud {
 	var dbClouds []dbmodel.Cloud
 	for tag, cld := range clouds {
 		var cloud dbmodel.Cloud
@@ -246,7 +247,7 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 	ctl.CloudRegion = modelSummary.CloudRegion
 	// TODO(mhilton) add the controller model?
 
-	clouds, err := api.Clouds(ctx)
+	clouds, err := api.Clouds()
 	if err != nil {
 		return errors.E(op, err, "failed to fetch controller clouds")
 	}
