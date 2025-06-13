@@ -9,6 +9,7 @@ import (
 
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
+	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -47,6 +48,37 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 	err = api.Prechecks(model)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to run pre-checks for migration: %w", err))
+	}
+	return nil
+}
+
+// AdoptResources adopts resources from a model with the given UUID
+// and controller version. This is used to adopt resources from a
+// model that is being migrated. It calls the method of the same name
+// on the target Juju controller.
+func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error {
+	const op = errors.Op("jimm.AdoptResources")
+
+	modelMigration := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to get model migration for model %q: %w", modelUUID, err))
+	}
+
+	api, err := j.dialController(ctx, &modelMigration.TargetController)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+	}
+	defer api.Close()
+
+	err = api.AdoptResources(modelUUID, sourceControllerVersion)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to adopt resources: %w", err))
 	}
 	return nil
 }

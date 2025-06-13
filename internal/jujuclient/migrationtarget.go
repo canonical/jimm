@@ -1,8 +1,13 @@
+// Copyright 2025 Canonical.
+
 package jujuclient
 
 import (
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
+	"github.com/juju/version/v2"
 )
 
 // PreChecks checks that the target controller is able to accept the
@@ -10,4 +15,24 @@ import (
 func (c Connection) Prechecks(model migration.ModelInfo) error {
 	migrationTarget := migrationtarget.NewClient(&c)
 	return migrationTarget.Prechecks(model)
+}
+
+// AdoptResources asks the cloud provider to update the controller
+// tags for a model's resources. This prevents the resources from
+// being destroyed if the source controller is destroyed after the
+// model is migrated away.
+//
+// Note that we can't use the migrationTarget client here because it
+// fetches the SourceControllerVersion from a global var based on the
+// Juju version we are using, which doesn't work for JIMM since we
+// want to use the controller version that was passed to us.
+func (c Connection) AdoptResources(modelUUID string, controllerVersion version.Number) error {
+	args := jujuparams.AdoptResourcesArgs{
+		ModelTag:                names.NewModelTag(modelUUID).String(),
+		SourceControllerVersion: controllerVersion,
+	}
+	if err := c.CallHighestFacadeVersion(c.Context(), "MigrationTarget", []int{1, 2, 3, 4}, "", "AdoptResources", &args, nil); err != nil {
+		return err
+	}
+	return nil
 }

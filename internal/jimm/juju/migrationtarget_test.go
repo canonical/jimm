@@ -143,6 +143,60 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
+func TestAdoptResources_Success(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	modelUUID := "00000001-0000-0000-0000-000000000001"
+	controllerVersion := version.MustParse("3.2.1")
+
+	// Validate that the API request to Juju is made with a modified version
+	// of the model description, where the owner is replaced with an external user.
+	api := &jimmtest.API{
+		AdoptResources_: func(uuid string, v version.Number) error {
+			c.Check(uuid, qt.Equals, modelUUID)
+			c.Check(v, qt.DeepEquals, controllerVersion)
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	err = j.AdoptResources(ctx, user, modelUUID, controllerVersion)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestAdoptResources_NoIncomingModelMigration(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	err := j.AdoptResources(ctx, user, "foo", version.MustParse("3.2.1"))
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+}
+
 func newIncomingMigration(userMap map[string]string, ctl dbmodel.Controller) dbmodel.IncomingModelMigration {
 	return dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{

@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/juju/juju/core/migration"
+	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
@@ -31,9 +32,11 @@ func init() {
 	facadeInit["MigrationTarget"] = func(r *controllerRoot) []int {
 		preChecks := rpc.Method(r.Prechecks)
 		caCert := rpc.Method(r.CACert)
+		adoptResources := rpc.Method(r.AdoptResources)
 
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 4, "CACert", caCert)
+		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
 
 		return []int{4}
 	}
@@ -54,6 +57,25 @@ func init() {
 // but doesn't actually require the result to have len() > 0, we can return an empty result.
 func (r *controllerRoot) CACert() (jujuparams.BytesResult, error) {
 	return jujuparams.BytesResult{}, nil
+}
+
+// AdoptResources implements the AdoptResources method of the MigrationTarget facade.
+// It is used by the source Juju controller to update the tags of the
+// resources of a model that has been migrated to a new controller.
+// This prevents the resources from being destroyed if the source controller
+// is destroyed after the model is migrated away.
+func (r *controllerRoot) AdoptResources(ctx context.Context, args params.AdoptResourcesArgs) error {
+	const op = errors.Op("jujuapi.AdoptResources")
+
+	if !r.user.JimmAdmin {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	modelTag, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return r.jimm.JujuManager().AdoptResources(ctx, r.user, modelTag.Id(), args.SourceControllerVersion)
 }
 
 // Prechecks implements the Prechecks method of the MigrationTarget facade.

@@ -14,6 +14,7 @@ import (
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -38,6 +39,11 @@ type API interface {
 
 	// AddCloud adds a new cloud.
 	AddCloud(names.CloudTag, jujucloud.Cloud, bool) error
+
+	// AdoptResources adopts resources from a model with the given UUID
+	// and controller version. This is used to adopt resources from a
+	// model that is being migrated.
+	AdoptResources(modelUUID string, controllerVersion version.Number) error
 
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
 	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error

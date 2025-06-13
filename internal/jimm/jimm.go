@@ -16,7 +16,7 @@ import (
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 
@@ -243,6 +243,7 @@ type JujuManager interface {
 	// in the order they are expected to be called.
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
 	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
+	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
 
 	// Other methods
 

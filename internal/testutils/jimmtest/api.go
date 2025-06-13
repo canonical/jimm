@@ -14,8 +14,9 @@ import (
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/juju/version"
+	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v5"
+	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -67,7 +68,7 @@ func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelT
 	}
 	ctl.AgentVersion = d.AgentVersion
 	if ctl.AgentVersion == "" {
-		ctl.AgentVersion = version.Current.String()
+		ctl.AgentVersion = jujuversion.Current.String()
 	}
 	ctl.Addresses = dbmodel.HostPorts(d.Addresses)
 	return apiWrapper{
@@ -125,6 +126,7 @@ type API struct {
 	base.APICaller
 
 	AddCloud_                          func(names.CloudTag, jujucloud.Cloud, bool) error
+	AdoptResources_                    func(modelUUID string, controllerVersion version.Number) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	Close_                             func() error
@@ -175,6 +177,13 @@ func (a *API) AddCloud(tag names.CloudTag, cld jujucloud.Cloud, force bool) erro
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.AddCloud_(tag, cld, force)
+}
+
+func (a *API) AdoptResources(modelUUID string, controllerVersion version.Number) error {
+	if a.AdoptResources_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.AdoptResources_(modelUUID, controllerVersion)
 }
 
 func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
