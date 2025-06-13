@@ -545,3 +545,11 @@ type VersionResponse struct {
 	Version string `json:"version" yaml:"version"`
 	Commit  string `json:"commit" yaml:"commit"`
 }
+
+// PrepareModelMigrationRequest holds the details to prepare JIMM
+// for a model migration.
+type PrepareModelMigrationRequest struct {
+	ModelTag             string            `json:"model-tag" yaml:"model-tag"`
+	TargetControllerName string            `json:"target-controller-name" yaml:"target-controller-name"`
+	UserMapping          map[string]string `json:"user-mapping" yaml:"user-mapping"`
+}

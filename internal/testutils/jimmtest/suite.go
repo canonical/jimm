@@ -4,6 +4,7 @@ package jimmtest
 
 import (
 	"context"
+	"database/sql"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -342,6 +343,29 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	c.Assert(err, gc.Equals, nil)
 
 	return names.NewModelTag(mi.UUID)
+}
+
+func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.ModelTag) {
+	ctx := context.Background()
+
+	// Call Juju DestroyModel API and set the model to dying state.
+	err := s.JIMM.JujuManager().DestroyModel(ctx, s.AdminUser, modelTag, nil, nil, nil, nil)
+	c.Assert(err, gc.Equals, nil)
+
+	// Remove the dying model from the database.
+	// This is required because the model will be deleted in JIMM's state only when it's finally
+	// removed from the backing controller and the cleanup routine runs.
+	// Sometimes we don't want to wait for that in tests.
+	model := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelTag.Id(),
+			Valid:  true,
+		},
+	}
+	err = s.JIMM.Database.GetModel(context.Background(), model)
+	c.Assert(err, gc.Equals, nil)
+	err = s.JIMM.Database.DeleteModel(context.Background(), model)
+	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {

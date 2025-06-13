@@ -59,19 +59,6 @@ func init() {
 	}
 }
 
-// RevokeCredentials implements the RevokeCredentials method used in
-// version 1 & 2 of the Cloud facade.
-func (r *controllerRoot) RevokeCredentials(ctx context.Context, args jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	creds := make([]jujuparams.RevokeCredentialArg, len(args.Entities))
-	for i, e := range args.Entities {
-		creds[i].Tag = e.Tag
-		creds[i].Force = true
-	}
-	return r.RevokeCredentialsCheckModels(ctx, jujuparams.RevokeCredentialArgs{
-		Credentials: creds,
-	})
-}
-
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.
 // It returns a default cloud if there is only one cloud available.
 func (r *controllerRoot) DefaultCloud(ctx context.Context) (jujuparams.StringResult, error) {
@@ -164,14 +151,14 @@ func (r *controllerRoot) RevokeCredentialsCheckModels(ctx context.Context, args 
 }
 
 // RevokeCredentials revokes a set of cloud credentials.
-func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, force bool) error {
+func (r *controllerRoot) revokeCredential(ctx context.Context, tag string, _ bool) error {
 	const op = errors.Op("jujuapi.RevokeCredentialsCheckModels")
 
 	ct, err := names.ParseCloudCredentialTag(tag)
 	if err != nil {
 		return errors.E(op, err, errors.CodeBadRequest)
 	}
-	if err := r.jimm.JujuManager().RevokeCloudCredential(ctx, r.user.Identity, ct, force); err != nil {
+	if err := r.jimm.JujuManager().RevokeCloudCredential(ctx, r.user.Identity, ct); err != nil {
 		return errors.E(op, err)
 	}
 	return nil

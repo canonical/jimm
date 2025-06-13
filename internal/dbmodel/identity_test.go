@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel_test
 
@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 func TestIdentity(t *testing.T) {
@@ -101,14 +102,12 @@ func TestIdentityCloudCredentials(t *testing.T) {
 	var creds []dbmodel.CloudCredential
 	err = db.Model(u).Association("CloudCredentials").Find(&creds)
 	c.Assert(err, qt.IsNil)
-	c.Check(creds, qt.DeepEquals, []dbmodel.CloudCredential{{
-		Model:             cred1.Model,
+	c.Assert(creds, jimmtest.DBObjectEquals, []dbmodel.CloudCredential{{
 		Name:              cred1.Name,
 		CloudName:         cred1.CloudName,
 		OwnerIdentityName: cred1.OwnerIdentityName,
 		AuthType:          cred1.AuthType,
 	}, {
-		Model:             cred2.Model,
 		Name:              cred2.Name,
 		CloudName:         cred2.CloudName,
 		OwnerIdentityName: cred2.OwnerIdentityName,

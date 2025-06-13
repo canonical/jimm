@@ -24,7 +24,7 @@ func TestModelMigration_UniqueModelUUIDConstraint(t *testing.T) {
 			Valid:  true,
 		},
 		TargetControllerID: ctl.ID,
-		UserMapping:        dbmodel.JSON([]byte(`{"local": "external"}`)),
+		UserMapping:        dbmodel.StringMap{"local": "external"},
 	}
 	c.Assert(db.Create(&m).Error, qt.IsNil)
 
@@ -34,7 +34,7 @@ func TestModelMigration_UniqueModelUUIDConstraint(t *testing.T) {
 			Valid:  true,
 		},
 		TargetControllerID: ctl.ID,
-		UserMapping:        dbmodel.JSON([]byte(`{"new-local": "new-external"}`)),
+		UserMapping:        dbmodel.StringMap{"local": "external"},
 	}
 	c.Assert(db.Create(&m2).Error, qt.ErrorMatches, ".*duplicate key value violates unique constraint \"incoming_model_migrations_model_uuid_key\".*")
 }

@@ -286,3 +286,55 @@ func (s *dbSuite) TestForEachCloudCredential(c *qt.C) {
 		})
 	}
 }
+
+func (s *dbSuite) TestDeleteCloudCredential(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	u, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region",
+		}},
+	}
+	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	cred := dbmodel.CloudCredential{
+		Name:              "test-cred",
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		AuthType:          "empty",
+	}
+	cred.Cloud.Regions = nil
+	err = s.Database.SetCloudCredential(context.Background(), &cred)
+	c.Assert(err, qt.Equals, nil)
+
+	cred.Cloud = cloud
+	cred.Cloud.Regions = nil
+
+	dbCred := dbmodel.CloudCredential{
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		Name:              cred.Name,
+	}
+	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(dbCred, jimmtest.DBObjectEquals, cred)
+
+	err = s.Database.DeleteCloudCredential(context.Background(), &cred)
+	c.Assert(err, qt.Equals, nil)
+
+	dbCred = dbmodel.CloudCredential{
+		CloudName:         cloud.Name,
+		OwnerIdentityName: u.Name,
+		Name:              cred.Name,
+	}
+	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
+	c.Assert(err, qt.ErrorMatches, `cloudcredential \S+ not found`)
+
+}

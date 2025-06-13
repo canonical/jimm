@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
@@ -511,7 +511,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	}})
 
 	mmclient := modelmanager.NewClient(conn)
-	_, err = mmclient.CreateModel("test", "test@canonical.com", jimmtest.TestCloudName, jimmtest.TestCloudRegionName, credTag, nil)
+	modelInfo, err := mmclient.CreateModel("test", "test@canonical.com", jimmtest.TestCloudName, jimmtest.TestCloudRegionName, credTag, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	var resp jujuparams.ErrorResults
@@ -525,10 +525,23 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
 
 	resp.Results = nil
+	// we don't support the force flag, so the test should fail again.
 	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
 		Credentials: []jujuparams.RevokeCredentialArg{{
 			Tag:   credTag.String(),
 			Force: true,
+		}},
+	}, &resp)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
+
+	s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(modelInfo.UUID))
+
+	resp.Results = nil
+	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
+		Credentials: []jujuparams.RevokeCredentialArg{{
+			Tag:   credTag.String(),
+			Force: false,
 		}},
 	}, &resp)
 	c.Assert(err, gc.Equals, nil)

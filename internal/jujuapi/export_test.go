@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi
 
@@ -34,7 +34,9 @@ func RunModelAccessWatcher(w *modelAccessWatcher) {
 	go w.loop()
 }
 
-func NewControllerRoot(j JIMM, p Params) *controllerRoot {
+type ControllerRoot = controllerRoot
+
+func NewControllerRoot(j JIMM, p Params) *ControllerRoot {
 	return newControllerRoot(j, p, "")
 }
 
