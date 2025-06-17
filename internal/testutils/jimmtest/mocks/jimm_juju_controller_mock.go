@@ -6,7 +6,7 @@ import (
 	"context"
 
 	jujucontroller "github.com/juju/juju/controller"
-	"github.com/juju/version"
+	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"

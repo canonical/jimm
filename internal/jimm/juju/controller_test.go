@@ -21,7 +21,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
-	semversion "github.com/juju/version"
+	semversion "github.com/juju/version/v2"
 	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
