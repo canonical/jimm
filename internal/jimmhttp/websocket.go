@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmhttp
 
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -49,7 +50,10 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ctx = context.WithValue(ctx, contextPathKey("path"), req.URL.EscapedPath())
+	ctx = context.WithValue(ctx, contextPathKey{}, req.URL.EscapedPath())
+	ctx = context.WithValue(ctx, migratingModelUUIDKey{}, req.Header.Get(jujuparams.MigrationModelHTTPHeader))
+	ctx = context.WithValue(ctx, clientVersionKey{}, req.Header.Get(jujuparams.JujuClientVersion))
+
 	conn, err := h.Upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		// If the upgrader returns an error it will have written an

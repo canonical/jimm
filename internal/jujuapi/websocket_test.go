@@ -69,6 +69,7 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.JIMM, s.Params)))
 	jwks := jimmhttp.NewWellKnownHandler(s.JIMM.CredentialStore)
 	mux.HandleFunc("/.well-known/jwks.json", jwks.JWKS)
+	mux.Handle("/migrate/logtransfer", jujuapi.LogTransferHandler(ctx, s.JIMM, s.Params))
 
 	s.APIHandler = mux
 	s.HTTP = httptest.NewTLSServer(s.APIHandler)

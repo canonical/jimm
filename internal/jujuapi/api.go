@@ -38,15 +38,24 @@ func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/{uuid}/api", &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
-		Server: &apiProxier{apiServer: apiServer{
+		Server: &apiModelProxier{apiServer: apiServer{
 			jimm: jimm,
 		}},
 	})
 	mux.Handle("/{uuid}/log", &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
-		Server: &streamProxier{apiServer: apiServer{
+		Server: &streamModelProxier{apiServer: apiServer{
 			jimm: jimm,
 		}},
 	})
 	return mux
+}
+
+func LogTransferHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
+	return &jimmhttp.WSHandler{
+		Upgrader: websocketUpgrader,
+		Server: &streamControllerProxier{apiServer: apiServer{
+			jimm: jimm,
+		}},
+	}
 }

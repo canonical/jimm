@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // Package errors contains types to help handle errors in the system.
 package errors
@@ -121,6 +121,7 @@ const (
 	CodeServerConfiguration          Code = "server configuration"
 	CodeStillAlive                   Code = apiparams.CodeStillAlive
 	CodeUnauthorized                 Code = jujuparams.CodeUnauthorized
+	CodeServerError                  Code = "server error"
 	CodeSessionTokenInvalid          Code = jujuparams.CodeSessionTokenInvalid
 	CodeUpgradeInProgress            Code = jujuparams.CodeUpgradeInProgress
 	CodeFailedToParseTupleKey        Code = "failed to parse tuple"

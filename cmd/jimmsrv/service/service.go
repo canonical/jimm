@@ -507,8 +507,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// HTTP Migration endpoints
 	mountHandler("/migrate", jimmhttp.NewMigrationHTTPProxyHandler(s.jimm))
 	// Log transfer endpoint
-	// TODO: Implement log transfer, this uses a websocket rather than HTTP.
-	// s.mux.Handle("/migrate/logtransfer", jimmhttp.NewHTTPProxyHandler(s.jimm).Routes())
+	s.mux.Handle("/migrate/logtransfer", jujuapi.LogTransferHandler(ctx, s.jimm, params))
 
 	// serve the ssh public key fingerprint
 	s.mux.Get("/ssh/public-key-fingerprints", jimmhttp.WriteFingerprints(p.HostKeyFingerprints))
