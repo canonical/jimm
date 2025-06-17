@@ -125,6 +125,7 @@ func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.M
 type API struct {
 	base.APICaller
 
+	Abort_                             func(modelUUID string) error
 	AddCloud_                          func(names.CloudTag, jujucloud.Cloud, bool) error
 	AdoptResources_                    func(modelUUID string, controllerVersion version.Number) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
@@ -170,6 +171,14 @@ type API struct {
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 	ListModels_                        func(ctx context.Context) ([]base.UserModel, error)
+}
+
+// Abort aborts the current operation on the controller.
+func (a *API) Abort(modelUUID string) error {
+	if a.Abort_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.Abort_(modelUUID)
 }
 
 func (a *API) AddCloud(tag names.CloudTag, cld jujucloud.Cloud, force bool) error {

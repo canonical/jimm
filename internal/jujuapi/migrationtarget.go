@@ -37,6 +37,7 @@ func init() {
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 4, "CACert", caCert)
 		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
+		r.AddMethod("MigrationTarget", 4, "Abort", adoptResources)
 
 		return []int{4}
 	}
@@ -57,6 +58,22 @@ func init() {
 // but doesn't actually require the result to have len() > 0, we can return an empty result.
 func (r *controllerRoot) CACert() (jujuparams.BytesResult, error) {
 	return jujuparams.BytesResult{}, nil
+}
+
+// Abort implements the Abort method of the MigrationTarget facade.
+// It is used by the source Juju controller to abort a model migration.
+func (r *controllerRoot) Abort(ctx context.Context, args params.ModelArgs) error {
+	const op = errors.Op("jujuapi.Abort")
+
+	if !r.user.JimmAdmin {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	modelTag, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return r.jimm.JujuManager().AbortMigration(ctx, r.user, modelTag.Id())
 }
 
 // AdoptResources implements the AdoptResources method of the MigrationTarget facade.
