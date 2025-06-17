@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc_test
 
@@ -28,8 +28,7 @@ func TestProxyHTTP(t *testing.T) {
 			w.WriteHeader(401)
 			return
 		}
-		_, err := w.Write([]byte("OK"))
-		c.Assert(err, qt.IsNil)
+		_, _ = w.Write([]byte("OK"))
 	}))
 	defer fakeController.Close()
 	controller := dbmodel.Controller{}
@@ -44,7 +43,6 @@ func TestProxyHTTP(t *testing.T) {
 		setup          func()
 		path           string
 		statusExpected int
-		errorMatches   string
 	}{
 		{
 			description: "good",
@@ -53,32 +51,32 @@ func TestProxyHTTP(t *testing.T) {
 				controller.PublicAddress = newURL.Host
 			},
 			statusExpected: http.StatusOK,
-		},
-		{
+		}, {
 			description: "controller no public address, only addresses",
 			setup: func() {
 				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
 				c.Assert(err, qt.Equals, nil)
+				hp.Scope = network.ScopePublic
 				controller.Addresses = append(make([][]jujuparams.HostPort, 0), []jujuparams.HostPort{{
 					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
 					Port:    hp.Port(),
 				}})
-				controller.Addresses = append(controller.Addresses, []jujuparams.HostPort{})
 				controller.PublicAddress = ""
 			},
 			statusExpected: http.StatusOK,
 		},
 		{
-			description: "controller no public address, only addresses",
+			description: "controller public address with unreachable alternatives",
 			setup: func() {
-				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
+				hp, err := network.ParseMachineHostPort("unreachable:61213")
 				c.Assert(err, qt.Equals, nil)
+				hp.Scope = network.ScopePublic
 				controller.Addresses = append(make([][]jujuparams.HostPort, 0), []jujuparams.HostPort{{
 					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
 					Port:    hp.Port(),
 				}})
-				controller.Addresses = append(controller.Addresses, []jujuparams.HostPort{})
-				controller.PublicAddress = ""
+
+				controller.PublicAddress = fakeController.Listener.Addr().String()
 			},
 			statusExpected: http.StatusOK,
 		},
@@ -97,23 +95,27 @@ func TestProxyHTTP(t *testing.T) {
 				controller.Addresses = nil
 				controller.PublicAddress = "localhost-not-found:61213"
 			},
-			errorMatches: "couldn't reach a valid address for controller",
+			statusExpected: http.StatusBadGateway,
 		},
 	}
 
 	for _, test := range tests {
-		test.setup()
-		req, err := http.NewRequest("POST", test.path, nil)
-		c.Assert(err, qt.IsNil)
-		recorder := httptest.NewRecorder()
-		err = rpc.ProxyHTTP(ctx, &controller, recorder, req)
-		if test.errorMatches == "" {
+		t.Run(test.description, func(t *testing.T) {
+			test.setup()
+			req, err := http.NewRequest("POST", test.path, nil)
 			c.Assert(err, qt.IsNil)
+			recorder := httptest.NewRecorder()
+
+			proxyInfo := rpc.ControllerProxy{
+				Controller: controller,
+				Username:   "test-user",
+				Password:   "test-password",
+			}
+			rpc.ProxyHTTP(ctx, proxyInfo, recorder, req)
+
 			resp := recorder.Result()
 			defer resp.Body.Close()
 			c.Assert(resp.StatusCode, qt.Equals, test.statusExpected)
-		} else {
-			c.Assert(err, qt.ErrorMatches, test.errorMatches)
-		}
+		})
 	}
 }

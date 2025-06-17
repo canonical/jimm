@@ -3,11 +3,10 @@
 package jimmhttp
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/juju/names/v4"
-	"gopkg.in/errgo.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/middleware"
@@ -55,7 +54,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 
 	modelUUID := chi.URLParam(req, "uuid")
 	if modelUUID == "" {
-		writeError(ctx, w, http.StatusUnprocessableEntity, errgo.New("cannot parse path"), "cannot parse path")
+		writeError(ctx, w, http.StatusUnprocessableEntity, errors.New("cannot parse path"), "cannot parse path")
 		return
 	}
 	model, err := hph.jimm.JujuManager().GetModel(ctx, modelUUID)
@@ -68,10 +67,11 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		writeError(ctx, w, http.StatusNotFound, err, "cannot retrieve credentials")
 		return
 	}
-	req.SetBasicAuth(names.NewUserTag(u).String(), p)
 
-	err = rpc.ProxyHTTP(ctx, &model.Controller, w, req)
-	if err != nil {
-		writeError(ctx, w, http.StatusGatewayTimeout, err, "Gateway timeout")
+	proxyDetails := rpc.ControllerProxy{
+		Controller: model.Controller,
+		Username:   u,
+		Password:   p,
 	}
+	rpc.ProxyHTTP(ctx, proxyDetails, w, req)
 }

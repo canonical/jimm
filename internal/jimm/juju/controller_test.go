@@ -1492,3 +1492,57 @@ func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec) 
 func (c *testControllerClient) Close() error {
 	return nil
 }
+
+const testControllerDetailsForModelEnv = `clouds:
+- name: test-cloud
+  type: test
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-cred
+  cloud: test-cloud
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.3
+  public-address: test-address.com
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-1
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-cred
+  owner: alice@canonical.com
+`
+
+func TestControllerDetailsForModel(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	invalidUUID := "invalid-uuid"
+	validUUID := "00000002-0000-0000-0000-000000000003"
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testControllerDetailsForModelEnv)
+	env.PopulateDB(c, j.Database)
+
+	err := j.CredentialStore.PutControllerCredentials(ctx, "controller-1", "test-user", "test-password")
+	c.Assert(err, qt.IsNil)
+
+	_, _, _, err = j.ControllerDetailsForModel(ctx, invalidUUID)
+	c.Assert(err, qt.ErrorMatches, `model not found`)
+
+	ctl, username, password, err := j.ControllerDetailsForModel(ctx, validUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctl.ID, qt.Not(qt.Equals), 0)
+	c.Assert(ctl.Name, qt.Equals, "controller-1")
+	c.Assert(ctl.PublicAddress, qt.Equals, "test-address.com")
+	c.Assert(username, qt.Equals, "test-user")
+	c.Assert(password, qt.Equals, "test-password")
+}

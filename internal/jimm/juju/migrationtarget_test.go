@@ -5,7 +5,6 @@ package juju_test
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -15,8 +14,13 @@ import (
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+)
+
+const (
+	migratingModelUUID = "00000000-0000-0000-0000-000000000001"
 )
 
 const testMigrationEnv = `clouds:
@@ -30,6 +34,7 @@ controllers:
   cloud: test
   region: test-region-1
   agent-version: 3.2.1
+  public-address: foo.com
 users:
 - username: alice@canonical.com
   controller-access: superuser
@@ -39,13 +44,12 @@ func TestAbortMigration_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	modelUUID := "00000001-0000-0000-0000-000000000001"
 	abortCalled := false
 	// Validate that the API request to Juju is made.
 	api := &jimmtest.API{
 		Abort_: func(uuid string) error {
 			abortCalled = true
-			c.Check(uuid, qt.Equals, modelUUID)
+			c.Check(uuid, qt.Equals, migratingModelUUID)
 			return nil
 		},
 	}
@@ -67,7 +71,7 @@ func TestAbortMigration_Success(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err = j.AbortMigration(ctx, user, modelUUID)
+	err = j.AbortMigration(ctx, user, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(abortCalled, qt.IsTrue)
 }
@@ -142,6 +146,37 @@ func TestCheckMachines_MissingIncomingModel(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
+func TestControllerDetailsForIncomingModel(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	err := j.CredentialStore.PutControllerCredentials(ctx, "test1", "test-user", "test-password")
+	c.Assert(err, qt.IsNil)
+
+	_, _, _, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Create an incoming model migration in the database.
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err = j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	ctl, username, password, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctl.Name, qt.Equals, "test1")
+	c.Assert(ctl.ID, qt.Not(qt.Equals), 0)
+	c.Assert(ctl.PublicAddress, qt.Equals, "foo.com")
+	c.Assert(username, qt.Equals, "test-user")
+	c.Assert(password, qt.Equals, "test-password")
+}
+
 func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -150,7 +185,7 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
 		Prechecks_: func(mi migration.ModelInfo) error {
-			c.Check(mi.UUID, qt.Equals, "00000001-0000-0000-0000-000000000001")
+			c.Check(mi.UUID, qt.Equals, migratingModelUUID)
 			c.Check(mi.Owner.Id(), qt.Equals, "alice@canonical.com")
 			// TODO: Check the description has been modified to use the external user mapping.
 			return nil
@@ -185,7 +220,7 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 
 	api := &jimmtest.API{
 		Prechecks_: func(mi migration.ModelInfo) error {
-			return errors.New("controller unreachable")
+			return errors.E("controller unreachable")
 		},
 	}
 
@@ -254,14 +289,13 @@ func TestAdoptResources_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	modelUUID := "00000001-0000-0000-0000-000000000001"
 	controllerVersion := version.MustParse("3.2.1")
 
 	// Validate that the API request to Juju is made with a modified version
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
 		AdoptResources_: func(uuid string, v version.Number) error {
-			c.Check(uuid, qt.Equals, modelUUID)
+			c.Check(uuid, qt.Equals, migratingModelUUID)
 			c.Check(v, qt.DeepEquals, controllerVersion)
 			return nil
 		},
@@ -284,7 +318,7 @@ func TestAdoptResources_Success(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err = j.AdoptResources(ctx, user, modelUUID, controllerVersion)
+	err = j.AdoptResources(ctx, user, migratingModelUUID, controllerVersion)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -419,7 +453,7 @@ func TestActivate_NoIncomingModelMigration(t *testing.T) {
 func newIncomingMigration(userMap map[string]string, ctl dbmodel.Controller) dbmodel.IncomingModelMigration {
 	return dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
-			String: "00000001-0000-0000-0000-000000000001",
+			String: migratingModelUUID,
 			Valid:  true,
 		},
 		TargetControllerID: ctl.ID,
@@ -442,7 +476,7 @@ func newMigrationInfo(owner string) migration.ModelInfo {
 	}
 	modelDescription.AddUser(userArgs)
 	modelInfo := migration.ModelInfo{
-		UUID:                   "00000001-0000-0000-0000-000000000001",
+		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag(owner),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.2.1"),

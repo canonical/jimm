@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package middleware_test
 
@@ -95,4 +95,32 @@ func TestAuthorizeUserForModelAccess(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAuthorizeUserAsJIMMAdmin(t *testing.T) {
+	c := qt.New(t)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	bob := openfga.NewUser(bobIdentity, nil)
+	// Normally this field is set on login.
+	bob.JimmAdmin = false
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	h := middleware.AuthorizeUserAsJIMMAdmin(handler)
+
+	// Verify that a user without JIMM admin rights gets a 403 Forbidden response.
+	h.ServeHTTP(w, req.WithContext(middleware.WithIdentity(context.Background(), bob)))
+	c.Assert(w.Code, qt.Equals, http.StatusForbidden)
+
+	// Create a new response recorder (cannot reuse the previous one)
+	// and verify that a user with JIMM admin rights gets a 200 OK response.
+	w = httptest.NewRecorder()
+	bob.JimmAdmin = true
+	h.ServeHTTP(w, req.WithContext(middleware.WithIdentity(context.Background(), bob)))
+	c.Assert(w.Code, qt.Equals, http.StatusOK)
 }

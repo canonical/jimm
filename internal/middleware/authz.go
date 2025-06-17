@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package middleware
 
@@ -12,7 +12,7 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
-// AuthorizeUserForModelAccess extract the user from the context, and checks for permission on the model uuid extracted from the path.
+// AuthorizeUserForModelAccess extracts the user from the context, and checks for permission on the model uuid extracted from the path.
 func AuthorizeUserForModelAccess(next http.Handler, accessNeeded cofga.Relation) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -49,6 +49,28 @@ func AuthorizeUserForModelAccess(next http.Handler, accessNeeded cofga.Relation)
 			_, _ = w.Write([]byte("no access to the resource"))
 			return
 		}
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// AuthorizeUserAsJIMMAdmin extracts the user from the context, and check that they are a JIMM admin.
+func AuthorizeUserAsJIMMAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		user, err := IdentityFromContext(ctx)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(err.Error()))
+			return
+		}
+
+		if !user.JimmAdmin {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("unauthorized"))
+			return
+		}
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
