@@ -15,6 +15,7 @@ type MigrationMocks struct {
 	Prechecks_      func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 	AdoptResources_ func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
 	AbortMigration_ func(ctx context.Context, user *openfga.User, modelUUID string) error
+	CheckMachines_  func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 }
 
 func (j *MigrationMocks) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
@@ -36,4 +37,11 @@ func (j *MigrationMocks) AdoptResources(ctx context.Context, user *openfga.User,
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.AdoptResources_(ctx, user, modelUUID, sourceControllerVersion)
+}
+
+func (j *MigrationMocks) CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error) {
+	if j.CheckMachines_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.CheckMachines_(ctx, user, modelUUID)
 }

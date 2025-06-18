@@ -130,6 +130,7 @@ type API struct {
 	AdoptResources_                    func(modelUUID string, controllerVersion version.Number) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	CheckMachines_                     func(modelUUID string) ([]error, error)
 	Close_                             func() error
 	Cloud_                             func(names.CloudTag, *jujucloud.Cloud) error
 	Clouds_                            func() (map[names.CloudTag]jujucloud.Cloud, error)
@@ -200,6 +201,13 @@ func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedC
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.CheckCredentialModels_(ctx, cred)
+}
+
+func (a *API) CheckMachines(modelUUID string) ([]error, error) {
+	if a.CheckMachines_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return a.CheckMachines_(modelUUID)
 }
 
 func (a *API) Close() error {
