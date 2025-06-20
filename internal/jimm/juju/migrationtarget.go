@@ -8,11 +8,13 @@ import (
 	"fmt"
 
 	"github.com/juju/juju/core/migration"
+	coremigration "github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -171,5 +173,58 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 	model.Owner = names.NewUserTag(newOwner)
 	// TODO: Replace fields on the model description including the model owner and users.
 
+	return nil
+}
+
+// Activate gets the model migration, proxies the Activate call to the target controller,
+// and then deletes the model migration from the database.
+func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error {
+	const op = errors.Op("jimm.Activate")
+
+	modelMigration := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelTag.Id(),
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to get model migration for model %q: %w", modelTag.Id(), err))
+	}
+	api, err := j.dialController(ctx, &modelMigration.TargetController)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+	}
+	defer api.Close()
+
+	err = api.Activate(modelTag.Id(), migrationInfo, relatedModels)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to activate model %q: %w", modelTag.Id(), err))
+	}
+
+	// This is done in a transaction to ensure that the model migration is only deleted
+	// if user mappings have been created.
+	err = j.Database.Transaction(func(db *db.Database) error {
+		for localUser, externalUser := range modelMigration.UserMapping {
+			userMapping := &dbmodel.UserMapping{
+				ModelUUID:        modelMigration.ModelUUID,
+				LocalUser:        localUser,
+				ExternalUserName: externalUser,
+			}
+			err = db.AddUserMapping(ctx, userMapping)
+			if err != nil {
+				return errors.E(op, fmt.Errorf("failed to add user mapping for model %q: %w", modelTag.Id(), err))
+			}
+		}
+		// TODO(SimoneDutto): set the model we've created in Import to active.
+		err = db.DeleteIncomingModelMigration(ctx, &modelMigration)
+		if err != nil {
+			return errors.E(op, fmt.Errorf("failed to delete model migration for model %q: %w", modelTag.Id(), err))
+		}
+		return nil
+	})
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to activate model %q: %w", modelTag.Id(), err))
+	}
 	return nil
 }

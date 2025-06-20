@@ -217,3 +217,133 @@ func (s *migrationTargetUnitSuite) TestAdoptResources(c *gc.C) {
 	err = cr.AdoptResources(ctx, args)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
 }
+
+func (s *migrationTargetUnitSuite) TestActivateUnauthorized(c *gc.C) {
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ActivateModelArgs{
+		ModelTag:        names.NewModelTag("00000001-0000-0000-0000-000000000001").String(),
+		ControllerTag:   names.NewControllerTag("00000001-0000-0000-0000-000000000002").String(),
+		ControllerAlias: "controller-1",
+		CrossModelUUIDs: []string{"related-model-1", "related-model-2"},
+	}
+
+	// Validate access denied without JIMM admin permissions.
+	err := cr.Activate(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}
+
+func (s *migrationTargetUnitSuite) TestActivateValid(c *gc.C) {
+	ctx := context.Background()
+
+	activateCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			Activate_: func(ctx context.Context, modelTag names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error {
+				activateCalled = true
+				c.Assert(modelTag.Id(), gc.Equals, "00000001-0000-0000-0000-000000000001")
+				c.Assert(sourceControllerInfo.ControllerAlias, gc.Equals, "controller-1")
+				c.Assert(relatedModels, gc.DeepEquals, []string{"related-model-1", "related-model-2"})
+				return nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ActivateModelArgs{
+		ModelTag:        names.NewModelTag("00000001-0000-0000-0000-000000000001").String(),
+		ControllerTag:   names.NewControllerTag("00000001-0000-0000-0000-000000000002").String(),
+		ControllerAlias: "controller-1",
+		CrossModelUUIDs: []string{"related-model-1", "related-model-2"},
+	}
+
+	// Validate the activate method is called when the user is a JIMM admin.
+	user.JimmAdmin = true
+	err := cr.Activate(ctx, args)
+	c.Assert(err, gc.IsNil)
+	c.Assert(activateCalled, gc.Equals, true)
+}
+
+func (s *migrationTargetUnitSuite) TestActivateInvalidModelTag(c *gc.C) {
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ActivateModelArgs{
+		ModelTag:        "invalid-model-tag",
+		ControllerTag:   names.NewControllerTag("00000001-0000-0000-0000-000000000002").String(),
+		ControllerAlias: "controller-1",
+		CrossModelUUIDs: []string{"related-model-1", "related-model-2"},
+	}
+
+	// Validate that an invalid model tag is rejected.
+	user.JimmAdmin = true
+	err := cr.Activate(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
+}
+
+func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ActivateModelArgs{
+		ModelTag:        names.NewModelTag("00000001-0000-0000-0000-000000000001").String(),
+		ControllerTag:   "invalid-controller-tag",
+		ControllerAlias: "controller-1",
+		CrossModelUUIDs: []string{"related-model-1", "related-model-2"},
+	}
+
+	// Validate that an invalid controller tag is rejected.
+	user.JimmAdmin = true
+	err := cr.Activate(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `"invalid-controller-tag" is not a valid tag`)
+}

@@ -31,12 +31,14 @@ func (api *API) Prechecks(model params.MigrationModelInfo) error
 func init() {
 	facadeInit["MigrationTarget"] = func(r *controllerRoot) []int {
 		preChecks := rpc.Method(r.Prechecks)
+		activate := rpc.Method(r.Activate)
 		caCert := rpc.Method(r.CACert)
 		adoptResources := rpc.Method(r.AdoptResources)
 		checkMachines := rpc.Method(r.CheckMachines)
 
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 4, "CACert", caCert)
+		r.AddMethod("MigrationTarget", 4, "Activate", activate)
 		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "Abort", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "CheckMachines", checkMachines)
@@ -146,6 +148,38 @@ func (r *controllerRoot) Prechecks(ctx context.Context, args jujuparams.Migratio
 	err = r.jimm.JujuManager().Prechecks(ctx, r.user, model)
 	if err != nil {
 		return errors.E(op, err)
+	}
+	return nil
+}
+
+// Activate is the implementation of the Activate method of the MigrationTarget facade.
+func (r *controllerRoot) Activate(ctx context.Context, args params.ActivateModelArgs) error {
+	const op = errors.Op("jujuapi.Activate")
+
+	if !r.user.JimmAdmin {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	modelTag, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	controllerTag, err := names.ParseControllerTag(args.ControllerTag)
+	if err != nil {
+		return errors.E(op, err)
+	}
+
+	err = r.jimm.JujuManager().Activate(
+		ctx,
+		modelTag, migration.SourceControllerInfo{
+			ControllerTag:   controllerTag,
+			ControllerAlias: args.ControllerAlias,
+			Addrs:           args.SourceAPIAddrs,
+			CACert:          args.SourceCACert,
+		},
+		args.CrossModelUUIDs)
+	if err != nil {
+		return errors.E(errors.Op("jujuapi.Activate"), err)
 	}
 	return nil
 }

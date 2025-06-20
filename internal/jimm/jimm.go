@@ -14,6 +14,7 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/migration"
+	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -253,7 +254,7 @@ type JujuManager interface {
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
 	AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error
-
+	Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error
 	// Other methods
 
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error

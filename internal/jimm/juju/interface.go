@@ -40,6 +40,10 @@ type API interface {
 	// Abort aborts a model migration.
 	Abort(modelUUID string) error
 
+	// Activate activates a model on the controller.
+	// It is used to activate a model that has been migrated from another controller.
+	Activate(modelUUID string, sourceInfo migration.SourceControllerInfo, relatedModels []string) error
+
 	// AddCloud adds a new cloud.
 	AddCloud(names.CloudTag, jujucloud.Cloud, bool) error
 

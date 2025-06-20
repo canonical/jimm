@@ -304,6 +304,118 @@ func TestAdoptResources_NoIncomingModelMigration(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
+func TestActivate_Success(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	modelUUID := "00000001-0000-0000-0000-000000000001"
+	sourceInfo := migration.SourceControllerInfo{
+		ControllerTag: names.NewControllerTag("00000001-0000-0000-0000-000000000002"),
+	}
+	relatedModels := []string{"related-model-1", "related-model-2"}
+
+	// Validate that the API request to Juju is made with the correct parameters.
+	api := &jimmtest.API{
+		Activate_: func(modelUUID string, sourceInfo migration.SourceControllerInfo, relatedModels []string) error {
+			c.Check(modelUUID, qt.Equals, modelUUID)
+			c.Check(sourceInfo.ControllerTag.Id(), qt.Equals, "00000001-0000-0000-0000-000000000002")
+			c.Check(relatedModels, qt.DeepEquals, []string{"related-model-1", "related-model-2"})
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	err = j.Activate(ctx, names.NewModelTag(modelUUID), sourceInfo, relatedModels)
+	c.Assert(err, qt.IsNil)
+
+	modelMigration = dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	// Check the model migration has been removed from the database.
+	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	userMapping := dbmodel.UserMapping{
+		ModelUUID: modelMigration.ModelUUID,
+		LocalUser: "bob",
+	}
+
+	err = j.Database.GetUserMapping(ctx, &userMapping)
+	c.Assert(err, qt.IsNil)
+	c.Assert(userMapping.ExternalUserName, qt.Equals, "alice@canonical.com")
+}
+
+func TestActivate_APIFailure(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	modelUUID := "00000001-0000-0000-0000-000000000001"
+	sourceInfo := migration.SourceControllerInfo{}
+	relatedModels := []string{"related-model-1", "related-model-2"}
+
+	// Simulate an API failure.
+	api := &jimmtest.API{
+		Activate_: func(modelUUID string, sourceInfo migration.SourceControllerInfo, relatedModels []string) error {
+			return errors.New("API failure")
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	err = j.Activate(ctx, names.NewModelTag(modelUUID), sourceInfo, relatedModels)
+	c.Assert(err, qt.ErrorMatches, `.*API failure`)
+
+	modelMigration = dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	// Check the model migration has not been removed from the database.
+	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestActivate_NoIncomingModelMigration(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	err := j.Activate(ctx, names.NewModelTag("foo"), migration.SourceControllerInfo{}, nil)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+}
+
 func newIncomingMigration(userMap map[string]string, ctl dbmodel.Controller) dbmodel.IncomingModelMigration {
 	return dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{

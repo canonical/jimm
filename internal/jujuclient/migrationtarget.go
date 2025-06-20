@@ -5,6 +5,7 @@ package jujuclient
 import (
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
+	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -47,4 +48,9 @@ func (c Connection) Abort(modelUUID string) error {
 func (c Connection) CheckMachines(modelUUID string) ([]error, error) {
 	migrationTarget := migrationtarget.NewClient(&c)
 	return migrationTarget.CheckMachines(modelUUID)
+}
+
+// Activate activates a model on the controller.
+func (c Connection) Activate(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error {
+	return migrationtarget.NewClient(&c).Activate(modelUUID, sourceInfo, relatedModels)
 }

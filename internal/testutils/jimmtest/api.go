@@ -13,6 +13,7 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/core/migration"
+	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v5"
@@ -125,6 +126,7 @@ func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.M
 type API struct {
 	base.APICaller
 
+	Activate_                          func(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error
 	Abort_                             func(modelUUID string) error
 	AddCloud_                          func(names.CloudTag, jujucloud.Cloud, bool) error
 	AdoptResources_                    func(modelUUID string, controllerVersion version.Number) error
@@ -172,6 +174,13 @@ type API struct {
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 	ListModels_                        func(ctx context.Context) ([]base.UserModel, error)
+}
+
+func (a *API) Activate(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error {
+	if a.Activate_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.Activate_(modelUUID, sourceInfo, relatedModels)
 }
 
 // Abort aborts the current operation on the controller.

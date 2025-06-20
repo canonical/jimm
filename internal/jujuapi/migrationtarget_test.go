@@ -97,3 +97,18 @@ func (s *migrationTargetSuite) TestAdoptResources(c *gc.C) {
 	err := client.AdoptResources(modelUUID)
 	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
 }
+
+func (s *migrationTargetSuite) TestActivate(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	modelUUID := "00000001-0000-0000-0000-000000000001"
+	sourceInfo := migration.SourceControllerInfo{
+		ControllerTag: names.NewControllerTag("00000001-0000-0000-0000-000000000002"),
+	}
+	relatedModels := []string{"related-model-1", "related-model-2"}
+
+	client := migrationtarget.NewClient(conn)
+	err := client.Activate(modelUUID, sourceInfo, relatedModels)
+	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+}
