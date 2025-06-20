@@ -32,6 +32,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
+	"github.com/canonical/jimm/v3/internal/jimm/offer"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
@@ -202,6 +203,12 @@ type SSHManager interface {
 type ConfigManager interface {
 	// GetConfig returns the configuration for the JIMM controller.
 	GetConfig() (config.ControllerConfig, error)
+}
+
+// OfferAuthorizer provides methods to check if a user is a consumer of an application offer.
+type OfferAuthorizer interface {
+	// IsUserConsumerForOffer checks if a user is a consumer of an application offer.
+	IsUserConsumerForOffer(ctx context.Context, userTag names.UserTag, offerTag names.ApplicationOfferTag) (bool, error)
 }
 
 // JujuManager is the interface to manage all Juju related operations.
@@ -467,6 +474,12 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.configManager = configManager
 
+	offerAuthorizer, err := offer.NewOfferAuthorizer(j.Database, j.OpenFGAClient)
+	if err != nil {
+		return nil, err
+	}
+	j.offerAuthorizer = offerAuthorizer
+
 	return j, nil
 }
 
@@ -507,6 +520,9 @@ type JIMM struct {
 
 	// jujuManager provides a means to manage Juju resources within JIMM.
 	jujuManager JujuManager
+
+	// offerAuthorizer provides a means to check if a user is a consumer of an application offer.
+	offerAuthorizer OfferAuthorizer
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -578,4 +594,9 @@ func (j *JIMM) JujuManager() JujuManager {
 // This is used to expose the config via the ControllerConfig facade.
 func (j *JIMM) ConfigManager() ConfigManager {
 	return j.configManager
+}
+
+// OfferAuthorizer returns an authorizer that enables checking if a user is a consumer of an application offer.
+func (j *JIMM) OfferAuthorizer() OfferAuthorizer {
+	return j.offerAuthorizer
 }

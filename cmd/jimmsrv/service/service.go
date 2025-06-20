@@ -580,7 +580,7 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
 		ControllerUUID:         p.ControllerUUID,
 	}
-	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, s.jimm.Database, s.jimm.OpenFGAClient)
+	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, s.jimm.Database, s.jimm.OfferAuthorizer())
 	if err != nil {
 		return nil, errors.E(err)
 	}

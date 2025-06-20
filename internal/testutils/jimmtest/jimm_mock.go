@@ -25,6 +25,7 @@ type JIMM struct {
 	PubSubHub_         func() *pubsub.Hub
 	ResourceTag_       func() names.ControllerTag
 	ConfigManager_     func() jimm.ConfigManager
+	OfferAuthorizer_   func() jimm.OfferAuthorizer
 }
 
 func (j *JIMM) RoleManager() jimm.RoleManager {
@@ -95,4 +96,11 @@ func (j *JIMM) ConfigManager() jimm.ConfigManager {
 		return nil
 	}
 	return j.ConfigManager_()
+}
+
+func (j *JIMM) OfferAuthorizer() jimm.OfferAuthorizer {
+	if j.OfferAuthorizer_ == nil {
+		return nil
+	}
+	return j.OfferAuthorizer_()
 }

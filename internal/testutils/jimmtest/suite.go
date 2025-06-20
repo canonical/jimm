@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -141,20 +140,13 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		"/.well-known",
 		jimmhttp.NewWellKnownHandler(credentialStore),
 	)
-	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.OFGAClient)
-	localDischargePath := "/macaroons"
-	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
-
-	s.Server = httptest.NewServer(mux)
-
-	u, _ := url.Parse(s.Server.URL)
 
 	jwksService := jimmjwx.NewJWKSService(credentialStore)
 	err = jwksService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
 	c.Assert(err, gc.Equals, nil)
 
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:   u.Host,
+		Host:   "127.0.0.1",
 		Store:  credentialStore,
 		Expiry: time.Minute,
 	})
@@ -175,6 +167,10 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 		CrossModelQueryTimeout: time.Second * 5,
 	})
+	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.JIMM.OfferAuthorizer())
+	localDischargePath := "/macaroons"
+	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
+	s.Server = httptest.NewServer(mux)
 
 	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
@@ -240,14 +236,14 @@ func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.Au
 	return authSvc
 }
 
-func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, ofgaClient *openfga.OFGAClient) *discharger.MacaroonDischarger {
+func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, offerAuthorizer jimm.OfferAuthorizer) *discharger.MacaroonDischarger {
 	cfg := discharger.MacaroonDischargerConfig{
 		MacaroonExpiryDuration: 1 * time.Hour,
 		ControllerUUID:         uuid,
 		PrivateKey:             "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
 		PublicKey:              "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
 	}
-	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, db, ofgaClient)
+	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, db, offerAuthorizer)
 	c.Assert(err, gc.IsNil)
 	return macaroonDischarger
 }
