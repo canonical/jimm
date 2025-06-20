@@ -96,13 +96,12 @@ func TestCheckMachines_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	modelUUID := "00000001-0000-0000-0000-000000000001"
 	checkMachinesCalled := false
 	// Validate that the API request to Juju is made.
 	api := &jimmtest.API{
 		CheckMachines_: func(uuid string) ([]error, error) {
 			checkMachinesCalled = true
-			c.Check(uuid, qt.Equals, modelUUID)
+			c.Check(uuid, qt.Equals, migratingModelUUID)
 			return nil, nil
 		},
 	}
@@ -124,7 +123,7 @@ func TestCheckMachines_Success(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	res, err := j.CheckMachines(ctx, user, modelUUID)
+	res, err := j.CheckMachines(ctx, user, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsNil)
 	c.Assert(checkMachinesCalled, qt.IsTrue)
@@ -158,7 +157,7 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	err := j.CredentialStore.PutControllerCredentials(ctx, "test1", "test-user", "test-password")
 	c.Assert(err, qt.IsNil)
 
-	_, _, _, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	_, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
@@ -168,13 +167,13 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	err = j.Database.AddIncomingModelMigration(ctx, &modelMigration)
 	c.Assert(err, qt.IsNil)
 
-	ctl, username, password, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	controllerDetails, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl.Name, qt.Equals, "test1")
-	c.Assert(ctl.ID, qt.Not(qt.Equals), 0)
-	c.Assert(ctl.PublicAddress, qt.Equals, "foo.com")
-	c.Assert(username, qt.Equals, "test-user")
-	c.Assert(password, qt.Equals, "test-password")
+	c.Assert(controllerDetails.Controller.Name, qt.Equals, "test1")
+	c.Assert(controllerDetails.Controller.ID, qt.Not(qt.Equals), 0)
+	c.Assert(controllerDetails.Controller.PublicAddress, qt.Equals, "foo.com")
+	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
+	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
 func TestPrechecks_ModifiesModelDescription(t *testing.T) {

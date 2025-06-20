@@ -90,8 +90,8 @@ func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, mod
 
 // ControllerDetailsForIncomingModel retrieves the target controller details for a model that is being migrated.
 // It returns the controller information, username, and password for the target controller.
-func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (dbmodel.Controller, string, string, error) {
-	const op = errors.Op("jimm.GetControllerForIncomingModel")
+func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (ControllerDetails, error) {
+	const op = errors.Op("jimm.ControllerDetailsForIncomingModel")
 
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -103,17 +103,23 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return dbmodel.Controller{}, "", "", errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
+			return ControllerDetails{}, errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
 		}
-		return dbmodel.Controller{}, "", "", errors.E(op, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
+		return ControllerDetails{}, errors.E(op, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
 	}
 
 	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, incomingModel.TargetController.Name)
 	if err != nil {
-		return dbmodel.Controller{}, "", "", err
+		return ControllerDetails{}, err
 	}
 
-	return incomingModel.TargetController, username, password, nil
+	return ControllerDetails{
+		Controller: incomingModel.TargetController,
+		Credentials: ControllerCreds{
+			AdminIdentityName: username,
+			AdminPassword:     password,
+		},
+	}, nil
 }
 
 // Prechecks checks that the model can be migrated to the target controller.

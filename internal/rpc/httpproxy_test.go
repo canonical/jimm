@@ -106,7 +106,7 @@ func TestProxyHTTP(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			recorder := httptest.NewRecorder()
 
-			proxyInfo := rpc.ControllerProxy{
+			proxyInfo := rpc.ControllerDetails{
 				Controller: controller,
 				Username:   "test-user",
 				Password:   "test-password",

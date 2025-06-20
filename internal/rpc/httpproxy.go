@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
@@ -26,17 +27,29 @@ const (
 	defaultScheme = "https"
 )
 
-type ControllerProxy struct {
+// ControllerDetails contains the details
+// used to connect to a Juju controller
+// as well as the admin user's credentials.
+type ControllerDetails struct {
 	Controller dbmodel.Controller
 	Username   string
 	Password   string
 }
 
-func ProxyHTTP(ctx context.Context, ctl ControllerProxy, w http.ResponseWriter, req *http.Request) {
+// ProxyHTTP handles HTTP requests by proxying them to the Juju controller.
+// It retrieves the controller's addresses, sets up TLS if necessary,
+// and acts as a reverse proxy to forward the request.
+func ProxyHTTP(ctx context.Context, ctl ControllerDetails, w http.ResponseWriter, req *http.Request) {
 	urls, err := getControllerAddresses(ctl.Controller)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get controller addresses", zap.Error(err))
 		http.Error(w, fmt.Sprintf("failed to get controller addresses: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		zapctx.Error(ctx, "no controller addresses found", zap.String("controller", ctl.Controller.Name))
+		http.Error(w, "no controller addresses found", http.StatusInternalServerError)
 		return
 	}
 
@@ -65,12 +78,6 @@ func ProxyHTTP(ctx context.Context, ctl ControllerProxy, w http.ResponseWriter, 
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
-	if len(urls) == 0 {
-		zapctx.Error(ctx, "no controller addresses found", zap.String("controller", ctl.Controller.Name))
-		http.Error(w, "no controller addresses found", http.StatusInternalServerError)
-		return
-	}
-
 	if len(urls) > 1 {
 		rand.Shuffle(len(urls), func(i, j int) {
 			urls[i], urls[j] = urls[j], urls[i]
@@ -86,8 +93,16 @@ func ProxyHTTP(ctx context.Context, ctl ControllerProxy, w http.ResponseWriter, 
 			pr.Out.SetBasicAuth(names.NewUserTag(ctl.Username).String(), ctl.Password)
 		},
 		Transport: transport,
+		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us
 	}
 	proxy.ServeHTTP(w, req)
+}
+
+type proxyErrorLogger struct{}
+
+func (pl *proxyErrorLogger) Write(p []byte) (n int, err error) {
+	zapctx.Error(context.Background(), "HTTP proxy error", zap.String("error", string(p)))
+	return len(p), nil
 }
 
 func getControllerAddresses(ctl dbmodel.Controller) ([]*url.URL, error) {

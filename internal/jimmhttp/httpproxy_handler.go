@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -54,11 +55,18 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 
 	modelUUID := chi.URLParam(req, "uuid")
 	if modelUUID == "" {
-		writeError(ctx, w, http.StatusUnprocessableEntity, errors.E("cannot parse path"), "cannot parse path")
+		msg := "cannot parse model UUID from path"
+		writeError(ctx, w, http.StatusBadRequest, errors.E(msg), msg)
 		return
 	}
 
-	controller, username, password, err := hph.jimm.JujuManager().ControllerDetailsForModel(ctx, modelUUID)
+	if !names.IsValidModel(modelUUID) {
+		msg := "invalid model UUID format"
+		writeError(ctx, w, http.StatusBadRequest, errors.E(msg), msg)
+		return
+	}
+
+	controllerDetails, err := hph.jimm.JujuManager().ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "controller details not found")
@@ -68,10 +76,10 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	proxyDetails := rpc.ControllerProxy{
-		Controller: controller,
-		Username:   username,
-		Password:   password,
+	proxyDetails := rpc.ControllerDetails{
+		Controller: controllerDetails.Controller,
+		Username:   controllerDetails.Credentials.AdminIdentityName,
+		Password:   controllerDetails.Credentials.AdminPassword,
 	}
 	rpc.ProxyHTTP(ctx, proxyDetails, w, req)
 }

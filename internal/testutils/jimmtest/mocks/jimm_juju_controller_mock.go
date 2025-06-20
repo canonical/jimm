@@ -17,8 +17,8 @@ import (
 // ControllerService is an implementation of the jujuapi.ControllerService interface.
 type ControllerService struct {
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
-	ControllerDetailsForModel_         func(ctx context.Context, modelUUID string) (dbmodel.Controller, string, string, error)
-	ControllerDetailsForIncomingModel_ func(ctx context.Context, modelUUID string) (dbmodel.Controller, string, string, error)
+	ControllerDetailsForModel_         func(ctx context.Context, modelUUID string) (juju.ControllerDetails, error)
+	ControllerDetailsForIncomingModel_ func(ctx context.Context, modelUUID string) (juju.ControllerDetails, error)
 	ControllerInfo_                    func(ctx context.Context, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
@@ -34,16 +34,16 @@ func (j *ControllerService) AddController(ctx context.Context, u *openfga.User, 
 	return j.AddController_(ctx, u, ctl, creds)
 }
 
-func (j *ControllerService) ControllerDetailsForModel(ctx context.Context, modelUUID string) (dbmodel.Controller, string, string, error) {
+func (j *ControllerService) ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerDetails, error) {
 	if j.ControllerDetailsForModel_ == nil {
-		return dbmodel.Controller{}, "", "", errors.E(errors.CodeNotImplemented)
+		return juju.ControllerDetails{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ControllerDetailsForModel_(ctx, modelUUID)
 }
 
-func (j *ControllerService) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (dbmodel.Controller, string, string, error) {
+func (j *ControllerService) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerDetails, error) {
 	if j.ControllerDetailsForIncomingModel_ == nil {
-		return dbmodel.Controller{}, "", "", errors.E(errors.CodeNotImplemented)
+		return juju.ControllerDetails{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ControllerDetailsForIncomingModel_(ctx, modelUUID)
 }

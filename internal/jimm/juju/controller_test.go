@@ -1535,14 +1535,15 @@ func TestControllerDetailsForModel(t *testing.T) {
 	err := j.CredentialStore.PutControllerCredentials(ctx, "controller-1", "test-user", "test-password")
 	c.Assert(err, qt.IsNil)
 
-	_, _, _, err = j.ControllerDetailsForModel(ctx, invalidUUID)
-	c.Assert(err, qt.ErrorMatches, `model not found`)
+	_, err = j.ControllerDetailsForModel(ctx, invalidUUID)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	ctl, username, password, err := j.ControllerDetailsForModel(ctx, validUUID)
+	controllerDetails, err := j.ControllerDetailsForModel(ctx, validUUID)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ctl.ID, qt.Not(qt.Equals), 0)
-	c.Assert(ctl.Name, qt.Equals, "controller-1")
-	c.Assert(ctl.PublicAddress, qt.Equals, "test-address.com")
-	c.Assert(username, qt.Equals, "test-user")
-	c.Assert(password, qt.Equals, "test-password")
+	c.Assert(controllerDetails.Controller.ID, qt.Not(qt.Equals), 0)
+	c.Assert(controllerDetails.Controller.Name, qt.Equals, "controller-1")
+	c.Assert(controllerDetails.Controller.PublicAddress, qt.Equals, "test-address.com")
+	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
+	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }

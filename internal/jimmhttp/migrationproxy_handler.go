@@ -30,11 +30,6 @@ type MigrationHTTPProxyHandler struct {
 	jimm   *jimm.JIMM
 }
 
-const (
-	// all endpoints managed by this handler
-	migrationProxyEndpoints = "/*"
-)
-
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
 func NewMigrationHTTPProxyHandler(jimm *jimm.JIMM) *MigrationHTTPProxyHandler {
 	return &MigrationHTTPProxyHandler{Router: chi.NewRouter(), jimm: jimm}
@@ -43,7 +38,9 @@ func NewMigrationHTTPProxyHandler(jimm *jimm.JIMM) *MigrationHTTPProxyHandler {
 // Routes returns the grouped routers routes with group specific middlewares.
 func (hph *MigrationHTTPProxyHandler) Routes() chi.Router {
 	hph.SetupMiddleware()
-	hph.Router.HandleFunc(migrationProxyEndpoints, hph.ProxyHTTP)
+	hph.Router.HandleFunc("/charms/*", hph.ProxyHTTP)
+	hph.Router.HandleFunc("/tools", hph.ProxyHTTP)
+	hph.Router.HandleFunc("/resources", hph.ProxyHTTP)
 	return hph.Router
 }
 
@@ -66,7 +63,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	ctl, username, password, err := hph.jimm.JujuManager().ControllerDetailsForIncomingModel(ctx, modelUUID)
+	controllerDetails, err := hph.jimm.JujuManager().ControllerDetailsForIncomingModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "controller details not found")
@@ -76,10 +73,10 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	controllerProxy := rpc.ControllerProxy{
-		Controller: ctl,
-		Username:   username,
-		Password:   password,
+	controllerProxy := rpc.ControllerDetails{
+		Controller: controllerDetails.Controller,
+		Username:   controllerDetails.Credentials.AdminIdentityName,
+		Password:   controllerDetails.Credentials.AdminPassword,
 	}
 	rpc.ProxyHTTP(ctx, controllerProxy, w, req)
 }
