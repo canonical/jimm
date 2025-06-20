@@ -3,11 +3,11 @@
 package jimmhttp
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -54,24 +54,24 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 
 	modelUUID := chi.URLParam(req, "uuid")
 	if modelUUID == "" {
-		writeError(ctx, w, http.StatusUnprocessableEntity, errors.New("cannot parse path"), "cannot parse path")
+		writeError(ctx, w, http.StatusUnprocessableEntity, errors.E("cannot parse path"), "cannot parse path")
 		return
 	}
-	model, err := hph.jimm.JujuManager().GetModel(ctx, modelUUID)
+
+	controller, username, password, err := hph.jimm.JujuManager().ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
-		writeError(ctx, w, http.StatusNotFound, err, "cannot get model")
-		return
-	}
-	u, p, err := hph.jimm.CredentialStore.GetControllerCredentials(ctx, model.Controller.Name)
-	if err != nil {
-		writeError(ctx, w, http.StatusNotFound, err, "cannot retrieve credentials")
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			writeError(ctx, w, http.StatusNotFound, err, "controller details not found")
+			return
+		}
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to get controller details")
 		return
 	}
 
 	proxyDetails := rpc.ControllerProxy{
-		Controller: model.Controller,
-		Username:   u,
-		Password:   p,
+		Controller: controller,
+		Username:   username,
+		Password:   password,
 	}
 	rpc.ProxyHTTP(ctx, proxyDetails, w, req)
 }

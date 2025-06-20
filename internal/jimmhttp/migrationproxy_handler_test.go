@@ -74,10 +74,10 @@ func (s *migrationHTTPProxySuite) TestMigrationHTTPProxyHandler(c *gc.C) {
 	// we expect the controller to respond with TLS
 	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, _ := r.BasicAuth()
-		c.Assert(u, gc.Equals, names.NewUserTag(expectUsername).String())
-		c.Assert(p, gc.Equals, expectPassword)
+		c.Check(u, gc.Equals, names.NewUserTag(expectUsername).String())
+		c.Check(p, gc.Equals, expectPassword)
 		_, err = w.Write([]byte("OK"))
-		c.Assert(err, gc.IsNil)
+		c.Check(err, gc.IsNil)
 	}))
 	defer fakeController.Close()
 

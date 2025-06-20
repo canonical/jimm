@@ -119,7 +119,7 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 			url:            fmt.Sprintf("/model/%s/charms", "54d9f921-c45a-4825-8253-74e7edc28066"),
 			modelUUID:      "54d9f921-c45a-4825-8253-74e7edc28066",
 			statusExpected: http.StatusNotFound,
-			bodyExpected:   ".*failed to get model.*",
+			bodyExpected:   "Not Found - model not found",
 		},
 	}
 
