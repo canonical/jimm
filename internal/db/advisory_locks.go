@@ -18,7 +18,7 @@ const (
 
 // LockAdvisory attempts to acquire an advisory lock with the given ID.
 // It returns an error if the lock is already held by another session.
-func (d *Database) LockAdvisory(ctx context.Context, id LockID) error {
+func (d *Database) lockAdvisory(ctx context.Context, id LockID) error {
 	var success bool
 	err := d.DB.WithContext(ctx).Raw("SELECT pg_try_advisory_lock(?)", id).Scan(&success).Error
 	if err != nil {
@@ -33,7 +33,7 @@ func (d *Database) LockAdvisory(ctx context.Context, id LockID) error {
 
 // UnlockAdvisory releases an advisory lock with the given ID.
 // It returns an error if the lock was not held or could not be released.
-func (d *Database) UnlockAdvisory(ctx context.Context, id LockID) error {
+func (d *Database) unlockAdvisory(ctx context.Context, id LockID) error {
 	var released bool
 
 	err := d.DB.WithContext(ctx).Raw("SELECT pg_advisory_unlock(?)", id).Scan(&released).Error
@@ -46,4 +46,16 @@ func (d *Database) UnlockAdvisory(ctx context.Context, id LockID) error {
 	}
 
 	return nil
+}
+
+// LockBootstrap acquires the advisory lock for controller bootstrap operations.
+// It returns an error if the lock cannot be acquired.
+func (d *Database) LockBootstrap(ctx context.Context) error {
+	return d.lockAdvisory(ctx, ControllerBootstrapLock)
+}
+
+// UnlockBootstrap releases the advisory lock for controller bootstrap operations.
+// It returns an error if the lock was not held or could not be released.
+func (d *Database) UnlockBootstrap(ctx context.Context) error {
+	return d.unlockAdvisory(ctx, ControllerBootstrapLock)
 }

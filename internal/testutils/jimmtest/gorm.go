@@ -159,20 +159,6 @@ func randSeq(n int) string {
 var createDatabaseMutex = sync.Mutex{}
 var deleteDatabaseMutex = sync.Mutex{}
 
-func GetTestDBDSN() (*url.URL, string, error) {
-	dsn := defaultDSN
-	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
-		dsn = envTestDSN
-	}
-
-	u, err := url.Parse(dsn)
-	if err != nil {
-		return nil, dsn, errors.E("error parsing DSN as a URI: %s", err)
-	}
-
-	return u, dsn, nil
-}
-
 // createDatabaseFromTemplate creates a Postgres database from a given template
 // and returns the created database name (which may be different than the
 // requested name due to sanitization) and DSN.
@@ -180,9 +166,14 @@ func GetTestDBDSN() (*url.URL, string, error) {
 func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
 	databaseName := computeSafeDatabaseName(suggestedName)
 
-	u, dsn, err := GetTestDBDSN()
+	dsn := defaultDSN
+	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
+		dsn = envTestDSN
+	}
+
+	u, err := url.Parse(dsn)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.E("error parsing DSN as a URI: %s", err)
 	}
 
 	createDatabaseMutex.Lock()

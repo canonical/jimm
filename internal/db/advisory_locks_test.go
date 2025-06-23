@@ -20,28 +20,31 @@ type advisoryLocksSuite struct{}
 func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	ctx := c.Context()
 
-	gdb1, dbName := jimmtest.PostgresDBWithDbName(c, time.Now)
-	dsn, _, err := jimmtest.GetTestDBDSN()
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get test DB DSN"))
-
-	dsn.Path = dbName
-	gdb2, err := gorm.Open(postgres.Open(dsn.String()))
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to open second DB connection"))
+	gdb1, _ := jimmtest.PostgresDBWithDbName(c, time.Now)
 
 	db1 := &db.Database{
 		DB: gdb1,
 	}
+
+	sqldb, err := db1.DB.DB()
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL DB connection"))
+	sqlconn, err := sqldb.Conn(ctx)
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL connection"))
+	gdb2, err := gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlconn,
+	}))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to open second GORM DB connection"))
 
 	db2 := &db.Database{
 		DB: gdb2,
 	}
 
 	// Acquire lock in db session 1.
-	err = db1.LockAdvisory(ctx, db.ControllerBootstrapLock)
+	err = db1.LockBootstrap(ctx)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock"))
 
 	// Attempt to acquire lock in session 2, should fail.
-	err = db2.LockAdvisory(ctx, db.ControllerBootstrapLock)
+	err = db2.LockBootstrap(ctx)
 	c.Assert(
 		err,
 		qt.ErrorMatches,
@@ -50,10 +53,10 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	)
 
 	// Now unlock from session 1 and attempt to acquire in session 2 again.
-	err = db1.UnlockAdvisory(ctx, db.ControllerBootstrapLock)
+	err = db1.UnlockBootstrap(ctx)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to release lock"))
 
-	err = db2.LockAdvisory(ctx, db.ControllerBootstrapLock)
+	err = db2.LockBootstrap(ctx)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock in second session"))
 }
 
