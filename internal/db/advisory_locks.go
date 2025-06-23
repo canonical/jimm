@@ -13,7 +13,7 @@ type LockID int64
 
 const (
 	// ControllerBootstrapLock is the advisory lock ID used for controller bootstrap operations.
-	ControllerBootstrapLock LockID = 1001
+	ControllerBootstrapLock LockID = iota + 1
 )
 
 // LockAdvisory attempts to acquire an advisory lock with the given ID.
