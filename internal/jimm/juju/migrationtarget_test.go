@@ -404,7 +404,7 @@ func TestActivate_APIFailure(t *testing.T) {
 	// Simulate an API failure.
 	api := &jimmtest.API{
 		Activate_: func(modelUUID string, sourceInfo migration.SourceControllerInfo, relatedModels []string) error {
-			return errors.New("API failure")
+			return errors.E("API failure")
 		},
 	}
 
