@@ -16,6 +16,8 @@ const (
 	ControllerBootstrapLock LockID = 1001
 )
 
+// LockAdvisory attempts to acquire an advisory lock with the given ID.
+// It returns an error if the lock is already held by another session.
 func (d *Database) LockAdvisory(ctx context.Context, id LockID) error {
 	var success bool
 	err := d.DB.WithContext(ctx).Raw("SELECT pg_try_advisory_lock(?)", id).Scan(&success).Error
@@ -29,6 +31,8 @@ func (d *Database) LockAdvisory(ctx context.Context, id LockID) error {
 	return nil
 }
 
+// UnlockAdvisory releases an advisory lock with the given ID.
+// It returns an error if the lock was not held or could not be released.
 func (d *Database) UnlockAdvisory(ctx context.Context, id LockID) error {
 	var released bool
 

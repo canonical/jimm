@@ -12,7 +12,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/db"
-	jimmdb "github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -37,12 +36,12 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 		DB: gdb2,
 	}
 
-	// Acquite lock in db session 1.
-	err = db1.LockAdvisory(ctx, jimmdb.ControllerBootstrapLock)
+	// Acquire lock in db session 1.
+	err = db1.LockAdvisory(ctx, db.ControllerBootstrapLock)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock"))
 
 	// Attempt to acquire lock in session 2, should fail.
-	err = db2.LockAdvisory(ctx, jimmdb.ControllerBootstrapLock)
+	err = db2.LockAdvisory(ctx, db.ControllerBootstrapLock)
 	c.Assert(
 		err,
 		qt.ErrorMatches,
@@ -51,10 +50,10 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	)
 
 	// Now unlock from session 1 and attempt to acquire in session 2 again.
-	err = db1.UnlockAdvisory(ctx, jimmdb.ControllerBootstrapLock)
+	err = db1.UnlockAdvisory(ctx, db.ControllerBootstrapLock)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to release lock"))
 
-	err = db2.LockAdvisory(ctx, jimmdb.ControllerBootstrapLock)
+	err = db2.LockAdvisory(ctx, db.ControllerBootstrapLock)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock in second session"))
 }
 
