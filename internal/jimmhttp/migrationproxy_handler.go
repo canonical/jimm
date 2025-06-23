@@ -66,7 +66,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 	controllerDetails, err := hph.jimm.JujuManager().ControllerDetailsForIncomingModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			writeError(ctx, w, http.StatusNotFound, err, "controller details not found")
+			writeError(ctx, w, http.StatusNotFound, err, "migrating model not found")
 			return
 		}
 		writeError(ctx, w, http.StatusInternalServerError, err, "cannot retrieve controller")

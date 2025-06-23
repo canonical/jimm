@@ -154,10 +154,8 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	err := j.CredentialStore.PutControllerCredentials(ctx, "test1", "test-user", "test-password")
-	c.Assert(err, qt.IsNil)
-
-	_, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	// Expect an error when there is no incoming model migration.
+	_, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
@@ -167,6 +165,15 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	err = j.Database.AddIncomingModelMigration(ctx, &modelMigration)
 	c.Assert(err, qt.IsNil)
 
+	// Expect an error when the controller credentials are not set.
+	_, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	err = j.CredentialStore.PutControllerCredentials(ctx, "test1", "test-user", "test-password")
+	c.Assert(err, qt.IsNil)
+
+	// Expect to retrieve the controller details successfully.
 	controllerDetails, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(controllerDetails.Controller.Name, qt.Equals, "test1")
@@ -341,7 +348,6 @@ func TestActivate_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	modelUUID := "00000001-0000-0000-0000-000000000001"
 	sourceInfo := migration.SourceControllerInfo{
 		ControllerTag: names.NewControllerTag("00000001-0000-0000-0000-000000000002"),
 	}
@@ -371,12 +377,12 @@ func TestActivate_Success(t *testing.T) {
 	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
 	c.Assert(err, qt.IsNil)
 
-	err = j.Activate(ctx, names.NewModelTag(modelUUID), sourceInfo, relatedModels)
+	err = j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
 	c.Assert(err, qt.IsNil)
 
 	modelMigration = dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
-			String: modelUUID,
+			String: migratingModelUUID,
 			Valid:  true,
 		},
 	}
@@ -397,7 +403,6 @@ func TestActivate_APIFailure(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	modelUUID := "00000001-0000-0000-0000-000000000001"
 	sourceInfo := migration.SourceControllerInfo{}
 	relatedModels := []string{"related-model-1", "related-model-2"}
 
@@ -422,12 +427,12 @@ func TestActivate_APIFailure(t *testing.T) {
 	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
 	c.Assert(err, qt.IsNil)
 
-	err = j.Activate(ctx, names.NewModelTag(modelUUID), sourceInfo, relatedModels)
+	err = j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
 	c.Assert(err, qt.ErrorMatches, `.*API failure`)
 
 	modelMigration = dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
-			String: modelUUID,
+			String: migratingModelUUID,
 			Valid:  true,
 		},
 	}

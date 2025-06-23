@@ -113,6 +113,10 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 		return ControllerDetails{}, err
 	}
 
+	if username == "" || password == "" {
+		return ControllerDetails{}, errors.E(op, errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
+	}
+
 	return ControllerDetails{
 		Controller: incomingModel.TargetController,
 		Credentials: ControllerCreds{

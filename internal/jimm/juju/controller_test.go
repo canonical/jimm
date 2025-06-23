@@ -1532,13 +1532,21 @@ func TestControllerDetailsForModel(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testControllerDetailsForModelEnv)
 	env.PopulateDB(c, j.Database)
 
-	err := j.CredentialStore.PutControllerCredentials(ctx, "controller-1", "test-user", "test-password")
-	c.Assert(err, qt.IsNil)
-
-	_, err = j.ControllerDetailsForModel(ctx, invalidUUID)
+	// Expect a failure with an invalid UUID
+	_, err := j.ControllerDetailsForModel(ctx, invalidUUID)
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
+	// Expect a failure with a valid UUID but no credentials
+	_, err = j.ControllerDetailsForModel(ctx, validUUID)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Set up credentials for the controller
+	err = j.CredentialStore.PutControllerCredentials(ctx, "controller-1", "test-user", "test-password")
+	c.Assert(err, qt.IsNil)
+
+	// Expect a successful retrieval of controller details with valid UUID and credentials
 	controllerDetails, err := j.ControllerDetailsForModel(ctx, validUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(controllerDetails.Controller.ID, qt.Not(qt.Equals), 0)

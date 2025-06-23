@@ -69,7 +69,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 	controllerDetails, err := hph.jimm.JujuManager().ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			writeError(ctx, w, http.StatusNotFound, err, "controller details not found")
+			writeError(ctx, w, http.StatusNotFound, err, "model not found")
 			return
 		}
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to get controller details")
