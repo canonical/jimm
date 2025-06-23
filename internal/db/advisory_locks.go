@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-// LockDI represents a unique identifier for an advisory lock in the database.
+// LockID represents a unique identifier for an advisory lock in the database.
 type LockID int64
 
 const (
@@ -16,7 +16,7 @@ const (
 	ControllerBootstrapLock LockID = iota + 1
 )
 
-// LockAdvisory attempts to acquire an advisory lock with the given ID.
+// lockAdvisory attempts to acquire an advisory lock with the given ID.
 // It returns an error if the lock is already held by another session.
 func (d *Database) lockAdvisory(ctx context.Context, id LockID) error {
 	var success bool
@@ -31,7 +31,7 @@ func (d *Database) lockAdvisory(ctx context.Context, id LockID) error {
 	return nil
 }
 
-// UnlockAdvisory releases an advisory lock with the given ID.
+// unlockAdvisory releases an advisory lock with the given ID.
 // It returns an error if the lock was not held or could not be released.
 func (d *Database) unlockAdvisory(ctx context.Context, id LockID) error {
 	var released bool
