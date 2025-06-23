@@ -8,6 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
@@ -55,6 +57,7 @@ func (hph *MigrationHTTPProxyHandler) SetupMiddleware() {
 // ProxyHTTP extracts the model uuid from an HTTP header to proxy the request to the right controller.
 func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+	zapctx.Debug(ctx, "starting migration proxy request", zap.String("path", req.URL.Path))
 
 	modelUUID := req.Header.Get(jujuparams.MigrationModelHTTPHeader)
 	if modelUUID == "" {

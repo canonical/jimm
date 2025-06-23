@@ -13,7 +13,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/juju/juju/core/network"
 	"github.com/juju/names/v4"
@@ -67,16 +66,8 @@ func ProxyHTTP(ctx context.Context, ctl ControllerDetails, w http.ResponseWriter
 		}
 	}
 
-	// transport is the default HTTP transport config with TLS configuration.
-	transport := &http.Transport{
-		TLSClientConfig:       tlsConfig,
-		Proxy:                 http.ProxyFromEnvironment,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
 
 	if len(urls) > 1 {
 		rand.Shuffle(len(urls), func(i, j int) {
