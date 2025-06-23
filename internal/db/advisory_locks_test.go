@@ -15,18 +15,21 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type advisoryLocksSuite struct{}
+type advisoryLocksSuite struct {
+	Database *db.Database
+}
+
+func (s *advisoryLocksSuite) Init(c *qt.C) {
+	db := &db.Database{
+		DB: jimmtest.PostgresDB(c, time.Now),
+	}
+	s.Database = db
+}
 
 func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	ctx := c.Context()
 
-	gdb1, _ := jimmtest.PostgresDBWithDbName(c, time.Now)
-
-	db1 := &db.Database{
-		DB: gdb1,
-	}
-
-	sqldb, err := db1.DB.DB()
+	sqldb, err := s.Database.DB.DB()
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL DB connection"))
 	sqlconn, err := sqldb.Conn(ctx)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL connection"))
@@ -40,7 +43,7 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	}
 
 	// Acquire lock in db session 1.
-	err = db1.LockBootstrap(ctx)
+	err = s.Database.LockBootstrap(ctx)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock"))
 
 	// Attempt to acquire lock in session 2, should fail.
@@ -53,7 +56,7 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	)
 
 	// Now unlock from session 1 and attempt to acquire in session 2 again.
-	err = db1.UnlockBootstrap(ctx)
+	err = s.Database.UnlockBootstrap(ctx)
 	c.Assert(err, qt.IsNil, qt.Commentf("Failed to release lock"))
 
 	err = db2.LockBootstrap(ctx)
