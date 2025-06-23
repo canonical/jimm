@@ -159,13 +159,7 @@ func randSeq(n int) string {
 var createDatabaseMutex = sync.Mutex{}
 var deleteDatabaseMutex = sync.Mutex{}
 
-// createDatabaseFromTemplate creates a Postgres database from a given template
-// and returns the created database name (which may be different than the
-// requested name due to sanitization) and DSN.
-// If the database was already exist, it'll be dropped and re-created.
-func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
-	databaseName := computeSafeDatabaseName(suggestedName)
-
+func GetTestDBDSN() (*url.URL, string, error) {
 	dsn := defaultDSN
 	if envTestDSN, exists := os.LookupEnv("JIMM_TEST_PGXDSN"); exists {
 		dsn = envTestDSN
@@ -173,7 +167,22 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 
 	u, err := url.Parse(dsn)
 	if err != nil {
-		return "", "", errors.E("error parsing DSN as a URI: %s", err)
+		return nil, dsn, errors.E("error parsing DSN as a URI: %s", err)
+	}
+
+	return u, dsn, nil
+}
+
+// createDatabaseFromTemplate creates a Postgres database from a given template
+// and returns the created database name (which may be different than the
+// requested name due to sanitization) and DSN.
+// If the database was already exist, it'll be dropped and re-created.
+func createDatabaseFromTemplate(suggestedName string, templateName string) (string, string, error) {
+	databaseName := computeSafeDatabaseName(suggestedName)
+
+	u, dsn, err := GetTestDBDSN()
+	if err != nil {
+		return "", "", err
 	}
 
 	createDatabaseMutex.Lock()
