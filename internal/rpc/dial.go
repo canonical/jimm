@@ -75,7 +75,7 @@ func GetAddressesAndTLSConfig(ctx context.Context, ctl *dbmodel.Controller) ([]s
 
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
-			if maybeReachable(hp.Scope) {
+			if maybeReachable(network.Scope(hp.Scope)) {
 				var ip string
 				if hp.Type == string(network.IPv6Address) {
 					ip = fmt.Sprintf("[%s]:%d", hp.Value, hp.Port)
@@ -111,11 +111,11 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 
 // maybeReachable decides what kinds of links JIMM should try to connect via.
 // Local IPs like localhost for example are excluded but public IPs and Cloud local IPs are potentially reachable.
-func maybeReachable(scope string) bool {
+func maybeReachable(scope network.Scope) bool {
 	switch scope {
-	case string(network.ScopeCloudLocal):
+	case network.ScopeCloudLocal:
 		return true
-	case string(network.ScopePublic):
+	case network.ScopePublic:
 		return true
 	case "":
 		return true

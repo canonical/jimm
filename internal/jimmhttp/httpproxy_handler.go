@@ -76,10 +76,5 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	proxyDetails := rpc.ControllerDetails{
-		Controller: controllerDetails.Controller,
-		Username:   controllerDetails.Credentials.AdminIdentityName,
-		Password:   controllerDetails.Credentials.AdminPassword,
-	}
-	rpc.ProxyHTTP(ctx, proxyDetails, w, req)
+	rpc.ProxyHTTP(ctx, controllerDetails, w, req)
 }

@@ -19,27 +19,18 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 )
 
 const (
 	defaultScheme = "https"
 )
 
-// ControllerDetails contains the details
-// used to connect to a Juju controller
-// as well as the admin user's credentials.
-type ControllerDetails struct {
-	Controller dbmodel.Controller
-	Username   string
-	Password   string
-}
-
 // ProxyHTTP handles HTTP requests by proxying them to the Juju controller.
 // It retrieves the controller's addresses, sets up TLS if necessary,
 // and acts as a reverse proxy to forward the request.
-func ProxyHTTP(ctx context.Context, ctl ControllerDetails, w http.ResponseWriter, req *http.Request) {
-	urls, err := getControllerAddresses(ctl.Controller)
+func ProxyHTTP(ctx context.Context, ctl juju.ControllerConnectionDetails, w http.ResponseWriter, req *http.Request) {
+	urls, err := getControllerAddresses(ctl)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get controller addresses", zap.Error(err))
 		http.Error(w, fmt.Sprintf("failed to get controller addresses: %v", err), http.StatusInternalServerError)
@@ -47,21 +38,21 @@ func ProxyHTTP(ctx context.Context, ctl ControllerDetails, w http.ResponseWriter
 	}
 
 	if len(urls) == 0 {
-		zapctx.Error(ctx, "no controller addresses found", zap.String("controller", ctl.Controller.Name))
+		zapctx.Error(ctx, "no controller addresses found")
 		http.Error(w, "no controller addresses found", http.StatusInternalServerError)
 		return
 	}
 
 	var tlsConfig *tls.Config
-	if ctl.Controller.CACertificate != "" {
+	if ctl.CACertificate != "" {
 		cp := x509.NewCertPool()
-		ok := cp.AppendCertsFromPEM([]byte(ctl.Controller.CACertificate))
+		ok := cp.AppendCertsFromPEM([]byte(ctl.CACertificate))
 		if !ok {
 			zapctx.Warn(ctx, "no CA certificates added")
 		}
 		tlsConfig = &tls.Config{
 			RootCAs:    cp,
-			ServerName: ctl.Controller.TLSHostname,
+			ServerName: ctl.TLSHostname,
 			MinVersion: tls.VersionTLS12,
 		}
 	}
@@ -78,10 +69,11 @@ func ProxyHTTP(ctx context.Context, ctl ControllerDetails, w http.ResponseWriter
 	// TODO: Consider implementing a better load balancing mechanism that handles
 	// multiples URLs and handles failing backends gracefully e.g. try send to first
 	// URL and on failure, try second, etc.
+	adminUsername := names.NewUserTag(ctl.Credentials.AdminIdentityName).String()
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(urls[0])
-			pr.Out.SetBasicAuth(names.NewUserTag(ctl.Username).String(), ctl.Password)
+			pr.Out.SetBasicAuth(adminUsername, ctl.Credentials.AdminPassword)
 		},
 		Transport: transport,
 		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us
@@ -96,7 +88,7 @@ func (pl *proxyErrorLogger) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func getControllerAddresses(ctl dbmodel.Controller) ([]*url.URL, error) {
+func getControllerAddresses(ctl juju.ControllerConnectionDetails) ([]*url.URL, error) {
 	urls := make([]*url.URL, 0, 1)
 	if ctl.PublicAddress != "" {
 		address := ctl.PublicAddress
@@ -115,10 +107,10 @@ func getControllerAddresses(ctl dbmodel.Controller) ([]*url.URL, error) {
 		for _, hp := range hps {
 			if maybeReachable(hp.Scope) {
 				var ip string
-				if hp.Type == string(network.IPv6Address) {
-					ip = fmt.Sprintf("[%s]:%d", hp.Value, hp.Port)
+				if hp.Type == network.IPv6Address {
+					ip = fmt.Sprintf("[%s]:%d", hp.Value, hp.Port())
 				} else {
-					ip = fmt.Sprintf("%s:%d", hp.Value, hp.Port)
+					ip = fmt.Sprintf("%s:%d", hp.Value, hp.Port())
 				}
 				newURL := url.URL{Scheme: defaultScheme, Host: ip}
 				urls = append(urls, &newURL)

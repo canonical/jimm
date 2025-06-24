@@ -1549,9 +1549,7 @@ func TestControllerDetailsForModel(t *testing.T) {
 	// Expect a successful retrieval of controller details with valid UUID and credentials
 	controllerDetails, err := j.ControllerDetailsForModel(ctx, validUUID)
 	c.Assert(err, qt.IsNil)
-	c.Assert(controllerDetails.Controller.ID, qt.Not(qt.Equals), 0)
-	c.Assert(controllerDetails.Controller.Name, qt.Equals, "controller-1")
-	c.Assert(controllerDetails.Controller.PublicAddress, qt.Equals, "test-address.com")
+	c.Assert(controllerDetails.PublicAddress, qt.Equals, "test-address.com")
 	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }

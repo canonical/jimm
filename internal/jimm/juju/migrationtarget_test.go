@@ -176,9 +176,7 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	// Expect to retrieve the controller details successfully.
 	controllerDetails, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
-	c.Assert(controllerDetails.Controller.Name, qt.Equals, "test1")
-	c.Assert(controllerDetails.Controller.ID, qt.Not(qt.Equals), 0)
-	c.Assert(controllerDetails.Controller.PublicAddress, qt.Equals, "foo.com")
+	c.Assert(controllerDetails.PublicAddress, qt.Equals, "foo.com")
 	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }

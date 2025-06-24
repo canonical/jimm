@@ -90,7 +90,7 @@ func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, mod
 
 // ControllerDetailsForIncomingModel retrieves the target controller details for a model that is being migrated.
 // It returns the controller information, username, and password for the target controller.
-func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (ControllerDetails, error) {
+func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (ControllerConnectionDetails, error) {
 	const op = errors.Op("jimm.ControllerDetailsForIncomingModel")
 
 	incomingModel := dbmodel.IncomingModelMigration{
@@ -103,27 +103,21 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return ControllerDetails{}, errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
+			return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
 		}
-		return ControllerDetails{}, errors.E(op, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
+		return ControllerConnectionDetails{}, errors.E(op, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
 	}
 
 	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, incomingModel.TargetController.Name)
 	if err != nil {
-		return ControllerDetails{}, err
+		return ControllerConnectionDetails{}, err
 	}
 
 	if username == "" || password == "" {
-		return ControllerDetails{}, errors.E(op, errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
+		return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
 	}
 
-	return ControllerDetails{
-		Controller: incomingModel.TargetController,
-		Credentials: ControllerCreds{
-			AdminIdentityName: username,
-			AdminPassword:     password,
-		},
-	}, nil
+	return toControllerConnectionDetails(incomingModel.TargetController, username, password), nil
 }
 
 // Prechecks checks that the model can be migrated to the target controller.
