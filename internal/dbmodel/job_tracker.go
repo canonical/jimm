@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 // JobStatus represents the status of a job in the job tracker.
@@ -31,10 +30,10 @@ type JobTrackerEntry struct {
 	JobID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	// JobType is the type of the job, e.g., bootstrap, destroy, etc.
 	JobType string `gorm:"type:varchar(128);not null"`
-	// Stop signals whether the job should be stopped. This is set to true when the job is
+	// StopSignal signals whether the job should be stopped. This is set to true when the job is
 	// requested to be stopped, but it does not mean the job has stopped yet.
 	// This can be determined by the Status field.
-	Stop bool `gorm:"not null;default:false"`
+	StopSignal bool `gorm:"not null;default:false"`
 	// Status holds the current status of the job.
 	Status JobStatus `gorm:"type:job_tracker_status;not null;default:'pending'"`
 	// Error holds any error message associated with the job. Not to be set manually
@@ -43,18 +42,22 @@ type JobTrackerEntry struct {
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 // NewJobTrackerEntry creates a new JobTrackerEntry with the given jobType.
 // The Status is set to [statusPending] by default.
 // And a new JobID is generated automatically.
-func NewJobTrackerEntry(jobType string) *JobTrackerEntry {
+func NewJobTrackerEntry(jobType string) (*JobTrackerEntry, error) {
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+
 	return &JobTrackerEntry{
-		JobID:   uuid.New(),
+		JobID:   uuid,
 		JobType: jobType,
 		Status:  StatusPending,
-	}
+	}, nil
 }
 
 // SetFailed marks the job as failed and sets the error message.

@@ -27,7 +27,8 @@ func (j *jobTrackerSuite) TestJobTracker(c *qt.C) {
 	badEntry := &dbmodel.JobTrackerEntry{}
 	c.Assert(db.First(badEntry).Error, qt.IsNotNil)
 
-	entry := dbmodel.NewJobTrackerEntry("test-job")
+	entry, err := dbmodel.NewJobTrackerEntry("test-job")
+	c.Assert(err, qt.IsNil)
 	c.Assert(db.Create(entry).Error, qt.IsNil)
 
 	c.Assert(entry.Error, qt.Equals, "")
@@ -48,7 +49,8 @@ func (j *jobTrackerSuite) TestJobTracker_CannotSetArbritaryStatus(c *qt.C) {
 	badEntry := &dbmodel.JobTrackerEntry{}
 	c.Assert(db.First(badEntry).Error, qt.IsNotNil)
 
-	entry := dbmodel.NewJobTrackerEntry("test-job")
+	entry, err := dbmodel.NewJobTrackerEntry("test-job")
+	c.Assert(err, qt.IsNil)
 	c.Assert(db.Create(entry).Error, qt.IsNil)
 
 	entry.Status = "not a real status"

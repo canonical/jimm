@@ -29,7 +29,10 @@ func (d *Database) AddJob(ctx context.Context, jobType string) (jobId uuid.UUID,
 
 	db := d.DB.WithContext(ctx)
 
-	entry := dbmodel.NewJobTrackerEntry(jobType)
+	entry, err := dbmodel.NewJobTrackerEntry(jobType)
+	if err != nil {
+		return jobId, errors.E(op, fmt.Sprintf("failed to create new job tracker entry: %v", err))
+	}
 	if err := db.Create(entry).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
@@ -56,8 +59,14 @@ func (d *Database) StopJob(ctx context.Context, jobId uuid.UUID) (err error) {
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	if err := db.Model(&dbmodel.JobTrackerEntry{}).Where("job_id = ?", jobId).Update("stop", true).Error; err != nil {
+
+	result := db.Model(&dbmodel.JobTrackerEntry{}).Where("job_id = ?", jobId).Update("stop_signal", true)
+	if err := result.Error; err != nil {
 		return dbError(err)
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("job %s not found", jobId))
 	}
 
 	return nil
@@ -70,7 +79,7 @@ func (d *Database) SetJobRunning(ctx context.Context, jobId uuid.UUID) (err erro
 		JobID: jobId,
 	}
 	entry.SetRunning()
-	return d.updateJobStatus(ctx, entry)
+	return d.updateJob(ctx, entry)
 }
 
 // SetJobSuccessful sets the job status to successful.
@@ -80,7 +89,7 @@ func (d *Database) SetJobSuccessful(ctx context.Context, jobId uuid.UUID) (err e
 		JobID: jobId,
 	}
 	entry.SetSuccessful()
-	return d.updateJobStatus(ctx, entry)
+	return d.updateJob(ctx, entry)
 }
 
 // SetJobFailed sets the job status to failed and records the error message.
@@ -94,10 +103,10 @@ func (d *Database) SetJobFailed(ctx context.Context, jobId uuid.UUID, jobErr err
 		return errors.E(op, err)
 	}
 
-	return d.updateJobStatus(ctx, entry)
+	return d.updateJob(ctx, entry)
 }
 
-func (d *Database) updateJobStatus(ctx context.Context, entry dbmodel.JobTrackerEntry) (err error) {
+func (d *Database) updateJob(ctx context.Context, entry dbmodel.JobTrackerEntry) (err error) {
 	const op = errors.Op("db.updateJobStatus")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -108,8 +117,13 @@ func (d *Database) updateJobStatus(ctx context.Context, entry dbmodel.JobTracker
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	db := d.DB.WithContext(ctx)
-	if err := db.Model(&entry).Select("status", "error").Updates(entry).Error; err != nil {
+	result := db.Model(&entry).Select("status", "error").Updates(entry)
+	if err := result.Error; err != nil {
 		return dbError(err)
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.E(op, errors.CodeNotFound, fmt.Sprintf("job %s not found", entry.JobID))
 	}
 
 	return nil
