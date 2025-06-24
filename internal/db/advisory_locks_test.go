@@ -30,13 +30,13 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 	ctx := c.Context()
 
 	sqldb, err := s.Database.DB.DB()
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL DB connection"))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL DB connection."))
 	sqlconn, err := sqldb.Conn(ctx)
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL connection"))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to get SQL connection."))
 	gdb2, err := gorm.Open(postgres.New(postgres.Config{
 		Conn: sqlconn,
 	}))
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to open second GORM DB connection"))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to open second GORM DB connection."))
 
 	db2 := &db.Database{
 		DB: gdb2,
@@ -44,7 +44,7 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 
 	// Acquire lock in db session 1.
 	err = s.Database.LockBootstrap(ctx)
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock"))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock."))
 
 	// Attempt to acquire lock in session 2, should fail.
 	err = db2.LockBootstrap(ctx)
@@ -52,15 +52,15 @@ func (s *advisoryLocksSuite) TestAdvisory_LockAndUnlock(c *qt.C) {
 		err,
 		qt.ErrorMatches,
 		"lock is already held",
-		qt.Commentf("Expected lock acquisition to fail in second session"),
+		qt.Commentf("Expected lock acquisition to fail in second session."),
 	)
 
 	// Now unlock from session 1 and attempt to acquire in session 2 again.
 	err = s.Database.UnlockBootstrap(ctx)
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to release lock"))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to release lock."))
 
 	err = db2.LockBootstrap(ctx)
-	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock in second session"))
+	c.Assert(err, qt.IsNil, qt.Commentf("Failed to acquire lock in second session."))
 }
 
 func TestAdvisoryLocks(t *testing.T) {
