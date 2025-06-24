@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/description/v9"
@@ -487,4 +488,65 @@ func newMigrationInfo(owner string) migration.ModelInfo {
 		ModelDescription:       modelDescription,
 	}
 	return modelInfo
+}
+
+const migratedModelEnv = `clouds:
+- name: test-cloud
+  type: test
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: test-controller
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.2.1
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: test-controller
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+`
+
+func TestLatestLogTime_Success(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	modelUUID := "00000002-0000-0000-0000-000000000001"
+	latestLogTimeCalled := false
+	// Validate that the API request to Juju is made.
+	api := &jimmtest.API{
+		LatestLogTime_: func(s string) (time.Time, error) {
+			latestLogTimeCalled = true
+			c.Check(s, qt.Equals, modelUUID)
+			return time.Now(), nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, migratedModelEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	// Test a model UUID that does not exist
+	_, err := j.LatestLogTime(ctx, "does-not-exist")
+	c.Assert(err, qt.IsNotNil)
+
+	// Test a model UUID that exists
+	logTime, err := j.LatestLogTime(ctx, modelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(logTime, qt.Not(qt.IsNil))
+	c.Assert(latestLogTimeCalled, qt.IsTrue)
 }

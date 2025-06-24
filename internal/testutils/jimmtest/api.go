@@ -150,6 +150,7 @@ type API struct {
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
 	GrantModelAccess_                  func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 	IsBroken_                          bool
+	LatestLogTime_                     func(string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ModelInfo_                         func(context.Context, *jujuparams.ModelInfo) error
 	ModelStatus_                       func(context.Context, *jujuparams.ModelStatus) error
@@ -368,6 +369,13 @@ func (a *API) ModelSummaryWatcherStop(ctx context.Context, id string) error {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.ModelSummaryWatcherStop_(ctx, id)
+}
+
+func (a *API) LatestLogTime(modelUUID string) (time.Time, error) {
+	if a.LatestLogTime_ == nil {
+		return time.Time{}, errors.E(errors.CodeNotImplemented)
+	}
+	return a.LatestLogTime_(modelUUID)
 }
 
 func (a *API) ListModelSummaries(ctx context.Context, req jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
