@@ -1492,3 +1492,64 @@ func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec) 
 func (c *testControllerClient) Close() error {
 	return nil
 }
+
+const testControllerDetailsForModelEnv = `clouds:
+- name: test-cloud
+  type: test
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-cred
+  cloud: test-cloud
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.3
+  public-address: test-address.com
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-1
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-cred
+  owner: alice@canonical.com
+`
+
+func TestControllerDetailsForModel(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	invalidUUID := "invalid-uuid"
+	validUUID := "00000002-0000-0000-0000-000000000003"
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testControllerDetailsForModelEnv)
+	env.PopulateDB(c, j.Database)
+
+	// Expect a failure with an invalid UUID
+	_, err := j.ControllerDetailsForModel(ctx, invalidUUID)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Expect a failure with a valid UUID but no credentials
+	_, err = j.ControllerDetailsForModel(ctx, validUUID)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Set up credentials for the controller
+	err = j.CredentialStore.PutControllerCredentials(ctx, "controller-1", "test-user", "test-password")
+	c.Assert(err, qt.IsNil)
+
+	// Expect a successful retrieval of controller details with valid UUID and credentials
+	controllerDetails, err := j.ControllerDetailsForModel(ctx, validUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(controllerDetails.PublicAddress, qt.Equals, "test-address.com")
+	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
+	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
+}

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc
 
@@ -7,25 +7,42 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
+	"log"
+	"math/rand"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
+	"strings"
 
-	"github.com/juju/zaputil"
+	"github.com/juju/juju/core/network"
+	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
-	"gopkg.in/errgo.v1"
+	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 )
 
-type httpOptions struct {
-	TLSConfig *tls.Config
-	URL       url.URL
-}
+const (
+	defaultScheme = "https"
+)
 
-// ProxyHTTP proxies the request to the controller using the info contained in dbmodel.Controller.
-// It tries for a controller, if it errors, it logs the error and go to the next, if no controller responds it returns a 504.
-func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWriter, req *http.Request) error {
+// ProxyHTTP handles HTTP requests by proxying them to the Juju controller.
+// It retrieves the controller's addresses, sets up TLS if necessary,
+// and acts as a reverse proxy to forward the request.
+func ProxyHTTP(ctx context.Context, ctl juju.ControllerConnectionDetails, w http.ResponseWriter, req *http.Request) {
+	urls, err := getControllerAddresses(ctl)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get controller addresses", zap.Error(err))
+		http.Error(w, fmt.Sprintf("failed to get controller addresses: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if len(urls) == 0 {
+		zapctx.Error(ctx, "no controller addresses found")
+		http.Error(w, "no controller addresses found", http.StatusInternalServerError)
+		return
+	}
+
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
 		cp := x509.NewCertPool()
@@ -40,65 +57,65 @@ func ProxyHTTP(ctx context.Context, ctl *dbmodel.Controller, w http.ResponseWrit
 		}
 	}
 
-	if ctl.PublicAddress != "" {
-		err := doRequest(ctx, w, req, httpOptions{
-			TLSConfig: tlsConfig,
-			URL:       createURLWithNewHost(*req.URL, ctl.PublicAddress),
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+
+	if len(urls) > 1 {
+		rand.Shuffle(len(urls), func(i, j int) {
+			urls[i], urls[j] = urls[j], urls[i]
 		})
-		if err == nil {
-			return nil
-		}
 	}
+
+	// TODO: Consider implementing a better load balancing mechanism that handles
+	// multiples URLs and handles failing backends gracefully e.g. try send to first
+	// URL and on failure, try second, etc.
+	adminUsername := names.NewUserTag(ctl.Credentials.AdminIdentityName).String()
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(urls[0])
+			pr.Out.SetBasicAuth(adminUsername, ctl.Credentials.AdminPassword)
+		},
+		Transport: transport,
+		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us
+	}
+	proxy.ServeHTTP(w, req)
+}
+
+type proxyErrorLogger struct{}
+
+func (pl *proxyErrorLogger) Write(p []byte) (n int, err error) {
+	zapctx.Error(context.Background(), "HTTP proxy error", zap.String("error", string(p)))
+	return len(p), nil
+}
+
+func getControllerAddresses(ctl juju.ControllerConnectionDetails) ([]*url.URL, error) {
+	urls := make([]*url.URL, 0, 1)
+	if ctl.PublicAddress != "" {
+		address := ctl.PublicAddress
+		if !strings.Contains(address, "://") {
+			address = defaultScheme + "://" + address // ensure the address has a scheme
+		}
+		newURL, err := url.Parse(address)
+		if err != nil {
+			return nil, err
+		}
+		urls = append(urls, newURL)
+		return urls, nil
+	}
+
 	for _, hps := range ctl.Addresses {
 		for _, hp := range hps {
-			err := doRequest(ctx, w, req, httpOptions{
-				TLSConfig: tlsConfig,
-				URL:       createURLWithNewHost(*req.URL, fmt.Sprintf("%s:%d", hp.Value, hp.Port)),
-			})
-			if err == nil {
-				return nil
-			} else {
-				zapctx.Error(ctx, "failed to proxy request: continue to next addr", zaputil.Error(err))
+			if maybeReachable(hp.Scope) {
+				var ip string
+				if hp.Type == network.IPv6Address {
+					ip = fmt.Sprintf("[%s]:%d", hp.Value, hp.Port())
+				} else {
+					ip = fmt.Sprintf("%s:%d", hp.Value, hp.Port())
+				}
+				newURL := url.URL{Scheme: defaultScheme, Host: ip}
+				urls = append(urls, &newURL)
 			}
 		}
 	}
-
-	return errgo.New("couldn't reach a valid address for controller")
-}
-
-func doRequest(ctx context.Context, w http.ResponseWriter, req *http.Request, opt httpOptions) error {
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: opt.TLSConfig,
-		},
-	}
-	req = req.Clone(ctx)
-	req.RequestURI = ""
-	req.URL = &opt.URL
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// copy headers
-	for k, vv := range resp.Header {
-		for _, v := range vv {
-			w.Header().Add(k, v)
-		}
-	}
-	w.WriteHeader(resp.StatusCode)
-	// copy body
-	_, err = io.Copy(w, resp.Body)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// createURLWithNewHost takes a url.URL as parameter and return a url.URL with new host set and https enforced.
-func createURLWithNewHost(reqUrl url.URL, host string) url.URL {
-	reqUrl.Scheme = "https"
-	reqUrl.Host = host
-	return reqUrl
+	return urls, nil
 }

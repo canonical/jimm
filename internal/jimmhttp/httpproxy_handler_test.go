@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmhttp_test
 
@@ -78,10 +78,10 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 	// we expect the controller to respond with TLS
 	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, _ := r.BasicAuth()
-		c.Assert(u, gc.Equals, names.NewUserTag(expectU).String())
-		c.Assert(p, gc.Equals, expectP)
-		_, err = w.Write([]byte("OK"))
-		c.Assert(err, gc.IsNil)
+		c.Check(u, gc.Equals, names.NewUserTag(expectU).String())
+		c.Check(p, gc.Equals, expectP)
+		_, err := w.Write([]byte("OK"))
+		c.Check(err, gc.IsNil)
 	}))
 	defer fakeController.Close()
 	controller := s.model.Controller
@@ -104,7 +104,7 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 			setup: func() {
 				newURL, _ := url.Parse(fakeController.URL)
 				controller.PublicAddress = newURL.Host
-				err = s.JIMM.Database.UpdateController(ctx, &controller)
+				err := s.JIMM.Database.UpdateController(ctx, &controller)
 				c.Assert(err, gc.IsNil)
 			},
 			url:            fmt.Sprintf("/model/%s/charms", s.model.UUID.String),
@@ -113,17 +113,31 @@ func (s *httpProxySuite) TestHTTPProxyHandler(c *gc.C) {
 			bodyExpected:   "OK",
 		},
 		{
+			description: "invalid model UUID",
+			setup: func() {
+				newURL, _ := url.Parse(fakeController.URL)
+				controller.PublicAddress = newURL.Host
+				err := s.JIMM.Database.UpdateController(ctx, &controller)
+				c.Assert(err, gc.IsNil)
+			},
+			url:            fmt.Sprintf("/model/%s/charms", "fake-uuid"),
+			modelUUID:      "fake-uuid",
+			statusExpected: http.StatusBadRequest,
+			bodyExpected:   "Bad Request - invalid model UUID format",
+		},
+		{
 			description: "model not existing",
 			setup: func() {
 			},
 			url:            fmt.Sprintf("/model/%s/charms", "54d9f921-c45a-4825-8253-74e7edc28066"),
 			modelUUID:      "54d9f921-c45a-4825-8253-74e7edc28066",
 			statusExpected: http.StatusNotFound,
-			bodyExpected:   ".*failed to get model.*",
+			bodyExpected:   "Not Found - migrating model .* not found",
 		},
 	}
 
 	for _, test := range tests {
+		c.Log(test.description)
 		if test.setup != nil {
 			test.setup()
 		}

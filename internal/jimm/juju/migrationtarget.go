@@ -88,6 +88,38 @@ func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, mod
 	return machineErrors, nil
 }
 
+// ControllerDetailsForIncomingModel retrieves the target controller details for a model that is being migrated.
+// It returns the controller information, username, and password for the target controller.
+func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (ControllerConnectionDetails, error) {
+	const op = errors.Op("jimm.ControllerDetailsForIncomingModel")
+
+	incomingModel := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+
+	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
+		}
+		return ControllerConnectionDetails{}, errors.E(op, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
+	}
+
+	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, incomingModel.TargetController.Name)
+	if err != nil {
+		return ControllerConnectionDetails{}, err
+	}
+
+	if username == "" || password == "" {
+		return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
+	}
+
+	return toControllerConnectionDetails(incomingModel.TargetController, username, password), nil
+}
+
 // Prechecks checks that the model can be migrated to the target controller.
 // It does this by calling the method of the same name on the target Juju controller.
 // As part of all model migrations passing through JIMM, it modifies the model description

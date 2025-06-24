@@ -747,3 +747,34 @@ func (j *JujuManager) ControllerConfig(ctx context.Context, controllerName strin
 	}
 	return jujucontroller.Config(cfg.Config), nil
 }
+
+// ControllerDetailsForModel returns the controller details for the specified model
+// including the controller, and the admin credentials (username and password) for the controller.
+func (j *JujuManager) ControllerDetailsForModel(ctx context.Context, modelUUID string) (ControllerConnectionDetails, error) {
+	const op = errors.Op("jimm.ControllerDetailsForModel")
+
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetModel(ctx, &model)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
+		}
+		return ControllerConnectionDetails{}, errors.E(op, err)
+	}
+
+	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, model.Controller.Name)
+	if err != nil {
+		return ControllerConnectionDetails{}, errors.E(op, err)
+	}
+
+	if username == "" || password == "" {
+		return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", model.Controller.Name))
+	}
+
+	return toControllerConnectionDetails(model.Controller, username, password), nil
+}

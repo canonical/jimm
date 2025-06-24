@@ -499,12 +499,16 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	// Websockets require extra care when cookies are used for authentication
 	// to avoid CSRF attacks. https://portswigger.net/web-security/websockets/cross-site-websocket-hijacking
 	websocketCors := middleware.NewWebsocketCors(p.CorsAllowedOrigins)
+	// Juju API handlers
 	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
 	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
-	mountHandler(
-		"/model/{uuid}/{type:charms|applications}",
-		jimmhttp.NewHTTPProxyHandler(s.jimm),
-	)
+	// Uploading local charms
+	mountHandler("/model/{uuid}/{type:charms|applications}", jimmhttp.NewHTTPProxyHandler(s.jimm))
+	// HTTP Migration endpoints
+	mountHandler("/migrate", jimmhttp.NewMigrationHTTPProxyHandler(s.jimm))
+	// Log transfer endpoint
+	// TODO: Implement log transfer, this uses a websocket rather than HTTP.
+	// s.mux.Handle("/migrate/logtransfer", jimmhttp.NewHTTPProxyHandler(s.jimm).Routes())
 
 	// serve the ssh public key fingerprint
 	s.mux.Get("/ssh/public-key-fingerprints", jimmhttp.WriteFingerprints(p.HostKeyFingerprints))
