@@ -58,7 +58,11 @@ func (j *jobTrackerSuite) TestJobTracker_CannotSetArbritaryStatus(c *qt.C) {
 func (j *jobTrackerSuite) TestJobTracker_StatusesSetCorrectly(c *qt.C) {
 	entry := dbmodel.JobTrackerEntry{}
 
-	entry.SetFailed(errors.New("test error"))
+	err := entry.SetFailed(nil)
+	c.Assert(err, qt.ErrorMatches, ".*error cannot be nil.*")
+
+	err = entry.SetFailed(errors.New("test error"))
+	c.Assert(err, qt.IsNil)
 	c.Assert(entry.Status, qt.Equals, dbmodel.StatusFailed)
 	c.Assert(entry.Error, qt.Equals, "test error")
 
