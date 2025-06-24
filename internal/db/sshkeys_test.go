@@ -30,7 +30,7 @@ type sshKeysSuite struct {
 func (s *sshKeysSuite) Init(c *qt.C) {
 	ctx := context.Background()
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	s.Database = db
 	err := s.Database.Migrate(context.Background())

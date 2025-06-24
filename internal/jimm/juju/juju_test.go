@@ -32,7 +32,7 @@ func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 		p.CrossModelQueryTimeout = time.Second * 5
 	}
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		DB: jimmtest.PostgresDB(c, func() time.Time { return now }, false),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

@@ -64,7 +64,7 @@ func NewJIMM(t Tester, additionalParameters *jimm.Parameters, options ...Option)
 
 	if p.Database == nil {
 		p.Database = &db.Database{
-			DB: PostgresDB(t, func() time.Time { return now }),
+			DB: PostgresDB(t, func() time.Time { return now }, false),
 		}
 	}
 	if p.CredentialStore == nil {

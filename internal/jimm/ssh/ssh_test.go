@@ -86,7 +86,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	// Setup DB
 
 	s.database = &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	err := s.database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

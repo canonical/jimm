@@ -25,7 +25,7 @@ import (
 func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 	// Setup db ahead of time so we have access to session store
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	c.Assert(db.Migrate(context.Background()), qt.IsNil)
 

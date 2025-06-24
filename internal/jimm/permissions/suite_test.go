@@ -33,7 +33,7 @@ func (s *permissionManagerSuite) Init(c *qt.C) {
 	ctx := context.Background()
 
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

@@ -39,16 +39,15 @@ type Tester interface {
 // is already-migrated).
 // In cases where you need an entirely empty database, you should use
 // `CreateEmptyDatabase` function in this package.
-func PostgresDB(t Tester, nowFunc func() time.Time) *gorm.DB {
-	db, _ := PostgresDBWithDbName(t, nowFunc)
+func PostgresDB(t Tester, nowFunc func() time.Time, logSQL bool) *gorm.DB {
+	db, _ := PostgresDBWithDbName(t, nowFunc, logSQL)
 	return db
 }
 
 // PostgresDBWithDbName creates a Postgres DB for tests, returning the DB name.
 // Useful for GoCheck tests that don't support a cleanup function and require the DB
 // name for manual cleanup.
-func PostgresDBWithDbName(t Tester, nowFunc func() time.Time) (*gorm.DB, string) {
-
+func PostgresDBWithDbName(t Tester, nowFunc func() time.Time, logSQL bool) (*gorm.DB, string) {
 	wrappedNowFunc := func() time.Time {
 		var now time.Time
 		if nowFunc != nil {
@@ -59,7 +58,7 @@ func PostgresDBWithDbName(t Tester, nowFunc func() time.Time) (*gorm.DB, string)
 		return now.Truncate(time.Microsecond)
 	}
 	cfg := gorm.Config{
-		Logger:  logger.NewGormTestLogger(t),
+		Logger:  logger.NewGormTestLogger(t, logSQL),
 		NowFunc: wrappedNowFunc,
 	}
 

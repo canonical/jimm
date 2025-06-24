@@ -28,7 +28,7 @@ type identityManagerSuite struct {
 func (s *identityManagerSuite) Init(c *qt.C) {
 	// Setup DB
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

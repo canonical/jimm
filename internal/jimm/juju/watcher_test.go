@@ -140,7 +140,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			w := &juju.Watcher{
 				Pubsub: publisher,
 				Database: &db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
+					DB: jimmtest.PostgresDB(c, nil, false),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -223,7 +223,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	controllerUnavailableChannel := make(chan error, 1)
 	w := juju.NewWatcherWithControllerUnavailableChan(
 		&db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil, false),
 		},
 		&jimmtest.Dialer{
 			Err: errors.E("test error"),
@@ -269,7 +269,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 
 	w := juju.Watcher{
 		Database: &db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
+			DB: jimmtest.PostgresDB(c, nil, false),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{

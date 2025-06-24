@@ -33,7 +33,7 @@ var _ = gc.Suite(&dischargerSuite{})
 
 func (s *dischargerSuite) Init(c *qt.C) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

@@ -77,7 +77,7 @@ func (s *postgresSuite) Init(c *qt.C) {
 
 	cfg := gorm.Config{
 		NowFunc: func() time.Time { return time.Now().UTC().Round(time.Millisecond) },
-		Logger:  logger.NewGormTestLogger(c),
+		Logger:  logger.NewGormTestLogger(c, false),
 	}
 	pCfg := postgres.Config{
 		Conn: sqlDB,

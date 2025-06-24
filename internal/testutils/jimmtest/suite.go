@@ -101,7 +101,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		},
 	}
 
-	pgdb, databaseName := PostgresDBWithDbName(gct, nil)
+	pgdb, databaseName := PostgresDBWithDbName(gct, nil, false)
 	s.databaseName = databaseName
 
 	database := &db.Database{

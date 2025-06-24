@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package logger
 
 import (
@@ -28,7 +29,7 @@ type gormLogger struct {
 
 // NewGormLogger returns a gorm logger.Interface that can be used in a test
 // All output is logged to the test.
-func NewGormTestLogger(t Tester) logger.Interface {
+func NewGormTestLogger(t Tester, logSQL bool) logger.Interface {
 	output := gormTesterZapWriter{t}
 
 	devConfig := zap.NewDevelopmentEncoderConfig()
@@ -42,11 +43,18 @@ func NewGormTestLogger(t Tester) logger.Interface {
 			zap.DebugLevel,
 		))
 	zapctx.Default = logger
-	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_TEST_LOG_SQL"))
+	shouldLogSQL := false
+	if logSQL {
+		shouldLogSQL = true
+	} else {
+		logSQLEnv, _ := strconv.ParseBool(os.Getenv("JIMM_TEST_LOG_SQL"))
+		shouldLogSQL = logSQLEnv
+	}
+
 	return &gormLogger{
 		t: t,
 		GormLogger: GormLogger{
-			LogSQL: logSQL,
+			LogSQL: shouldLogSQL,
 		},
 	}
 }

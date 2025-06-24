@@ -21,7 +21,7 @@ type advisoryLocksSuite struct {
 
 func (s *advisoryLocksSuite) Init(c *qt.C) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: jimmtest.PostgresDB(c, time.Now, false),
 	}
 	s.Database = db
 }
