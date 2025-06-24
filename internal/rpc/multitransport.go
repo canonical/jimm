@@ -33,6 +33,18 @@ type multiBackendTransport struct {
 	currentURLIndex int
 }
 
+// newMultiBackendTransport creates a new MultiBackendTransport with the given
+// base transport and URLs.
+func newMultiBackendTransport(baseTransport http.RoundTripper, urls []*url.URL) (*multiBackendTransport, error) {
+	if len(urls) == 0 {
+		return nil, errors.New("no backend URLs configured")
+	}
+	return &multiBackendTransport{
+		baseTransport: baseTransport,
+		urls:          urls,
+	}, nil
+}
+
 // RoundTrip implements the http.RoundTripper interface and attempts to make
 // requests to multiple backends in succession.
 func (m *multiBackendTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -83,16 +95,4 @@ func (m *multiBackendTransport) RoundTrip(req *http.Request) (*http.Response, er
 
 	// All backends failed
 	return nil, fmt.Errorf("all backends failed, last error: %w", lastErr)
-}
-
-// newMultiBackendTransport creates a new MultiBackendTransport with the given
-// base transport and URLs.
-func newMultiBackendTransport(baseTransport http.RoundTripper, urls []*url.URL) (*multiBackendTransport, error) {
-	if len(urls) == 0 {
-		return nil, errors.New("no backend URLs configured")
-	}
-	return &multiBackendTransport{
-		baseTransport: baseTransport,
-		urls:          urls,
-	}, nil
 }

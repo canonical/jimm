@@ -117,9 +117,7 @@ func TestMultiBackendTransport(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.description, func(t *testing.T) {
-			c = qt.New(t)
-
+		c.Run(test.description, func(c *qt.C) {
 			body := strings.NewReader(expectedBody)
 			limitReader := io.LimitReader(body, int64(len(expectedBody))) // Ensure we can only read the data once.
 			req, err := http.NewRequest("POST", test.path, limitReader)
