@@ -53,6 +53,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	}
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	modelDescription := description.NewModel(modelDescriptionArgs)
+	modelDescription.SetStatus(description.StatusArgs{Value: "available"})
 	model := migration.ModelInfo{
 		UUID:                   modelUUID,
 		Owner:                  names.NewUserTag("alice"),
