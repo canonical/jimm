@@ -3,9 +3,10 @@
 package juju
 
 import (
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
 // ControllerCreds represent the admin username and password

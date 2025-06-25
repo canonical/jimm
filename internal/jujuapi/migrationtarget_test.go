@@ -3,7 +3,7 @@
 package jujuapi_test
 
 import (
-	"github.com/juju/description/v8"
+	"github.com/juju/description/v9"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
