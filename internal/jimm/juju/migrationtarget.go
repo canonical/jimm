@@ -196,15 +196,18 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 		// controller to another, where the owner is already an external user.
 		return nil
 	}
+
 	newOwner, ok := userMapping[model.Owner.Id()]
 	if !ok {
 		// If the owner is not found in the user mappings, we return an error.
 		// This is to ensure that the migration does not proceed with an invalid owner.
 		return errors.E(fmt.Errorf("no external user mapping found for local user %q", model.Owner.Id()))
 	}
-	model.Owner = names.NewUserTag(newOwner)
-	// TODO: Replace fields on the model description including the model owner and users.
 
+	newOwnerTag := names.NewUserTag(newOwner)
+	model.Owner = newOwnerTag
+	model.ModelDescription.SetOwner(newOwnerTag)
+	model.ModelDescription.SetUsers(nil) // Clear users with access since JIMM gates access.
 	return nil
 }
 

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/description/v8"
+	"github.com/juju/description/v9"
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -191,7 +191,8 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 		Prechecks_: func(mi migration.ModelInfo) error {
 			c.Check(mi.UUID, qt.Equals, migratingModelUUID)
 			c.Check(mi.Owner.Id(), qt.Equals, "alice@canonical.com")
-			// TODO: Check the description has been modified to use the external user mapping.
+			c.Check(mi.ModelDescription.Users(), qt.HasLen, 0)
+			c.Check(mi.ModelDescription.Owner().String(), qt.Equals, "user-alice@canonical.com")
 			return nil
 		},
 	}

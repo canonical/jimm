@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/juju/description/v9"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -147,14 +148,26 @@ func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
 	jujuapi.SetUser(cr, user)
 
+	modelDescription := description.NewModel(description.ModelArgs{
+		Type:        description.IAAS,
+		Owner:       names.NewUserTag("bob"),
+		Cloud:       jimmtest.TestCloudName,
+		CloudRegion: jimmtest.TestCloudRegionName,
+	})
+	modelDescription.SetStatus(description.StatusArgs{Value: "available"})
+
+	serialisedDescription, err := description.Serialize(modelDescription)
+	c.Assert(err, gc.IsNil)
+
 	args := jujuparams.MigrationModelInfo{
-		UUID:     "00000001-0000-0000-0000-000000000001",
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("bob").String(),
+		UUID:             "00000001-0000-0000-0000-000000000001",
+		Name:             "test-model",
+		OwnerTag:         names.NewUserTag("bob").String(),
+		ModelDescription: serialisedDescription,
 	}
 
 	// Validate access denied without JIMM admin permissions.
-	err := cr.Prechecks(ctx, args)
+	err = cr.Prechecks(ctx, args)
 	c.Assert(err, gc.ErrorMatches, `unauthorized`)
 	c.Assert(preChecksCalled, gc.Equals, false)
 
@@ -168,6 +181,31 @@ func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 	args.OwnerTag = "invalid-owner-tag"
 	err = cr.Prechecks(ctx, args)
 	c.Assert(err, gc.ErrorMatches, `"invalid-owner-tag" is not a valid tag`)
+}
+
+func (s *migrationTargetUnitSuite) TestPreChecks_InvalidModelDescription(c *gc.C) {
+	ctx := context.Background()
+
+	jimm := &jimmtest.JIMM{}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+	user.JimmAdmin = true
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.MigrationModelInfo{
+		UUID:             "00000001-0000-0000-0000-000000000001",
+		Name:             "test-model",
+		OwnerTag:         names.NewUserTag("bob").String(),
+		ModelDescription: []byte(`invalid`),
+	}
+
+	// Validate access denied without JIMM admin permissions.
+	err := cr.Prechecks(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `(?s)failed to deserialize model description.*`)
 }
 
 func (s *migrationTargetUnitSuite) TestAdoptResources(c *gc.C) {

@@ -3,7 +3,7 @@
 package jujuapi_test
 
 import (
-	"github.com/juju/description/v8"
+	"github.com/juju/description/v9"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
@@ -53,6 +53,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	}
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	modelDescription := description.NewModel(modelDescriptionArgs)
+	modelDescription.SetStatus(description.StatusArgs{Value: "available"})
 	model := migration.ModelInfo{
 		UUID:                   modelUUID,
 		Owner:                  names.NewUserTag("alice"),
