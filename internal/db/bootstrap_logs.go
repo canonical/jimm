@@ -27,7 +27,7 @@ func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine
 		Select("COALESCE(MAX(line_number), 0)").
 		Scan(&currentLineNumber).Error
 	if err != nil {
-		return errors.E(op, "failed to get max line_number", err)
+		return errors.E(op, "failed to get current line number", err)
 	}
 
 	nextLineNumber := currentLineNumber + 1
