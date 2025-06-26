@@ -10,6 +10,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	"sigs.k8s.io/yaml"
 
@@ -471,6 +472,7 @@ type Model struct {
 	Type          string                   `json:"type"`
 	DefaultSeries string                   `json:"default-series"`
 	Life          string                   `json:"life"`
+	MigrationMode state.MigrationMode      `json:"migration-mode"`
 	Status        jujuparams.EntityStatus  `json:"status"`
 	SLA           *jujuparams.ModelSLAInfo `json:"sla"`
 	AgentVersion  string                   `json:"agent-version"`
@@ -504,6 +506,7 @@ func (m *Model) DBObject(c Tester, db *db.Database) dbmodel.Model {
 	m.dbo.CloudCredential = m.env.CloudCredential(m.Owner, m.Cloud, m.CloudCredential).DBObject(c, db)
 
 	m.dbo.Life = m.Life
+	m.dbo.MigrationMode = m.MigrationMode
 
 	err := db.AddModel(context.Background(), &m.dbo)
 	if err != nil {

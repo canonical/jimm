@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/zaputil/zapctx"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -24,6 +25,10 @@ func (j *JujuManager) CleanupNotFoundModels(ctx context.Context) (err error) {
 	defer durationObserver()
 
 	err = j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
+		// we don't want to delete models that are in the process of being migrated.
+		if m.MigrationMode != state.MigrationModeNone {
+			return nil
+		}
 		api, err := j.dialController(ctx, &m.Controller)
 		if err != nil {
 			zapctx.Error(ctx, fmt.Sprintf("cannot dial controller %s: %s\n", m.Controller.UUID, err))

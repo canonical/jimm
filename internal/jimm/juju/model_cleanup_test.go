@@ -70,6 +70,7 @@ models:
   cloud-credential: cred-1
   owner: alice@canonical.com
   life: alive
+  migration-mode: importing
   users:
   - user: alice@canonical.com
     access: admin
@@ -97,9 +98,10 @@ func (s *modelCleanupSuite) Init(c *qt.C) {
 
 	s.env = jimmtest.ParseEnvironment(c, modelPollerTestEnv)
 	s.env.PopulateDBAndPermissions(c, s.jujuManager.ResourceTag(), s.jujuManager.Database, s.jujuManager.OpenFGAClient)
+
 }
 
-func (s *modelCleanupSuite) TestPollModelsDying(c *qt.C) {
+func (s *modelCleanupSuite) TestModelCleanup(c *qt.C) {
 	ctx := context.Background()
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
@@ -109,6 +111,9 @@ func (s *modelCleanupSuite) TestPollModelsDying(c *qt.C) {
 				case s.env.Models[0].UUID:
 					return errors.E(errors.CodeNotFound)
 				case s.env.Models[1].UUID:
+					return nil
+				case s.env.Models[2].UUID:
+					c.Fatalf("unexpected call to ModelInfo_ for model %s", mi.UUID)
 					return nil
 				default:
 					return errors.E("new error")

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel
 
@@ -8,6 +8,7 @@ import (
 
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -48,6 +49,12 @@ type Model struct {
 
 	// Offers are the ApplicationOffers attached to the model.
 	Offers []ApplicationOffer
+
+	// MigrationMode is the migration mode of the model.
+	// In JIMM it can have two values:
+	// - state.MigrationModeNone: the model is not being migrated.
+	// - state.MigrationModeImporting: the model is being migrated to JIMM.
+	MigrationMode state.MigrationMode `gorm:"default:''"`
 }
 
 // Tag returns a names.Tag for the model.

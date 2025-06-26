@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel_test
 
@@ -162,6 +162,64 @@ func TestModelUniqueConstraint(t *testing.T) {
 	pdb = pdb.Preload("Owner")
 	c.Assert(pdb.First(&m3).Error, qt.IsNil)
 	c.Check(m3, qt.DeepEquals, m1)
+}
+
+func TestModelSetMigrationModeEnumType(t *testing.T) {
+	c := qt.New(t)
+	db := gormDB(c)
+	cl1, cred1, ctl1, u := initModelEnv(c, db)
+
+	m1 := dbmodel.Model{
+		Name: "staging1",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl1,
+		CloudRegion:     cl1.Regions[0],
+		CloudCredential: cred1,
+		Life:            state.Alive.String(),
+	}
+	c.Assert(db.Create(&m1).Error, qt.IsNil)
+	// Check default migration mode is set to empty string.
+	m := dbmodel.Model{
+		UUID: m1.UUID,
+	}
+	c.Assert(db.First(&m).Error, qt.IsNil)
+	c.Check(m.MigrationMode, qt.Equals, state.MigrationModeNone)
+
+	// Check that we can set the migration mode to a valid value.
+	m2 := dbmodel.Model{
+		Name: "staging2",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000002",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl1,
+		CloudRegion:     cl1.Regions[0],
+		CloudCredential: cred1,
+		Life:            state.Alive.String(),
+		MigrationMode:   state.MigrationModeNone,
+	}
+	c.Assert(db.Create(&m2).Error, qt.IsNil)
+
+	// Check migration mode set to a random value is not allowed.
+	m3 := dbmodel.Model{
+		Name: "staging3",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000003",
+			Valid:  true,
+		},
+		Owner:           u,
+		Controller:      ctl1,
+		CloudRegion:     cl1.Regions[0],
+		CloudCredential: cred1,
+		Life:            state.Alive.String(),
+		MigrationMode:   "random-mode",
+	}
+	c.Assert(db.Create(&m3).Error, qt.ErrorMatches, `.*invalid input value for enum migration_mode_type: "random-mode".*`)
 }
 
 func TestToJujuModel(t *testing.T) {
