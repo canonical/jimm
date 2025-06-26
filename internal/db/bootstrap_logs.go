@@ -64,34 +64,40 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	// Make sure job exists, if it doesn't, there's no point running the query
-	if err := d.DB.WithContext(ctx).First(&dbmodel.JobTrackerEntry{JobID: jobId}, "job_id = ?", jobId).Error; err != nil {
-		return loggies, errors.E(op, "job not found", dbError(err))
-	}
-
-	query := d.DB.WithContext(ctx).
-		Model(&dbmodel.BootstrapLog{}).
-		Where("job_id = ?", jobId).
-		Order("line_number ASC")
-
-	var count int64
-	if err := query.Count(&count).Error; err != nil {
-		return loggies, errors.E(op, dbError(err))
-	}
-
-	if count == 0 {
-		return loggies, errors.E(op, errors.CodeNotFound)
-	}
-
-	// Validate the offset isn't greater than the amount of actual logs
-	if int64(offset) >= count {
-		return loggies, errors.E(op, "offset cannot be greater than or equal to the amount of logs")
-	}
-
 	var logs []dbmodel.BootstrapLog
-	result := query.Offset(offset).Find(&logs)
-	if result.Error != nil {
-		return loggies, errors.E(op, dbError(result.Error))
+	err = d.Transaction(func(d *Database) error {
+		// Make sure job exists, if it doesn't, there's no point running the query
+		if err := d.DB.WithContext(ctx).First(&dbmodel.JobTrackerEntry{JobID: jobId}, "job_id = ?", jobId).Error; err != nil {
+			return errors.E(op, "job not found", dbError(err))
+		}
+
+		query := d.DB.WithContext(ctx).
+			Model(&dbmodel.BootstrapLog{}).
+			Where("job_id = ?", jobId).
+			Order("line_number ASC")
+
+		var count int64
+		if err := query.Count(&count).Error; err != nil {
+			return errors.E(op, dbError(err))
+		}
+
+		if count == 0 {
+			return errors.E(op, errors.CodeNotFound)
+		}
+
+		// Validate the offset isn't greater than the amount of actual logs
+		if int64(offset) >= count {
+			return errors.E(op, "offset cannot be greater than or equal to the amount of logs")
+		}
+
+		result := query.Offset(offset).Find(&logs)
+		if result.Error != nil {
+			return errors.E(op, dbError(result.Error))
+		}
+		return nil
+	})
+	if err != nil {
+		return loggies, err
 	}
 
 	for _, l := range logs {
