@@ -8,7 +8,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -43,6 +43,13 @@ func ProxyHTTP(ctx context.Context, ctl juju.ControllerConnectionDetails, w http
 		return
 	}
 
+	// Shuffle for initial load balancing
+	if len(urls) > 1 {
+		rand.Shuffle(len(urls), func(i, j int) {
+			urls[i], urls[j] = urls[j], urls[i]
+		})
+	}
+
 	var tlsConfig *tls.Config
 	if ctl.CACertificate != "" {
 		cp := x509.NewCertPool()
@@ -57,25 +64,25 @@ func ProxyHTTP(ctx context.Context, ctl juju.ControllerConnectionDetails, w http
 		}
 	}
 
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = tlsConfig
+	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
+	baseTransport.TLSClientConfig = tlsConfig
 
-	if len(urls) > 1 {
-		rand.Shuffle(len(urls), func(i, j int) {
-			urls[i], urls[j] = urls[j], urls[i]
-		})
+	// Create custom transport that handles multiple backends
+	multiBackendTransport, err := newMultiBackendTransport(baseTransport, urls)
+	if err != nil {
+		zapctx.Error(ctx, "failed to create multiBackendTransport", zap.Error(err))
+		http.Error(w, fmt.Sprintf("failed to create multiBackendTransport: %v", err), http.StatusInternalServerError)
+		return
 	}
 
-	// TODO: Consider implementing a better load balancing mechanism that handles
-	// multiples URLs and handles failing backends gracefully e.g. try send to first
-	// URL and on failure, try second, etc.
 	adminUsername := names.NewUserTag(ctl.Credentials.AdminIdentityName).String()
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(urls[0])
+			// The multiBackendTransport will handle URL selection and failover
+			// We just need to set up basic auth here
 			pr.Out.SetBasicAuth(adminUsername, ctl.Credentials.AdminPassword)
 		},
-		Transport: transport,
+		Transport: multiBackendTransport,
 		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us
 	}
 	proxy.ServeHTTP(w, req)
