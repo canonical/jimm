@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
@@ -209,6 +210,35 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 	model.ModelDescription.SetOwner(newOwnerTag)
 	model.ModelDescription.SetUsers(nil) // Clear users with access since JIMM gates access.
 	return nil
+}
+
+// LatestLogTime asks the target controller for the time of the latest
+// log record it has seen.
+func (j *JujuManager) LatestLogTime(ctx context.Context, modelUUID string) (time.Time, error) {
+	const op = errors.Op("jimm.LatestLogTime")
+
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetModel(ctx, &model)
+	if err != nil {
+		return time.Time{}, errors.E(op, fmt.Errorf("failed to get model %q: %w", modelUUID, err))
+	}
+
+	api, err := j.dialController(ctx, &model.Controller)
+	if err != nil {
+		return time.Time{}, errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+	}
+	defer api.Close()
+
+	t, err := api.LatestLogTime(modelUUID)
+	if err != nil {
+		return time.Time{}, errors.E(op, fmt.Errorf("failed to get latest log time for model %q: %w", modelUUID, err))
+	}
+	return t, nil
 }
 
 // Activate gets the model migration, proxies the Activate call to the target controller,

@@ -3,6 +3,8 @@
 package jujuclient
 
 import (
+	"time"
+
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
@@ -53,4 +55,12 @@ func (c Connection) CheckMachines(modelUUID string) ([]error, error) {
 // Activate activates a model on the controller.
 func (c Connection) Activate(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error {
 	return migrationtarget.NewClient(&c).Activate(modelUUID, sourceInfo, relatedModels)
+}
+
+// LatestLogTime asks the target controller for the time of the latest
+// log record it has seen. This can be used to make the log transfer
+// restartable.
+func (c Connection) LatestLogTime(modelUUID string) (time.Time, error) {
+	migrationTarget := migrationtarget.NewClient(&c)
+	return migrationTarget.LatestLogTime(modelUUID)
 }

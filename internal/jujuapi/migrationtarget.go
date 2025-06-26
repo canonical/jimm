@@ -5,6 +5,7 @@ package jujuapi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/juju/description/v9"
 	"github.com/juju/juju/core/migration"
@@ -37,6 +38,7 @@ func init() {
 		caCert := rpc.Method(r.CACert)
 		adoptResources := rpc.Method(r.AdoptResources)
 		checkMachines := rpc.Method(r.CheckMachines)
+		latestLogTime := rpc.Method(r.LatestLogTime)
 
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 4, "CACert", caCert)
@@ -44,6 +46,7 @@ func init() {
 		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "Abort", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "CheckMachines", checkMachines)
+		r.AddMethod("MigrationTarget", 4, "LatestLogTime", latestLogTime)
 
 		return []int{4}
 	}
@@ -126,6 +129,28 @@ func (r *controllerRoot) AdoptResources(ctx context.Context, args params.AdoptRe
 		return errors.E(op, err)
 	}
 	return r.jimm.JujuManager().AdoptResources(ctx, r.user, modelTag.Id(), args.SourceControllerVersion)
+}
+
+// LatestLogTime implements the LatestLogTime method of the MigrationTarget facade.
+// It is used by the source Juju controller to retrieve the time of the
+// latest log record it has seen.
+func (r *controllerRoot) LatestLogTime(ctx context.Context, args params.ModelArgs) (time.Time, error) {
+	const op = errors.Op("jujuapi.LatestLogTime")
+
+	if !r.user.JimmAdmin {
+		return time.Time{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	modelTag, err := names.ParseModelTag(args.ModelTag)
+	if err != nil {
+		return time.Time{}, errors.E(op, err)
+	}
+
+	t, err := r.jimm.JujuManager().LatestLogTime(ctx, modelTag.Id())
+	if err != nil {
+		return time.Time{}, errors.E(op, err)
+	}
+	return t, nil
 }
 
 // Prechecks implements the Prechecks method of the MigrationTarget facade.

@@ -122,6 +122,10 @@ type API interface {
 	// IsBroken returns true if the API connection has failed.
 	IsBroken() bool
 
+	// LatestLogTime returns the time of the latest log record
+	// seen by the controller for the given model.
+	LatestLogTime(string) (time.Time, error)
+
 	// ListApplicationOffers lists application offers that match the
 	// filter.
 	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)

@@ -5,6 +5,7 @@ package jujuapi_test
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/juju/description/v9"
 	"github.com/juju/juju/core/migration"
@@ -384,4 +385,51 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
 	user.JimmAdmin = true
 	err := cr.Activate(ctx, args)
 	c.Assert(err, gc.ErrorMatches, `"invalid-controller-tag" is not a valid tag`)
+}
+
+func (s *migrationTargetUnitSuite) TestLatestLogTime(c *gc.C) {
+	ctx := context.Background()
+
+	latestLogTimeCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			LatestLogTime_: func(ctx context.Context, modelUUID string) (time.Time, error) {
+				latestLogTimeCalled = true
+				c.Check(modelUUID, gc.Equals, "00000001-0000-0000-0000-000000000001")
+				return time.Now(), nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	args := jujuparams.ModelArgs{}
+
+	// Validate access denied without JIMM admin permissions.
+	_, err := cr.LatestLogTime(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(latestLogTimeCalled, gc.Equals, false)
+
+	// Validate the latest log time method is not called with an invalid model tag.
+	user.JimmAdmin = true
+	args.ModelTag = "invalid-model-tag"
+	_, err = cr.LatestLogTime(ctx, args)
+	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
+	c.Assert(latestLogTimeCalled, gc.Equals, false)
+
+	// Validate the latest log time method is called when the user is a JIMM admin
+	// with a valid model tag.
+	args.ModelTag = names.NewModelTag("00000001-0000-0000-0000-000000000001").String()
+	logTime, err := cr.LatestLogTime(ctx, args)
+	c.Assert(err, gc.IsNil)
+	c.Assert(logTime, gc.Not(gc.IsNil))
+	c.Assert(latestLogTimeCalled, gc.Equals, true)
 }

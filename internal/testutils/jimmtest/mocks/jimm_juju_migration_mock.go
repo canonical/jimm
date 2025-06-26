@@ -3,6 +3,7 @@ package mocks
 
 import (
 	"context"
+	"time"
 
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/names/v5"
@@ -18,6 +19,7 @@ type MigrationMocks struct {
 	Activate_       func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
 	AbortMigration_ func(ctx context.Context, user *openfga.User, modelUUID string) error
 	CheckMachines_  func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
+	LatestLogTime_  func(ctx context.Context, modelUUID string) (time.Time, error)
 }
 
 func (j *MigrationMocks) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
@@ -53,4 +55,11 @@ func (j *MigrationMocks) CheckMachines(ctx context.Context, user *openfga.User, 
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.CheckMachines_(ctx, user, modelUUID)
+}
+
+func (j *MigrationMocks) LatestLogTime(ctx context.Context, modelUUID string) (time.Time, error) {
+	if j.LatestLogTime_ == nil {
+		return time.Time{}, errors.E(errors.CodeNotImplemented)
+	}
+	return j.LatestLogTime_(ctx, modelUUID)
 }

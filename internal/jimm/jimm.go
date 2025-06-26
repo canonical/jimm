@@ -251,16 +251,20 @@ type JujuManager interface {
 	// ControllerDetailsForIncomingModel retrieves details about the
 	// target controller for a model that is being migrated.
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-	// The migration methods below are sorted roughly
-	// in the order they are expected to be called.
+
+	// The remaining migration methods below are sorted roughly in the order they are expected to be called.
+	// Please MAINTAIN this order as it is helpful to understand the migration flow and which methods
+	// can use the IncomingModelMigration table versus which must use the plain Models table.
+
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
 	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
-	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
-	AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error
 	Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error
-	// Other methods
+	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
+	LatestLogTime(ctx context.Context, modelUUID string) (time.Time, error)
+	AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error
 
+	// Other methods
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
 	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
 	CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)

@@ -113,3 +113,12 @@ func (s *migrationTargetSuite) TestActivate(c *gc.C) {
 	err := client.Activate(modelUUID, sourceInfo, relatedModels)
 	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
 }
+
+func (s *migrationTargetSuite) TestLatestLogTime(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := migrationtarget.NewClient(conn)
+	_, err := client.LatestLogTime(s.Model.UUID.String)
+	c.Assert(err, gc.IsNil)
+}
