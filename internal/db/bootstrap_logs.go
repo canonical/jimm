@@ -19,29 +19,35 @@ func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine
 		return errors.E(op, err)
 	}
 
-	// Get the current line number for this bootstrap job.
-	var currentLineNumber int
-	err = d.DB.WithContext(ctx).
-		Model(&dbmodel.BootstrapLog{}).
-		Where("job_id = ?", jobId).
-		Select("COALESCE(MAX(line_number), 0)").
-		Scan(&currentLineNumber).Error
-	if err != nil {
-		return errors.E(op, "failed to get current line number", err)
-	}
+	return d.Transaction(func(d *Database) error {
+		// Lock entire table at start as we're only allowing one bootstrap at a time.
+		if err := d.DB.Exec("LOCK TABLE bootstrap_logs IN EXCLUSIVE MODE").Error; err != nil {
+			return errors.E(op, "failed to lock table", err)
+		}
 
-	nextLineNumber := currentLineNumber + 1
+		// Get the current line number for this bootstrap job.
+		var currentLineNumber int
+		err = d.DB.WithContext(ctx).
+			Model(&dbmodel.BootstrapLog{}).
+			Where("job_id = ?", jobId).
+			Select("COALESCE(MAX(line_number), 0)").
+			Scan(&currentLineNumber).Error
+		if err != nil {
+			return errors.E(op, "failed to get current line number", err)
+		}
 
-	log, err := dbmodel.NewBootstrapLog(jobId, nextLineNumber, logLine)
-	if err != nil {
-		return errors.E(op, "failed to construct bootstrap log", err)
-	}
+		nextLineNumber := currentLineNumber + 1
 
-	if err := d.DB.WithContext(ctx).Create(log).Error; err != nil {
-		return errors.E(op, dbError(err))
-	}
+		log, err := dbmodel.NewBootstrapLog(jobId, nextLineNumber, logLine)
+		if err != nil {
+			return errors.E(op, "failed to construct bootstrap log", err)
+		}
 
-	return nil
+		if err := d.DB.WithContext(ctx).Create(log).Error; err != nil {
+			return errors.E(op, dbError(err))
+		}
+		return nil
+	})
 }
 
 // QueryBootstrapLog queries for bootstrap logs based on the jobId and offset.
