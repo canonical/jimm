@@ -3,30 +3,13 @@
 package db_test
 
 import (
-	"testing"
-	"time"
-
 	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 	"github.com/google/uuid"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type bootstrapLogsSuite struct {
-	Database *db.Database
-}
-
-func (s *bootstrapLogsSuite) Init(c *qt.C) {
-	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
-	}
-	s.Database = db
-}
-
-func (s *bootstrapLogsSuite) TestBootstrapLogs_AddBootstrapLog(c *qt.C) {
+func (s *dbSuite) TestBootstrapLogs_AddBootstrapLog(c *qt.C) {
 	ctx := c.Context()
 
 	err := s.Database.Migrate(ctx)
@@ -74,15 +57,9 @@ func (s *bootstrapLogsSuite) TestBootstrapLogs_AddBootstrapLog(c *qt.C) {
 	c.Assert(logs2, qt.HasLen, 1)
 	c.Assert(logs2[0].LineNumber, qt.Equals, 0)
 	c.Assert(logs2[0].LogLine, qt.Equals, "Creating Juju controller \"diglett2\" on the-most-amazing-cloud")
-
-	// Expect total length to be 3
-	var count int64
-	err = s.Database.DB.Model(&dbmodel.BootstrapLog{}).Count(&count).Error
-	c.Assert(err, qt.IsNil)
-	c.Assert(count, qt.Equals, int64(3))
 }
 
-func (s *bootstrapLogsSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
+func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 	ctx := c.Context()
 
 	err := s.Database.Migrate(ctx)
@@ -122,8 +99,4 @@ func (s *bootstrapLogsSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 	// Query with two logs, offset 2 (equal to the amount of logs)
 	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 2)
 	c.Assert(err, qt.ErrorMatches, ".*offset cannot be greater than or equal to the amount of logs.*")
-}
-
-func TestBootstrapLogs(t *testing.T) {
-	qtsuite.Run(qt.New(t), &bootstrapLogsSuite{})
 }

@@ -66,9 +66,7 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 		return loggies, errors.E(op, dbError(err))
 	}
 
-	// Special case to say there aren't any logs, otherwise we check the offset >= count
-	// If we don't check they're both 0, the error below runs which is misleading
-	if int64(offset) == 0 && count == 0 {
+	if count == 0 {
 		return loggies, errors.E(op, "no logs")
 	}
 
