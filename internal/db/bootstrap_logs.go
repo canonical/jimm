@@ -12,6 +12,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
+func lockBootstrapLogs(d *Database) error {
+	return d.DB.Exec("LOCK TABLE bootstrap_logs IN SHARE MODE").Error
+}
+
 func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error) {
 	const op = errors.Op("db.AddBootstrapLog")
 
@@ -21,8 +25,8 @@ func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine
 
 	return d.Transaction(func(d *Database) error {
 		// Lock entire table at start as we're only allowing one bootstrap at a time.
-		if err := d.DB.Exec("LOCK TABLE bootstrap_logs IN EXCLUSIVE MODE").Error; err != nil {
-			return errors.E(op, "failed to lock table", err)
+		if err := lockBootstrapLogs(d); err != nil {
+			return errors.E(op, "failed to lock bootstrap_logs table", err)
 		}
 
 		// Get the current line number for this bootstrap job.

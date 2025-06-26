@@ -3,9 +3,12 @@
 package db_test
 
 import (
+	"time"
+
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 )
 
@@ -99,4 +102,60 @@ func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 	// Query with two logs, offset 2 (equal to the amount of logs)
 	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 2)
 	c.Assert(err, qt.ErrorMatches, ".*offset cannot be greater than or equal to the amount of logs.*")
+}
+
+// This test is a behaviour check, that is, we want to see that our queued
+// locking for the bootstrap_logs table does indeed wait and prevent writes whilst
+// it is locked.
+func (s *dbSuite) TestBootstrapLogs_lockBootstrapLogs(c *qt.C) {
+	ctx := c.Context()
+
+	err := s.Database.Migrate(ctx)
+	c.Assert(err, qt.IsNil)
+
+	jobId, err := s.Database.AddJob(ctx, "test-job")
+	c.Assert(err, qt.IsNil)
+
+	finishTransaction := make(chan bool)
+	lockAcquired := make(chan bool)
+
+	go func() {
+		// Simulate a "AddBootstrapLog" call utilising the lockBootstrapLogs func.
+		// This enables us to see that locking the table does indeed prevent
+		// other AddBootstrapLog calls.
+		err := s.Database.Transaction(func(d *db.Database) error {
+			err := db.LockBootstrapLogs(d)
+			if err != nil {
+				return err
+			}
+
+			close(lockAcquired)
+
+			<-finishTransaction
+			return nil
+		})
+
+		c.Assert(err, qt.IsNil)
+	}()
+
+	<-lockAcquired
+
+	// Normal table locks do not support NOWAIT, so this is queue of INSERTS.
+	// Meaning, this AddBootstrapLog call will just wait indefinitely until
+	// the transaction above finishes.
+	//
+	// As such we're gonna track the time is above 100ms (best effort test).
+	sleepTime := time.Millisecond * 100
+	before := time.Now()
+	go func() {
+		time.Sleep(sleepTime)
+		close(finishTransaction)
+	}()
+	err = s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+	c.Assert(err, qt.IsNil)
+	after := time.Since(before)
+
+	// We simply check that it taken more than 100ms, as we slept at least 100 and AddBootstrapLog should have
+	// taken a few ms too.
+	c.Assert(after > sleepTime, qt.IsTrue)
 }
