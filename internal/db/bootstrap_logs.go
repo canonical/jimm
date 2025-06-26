@@ -12,23 +12,30 @@ import (
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
-// AddBootstrapLog creates a bootstrap log entry.
-// It returns an error if the parameters cannot be validated or the database encounters an error.
-func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, lineNumber int, logLine string) (err error) {
-	const op = errors.Op("db.CreateBootstrapLog")
-
-	log, err := dbmodel.NewBootstrapLog(jobId, lineNumber, logLine)
-	if err != nil {
-		return errors.E(op, "failed to construct bootstrap log", err)
-	}
+func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error) {
+	const op = errors.Op("db.AddBootstrapLog")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	// Get the current line number for this bootstrap job.
+	var currentLineNumber int
+	err = d.DB.WithContext(ctx).
+		Model(&dbmodel.BootstrapLog{}).
+		Where("job_id = ?", jobId).
+		Select("COALESCE(MAX(line_number), 0)").
+		Scan(&currentLineNumber).Error
+	if err != nil {
+		return errors.E(op, "failed to get max line_number", err)
+	}
+
+	nextLineNumber := currentLineNumber + 1
+
+	log, err := dbmodel.NewBootstrapLog(jobId, nextLineNumber, logLine)
+	if err != nil {
+		return errors.E(op, "failed to construct bootstrap log", err)
+	}
 
 	if err := d.DB.WithContext(ctx).Create(log).Error; err != nil {
 		return errors.E(op, dbError(err))

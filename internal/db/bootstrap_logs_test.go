@@ -21,17 +21,14 @@ func (s *dbSuite) TestBootstrapLogs_AddBootstrapLog(c *qt.C) {
 
 	// Test where job id doesn't exist
 	jobThatDoesntExistId := uuid.New()
-	err = s.Database.AddBootstrapLog(ctx, jobThatDoesntExistId, 0, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+	err = s.Database.AddBootstrapLog(ctx, jobThatDoesntExistId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
 	c.Assert(err, qt.ErrorMatches, ".*violates foreign key constraint.*")
 
 	// Test success
-	err = s.Database.AddBootstrapLog(ctx, jobId, 0, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+	err = s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
 	c.Assert(err, qt.IsNil)
-	// Test adding duplicate
-	err = s.Database.AddBootstrapLog(ctx, jobId, 0, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
-	c.Assert(err, qt.ErrorMatches, ".*violates unique constraint.*")
 	// Test adding second line
-	err = s.Database.AddBootstrapLog(ctx, jobId, 1, "Fetching Juju agent binaries")
+	err = s.Database.AddBootstrapLog(ctx, jobId, "Fetching Juju agent binaries")
 	c.Assert(err, qt.IsNil)
 	// Check all lines exist
 	var logs []dbmodel.BootstrapLog
@@ -39,15 +36,15 @@ func (s *dbSuite) TestBootstrapLogs_AddBootstrapLog(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(logs, qt.HasLen, 2)
-	c.Assert(logs[0].LineNumber, qt.Equals, 0)
+	c.Assert(logs[0].LineNumber, qt.Equals, 1)
 	c.Assert(logs[0].LogLine, qt.Equals, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
-	c.Assert(logs[1].LineNumber, qt.Equals, 1)
+	c.Assert(logs[1].LineNumber, qt.Equals, 2)
 	c.Assert(logs[1].LogLine, qt.Equals, "Fetching Juju agent binaries")
 
 	// Test adding another where job id is different
 	jobId2, err := s.Database.AddJob(ctx, "test-job")
 	c.Assert(err, qt.IsNil)
-	err = s.Database.AddBootstrapLog(ctx, jobId2, 0, "Creating Juju controller \"diglett2\" on the-most-amazing-cloud")
+	err = s.Database.AddBootstrapLog(ctx, jobId2, "Creating Juju controller \"diglett2\" on the-most-amazing-cloud")
 	c.Assert(err, qt.IsNil)
 
 	var logs2 []dbmodel.BootstrapLog
@@ -55,7 +52,7 @@ func (s *dbSuite) TestBootstrapLogs_AddBootstrapLog(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(logs2, qt.HasLen, 1)
-	c.Assert(logs2[0].LineNumber, qt.Equals, 0)
+	c.Assert(logs2[0].LineNumber, qt.Equals, 1)
 	c.Assert(logs2[0].LogLine, qt.Equals, "Creating Juju controller \"diglett2\" on the-most-amazing-cloud")
 }
 
@@ -78,24 +75,27 @@ func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 0)
 	c.Assert(err, qt.ErrorMatches, "no logs")
 	// Query with one log
-	err = s.Database.AddBootstrapLog(ctx, jobId, 0, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+	err = s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
 	c.Assert(err, qt.IsNil)
 
 	loggies, err := s.Database.QueryBootstrapLog(ctx, jobId, 0)
 	c.Assert(err, qt.IsNil)
 	c.Assert(loggies[0], qt.Equals, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+
 	// Query with two logs, offset 0
-	err = s.Database.AddBootstrapLog(ctx, jobId, 1, "Fetching Juju agent binaries")
+	err = s.Database.AddBootstrapLog(ctx, jobId, "Fetching Juju agent binaries")
 	c.Assert(err, qt.IsNil)
 
 	loggies, err = s.Database.QueryBootstrapLog(ctx, jobId, 0)
 	c.Assert(err, qt.IsNil)
 	c.Assert(loggies[0], qt.Equals, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
 	c.Assert(loggies[1], qt.Equals, "Fetching Juju agent binaries")
+
 	// Query with two logs, offset 1
 	loggies, err = s.Database.QueryBootstrapLog(ctx, jobId, 1)
 	c.Assert(err, qt.IsNil)
 	c.Assert(loggies[0], qt.Equals, "Fetching Juju agent binaries")
+
 	// Query with two logs, offset 2 (equal to the amount of logs)
 	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 2)
 	c.Assert(err, qt.ErrorMatches, ".*offset cannot be greater than or equal to the amount of logs.*")
