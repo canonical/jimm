@@ -73,7 +73,7 @@ func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 
 	// Query with no logs
 	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 0)
-	c.Assert(err, qt.ErrorMatches, "no logs")
+	c.Assert(err, qt.ErrorMatches, "not found")
 	// Query with one log
 	err = s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
 	c.Assert(err, qt.IsNil)

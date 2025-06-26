@@ -80,7 +80,7 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 	}
 
 	if count == 0 {
-		return loggies, errors.E(op, "no logs")
+		return loggies, errors.E(op, errors.CodeNotFound)
 	}
 
 	// Validate the offset isn't greater than the amount of actual logs
