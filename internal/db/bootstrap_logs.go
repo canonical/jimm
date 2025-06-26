@@ -91,7 +91,7 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 
 		// Validate the offset isn't greater than the amount of actual logs
 		if int64(offset) >= count {
-			return errors.E(op, "offset cannot be greater than or equal to the amount of logs")
+			return errors.E(op, errors.CodeNotFound, "offset cannot be greater than or equal to the amount of logs")
 		}
 
 		result := query.Offset(offset).Find(&logs)
