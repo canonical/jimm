@@ -15,6 +15,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/streamproxy"
 )
@@ -29,7 +30,7 @@ const (
 // Messages are handled by proxying them between the
 // controller and client.
 type streamControllerProxier struct {
-	apiServer
+	jimm *jimm.JIMM
 }
 
 // Authenticate implements WSServer.Authenticate

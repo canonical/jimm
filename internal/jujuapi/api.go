@@ -51,11 +51,10 @@ func ModelHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 	return mux
 }
 
+// LogTransferHandler creates an http.Handler for the "/migrate/logtransfer" endpoint.
 func LogTransferHandler(ctx context.Context, jimm *jimm.JIMM, p Params) http.Handler {
 	return &jimmhttp.WSHandler{
 		Upgrader: websocketUpgrader,
-		Server: &streamControllerProxier{apiServer: apiServer{
-			jimm: jimm,
-		}},
+		Server:   &streamControllerProxier{jimm: jimm},
 	}
 }

@@ -45,6 +45,10 @@ func (s streamModelProxier) Authenticate(ctx context.Context, w http.ResponseWri
 }
 
 // ServeWS implements jimmhttp.WSServer.
+//
+// This endpoint serves any /model/{uuid}/* endpoint by proxying messages
+// between the controller and client. Most notably used for the /model/{uuid}/log
+// endpoint for streaming model logs from the controller to the client.
 func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	writeError := func(msg string, code errors.Code) {
 		var errResult jujuparams.ErrorResult

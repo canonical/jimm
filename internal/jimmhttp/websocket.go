@@ -50,8 +50,13 @@ func (h *WSHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Set the request context with additional values that will be used by the websocket server.
+
+	// Set the path of the request to the context for handling different endpoints.
 	ctx = context.WithValue(ctx, contextPathKey{}, req.URL.EscapedPath())
+	// Set the migrating model UUID if it exists in the request header.
 	ctx = context.WithValue(ctx, migratingModelUUIDKey{}, req.Header.Get(jujuparams.MigrationModelHTTPHeader))
+	// Set the client version from the request header, expected by Juju controllers.
 	ctx = context.WithValue(ctx, clientVersionKey{}, req.Header.Get(jujuparams.JujuClientVersion))
 
 	conn, err := h.Upgrader.Upgrade(w, req, nil)
