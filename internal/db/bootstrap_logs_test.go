@@ -65,7 +65,7 @@ func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 
 	// Query where the job doesn't exist
 	jobIdThatDoesntExist := uuid.New()
-	_, err = s.Database.QueryBootstrapLog(ctx, jobIdThatDoesntExist, 0)
+	_, _, err = s.Database.QueryBootstrapLog(ctx, jobIdThatDoesntExist, 0)
 	c.Assert(err, qt.ErrorMatches, "job not found")
 
 	// Add job to reference
@@ -73,33 +73,44 @@ func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	// Query with no logs
-	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 0)
-	c.Assert(err, qt.ErrorMatches, "not found")
-	// Query with one log
-	err = s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+	loggies, nextOffsetVal, err := s.Database.QueryBootstrapLog(ctx, jobId, 0)
 	c.Assert(err, qt.IsNil)
+	c.Assert(loggies, qt.HasLen, 0)
+	c.Assert(nextOffsetVal, qt.Equals, 0)
 
-	loggies, err := s.Database.QueryBootstrapLog(ctx, jobId, 0)
+	// Test iterating through a simulated incoming logs
+	offsetTracker := 0
+	collectedLogs := make([]string, 0)
+
+	newLogs, nextOffsetValue, err := s.Database.QueryBootstrapLog(ctx, jobId, offsetTracker)
 	c.Assert(err, qt.IsNil)
-	c.Assert(loggies[0], qt.Equals, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
+	offsetTracker = nextOffsetValue
+	collectedLogs = append(collectedLogs, newLogs...)
 
-	// Query with two logs, offset 0
-	err = s.Database.AddBootstrapLog(ctx, jobId, "Fetching Juju agent binaries")
+	c.Assert(s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud"), qt.IsNil)
+	c.Assert(s.Database.AddBootstrapLog(ctx, jobId, "Fetching Juju agent binaries"), qt.IsNil)
+
+	newLogs, nextOffsetValue, err = s.Database.QueryBootstrapLog(ctx, jobId, offsetTracker)
 	c.Assert(err, qt.IsNil)
+	offsetTracker = nextOffsetValue
+	collectedLogs = append(collectedLogs, newLogs...)
 
-	loggies, err = s.Database.QueryBootstrapLog(ctx, jobId, 0)
+	c.Assert(s.Database.AddBootstrapLog(ctx, jobId, "Binaries contain gems"), qt.IsNil)
+	c.Assert(s.Database.AddBootstrapLog(ctx, jobId, "Gems appear to be very expensive"), qt.IsNil)
+
+	newLogs, nextOffsetValue, err = s.Database.QueryBootstrapLog(ctx, jobId, offsetTracker)
 	c.Assert(err, qt.IsNil)
-	c.Assert(loggies[0], qt.Equals, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
-	c.Assert(loggies[1], qt.Equals, "Fetching Juju agent binaries")
+	offsetTracker = nextOffsetValue
+	collectedLogs = append(collectedLogs, newLogs...)
 
-	// Query with two logs, offset 1
-	loggies, err = s.Database.QueryBootstrapLog(ctx, jobId, 1)
+	c.Assert(collectedLogs, qt.HasLen, 4)
+
+	newLogs, nextOffsetValue, err = s.Database.QueryBootstrapLog(ctx, jobId, offsetTracker)
 	c.Assert(err, qt.IsNil)
-	c.Assert(loggies[0], qt.Equals, "Fetching Juju agent binaries")
-
-	// Query with two logs, offset 2 (equal to the amount of logs)
-	_, err = s.Database.QueryBootstrapLog(ctx, jobId, 2)
-	c.Assert(err, qt.ErrorMatches, ".*offset cannot be greater than or equal to the amount of logs.*")
+	// This means no new logs have come in, but they may later, and the client should query again for logs
+	// after some time.
+	c.Assert(newLogs, qt.HasLen, 0)
+	c.Assert(nextOffsetValue, qt.Equals, offsetTracker)
 }
 
 // This test is a behaviour check, that is, we want our lock does indeed reject
