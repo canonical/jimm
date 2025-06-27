@@ -17,7 +17,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 )
 
 const (
@@ -26,7 +25,7 @@ const (
 
 type JWTServiceParams struct {
 	Host   string
-	Store  credentials.CredentialStore
+	Store  CredentialStore
 	Expiry time.Duration
 }
 
@@ -37,7 +36,7 @@ type JwksGetter interface {
 
 // CredentialCache provides a cache that will periodically fetch the JWK set from a credential store.
 type CredentialCache struct {
-	credentials.CredentialStore
+	CredentialStore
 	c *expirable.LRU[string, jwk.Set]
 }
 
@@ -45,7 +44,7 @@ type CredentialCache struct {
 // a JWK set from the provided credential store.
 // Note that the cache duration is configured at 1h, which should be much lower than the
 // rotation period of the JWK set.
-func NewCredentialCache(credentialStore credentials.CredentialStore) CredentialCache {
+func NewCredentialCache(credentialStore CredentialStore) CredentialCache {
 	cache := expirable.NewLRU[string, jwk.Set](1, nil, time.Duration(1*time.Hour))
 	return CredentialCache{CredentialStore: credentialStore, c: cache}
 }

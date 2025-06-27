@@ -17,21 +17,47 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 )
+
+// CredentialStore defines the interface for a store that can manage
+// JSON Web Key Sets (JWKS), their associated private keys, expiry times
+// and cleanup operations. This is used by the JWKSService to manage
+// the JWKS lifecycle for JIMM.
+type CredentialStore interface {
+	// CleanupJWKS removes all secrets associated with the JWKS process.
+	CleanupJWKS(ctx context.Context) error
+
+	// GetJWKS returns the current key set stored within the credential store.
+	GetJWKS(ctx context.Context) (jwk.Set, error)
+
+	// GetJWKSPrivateKey returns the current private key for the active JWKS
+	GetJWKSPrivateKey(ctx context.Context) ([]byte, error)
+
+	// GetJWKSExpiry returns the expiry of the active JWKS.
+	GetJWKSExpiry(ctx context.Context) (time.Time, error)
+
+	// PutJWKS puts a generated RS256[4096 bit] JWKS without x5c or x5t into the credential store.
+	PutJWKS(ctx context.Context, jwks jwk.Set) error
+
+	// PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
+	PutJWKSPrivateKey(ctx context.Context, pem []byte) error
+
+	// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
+	PutJWKSExpiry(ctx context.Context, expiry time.Time) error
+}
 
 // JWKSService handles the creation, rotation and retrieval of JWKS for JIMM.
 // It utilises the underlying credential store currently in effect.
 type JWKSService struct {
-	credentialStore credentials.CredentialStore
+	credentialStore CredentialStore
 }
 
 // NewJWKSService returns a new JWKS service for handling JIMMs JWKS.
-func NewJWKSService(credStore credentials.CredentialStore) *JWKSService {
+func NewJWKSService(credStore CredentialStore) *JWKSService {
 	return &JWKSService{credentialStore: credStore}
 }
 
-func rotateJWKS(ctx context.Context, credStore credentials.CredentialStore, initialExpiryTime time.Time) error {
+func rotateJWKS(ctx context.Context, credStore CredentialStore, initialExpiryTime time.Time) error {
 	// putJwks simply attempts the process of setting up the JWKS suite
 	// and all secrets required for JIMM to sign JWTs and clients to verify
 	// JWTs from JIMM.
