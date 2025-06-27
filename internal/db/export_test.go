@@ -17,6 +17,7 @@ var (
 	OAuthSessionStoreSecretTag = oauthSessionStoreSecretTag
 	NewUUID                    = &newUUID
 	MigrationTableName         = migrationTableName
+	BootstrapLogLockQuery      = &bootstrapLoglockQuery
 )
 
 func (d *Database) MigrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {
