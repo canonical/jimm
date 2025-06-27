@@ -3,8 +3,6 @@
 package db_test
 
 import (
-	"time"
-
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 
@@ -104,9 +102,8 @@ func (s *dbSuite) TestBootstrapLogs_QueryBootstrapLogs(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, ".*offset cannot be greater than or equal to the amount of logs.*")
 }
 
-// This test is a behaviour check, that is, we want to see that our queued
-// locking for the bootstrap_logs table does indeed wait and prevent writes whilst
-// it is locked.
+// This test is a behaviour check, that is, we want our lock does indeed reject
+// on an ACCESS EXCLUSIVE mode when inserting new logs.
 func (s *dbSuite) TestBootstrapLogs_lockBootstrapLogs(c *qt.C) {
 	ctx := c.Context()
 
@@ -117,14 +114,20 @@ func (s *dbSuite) TestBootstrapLogs_lockBootstrapLogs(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	finishTransaction := make(chan bool)
+	c.Cleanup(func() {
+		close(finishTransaction)
+	})
 	lockAcquired := make(chan bool)
 
+	// Adjust the query to use NOWAIT, such that it can error immediately
+	// within our AddBootstrapLog call. The routine below will successfully
+	// acquire a lock because none is present yet. When we attempt to acquire
+	// it again in our AddBootstrapLogs call, it is going to immediately error
+	// and not queue.
+	c.Patch(db.BootstrapLogLockQuery, *db.BootstrapLogLockQuery+" NOWAIT")
 	go func() {
-		// Simulate a "AddBootstrapLog" call utilising the lockBootstrapLogs func.
-		// This enables us to see that locking the table does indeed prevent
-		// other AddBootstrapLog calls.
 		err := s.Database.Transaction(func(d *db.Database) error {
-			err := db.LockBootstrapLogs(d)
+			err := d.DB.Exec(*db.BootstrapLogLockQuery).Error
 			if err != nil {
 				return err
 			}
@@ -134,28 +137,11 @@ func (s *dbSuite) TestBootstrapLogs_lockBootstrapLogs(c *qt.C) {
 			<-finishTransaction
 			return nil
 		})
-
 		c.Assert(err, qt.IsNil)
 	}()
 
 	<-lockAcquired
 
-	// Normal table locks do not support NOWAIT, so this is queue of INSERTS.
-	// Meaning, this AddBootstrapLog call will just wait indefinitely until
-	// the transaction above finishes.
-	//
-	// As such we're gonna track the time is above 100ms (best effort test).
-	sleepTime := time.Millisecond * 100
-	before := time.Now()
-	go func() {
-		time.Sleep(sleepTime)
-		close(finishTransaction)
-	}()
 	err = s.Database.AddBootstrapLog(ctx, jobId, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
-	c.Assert(err, qt.IsNil)
-	after := time.Since(before)
-
-	// We simply check that it taken more than 100ms, as we slept at least 100 and AddBootstrapLog should have
-	// taken a few ms too.
-	c.Assert(after > sleepTime, qt.IsTrue)
+	c.Assert(err, qt.ErrorMatches, "failed to lock bootstrap_logs table")
 }
