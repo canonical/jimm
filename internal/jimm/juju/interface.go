@@ -17,6 +17,7 @@ import (
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -215,4 +216,14 @@ type PermissionChecker interface {
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	// GetUserModelAccess returns the user's level of access to a model.
 	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
+}
+
+// MigrationTokenGenerator is an interface for generating migration tokens
+// that are used to authenticate Juju controllers with JIMM during model migrations.
+type MigrationTokenGenerator interface {
+	// NewToken generates a new migration token with the specified user and model tag.
+	// The token is valid for a limited time and includes claims that indicate the user
+	// has admin access to the specified model tag as well as an extra claim indicating
+	// that this token is for migration purposes.
+	NewToken(ctx context.Context, tokenArgs jujuauth.MigrationTokenArgs) ([]byte, error)
 }

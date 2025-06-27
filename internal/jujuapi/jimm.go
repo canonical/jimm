@@ -523,36 +523,38 @@ func (r *controllerRoot) Version(ctx context.Context) (apiparams.VersionResponse
 }
 
 // PrepareModelMigration prepares JIMM for an incoming migration.
-func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apiparams.PrepareModelMigrationRequest) error {
+func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apiparams.PrepareModelMigrationRequest) (apiparams.PrepareModelMigrationResponse, error) {
 	const op = errors.Op("jujuapi.PrepareModelMigration")
+	resp := apiparams.PrepareModelMigrationResponse{}
 
 	if !r.user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return resp, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	mt, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(op, "invalid model tag", err)
+		return resp, errors.E(op, "invalid model tag", err)
 	}
 
-	if !names.IsValidControllerName(args.TargetControllerName) {
-		return errors.E(op, "invalid controller name")
+	if !names.IsValidControllerName(args.BackingControllerName) {
+		return resp, errors.E(op, "invalid controller name")
 	}
 
 	// Check each key is a valid local user and each value is a valid user and has a domain
 	for local, external := range args.UserMapping {
 		if !names.IsValidUserName(local) {
-			return errors.E(op, fmt.Sprintf("%s is not a valid local user name", local))
+			return resp, errors.E(op, fmt.Sprintf("%s is not a valid local user name", local))
 		}
 
 		if !names.IsValidUser(external) || !strings.Contains(external, "@") {
-			return errors.E(op, fmt.Sprintf("%s is not a valid external user name", external))
+			return resp, errors.E(op, fmt.Sprintf("%s is not a valid external user name", external))
 		}
 	}
 
-	if err := r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.TargetControllerName, args.UserMapping); err != nil {
-		return errors.E(op, err)
+	resp.Token, err = r.jimm.JujuManager().PrepareModelMigration(ctx, r.user, mt.Id(), args.BackingControllerName, args.UserMapping)
+	if err != nil {
+		return resp, errors.E(op, err)
 	}
 
-	return nil
+	return resp, nil
 }

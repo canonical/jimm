@@ -256,7 +256,7 @@ type JujuManager interface {
 	// Please MAINTAIN this order as it is helpful to understand the migration flow and which methods
 	// can use the IncomingModelMigration table versus which must use the plain Models table.
 
-	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
+	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) ([]byte, error)
 	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
@@ -440,6 +440,8 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
 
+	migrationTokenGenerator := j.jujuAuthFactory.NewMigrationTokenGenerater(p.UUID)
+
 	jujuManager, err := juju.NewJujuManager(
 		j.Database,
 		j.OpenFGAClient,
@@ -449,6 +451,7 @@ func New(p Parameters) (*JIMM, error) {
 		p.ReservedCloudNames,
 		j.Dialer,
 		p.CrossModelQueryTimeout,
+		&migrationTokenGenerator,
 	)
 	if err != nil {
 		return nil, err

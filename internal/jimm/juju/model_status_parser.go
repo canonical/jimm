@@ -82,7 +82,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			return results, errors.E(op, err)
 		}
 
-		queryCtx, cancel := context.WithTimeout(ctx, j.CrossModelQueryTimeout)
+		queryCtx, cancel := context.WithTimeout(ctx, j.crossModelQueryTimeout)
 		defer cancel()
 		queryIter := query.RunWithContext(queryCtx, tempMap)
 
@@ -97,7 +97,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
 				if stderrors.Is(err, context.DeadlineExceeded) {
-					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", j.CrossModelQueryTimeout.Seconds()), err)
+					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", j.crossModelQueryTimeout.Seconds()), err)
 				}
 				results.Errors[modelUUID] = append(results.Errors[modelUUID], "jq error: "+err.Error())
 				continue

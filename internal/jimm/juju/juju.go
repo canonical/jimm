@@ -17,14 +17,15 @@ import (
 
 // JujuManager handles all business logic with Juju resources.
 type JujuManager struct {
-	Database               *db.Database
-	OpenFGAClient          *openfga.OFGAClient
-	CredentialStore        credentials.CredentialStore
-	permissionManager      PermissionChecker
-	resourceTag            names.ControllerTag
-	ReservedCloudNames     []string
-	Dialer                 Dialer
-	CrossModelQueryTimeout time.Duration
+	Database                *db.Database
+	OpenFGAClient           *openfga.OFGAClient
+	CredentialStore         credentials.CredentialStore
+	permissionManager       PermissionChecker
+	resourceTag             names.ControllerTag
+	ReservedCloudNames      []string
+	Dialer                  Dialer
+	crossModelQueryTimeout  time.Duration
+	migrationTokenGenerator MigrationTokenGenerator
 }
 
 // NewJujuManager returns a new JIMM struct that manages business logic associated
@@ -38,6 +39,7 @@ func NewJujuManager(
 	reservedCloudNames []string,
 	dialer Dialer,
 	crossModelQueryTimeout time.Duration,
+	migrationTokenGenerator MigrationTokenGenerator,
 ) (*JujuManager, error) {
 	if store == nil {
 		return nil, errors.E("role store cannot be nil")
@@ -57,15 +59,19 @@ func NewJujuManager(
 	if crossModelQueryTimeout <= 0 {
 		return nil, errors.E("cross model query timeout must be greater than 0")
 	}
+	if migrationTokenGenerator == nil {
+		return nil, errors.E("migration token generator cannot be nil")
+	}
 	return &JujuManager{
-		Database:               store,
-		OpenFGAClient:          authSvc,
-		CredentialStore:        credentialStore,
-		permissionManager:      permissionManager,
-		resourceTag:            resourceTag,
-		ReservedCloudNames:     reservedCloudNames,
-		Dialer:                 dialer,
-		CrossModelQueryTimeout: crossModelQueryTimeout,
+		Database:                store,
+		OpenFGAClient:           authSvc,
+		CredentialStore:         credentialStore,
+		permissionManager:       permissionManager,
+		resourceTag:             resourceTag,
+		ReservedCloudNames:      reservedCloudNames,
+		Dialer:                  dialer,
+		crossModelQueryTimeout:  crossModelQueryTimeout,
+		migrationTokenGenerator: migrationTokenGenerator,
 	}, nil
 }
 
