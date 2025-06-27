@@ -362,6 +362,25 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 // values are used as URL query values when making the initial
 // HTTP request. Headers passed in will be added to the HTTP
 // request.
-func (c *Connection) ConnectControllerStream(path string, attrs url.Values, headers http.Header) (base.Stream, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
+func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extraHeaders http.Header) (base.Stream, error) {
+	const op = errors.Op("jujuclient.ConnectControllerStream")
+
+	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	header := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
+	for key, vals := range extraHeaders {
+		for _, val := range vals {
+			header.Add(key, val)
+		}
+	}
+
+	conn, err := rpc.Dial(c.ctx, c.ctl, names.ModelTag{}, path, header)
+	if err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	return conn, nil
 }

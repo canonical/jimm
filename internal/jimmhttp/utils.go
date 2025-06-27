@@ -13,12 +13,28 @@ import (
 	"go.uber.org/zap"
 )
 
-type contextPathKey string
+type contextPathKey struct{}
+type migratingModelUUIDKey struct{}
+type clientVersionKey struct{}
 
 // PathElementFromContext returns the value of the path element previously
 // extracted in a StripPathElement handler.
-func PathElementFromContext(ctx context.Context, key string) string {
-	s, _ := ctx.Value(contextPathKey(key)).(string)
+func PathElementFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(contextPathKey{}).(string)
+	return s
+}
+
+// MigratingModelUUIDFromContext returns the value of the migrating model UUID
+// sent in an HTTP header if one was sent.
+func MigratingModelUUIDFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(migratingModelUUIDKey{}).(string)
+	return s
+}
+
+// ClientVersionFromContext returns the value of the client version sent in an
+// HTTP header if one was sent.
+func ClientVersionFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(clientVersionKey{}).(string)
 	return s
 }
 
@@ -42,7 +58,7 @@ func StripPathElement(key string, h http.Handler) http.Handler {
 		// clear the RawPath if it was previously set.
 		req2.URL.RawPath = ""
 		if key != "" {
-			req2 = req2.WithContext(context.WithValue(req2.Context(), contextPathKey(key), v))
+			req2 = req2.WithContext(context.WithValue(req2.Context(), contextPathKey{}, v))
 		}
 		h.ServeHTTP(w, req2)
 	})

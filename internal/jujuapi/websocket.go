@@ -139,9 +139,9 @@ func mapError(err error) *jujuparams.Error {
 	}
 }
 
-// apiProxier serves the /commands and /api server for a model by
+// apiModelProxier serves the /commands and /api server for a model by
 // proxying all requests through to the controller.
-type apiProxier struct {
+type apiModelProxier struct {
 	apiServer
 }
 
@@ -173,7 +173,7 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 // ServeWS implements jimmhttp.WSServer.
 // We act as a proxier, handling auth on requests before forwarding the
 // requests to the appropriate Juju controller.
-func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
+func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	jwtGenerator := s.jimm.NewJujuAuthenticator()
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
 	zapctx.Debug(ctx, "Starting proxier")
@@ -194,10 +194,10 @@ func (s apiProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 
 // controllerConnectionFunc returns a function that will be used to
 // connect to a controller when a client makes a request.
-func controllerConnectionFunc(s apiProxier, jwtGenerator *jujuauth.LoginTokenGenerator) func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
+func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTokenGenerator) func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 	return func(ctx context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 		const op = errors.Op("proxy.controllerConnectionFunc")
-		path := jimmhttp.PathElementFromContext(ctx, "path")
+		path := jimmhttp.PathElementFromContext(ctx)
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {

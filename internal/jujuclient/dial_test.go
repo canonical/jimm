@@ -117,3 +117,35 @@ func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 	}
 	c.Check(addrs, gc.DeepEquals, info.Addrs)
 }
+
+// TestConnectStreams tests the ConnectStream and ConnectControllerStream methods
+// of our Juju dialer. It verifies that we can connect to valid endpoints
+// on a Juju controller, and that invalid endpoints return errors.
+func (s *dialSuite) TestConnectStreams(c *gc.C) {
+	ctl := dbmodel.Controller{
+		UUID: s.ControllerConfig.ControllerUUID(),
+	}
+	err := s.JIMM.Database.GetController(context.Background(), &ctl)
+	c.Assert(err, gc.IsNil)
+	api, err := s.Dialer.Dial(context.Background(), &ctl, s.Model.ModelTag(), nil, nil)
+	c.Assert(err, gc.IsNil)
+	defer api.Close()
+
+	// Connect to the model stream for a valid endpoint
+	modelStream, err := api.ConnectStream("/log", nil)
+	c.Assert(err, gc.IsNil)
+	defer modelStream.Close()
+
+	// Connect to the model stream for an invalid endpoint
+	_, err = api.ConnectStream("/log2", nil)
+	c.Assert(err, gc.NotNil)
+
+	// Connect to the controller stream for a valid endpoint
+	controllerStream, err := api.ConnectControllerStream("/migrate/logtransfer", nil, nil)
+	c.Assert(err, gc.IsNil)
+	defer controllerStream.Close()
+
+	// Connect to the controller stream for an invalid endpoint
+	_, err = api.ConnectControllerStream("/migrate/logtransfer2", nil, nil)
+	c.Assert(err, gc.NotNil)
+}

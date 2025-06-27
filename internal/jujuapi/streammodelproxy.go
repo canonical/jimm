@@ -20,17 +20,17 @@ import (
 	"github.com/canonical/jimm/v3/internal/streamproxy"
 )
 
-// A streamProxier serves the the /log endpoint by proxying
+// A streamModelProxier serves any /model/{uuid}/* endpoint by proxying
 // messages between the controller and client.
-type streamProxier struct {
-	// TODO(Kian): Refactor the apiServer to use the JIMM API rather than a concrete struct
+type streamModelProxier struct {
+	// TODO(Kian): Refactor the apiServer to use an interface rather than a concrete struct
 	// then we can write unit tests for the stream proxier.
 	apiServer
 }
 
-// Authenticate implements WSServer.Authenticate
+// Authenticate implements WSServer.Authenticate.
 // It attempts to perform basic auth and will return an unauthorized error if auth fails.
-func (s streamProxier) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+func (s streamModelProxier) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	_, password, ok := req.BasicAuth()
 	if !ok {
 		return ctx, errors.E(errors.CodeUnauthorized, "authentication missing")
@@ -45,7 +45,11 @@ func (s streamProxier) Authenticate(ctx context.Context, w http.ResponseWriter, 
 }
 
 // ServeWS implements jimmhttp.WSServer.
-func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
+//
+// This endpoint serves any /model/{uuid}/* endpoint by proxying messages
+// between the controller and client. Most notably used for the /model/{uuid}/log
+// endpoint for streaming model logs from the controller to the client.
+func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
 	writeError := func(msg string, code errors.Code) {
 		var errResult jujuparams.ErrorResult
 		errResult.Error = &jujuparams.Error{
@@ -65,7 +69,7 @@ func (s streamProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) 
 		return
 	}
 
-	uuid, finalPath, err := modelInfoFromPath(jimmhttp.PathElementFromContext(ctx, "path"))
+	uuid, finalPath, err := modelInfoFromPath(jimmhttp.PathElementFromContext(ctx))
 	if err != nil {
 		zapctx.Error(ctx, "error parsing path", zap.Error(err))
 		writeError(fmt.Sprintf("error parsing path: %s", err.Error()), errors.CodeBadRequest)

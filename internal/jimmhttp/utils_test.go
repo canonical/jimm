@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jimmhttp_test
 
@@ -50,7 +50,7 @@ func TestStripPathElement(t *testing.T) {
 	for _, test := range stripPathElementTests {
 		c.Run(test.name, func(c *qt.C) {
 			var hnd http.Handler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				c.Check(jimmhttp.PathElementFromContext(req.Context(), "key"), qt.Equals, test.expectVar)
+				c.Check(jimmhttp.PathElementFromContext(req.Context()), qt.Equals, test.expectVar)
 				c.Check(req.URL.Path, qt.Equals, test.expectPath)
 				c.Check(req.URL.RawPath, qt.Equals, "")
 			})
