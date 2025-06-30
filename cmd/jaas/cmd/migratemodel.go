@@ -224,8 +224,3 @@ func (c *migrateModelCommand) getMigrationSpec(token []byte) (controller.Migrati
 		TargetUser: accountDetails.User,
 	}, nil
 }
-
-func (c *migrateModelCommand) checkMigrationFeasibility(spec *controller.MigrationSpec) error {
-
-	return nil
-}
