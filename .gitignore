@@ -23,3 +23,5 @@ qa-lxd
 local/traefik/certs/ca.srl
 
 db_schemas
+
+*.test
