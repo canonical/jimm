@@ -16,34 +16,34 @@ import (
 )
 
 const (
-	moveModelCommandDoc = `
-The move command moves a model, or many models between two controllers
-registered within JIMM. This performs a model migration, but is named
-"move" to avoid confusion with the "move" command which moves
-a model to or from JIMM. 
+	migrateInternalModelCommandDoc = `
+The migrate-internal command migates a model, or many models between two controllers
+in your JAAS system. This performs a model migration, but is named
+"migrate-internal" to avoid confusion with the "migrate" command which migrates
+a model to or from JAAS. 
 
 You may specify a model name (of the form owner/name) or model UUID.
 
 `
-	moveModelCommandExample = `
-    juju move mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 fd469983-27c2-423b-bebf-84f616fb036b ...
-    juju move mycontroller user@domain.com/model-a user@domain.com/model-b ...
-    juju move mycontroller user@domain.com/model-a fd469983-27c2-423b-bebf-84f616fb036b ...
+	migrateInternalModelCommandExample = `
+    juju migrate-internal mycontroller 2cb433a6-04eb-4ec4-9567-90426d20a004 fd469983-27c2-423b-bebf-84f616fb036b ...
+    juju migrate-internal mycontroller user@domain.com/model-a user@domain.com/model-b ...
+    juju migrate-internal mycontroller user@domain.com/model-a fd469983-27c2-423b-bebf-84f616fb036b ...
 
 `
 )
 
-// NewMoveModelCommand returns a command to move models.
-func NewMoveModelCommand() cmd.Command {
-	cmd := &moveModelCommand{
+// NewMigrateInternalModelCommand returns a command to migrate internal models.
+func NewMigrateInternalModelCommand() cmd.Command {
+	cmd := &migrateInternalModelCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// moveModelCommand moves a model.
-type moveModelCommand struct {
+// migrateInternalModelCommand migrates a model between controllers within JAAS.
+type migrateInternalModelCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
@@ -53,18 +53,19 @@ type moveModelCommand struct {
 	modelTargets     []string
 }
 
-func (c *moveModelCommand) Info() *cmd.Info {
+// Info implements Command.Info.
+func (c *migrateInternalModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "move",
+		Name:     "migrate-internal",
 		Args:     "<controller name> <model uuid> [<model uuid>...]",
-		Purpose:  "Move models to the target controller",
-		Doc:      moveModelCommandDoc,
-		Examples: moveModelCommandExample,
+		Purpose:  "migrate models to another controller within JAAS",
+		Doc:      migrateInternalModelCommandDoc,
+		Examples: migrateInternalModelCommandExample,
 	})
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *moveModelCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *migrateInternalModelCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
@@ -73,7 +74,7 @@ func (c *moveModelCommand) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Init implements the cmd.Command interface.
-func (c *moveModelCommand) Init(args []string) error {
+func (c *migrateInternalModelCommand) Init(args []string) error {
 	if len(args) < 2 {
 		return errors.E("Missing controller name and model target arguments")
 	}
@@ -88,7 +89,7 @@ func (c *moveModelCommand) Init(args []string) error {
 }
 
 // Run implements Command.Run.
-func (c *moveModelCommand) Run(ctxt *cmd.Context) error {
+func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return errors.E(err, "could not determine controller")

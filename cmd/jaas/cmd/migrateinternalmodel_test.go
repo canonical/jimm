@@ -16,18 +16,18 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type moveModelSuite struct {
+type migrateInternalModelSuite struct {
 	cmdtest.JimmCmdSuite
 }
 
-var _ = gc.Suite(&moveModelSuite{})
+var _ = gc.Suite(&migrateInternalModelSuite{})
 
-// TestMigrateModelCommandSuperuser tests that a migration request makes it through to the Juju controller.
+// TestMigrateInternalModelCommandSuperuser tests that a migration request makes it through to the Juju controller.
 // Because our test suite only spins up 1 controller the furthest we can go is reaching Juju pre-checks which
 // detect that a model with the same UUID already exists on the target controller.
 // This functionality is already tested in jujuapi and ideally this test would only test the CLI functionality
 // but our CLI tests are currently integration based.
-func (s *moveModelSuite) TestMoveModelCommandSuperuser(c *gc.C) {
+func (s *migrateInternalModelSuite) TestMigrateInternalModelCommandSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
@@ -37,7 +37,7 @@ func (s *moveModelSuite) TestMoveModelCommandSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 	context, err := cmdtesting.RunCommand(
-		c, cmd.NewMoveModelCommandForTesting(s.ClientStore(), bClient),
+		c, cmd.NewMigrateInternalModelCommandForTesting(s.ClientStore(), bClient),
 		"controller-1",
 		mt.Id(),
 		"charlie@canonical.com/model-2",
@@ -54,8 +54,8 @@ func (s *moveModelSuite) TestMoveModelCommandSuperuser(c *gc.C) {
 	c.Assert(res.Results[1].Error.Message, gc.Equals, fmt.Sprintf(expected, mt2.Id()))
 }
 
-func (s *moveModelSuite) TestMoveModelCommandFailsWithMissingArgs(c *gc.C) {
+func (s *migrateInternalModelSuite) TestMigrateInternalModelCommandFailsWithMissingArgs(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewMoveModelCommandForTesting(s.ClientStore(), bClient), "myController")
+	_, err := cmdtesting.RunCommand(c, cmd.NewMigrateInternalModelCommandForTesting(s.ClientStore(), bClient), "myController")
 	c.Assert(err, gc.ErrorMatches, "Missing controller name and model target arguments")
 }

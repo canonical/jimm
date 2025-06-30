@@ -263,8 +263,8 @@ func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Logi
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewMoveModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &moveModelCommand{
+func NewMigrateInternalModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
+	cmd := &migrateInternalModelCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}

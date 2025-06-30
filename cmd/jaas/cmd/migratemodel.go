@@ -72,7 +72,7 @@ func NewMigrateModelCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// migrateModelCommand migrates a model.
+// migrateModelCommand migrates a model to/from JAAS.
 type migrateModelCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
@@ -85,6 +85,7 @@ type migrateModelCommand struct {
 	userMappingFile   string
 }
 
+// Info implements Command.Info.
 func (c *migrateModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "migrate",
