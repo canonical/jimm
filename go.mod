@@ -10,7 +10,7 @@ require (
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/http/v2 v2.0.1
-	github.com/juju/juju v0.0.0-20250630072737-cdafe8cdeaef // v3.6.5
+	github.com/juju/juju v0.0.0-20250630072737-cdafe8cdeaef // 3.6-tip
 	github.com/juju/loggo v1.0.0 // indirect
 	github.com/juju/names/v4 v4.0.0
 	github.com/juju/names/v5 v5.0.0
