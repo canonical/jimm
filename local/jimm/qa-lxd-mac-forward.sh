@@ -48,7 +48,7 @@ fi
 
 echo "Copying ssh key to local"
 KEY_COPIED_PATH="../../local/vm/id_rsa"
-if [ ! -f "$KEY" ]; then
+if [ ! -f "$KEY_COPIED_PATH" ]; then
     mkdir -p $(dirname "$KEY_COPIED_PATH")
     sudo cp "$KEY_PATH" "$KEY_COPIED_PATH"
     sudo chown $USER:$USER "$KEY_COPIED_PATH"
@@ -63,31 +63,28 @@ echo "Using SSH key: $KEY"
 echo "VM Name: $VM_NAME"
 echo "VM Address: $VM_ADDR"
 
-# Test SSH connection first (non-blocking, just exits if failure)
-ssh -i "$KEY_COPIED_PATH" -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@$VM_ADDR "exit"
+# Test SSH connection first (non-blocking, just exits if failure, sudo to prompt user)
+sudo ssh -i "$KEY_COPIED_PATH" -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@$VM_ADDR "exit"
 if [ $? -ne 0 ]; then
   echo "SSH connection test failed. Exiting."
   exit 1
 fi
 
 # Connect keycloak
-ssh -i "$KEY_COPIED_PATH" -N -L 8082:localhost:8082 ubuntu@$VM_ADDR > /dev/null 2>&1 &
-KEYCLOAK_PID=$!
+sudo ssh -i "$KEY_COPIED_PATH" -N -L 8082:localhost:8082 -L 443:localhost:443 ubuntu@$VM_ADDR > /dev/null 2>&1 &
+SSH_PID=$!
+echo "SSH PID: $SSH_PID"
+echo "JIMM is available at https://jimm.localhost"
 echo "Keycloak is available at http://keycloak.localhost:8082"
-
-# Connect jimm
-ssh -i "$KEY_COPIED_PATH" -N -L 17071:localhost:443 ubuntu@$VM_ADDR > /dev/null 2>&1 &
-JIMM_PID=$!
-echo "JIMM is available at https://jimm.localhost:17071"
 
 cleanup() {
     echo "Cleaning up SSH tunnels..."
-    kill $KEYCLOAK_PID $JIMM_PID 2>/dev/null
+    kill $SSH_PID 2>/dev/null
 }
 
 trap cleanup EXIT
 
 if $WAIT; then
     echo "Waiting for tunnels..."
-    wait $KEYCLOAK_PID $JIMM_PID
+    wait $SSH_PID
 fi
