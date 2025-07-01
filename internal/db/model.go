@@ -5,7 +5,6 @@ package db
 import (
 	"context"
 
-	"github.com/juju/juju/state"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -251,44 +250,4 @@ func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Cont
 		return 0, errors.E(op, dbError(err))
 	}
 	return int(count), nil
-}
-
-// SetMigrationMode sets the migration mode for a model with the specified UUID.
-func (d *Database) SetMigrationMode(ctx context.Context, model *dbmodel.Model, mode state.MigrationMode) (err error) {
-	const op = errors.Op("db.SetMigrationMode")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
-
-	db := d.DB.WithContext(ctx)
-	switch {
-	case model.UUID.Valid:
-		db = db.Where("uuid = ?", model.UUID.String)
-	default:
-		return errors.E(op, "missing uuid", errors.CodeBadRequest)
-	}
-	// Check if the model doesn't exist or the current migration mode is already set to the desired value.
-	var currentModel dbmodel.Model
-	if err := db.First(&currentModel).Error; err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, err, "model not found")
-		}
-		return errors.E(op, dbError(err))
-	}
-	if currentModel.MigrationMode == mode {
-		return nil
-	}
-	db = d.DB.WithContext(ctx)
-	if err := db.Where("uuid = ?", model.UUID.String).Model(model).Update("migration_mode", mode).Error; err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, err, "model not found")
-		}
-		return errors.E(op, dbError(err))
-	}
-
-	return nil
 }

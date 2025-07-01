@@ -63,6 +63,9 @@ type API interface {
 	// reported by the provider and reports any discrepancies.
 	CheckMachines(modelUUID string) ([]error, error)
 
+	// Import imports a model from a serialized format.
+	Import(bytes []byte) error
+
 	// Close closes the API connection.
 	Close() error
 

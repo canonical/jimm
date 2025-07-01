@@ -64,3 +64,10 @@ func (c Connection) LatestLogTime(modelUUID string) (time.Time, error) {
 	migrationTarget := migrationtarget.NewClient(&c)
 	return migrationTarget.LatestLogTime(modelUUID)
 }
+
+// Import imports a model migration from the given bytes of the
+// serialized model description.
+func (c Connection) Import(bytes []byte) error {
+	migrationTarget := migrationtarget.NewClient(&c)
+	return migrationTarget.Import(bytes)
+}

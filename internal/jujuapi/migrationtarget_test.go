@@ -54,6 +54,11 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	modelDescription := description.NewModel(modelDescriptionArgs)
 	modelDescription.SetStatus(description.StatusArgs{Value: "available"})
+	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+		Name:  jimmtest.TestCloudName + "/alice@canonical.com/cred",
+		Cloud: names.NewCloudTag(jimmtest.TestCloudName),
+		Owner: names.NewUserTag("alice@canonical.com"),
+	})
 	model := migration.ModelInfo{
 		UUID:                   modelUUID,
 		Owner:                  names.NewUserTag("alice"),
@@ -121,4 +126,13 @@ func (s *migrationTargetSuite) TestLatestLogTime(c *gc.C) {
 	client := migrationtarget.NewClient(conn)
 	_, err := client.LatestLogTime(s.Model.UUID.String)
 	c.Assert(err, gc.IsNil)
+}
+
+func (s *migrationTargetSuite) TestImport(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := migrationtarget.NewClient(conn)
+	err := client.Import([]byte{})
+	c.Assert(err, gc.ErrorMatches, `^failed to import model.*`)
 }

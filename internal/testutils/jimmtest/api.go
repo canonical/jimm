@@ -149,6 +149,7 @@ type API struct {
 	GrantApplicationOfferAccess_       func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
 	GrantModelAccess_                  func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
+	Import_                            func(bytes []byte) error
 	IsBroken_                          bool
 	LatestLogTime_                     func(string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
@@ -510,6 +511,13 @@ func (a *API) ListModels(ctx context.Context) ([]base.UserModel, error) {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.ListModels_(ctx)
+}
+
+func (a *API) Import(bytes []byte) error {
+	if a.Import_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return a.Import_(bytes)
 }
 
 var _ juju.API = &API{}

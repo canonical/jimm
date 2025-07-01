@@ -11,6 +11,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/description/v9"
 	"github.com/juju/juju/core/migration"
+	"github.com/juju/juju/rpc/params"
+	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
@@ -344,6 +346,40 @@ func TestAdoptResources_NoIncomingModelMigration(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
+const testActivateEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  uuid: 00000000-0000-0000-0000-000000000001
+  controller: test1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: alice@canonical.com
+  life: alive
+  migration-mode: importing
+  users:
+  - user: alice@canonical.com
+    access: admin
+  - user: bob@canonical.com
+    access: write
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
 func TestActivate_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -369,7 +405,7 @@ func TestActivate_Success(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testActivateEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	userMap := map[string]string{"bob": "alice@canonical.com"}
@@ -397,6 +433,16 @@ func TestActivate_Success(t *testing.T) {
 	err = j.Database.GetUserMapping(ctx, &userMapping)
 	c.Assert(err, qt.IsNil)
 	c.Assert(userMapping.ExternalUserName, qt.Equals, "alice@canonical.com")
+	model := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, model)
+	c.Assert(err, qt.IsNil)
+	c.Assert(model.MigrationMode, qt.Equals, state.MigrationModeNone)
+	c.Assert(model.Life, qt.Equals, state.Alive.String())
 }
 
 func TestActivate_APIFailure(t *testing.T) {
@@ -465,12 +511,17 @@ func newIncomingMigration(userMap map[string]string, ctl dbmodel.Controller) dbm
 	}
 }
 
-func newMigrationInfo(owner string) migration.ModelInfo {
+func newModelDescription(owner string) description.Model {
 	descriptionArgs := description.ModelArgs{
 		AgentVersion: "3.2.1",
 		Owner:        names.NewUserTag(owner),
 		Type:         description.IAAS,
 		Cloud:        "test",
+		Config: map[string]interface{}{
+			"uuid": migratingModelUUID,
+			"name": "test-model",
+		},
+		CloudRegion: "test-region",
 	}
 	modelDescription := description.NewModel(descriptionArgs)
 	userArgs := description.UserArgs{
@@ -479,13 +530,22 @@ func newMigrationInfo(owner string) migration.ModelInfo {
 		Access:      "admin",
 	}
 	modelDescription.AddUser(userArgs)
+	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+		Owner: names.NewUserTag(owner),
+		Name:  "test-cred",
+		Cloud: names.NewCloudTag("test"),
+	})
+	return modelDescription
+}
+
+func newMigrationInfo(owner string) migration.ModelInfo {
 	modelInfo := migration.ModelInfo{
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag(owner),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.2.1"),
 		ControllerAgentVersion: version.MustParse("3.2.1"),
-		ModelDescription:       modelDescription,
+		ModelDescription:       newModelDescription(owner),
 	}
 	return modelInfo
 }
@@ -549,4 +609,267 @@ func TestLatestLogTime_Success(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(logTime, qt.Not(qt.IsNil))
 	c.Assert(latestLogTimeCalled, qt.IsTrue)
+}
+
+const testImportEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+  agent-version: 3.2.1
+  public-address: foo.com
+  cloud-regions:
+  - cloud: test
+    region: test-region
+    priority: 1
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+func TestImport_Success(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	// Validate that the API request to Juju is made with a modified version
+	// of the model description, where the owner is replaced with an external user.
+	api := &jimmtest.API{
+		Import_: func(bytes []byte) error {
+			desc, err := description.Deserialize(bytes)
+			c.Check(err, qt.IsNil)
+			c.Check(desc.Tag().Id(), qt.Equals, migratingModelUUID)
+			c.Check(desc.Owner(), qt.Equals, names.NewUserTag("alice@canonical.com"))
+			c.Check(desc.Users(), qt.HasLen, 0)
+			c.Check(desc.CloudCredential(), qt.Not(qt.IsNil))
+			c.Check(desc.CloudCredential().Name(), qt.Equals, "test-cred")
+			c.Check(desc.CloudCredential().Owner(), qt.Equals, "alice@canonical.com")
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testImportEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	desc := newModelDescription("bob")
+	desc.SetStatus(description.StatusArgs{Value: "available"})
+	bytes, err := description.Serialize(desc)
+	c.Assert(err, qt.IsNil)
+	err = j.Import(ctx, user, params.SerializedModel{
+		Bytes: bytes,
+	})
+	c.Assert(err, qt.IsNil)
+
+	// Check the model is created in the database with migration mode set to importing.
+	m := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, m)
+	c.Assert(err, qt.IsNil)
+	c.Assert(m.MigrationMode, qt.Equals, state.MigrationModeImporting)
+}
+
+func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testImportEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	// Check cloud credential are checked.
+	desc := newModelDescription("bob")
+	desc.SetStatus(description.StatusArgs{Value: "available"})
+	// Intentionally resetting cloud credential to simulate missing cloud credential.
+	desc.SetCloudCredential(description.CloudCredentialArgs{})
+	bytes, err := description.Serialize(desc)
+	c.Assert(err, qt.IsNil)
+	err = j.Import(ctx, user, params.SerializedModel{
+		Bytes: bytes,
+	})
+	c.Assert(err, qt.ErrorMatches, "^failed to modify model description.*")
+
+	// Check the model is created in the database with migration mode set to importing.
+	m := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, m)
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+}
+
+func TestImport_UserNotFoundInUserMapping(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testImportEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	// Check cloud credential are checked.
+	desc := newModelDescription("not-in-mapping")
+	desc.SetStatus(description.StatusArgs{Value: "available"})
+	bytes, err := description.Serialize(desc)
+	c.Assert(err, qt.IsNil)
+	err = j.Import(ctx, user, params.SerializedModel{
+		Bytes: bytes,
+	})
+	c.Assert(err, qt.ErrorMatches, "^failed to modify model description.*")
+
+	// Check the model is created in the database with migration mode set to importing.
+	m := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, m)
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+}
+
+func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{},
+		},
+	})
+
+	// we intentionally parse an environment that does not have the cloud credential.
+	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	// Check cloud credential are checked.
+	desc := newModelDescription("bob")
+	desc.SetStatus(description.StatusArgs{Value: "available"})
+	bytes, err := description.Serialize(desc)
+	c.Assert(err, qt.IsNil)
+	err = j.Import(ctx, user, params.SerializedModel{
+		Bytes: bytes,
+	})
+	c.Assert(err, qt.ErrorMatches, `^failed to import model from description: cloudcredential \S+ not found$`)
+
+	// Check the model is created in the database with migration mode set to importing.
+	m := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, m)
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+}
+
+func TestImport_APIFailure(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	// Validate that the API request to Juju is made with a modified version
+	// of the model description, where the owner is replaced with an external user.
+	api := &jimmtest.API{
+		Import_: func(bytes []byte) error {
+			return errors.E("API failure")
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testImportEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	userMap := map[string]string{"bob": "alice@canonical.com"}
+	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
+	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	desc := newModelDescription("bob")
+	desc.SetStatus(description.StatusArgs{Value: "available"})
+	bytes, err := description.Serialize(desc)
+	c.Assert(err, qt.IsNil)
+	err = j.Import(ctx, user, params.SerializedModel{
+		Bytes: bytes,
+	})
+	c.Assert(err, qt.ErrorMatches, `^failed to import model: API failure$`)
+
+	// Check the model is created in the database with migration mode set to importing.
+	m := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, m)
+	c.Assert(err, qt.IsNil)
+	c.Assert(m.MigrationMode, qt.Equals, state.MigrationModeImporting)
 }

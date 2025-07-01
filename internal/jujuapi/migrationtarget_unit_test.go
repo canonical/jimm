@@ -433,3 +433,56 @@ func (s *migrationTargetUnitSuite) TestLatestLogTime(c *gc.C) {
 	c.Assert(logTime, gc.Not(gc.IsNil))
 	c.Assert(latestLogTimeCalled, gc.Equals, true)
 }
+
+func (s *migrationTargetUnitSuite) TestImportValid(c *gc.C) {
+	ctx := context.Background()
+
+	activateCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			Import_: func(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error {
+				activateCalled = true
+				return nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	// Validate the activate method is called when the user is a JIMM admin.
+	user.JimmAdmin = true
+	err := cr.Import(ctx, jujuparams.SerializedModel{})
+	c.Assert(err, gc.IsNil)
+	c.Assert(activateCalled, gc.Equals, true)
+}
+
+func (s *migrationTargetUnitSuite) TestImportUnauthorized(c *gc.C) {
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	// Validate access denied without JIMM admin permissions.
+	err := cr.Import(ctx, jujuparams.SerializedModel{})
+	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+}

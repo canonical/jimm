@@ -38,6 +38,7 @@ func init() {
 		caCert := rpc.Method(r.CACert)
 		adoptResources := rpc.Method(r.AdoptResources)
 		checkMachines := rpc.Method(r.CheckMachines)
+		importMethod := rpc.Method(r.Import)
 		latestLogTime := rpc.Method(r.LatestLogTime)
 
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
@@ -46,6 +47,7 @@ func init() {
 		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "Abort", adoptResources)
 		r.AddMethod("MigrationTarget", 4, "CheckMachines", checkMachines)
+		r.AddMethod("MigrationTarget", 4, "Import", importMethod)
 		r.AddMethod("MigrationTarget", 4, "LatestLogTime", latestLogTime)
 
 		return []int{4}
@@ -214,6 +216,22 @@ func (r *controllerRoot) Activate(ctx context.Context, args params.ActivateModel
 		args.CrossModelUUIDs)
 	if err != nil {
 		return errors.E(errors.Op("jujuapi.Activate"), err)
+	}
+	return nil
+}
+
+// Import implements the Import method of the MigrationTarget facade.
+// It imports resources into JIMM and proxies the import request to the target Juju controller.
+func (r *controllerRoot) Import(ctx context.Context, serialized params.SerializedModel) error {
+	const op = errors.Op("jujuapi.Import")
+
+	if !r.user.JimmAdmin {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	err := r.jimm.JujuManager().Import(ctx, r.user, serialized)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to import model: %w", err))
 	}
 	return nil
 }
