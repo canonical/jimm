@@ -64,7 +64,7 @@ echo "VM Name: $VM_NAME"
 echo "VM Address: $VM_ADDR"
 
 # Test SSH connection first (non-blocking, just exits if failure)
-ssh -i "$KEY_COPIED_PATH" -o BatchMode=yes -o ConnectTimeout=5 ubuntu@$VM_ADDR "exit"
+ssh -i "$KEY_COPIED_PATH" -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@$VM_ADDR "exit"
 if [ $? -ne 0 ]; then
   echo "SSH connection test failed. Exiting."
   exit 1
