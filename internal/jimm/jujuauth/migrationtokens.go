@@ -51,9 +51,6 @@ func (s *MigrationTokenGenerator) NewToken(ctx context.Context, tokenArgs Migrat
 		Access: map[string]string{
 			tokenArgs.ModelTag.String(): string(permission.AdminAccess),
 		},
-		ExtraClaims: map[string]any{
-			"migration": true,
-		},
 		Expiry: migrationExpiry,
 	})
 	if err != nil {

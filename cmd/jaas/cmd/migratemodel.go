@@ -33,7 +33,7 @@ to remove any local users with access to the model and replace the model owner w
 an external user i.e. from alice -> alice@canonical.com.
 
 In order to determine the new model owner and to handle any existing application-offers 
-that have already been consumed with local users, you can specify a user mapping file
+that have already been consumed with local users, you must specify a user mapping file
 with the --user-mapping flag. This should point to a yaml file with a mapping of local 
 users to external users.
 For example:
@@ -51,9 +51,9 @@ was consumed by user "alice", when JIMM validates the relation it will understan
 "alice" has been mapped and checks that "alice@canonical" still has access to the offer.
 Revoking access from "alice@canonical.com" will result in the relation encountering an error.
 
-It may not be possible to know all users that have have consumed offers from a model, so
-the user mapping may need to be updated over time as offers fail due to permission errors.
-Updating the user mapping is available from the "add-user-mapping" command.
+It may not be possible to know all users that have have consumed offers from a model, but using
+"juju show-offer <offer-name> --format yaml" you can see all users that have access to the
+offer. This list should help determine which users to map in the user mapping file. 
 
 Any tools/scripts that refer to models by their full name (owner/name) will need to be 
 updated after migration to use the new external username or refer to models by their UUID.
@@ -72,7 +72,7 @@ func NewMigrateModelCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// migrateModelCommand migrates a model to/from JAAS.
+// migrateModelCommand migrates a model to JAAS.
 type migrateModelCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output

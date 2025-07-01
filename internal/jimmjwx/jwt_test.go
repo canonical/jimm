@@ -173,6 +173,47 @@ func TestNewJWTExpires(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
 }
 
+func TestNewJWTWithCustomExpiry(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	store := setupCredentialStore(ctx, c)
+
+	// Setup JWKSService
+	jwksService := jimmjwx.NewJWKSService(store)
+	// Start rotator
+	startAndTestRotator(c, ctx, store, jwksService)
+	// Setup JWTService
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   "host",
+		Store:  store,
+		Expiry: time.Hour,
+	})
+
+	shortExpiry := time.Minute // Use a shorter expiry for this token
+
+	// Mint a new JWT with custom expiry
+	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: "controller-my-diglett-controller",
+		User:       "foo",
+		Expiry:     shortExpiry,
+	})
+	c.Assert(err, qt.IsNil)
+
+	// Retrieve pubkey from cache
+	set, err := jwtService.JWKS.Get(ctx)
+	c.Assert(err, qt.IsNil)
+
+	_, err = jwt.Parse(
+		tok,
+		jwt.WithKeySet(set),
+		jwt.WithClock(futureClock{expiry: shortExpiry}),
+	)
+	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
+}
+
 type futureClock struct {
 	expiry time.Duration
 }

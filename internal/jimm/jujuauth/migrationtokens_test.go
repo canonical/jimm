@@ -32,9 +32,6 @@ func TestNewMigrationToken(t *testing.T) {
 	c.Assert(jwtSvc.params.Expiry, qt.Equals, 3*time.Hour)
 	c.Assert(jwtSvc.params.User, qt.Equals, "testuser")
 	c.Assert(jwtSvc.params.Controller, qt.Equals, "123")
-	c.Assert(jwtSvc.params.ExtraClaims, qt.DeepEquals, map[string]any{
-		"migration": true,
-	})
 	c.Assert(jwtSvc.params.Access, qt.DeepEquals, map[string]string{
 		"model-testmodel": string(permission.AdminAccess),
 	})
