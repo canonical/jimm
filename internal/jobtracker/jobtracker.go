@@ -59,9 +59,7 @@ func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.
 		return jobId, err
 	}
 
-	stopPollInterval := time.Second * 5
-
-	go j.runJob(ctx, jobId, stopPollInterval, deadline, job)
+	go j.runJob(ctx, jobId, deadline, job)
 
 	return jobId, nil
 }
@@ -75,12 +73,11 @@ func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.
 func (j *Tracker) runJob(
 	ctx context.Context,
 	id uuid.UUID,
-	stopPollInterval time.Duration,
 	deadline time.Duration,
 	job func(ctx context.Context) error,
 ) {
 	jobCtx, cancelJob := context.WithTimeout(ctx, deadline)
-	ticker := time.NewTicker(stopPollInterval)
+	ticker := time.NewTicker(j.stopInterval)
 	defer ticker.Stop()
 	defer cancelJob()
 
