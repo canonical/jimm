@@ -8,9 +8,9 @@
 # - go
 # - jq
 
-VM_NAME="jimm"
+VM_NAME="${1:-jimm}"
 
-echo "Setting up env."
+echo "Setting up VM $VM_NAME."
 vm_exists=$(multipass list --format json | jq -r ".list[] | select(.name == \"$VM_NAME\") | .name")
 if [ -n "$vm_exists" ]; then
   echo "Please delete $VM_NAME and try again."
