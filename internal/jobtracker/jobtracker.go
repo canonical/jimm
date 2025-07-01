@@ -59,50 +59,44 @@ func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.
 		return jobId, err
 	}
 
-	go j.runJob(ctx, jobId, deadline, job)
+	go j.manageJob(ctx, jobId, deadline, job)
 
 	return jobId, nil
 }
 
-// runJob runs a job with a given context, job ID, polling interval, and deadline.
+// manageJob runs a job with a given context, job ID, polling interval, and deadline.
 // It manages the job's lifecycle, including setting its status in the store, handling retries on store operations,
 // and responding to stop signals or context cancellations. The job is run in a separate goroutine, and its status
 // is updated as running, successful, or failed based on its result or context expiration.
 // If a stop signal is received or the context is canceled or times out, the job is marked as failed.
 // Store operations are retried up to 5 times with a 30-second delay between attempts in case of transient errors.
-func (j *Tracker) runJob(
+func (j *Tracker) manageJob(
 	ctx context.Context,
 	id uuid.UUID,
 	deadline time.Duration,
 	job func(ctx context.Context) error,
 ) {
 	jobCtx, cancelJob := context.WithTimeout(ctx, deadline)
-	ticker := time.NewTicker(j.stopInterval)
-	defer ticker.Stop()
 	defer cancelJob()
 
 	jobErrCh := make(chan error)
 
-	retryCall := func(f func() error) error {
-		if err := retry.Call(retry.CallArgs{
-			Attempts: 5,
-			Delay:    time.Second * 30,
-			Func:     f,
-			Clock:    clock.WallClock,
-		}); err != nil {
-			return err
-		}
-		return nil
-	}
+	go j.runJob(ctx, jobCtx, id, jobErrCh, job)
+	j.monitorJob(ctx, jobCtx, id, jobErrCh, cancelJob)
+}
 
-	go func() {
-		if err := j.store.SetJobRunning(ctx, id); err != nil {
-			jobErrCh <- fmt.Errorf("failed to set job running, job not starting: %w", err)
-			return
-		}
-		err := job(jobCtx)
-		jobErrCh <- err
-	}()
+func (j *Tracker) runJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh chan error, job func(context.Context) error) {
+	if err := j.store.SetJobRunning(ctx, id); err != nil {
+		jobErrCh <- fmt.Errorf("failed to set job running, job not starting: %w", err)
+		return
+	}
+	err := job(jobCtx)
+	jobErrCh <- err
+}
+
+func (j *Tracker) monitorJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh chan error, cancelJob context.CancelFunc) {
+	ticker := time.NewTicker(j.stopInterval)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -131,19 +125,27 @@ func (j *Tracker) runJob(
 			return
 		case <-ticker.C:
 			shouldStop, err := j.store.GetJobStopSignal(ctx, id)
-			if err != nil {
-				// If we fail to get the stop signal for any reason, we do a best
-				// effort (as the db probably is died on us), so we stop the job,
-				// and hope our status setters on context cancellation
-				// do eventually write the correct status.
-				cancelJob()
-				continue
-			}
 
-			if shouldStop {
+			// If we fail to get the stop signal for any reason, we do a best
+			// effort (as the db probably has died on us), so we stop the job,
+			// and hope our status setters on context cancellation
+			// do eventually write the correct status.
+			if err != nil || shouldStop {
 				cancelJob()
-				continue
 			}
 		}
 	}
+
+}
+
+func retryCall(f func() error) error {
+	if err := retry.Call(retry.CallArgs{
+		Attempts: 5,
+		Delay:    time.Second * 30,
+		Func:     f,
+		Clock:    clock.WallClock,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
