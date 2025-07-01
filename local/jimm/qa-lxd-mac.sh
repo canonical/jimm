@@ -26,8 +26,9 @@ multipass launch --cpus 4 docker -n $VM_NAME
 # Multipass detects the vm name is the same as parent working path dir and creates a fuse mount.
 # We want a classic mount to reflect changes on the host to the VM.
 echo "Setting up classic mount"
-multipass umount jimm jimm || true
-multipass mount --type=classic ../../ jimm:jimm || true 
+mount_name="$VM_NAME:jimm"
+multipass umount $mount_name|| true
+multipass mount --type=classic ../../ $mount_name || true 
 
 echo "Installing & setting up dependencies"
 multipass exec $VM_NAME -- sudo snap install juju
