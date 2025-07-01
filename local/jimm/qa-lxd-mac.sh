@@ -32,6 +32,7 @@ multipass mount --type=classic ../../ $mount_name || true
 
 echo "Installing & setting up dependencies"
 multipass exec $VM_NAME -- sudo snap install juju
+multipass exec $VM_NAME -- sudo snap install go --classic
 multipass exec $VM_NAME -- sudo sudo apt-get -y install make
 multipass exec $VM_NAME -- sudo lxd init --auto
 
