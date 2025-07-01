@@ -50,7 +50,19 @@ echo "Building JAAS CLI"
 $(cd  ../../ && go build ./cmd/jaas)
 
 echo "Setting up forwarding for keycloak login"
+
+# Run initially to setup connection (may require user interaction for sudo)
 ./qa-lxd-mac-forward.sh "$VM_NAME" --linux
+
+# Run again to background (shouldn't require user interaction for sudo)
+./qa-lxd-mac-forward.sh "$VM_NAME" --linux --wait &
+SSH_FORWARD_PID=$!
+
+# Kill SSH forwarding on process exit
+cleanup_ssh_forward() {
+  kill $SSH_FORWARD_PID 2>/dev/null
+}
+trap cleanup_ssh_forward EXIT
 
 echo
 echo
@@ -60,6 +72,9 @@ echo
 echo "To continue the QA environment setup, please login to keycloak."
 echo "The username is: \"jimm-test\" and the password is: \"password\""
 multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- juju login jimm.localhost -c jimm-dev
+
+cleanup_ssh_forward
+
 echo
 echo "Setting up LXD controller"
 multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- sudo iptables -I FORWARD -i lxdbr0 -j ACCEPT
