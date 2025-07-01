@@ -49,6 +49,7 @@ fi
 echo "Copying ssh key to local"
 KEY_COPIED_PATH="../../local/vm/id_rsa"
 if [ ! -f "$KEY" ]; then
+    mkdir -p $(dirname "$KEY_COPIED_PATH")
     sudo cp "$KEY_PATH" "$KEY_COPIED_PATH"
     sudo chown $USER:$USER "$KEY_COPIED_PATH"
     chmod 600 "$KEY_COPIED_PATH"
