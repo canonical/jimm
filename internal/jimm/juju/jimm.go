@@ -18,7 +18,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
-	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -279,7 +278,7 @@ func (j *JujuManager) PrepareModelMigration(
 	modelUUID string,
 	targetControllerName string,
 	userMapping map[string]string,
-) ([]byte, error) {
+) (string, error) {
 	const op = errors.Op("jujumanager.PrepareModelMigration")
 
 	err := j.Database.Transaction(func(d *db.Database) error {
@@ -300,16 +299,13 @@ func (j *JujuManager) PrepareModelMigration(
 	})
 	if err != nil {
 		zapctx.Error(ctx, "failed to add incoming model migration details", zap.Error(err))
-		return nil, errors.E(op, err)
+		return "", errors.E(op, err)
 	}
 
-	migrationToken, err := j.migrationTokenGenerator.NewToken(ctx, jujuauth.MigrationTokenArgs{
-		User:     user.Name,
-		ModelTag: names.NewModelTag(modelUUID),
-	})
+	migrationToken, err := j.migrationTokenGenerator.NewMigrationToken(ctx, user.Name)
 	if err != nil {
 		zapctx.Error(ctx, "failed to generate migration token", zap.Error(err))
-		return nil, errors.E(op, err)
+		return "", errors.E(op, err)
 	}
 
 	return migrationToken, nil

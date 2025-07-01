@@ -3,7 +3,7 @@
 package cmd
 
 import (
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 
@@ -18,7 +18,6 @@ import (
 	"github.com/juju/names/v5"
 	"gopkg.in/yaml.v3"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	jimmapi "github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -40,8 +39,8 @@ For example:
 
 my-user-mapping.yaml:
 '''
-alice:alice@canonical.com
-bob:bob@canonical.com
+alice: alice@canonical.com
+bob: bob@canonical.com
 '''
 
 The mapping must, at a minimum, contain an entry for the model owner.
@@ -59,7 +58,7 @@ Any tools/scripts that refer to models by their full name (owner/name) will need
 updated after migration to use the new external username or refer to models by their UUID.
 `
 	migrateModelCommandExample = `
-    juju migrate alice/my-model target-controller --backing-controller=target-controller --user-mapping=./user-mapping.yaml
+    juju migrate alice/my-model my-jaas --backing-controller=controller-1 --user-mapping=./user-mapping.yaml
 `
 )
 
@@ -72,7 +71,8 @@ func NewMigrateModelCommand() cmd.Command {
 	return modelcmd.WrapBase(cmd)
 }
 
-// migrateModelCommand migrates a model to JAAS.
+// migrateModelCommand migrates a model to JAAS from
+// a controller that isn't registered with JAAS.
 type migrateModelCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
@@ -80,7 +80,7 @@ type migrateModelCommand struct {
 	store             jujuclient.ClientStore
 	dialOpts          *jujuapi.DialOpts
 	targetController  string
-	modelUUID         string
+	modelName         string
 	backingController string
 	userMappingFile   string
 }
@@ -89,8 +89,8 @@ type migrateModelCommand struct {
 func (c *migrateModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "migrate",
-		Args:     "<model-name> <target-controller-name>",
-		Purpose:  "Migrate models to the JIMM targetting a specific controller managed by JIMM.",
+		Args:     "<model-name> <jaas-name>",
+		Purpose:  "Migrate models to JAAS, targetting the desired managed controller.",
 		Doc:      migrateModelCommandDoc,
 		Examples: migrateModelCommandExample,
 	})
@@ -110,15 +110,13 @@ func (c *migrateModelCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *migrateModelCommand) Init(args []string) error {
 	if len(args) < 2 {
-		return errors.E("Missing controller name and model target arguments")
+		return errors.New("Missing controller name and model target arguments")
 	}
-	c.modelUUID = args[0]
-	if !names.IsValidModel(c.modelUUID) {
-		return errors.E(fmt.Errorf("Invalid model name %q", c.modelUUID))
-	}
+	// Note that modelName is a fully qualified model name, i.e. "owner/model-name".
+	c.modelName = args[0]
 	c.targetController = args[1]
 	if c.userMappingFile == "" {
-		return errors.E("Missing user mapping file. Please provide a user mapping file with the --user-mapping flag.")
+		return errors.New("Missing user mapping file. Please provide a user mapping file with the --user-mapping flag.")
 	}
 	return nil
 }
@@ -130,85 +128,94 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 	// This is the controller where the model currently resides.
 	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return errors.E(err, "could not determine controller")
+		return fmt.Errorf("could not determine current controller: %w", err)
 	}
 
-	// Contact the target controller (JIMM) to prepare it for migration
-	// and receive a migration token.
-	token, err := c.prepareMigration()
+	// Get the model info from the current controller.
+	modelInfo, err := c.store.ModelByName(currentController, c.modelName)
+	if err != nil {
+		return fmt.Errorf("could not find model %q on controller %q: %v", c.modelName, currentController, err)
+	}
+
+	userMapping, err := c.parseUserMappingFile()
 	if err != nil {
 		return err
 	}
 
-	// Create the migration spec that will be used to initiate the migration.
-	spec, err := c.getMigrationSpec(token)
+	token, err := c.prepareMigration(userMapping, modelInfo.ModelUUID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failure preparing migration: %v", err)
 	}
 
-	// Dial the target controller and start the migration.
+	spec, err := c.getMigrationSpec(token, modelInfo.ModelUUID)
+	if err != nil {
+		return fmt.Errorf("could not get migration spec: %v", err)
+	}
+
+	// Dial the source controller and start the migration.
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not connect to controller %q: %w", currentController, err)
 	}
 
 	client := controllerapi.NewClient(apiCaller)
+	defer client.Close()
+
 	events, err := client.InitiateMigration(spec)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not initiate migration from controller %q: %v", currentController, err)
 	}
 
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not write migration events: %v", err)
 	}
 	return nil
 }
 
-func (c *migrateModelCommand) prepareMigration() (token []byte, err error) {
-	userMapping, err := c.readUserMappingFile()
-	if err != nil {
-		return nil, err
-	}
+// prepareMigration contacts the target controller (JIMM) to prepare
+// it for migration and receive a migration token.
+func (c *migrateModelCommand) prepareMigration(userMapping map[string]string, modelUUID string) (string, error) {
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, c.targetController, "", c.dialOpts)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("could not connect to target controller %q: %w", c.targetController, err)
 	}
 	client := jimmapi.NewClient(apiCaller)
 	response, err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
 		BackingControllerName: c.backingController,
 		UserMapping:           userMapping,
-		ModelTag:              names.NewModelTag(c.modelUUID).String(),
+		ModelTag:              names.NewModelTag(modelUUID).String(),
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return response.Token, nil
 }
 
-func (c *migrateModelCommand) readUserMappingFile() (map[string]string, error) {
+func (c *migrateModelCommand) parseUserMappingFile() (map[string]string, error) {
 	content, err := os.ReadFile(c.userMappingFile)
 	if err != nil {
-		return nil, errors.E(err, "could not read user mapping file")
+		return nil, fmt.Errorf("could not read user mapping file: %v", err)
 	}
 	userMapping := make(map[string]string)
 	err = yaml.Unmarshal(content, &userMapping)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse user mapping file: %v", err)
 	}
 	return userMapping, nil
 }
 
-func (c *migrateModelCommand) getMigrationSpec(token []byte) (controller.MigrationSpec, error) {
+// getMigrationSpec creates the migration spec that will be used to initiate the migration.
+func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (controller.MigrationSpec, error) {
 	store := c.store
 	accountDetails, err := store.AccountDetails(c.targetController)
 	if err != nil {
-		return controllerapi.MigrationSpec{}, errors.E(err, "could not get account details for target controller")
+		return controllerapi.MigrationSpec{}, fmt.Errorf("could not get account details for controller %q: %w", c.targetController, err)
 	}
 
 	controllerInfo, err := store.ControllerByName(c.targetController)
 	if err != nil {
-		return controllerapi.MigrationSpec{}, err
+		return controllerapi.MigrationSpec{}, fmt.Errorf("could not find controller %q: %w", c.targetController, err)
 	}
 
 	return controller.MigrationSpec{
@@ -216,8 +223,8 @@ func (c *migrateModelCommand) getMigrationSpec(token []byte) (controller.Migrati
 		TargetControllerAlias: c.targetController,
 		TargetAddrs:           controllerInfo.APIEndpoints,
 		TargetCACert:          controllerInfo.CACert,
-		ModelUUID:             c.modelUUID,
-		TargetToken:           base64.StdEncoding.EncodeToString(token),
+		ModelUUID:             modelUUID,
+		TargetToken:           token,
 		// The target user is not needed here, as the user details will be determined
 		// by the contents of the migration token - a JWT token parsed by JIMM.
 		// But Juju requires this field to be set, so we provide the user running the migration.

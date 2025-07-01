@@ -922,5 +922,5 @@ func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
 		UserMapping:           map[string]string{"alice": "alice@canonical.com"}, // `{"alice": "alice@canonical.com"}`,
 	})
 	c.Assert(err, gc.IsNil)
-	c.Assert(migrationToken, gc.Not(gc.IsNil))
+	c.Assert(migrationToken, gc.Not(gc.Equals), "")
 }

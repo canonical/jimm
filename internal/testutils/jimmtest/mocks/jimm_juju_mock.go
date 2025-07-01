@@ -59,7 +59,7 @@ type JujuManager struct {
 	ListModels_                        func(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 	GrantOfferAccessOnController_      func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
 	RevokeOfferAccessOnController_     func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
-	PrepareModelMigration_             func(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) ([]byte, error)
+	PrepareModelMigration_             func(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
 	// These mocks can be removed soon once the jujuManager interface is updated.
 	UpdateMetrics_         func(ctx context.Context)
 	CleanupNotFoundModels_ func(ctx context.Context) error
@@ -270,9 +270,9 @@ func (j *JujuManager) RevokeOfferAccessOnController(ctx context.Context, user *o
 	return j.RevokeOfferAccessOnController_(ctx, user, ut, offerURL, access)
 }
 
-func (j *JujuManager) PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) ([]byte, error) {
+func (j *JujuManager) PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error) {
 	if j.PrepareModelMigration_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return j.PrepareModelMigration_(ctx, user, modelUUID, targetControllerName, userMapping)
 }

@@ -558,5 +558,5 @@ type PrepareModelMigrationRequest struct {
 type PrepareModelMigrationResponse struct {
 	// Token is the token that should be used to initiate the migration
 	// as it allows the source controller to authenticate with JIMM.
-	Token []byte `json:"token" yaml:"token"`
+	Token string `json:"token" yaml:"token"`
 }

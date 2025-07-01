@@ -79,7 +79,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	jimmClient := api.NewClient(conn)
 	migrationToken, err := jimmClient.PrepareModelMigration(&prepareModelMigration)
 	c.Assert(err, gc.IsNil)
-	c.Assert(migrationToken, gc.Not(gc.IsNil))
+	c.Assert(migrationToken, gc.Not(gc.Equals), "")
 
 	err = client.Prechecks(model)
 	c.Assert(err, gc.IsNil)

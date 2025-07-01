@@ -158,10 +158,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 			ControllerCredentialsStore: credentialStore,
 			JWTService:                 jwtService,
 		},
-		CredentialStore:    credentialStore,
-		Pubsub:             &pubsub.Hub{MaxConcurrency: 10},
-		OpenFGAClient:      s.OFGAClient,
-		OAuthAuthenticator: authenticator,
+		CredentialStore:         credentialStore,
+		Pubsub:                  &pubsub.Hub{MaxConcurrency: 10},
+		OpenFGAClient:           s.OFGAClient,
+		OAuthAuthenticator:      authenticator,
+		MigrationTokenGenerator: mockMigrationTokenGenerator{},
 
 		JWTService: jwtService,
 
@@ -444,4 +445,12 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.Model.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model)
 	c.Assert(err, gc.Equals, nil)
+}
+
+type mockMigrationTokenGenerator struct{}
+
+func (m mockMigrationTokenGenerator) NewMigrationToken(ctx context.Context, username string) (string, error) {
+	// Simulate a token generation by returning a simple string.
+	// In a real implementation, this would be a JWT or similar token.
+	return "test-migration-token", nil
 }

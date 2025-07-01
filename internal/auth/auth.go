@@ -44,6 +44,9 @@ const (
 
 	// StateKey is the key for the OAuth callback state stored within a user's cookie.
 	StateKey = "jimm-oauth-state"
+
+	// migrationTokenExpiry is the expiry time for migration tokens.
+	migrationTokenExpiry = 3 * time.Hour
 )
 
 type sessionIdentityContextKey struct{}
@@ -324,6 +327,33 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 	}
 
 	return base64.StdEncoding.EncodeToString(freshToken), nil
+}
+
+// NewMigrationToken mints a migration token for a Juju controller to use when
+// migrating a model to JAAS. The token is used by a Juju controller to login
+// on the user's behalf and migrate the model.
+//
+// Currently the token provides the same level of access as the user, but keeping
+// this as a separate method from `MintSessionToken` allows for future changes to
+// the migration token without affecting the session token.
+func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username string) (string, error) {
+	const op = errors.Op("auth.AuthenticationService.MintMigrationToken")
+
+	token, err := jwt.NewBuilder().
+		Subject(username).
+		Expiration(time.Now().Add(migrationTokenExpiry)).
+		Build()
+	if err != nil {
+		return "", errors.E(op, err, "failed to mint migration token")
+	}
+
+	migrationToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
+	if err != nil {
+		zapctx.Error(context.Background(), "failed to sign migration token", zap.Error(err))
+		return "", errors.E(op, err, "failed to sign migration token")
+	}
+
+	return base64.StdEncoding.EncodeToString(migrationToken), nil
 }
 
 // VerifySessionToken symmetrically verifies the validty of the signature on the

@@ -13,7 +13,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -70,16 +69,10 @@ func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	return jujuManager
 }
 
-type mockMigrationTokenGenerator struct {
-	user     string
-	modelTag names.ModelTag
-}
+type mockMigrationTokenGenerator struct{}
 
-func (m *mockMigrationTokenGenerator) NewToken(ctx context.Context, tokenArgs jujuauth.MigrationTokenArgs) ([]byte, error) {
-	m.user = tokenArgs.User
-	m.modelTag = tokenArgs.ModelTag
-
+func (m *mockMigrationTokenGenerator) NewMigrationToken(ctx context.Context, username string) (string, error) {
 	// Simulate a token generation by returning a simple string.
 	// In a real implementation, this would be a JWT or similar token.
-	return []byte("test-migration-token"), nil
+	return "test-migration-token", nil
 }

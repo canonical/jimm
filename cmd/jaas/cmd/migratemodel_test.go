@@ -36,7 +36,7 @@ bob: bob@canonical.com
 
 	migrateCmd := NewMigrateModelCommandForTesting(jjclient.NewMemStore(), nil)
 	migrateCmd.userMappingFile = userMappingFile.Name()
-	mapping, err := migrateCmd.readUserMappingFile()
+	mapping, err := migrateCmd.parseUserMappingFile()
 	c.Assert(err, gc.IsNil)
 	c.Assert(mapping, gc.DeepEquals, map[string]string{
 		"alice": "alice@canonical.com",

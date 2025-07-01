@@ -33,8 +33,3 @@ func (f *Factory) NewLoginGenerator() LoginTokenGenerator {
 func (f *Factory) NewSSHGenerator() SSHTokenGenerator {
 	return newSSHTokenGenerator(f.jwtService)
 }
-
-// NewMigrationTokenGenerater returns a new token generator for Juju model migrations.
-func (f *Factory) NewMigrationTokenGenerater(jimmUUID string) MigrationTokenGenerator {
-	return newMigrationTokenGenerator(f.jwtService, jimmUUID)
-}
