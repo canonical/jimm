@@ -8,7 +8,7 @@ RUN go install github.com/air-verse/air@latest
 ENTRYPOINT [ "air" ]
 
 # Create a target without air that we use in smoke tests.
-FROM golang:1.24-bookworm as smoke
+FROM golang:1.24-bookworm AS smoke
 
 COPY entrypoint.sh     /entry/entrypoint.sh
 
