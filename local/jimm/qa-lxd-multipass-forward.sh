@@ -3,10 +3,10 @@
 # This script forwards JIMM and Keycloaks ports to localhost from the QA VM.
 #
 # It can be used in a number of ways, as follows:
-# ./qa-lxd-mac-forward.sh jimm2 --linux --wait  - Run for a VM named jimm2, on linux, and wait after tunnels are established
-# ./qa-lxd-mac-forward.sh jimm2 --linux         - Run for a VM named jimm2, on linux, and exit immediately
-# ./qa-lxd-mac-forward.sh --linux               - Run for the default VM (jimm), on linux, and exit immediately
-# ./qa-lxd-mac-forward.sh jimm2 --mac --wait    - Run for a VM named jimm2, on mac, and wait after tunnels are established
+# ./qa-lxd-multipass-forward.sh jimm2 --linux --wait  - Run for a VM named jimm2, on linux, and wait after tunnels are established
+# ./qa-lxd-multipass-forward.sh jimm2 --linux         - Run for a VM named jimm2, on linux, and exit immediately
+# ./qa-lxd-multipass-forward.sh --linux               - Run for the default VM (jimm), on linux, and exit immediately
+# ./qa-lxd-multipass-forward.sh jimm2 --mac --wait    - Run for a VM named jimm2, on mac, and wait after tunnels are established
 
 KEY_PATH_LINUX="/var/snap/multipass/common/data/multipassd/ssh-keys/id_rsa"
 KEY_PATH_MAC="/var/root/Library/Application Support/multipassd/ssh-keys/id_rsa"

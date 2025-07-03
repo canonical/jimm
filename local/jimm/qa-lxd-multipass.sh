@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script sets up a JIMM service within docker compose on macOS and adds an LXD controller.
+# This script sets up a JIMM service within docker compose in multipass and adds an LXD controller.
 # It uses the default branch of jimm for the deployment.
 #
 # It requires the following tools:
@@ -52,10 +52,10 @@ GOOS="linux" go build ./cmd/jaas
 echo "Setting up forwarding for keycloak login"
 
 # Run initially to setup connection (may require user interaction for sudo)
-./qa-lxd-mac-forward.sh "$VM_NAME"
+./qa-lxd-multipass-forward.sh "$VM_NAME"
 
 # Run again to background (shouldn't require user interaction for sudo)
-./qa-lxd-mac-forward.sh "$VM_NAME" --wait &
+./qa-lxd-multipass-forward.sh "$VM_NAME" --wait &
 SSH_FORWARD_PID=$!
 
 # Kill SSH forwarding on process exit
