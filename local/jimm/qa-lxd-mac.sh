@@ -47,7 +47,7 @@ multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make version/ve
 multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- docker compose --profile dev up --wait -d 
 
 echo "Building JAAS CLI"
-$(cd  ../../ && go build ./cmd/jaas)
+GOOS="linux" go build ./cmd/jaas
 
 echo "Setting up forwarding for keycloak login"
 
