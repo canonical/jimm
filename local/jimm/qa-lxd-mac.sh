@@ -52,10 +52,10 @@ $(cd  ../../ && go build ./cmd/jaas)
 echo "Setting up forwarding for keycloak login"
 
 # Run initially to setup connection (may require user interaction for sudo)
-./qa-lxd-mac-forward.sh "$VM_NAME" --linux
+./qa-lxd-mac-forward.sh "$VM_NAME"
 
 # Run again to background (shouldn't require user interaction for sudo)
-./qa-lxd-mac-forward.sh "$VM_NAME" --linux --wait &
+./qa-lxd-mac-forward.sh "$VM_NAME" --wait &
 SSH_FORWARD_PID=$!
 
 # Kill SSH forwarding on process exit

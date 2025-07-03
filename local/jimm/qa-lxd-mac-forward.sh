@@ -36,6 +36,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$OS" == "" ]]; then
+  case "$(uname -s)" in
+    Darwin)
+      OS="mac"
+      ;;
+    *)
+      OS="linux"
+      ;;
+  esac
+
+  echo "Detected running on $OS"
+fi
+
 # Set the key path based on OS
 if [[ "$OS" == "mac" ]]; then
   KEY_PATH="$KEY_PATH_MAC"
@@ -59,7 +72,7 @@ echo "Retrieving VM address"
 VM_ADDR=$(multipass info "$VM_NAME" --format json | jq -r ".info.\"$VM_NAME\".ipv4 | .[0]")
 
 echo "OS detected: $OS"
-echo "Using SSH key: $KEY"
+echo "Using SSH key: $KEY_PATH"
 echo "VM Name: $VM_NAME"
 echo "VM Address: $VM_ADDR"
 
