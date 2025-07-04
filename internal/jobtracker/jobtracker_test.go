@@ -9,6 +9,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -34,6 +35,20 @@ func (s *jobTrackerSuite) Init(c *qt.C) {
 	s.tracker = tracker
 }
 
+func (s *jobTrackerSuite) pollJob(ctx context.Context, id uuid.UUID, c *qt.C, expectedStatus dbmodel.JobStatus) {
+	var status dbmodel.JobStatus
+	var pollerr error
+	for i := 0; i < 10; i++ {
+		status, pollerr = s.db.GetJobStatus(ctx, id)
+		c.Assert(pollerr, qt.IsNil)
+		if status == expectedStatus {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	c.Assert(status, qt.Equals, expectedStatus)
+}
+
 func (s *jobTrackerSuite) TestRun_JobError(c *qt.C) {
 	testCtx := c.Context()
 
@@ -44,16 +59,7 @@ func (s *jobTrackerSuite) TestRun_JobError(c *qt.C) {
 	id, err := s.tracker.Run(testCtx, "test-job-type", aFastDyingJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
-	var status dbmodel.JobStatus
-	var pollerr error
-	for i := 0; i < 10; i++ {
-		status, pollerr = s.db.GetJobStatus(testCtx, id)
-		c.Assert(pollerr, qt.IsNil)
-		if status == dbmodel.StatusFailed {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
 
 	j := dbmodel.JobTrackerEntry{}
 	var jobErr string
@@ -76,18 +82,7 @@ func (s *jobTrackerSuite) TestRun_DeadlineExceeded(c *qt.C) {
 	id, err := s.tracker.Run(testCtx, "test-job-type", aDeadendJob, time.Millisecond*100)
 	c.Assert(err, qt.IsNil)
 
-	var status dbmodel.JobStatus
-	var pollerr error
-	for i := 0; i < 10; i++ {
-		status, pollerr = s.db.GetJobStatus(testCtx, id)
-		c.Assert(pollerr, qt.IsNil)
-		if status == dbmodel.StatusFailed {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	c.Assert(status, qt.Equals, dbmodel.StatusFailed)
+	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
 
 	j := dbmodel.JobTrackerEntry{}
 	var jobErr string
@@ -116,18 +111,7 @@ func (s *jobTrackerSuite) TestRun_CancelledJob(c *qt.C) {
 
 	c.Assert(s.db.StopJob(testCtx, id), qt.IsNil)
 
-	var status dbmodel.JobStatus
-	var pollerr error
-	for i := 0; i < 10; i++ {
-		status, pollerr = s.db.GetJobStatus(testCtx, id)
-		c.Assert(pollerr, qt.IsNil)
-		if status == dbmodel.StatusFailed {
-			break
-		}
-		time.Sleep(10 * time.Second)
-	}
-
-	c.Assert(status, qt.Equals, dbmodel.StatusFailed)
+	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
 
 	j := dbmodel.JobTrackerEntry{}
 	var jobErr string
@@ -165,18 +149,7 @@ func (s *jobTrackerSuite) TestRun_JobSetSuccessful(c *qt.C) {
 	id, err := s.tracker.Run(testCtx, "test-job-type", aSuccessfulJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
-	var status dbmodel.JobStatus
-	var pollerr error
-	for i := 0; i < 10; i++ {
-		status, pollerr = s.db.GetJobStatus(testCtx, id)
-		c.Assert(pollerr, qt.IsNil)
-		if status == dbmodel.StatusSuccessful {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-
-	c.Assert(status, qt.Equals, dbmodel.StatusSuccessful)
+	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
 }
 
 func TestJobTrackerSuite(t *testing.T) {
