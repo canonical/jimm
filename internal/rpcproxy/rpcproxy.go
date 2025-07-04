@@ -39,16 +39,16 @@ const (
 // ControllerDetails holds information about the controller
 // that is being proxied to.
 type ControllerDetails struct {
-	Servers [][]jujuparams.HostPort
-	CACert  string
+	Addresses [][]jujuparams.HostPort
+	CACert    string
 }
 
-// RedirectInfo provides information about the controller
+// RedirectInfoGetter provides information about the controller
 // that is being proxied to.T his information is useful
 // when we need to redirect a client to that controller
 // instead of proxying the request. This is the case during
 // model migration when receiving requests from agents.
-type RedirectInfo interface {
+type RedirectInfoGetter interface {
 	GetRedirectInfo(ctx context.Context) (ControllerDetails, error)
 }
 
@@ -116,7 +116,7 @@ type ProxyHelpers struct {
 	AuditLog                func(*dbmodel.AuditLogEntry)
 	LoginService            LoginService
 	AuthenticatedIdentityID string
-	RedirectInfo            RedirectInfo
+	RedirectInfo            RedirectInfoGetter
 }
 
 // ProxySockets will proxy requests from a client connection through to a controller
@@ -299,7 +299,7 @@ type modelProxy struct {
 	modelUUID               string
 	conversationId          string
 	authenticatedIdentityID string
-	redirectInfo            RedirectInfo
+	redirectInfo            RedirectInfoGetter
 
 	deviceOAuthResponse *oauth2.DeviceAuthResponse
 }
@@ -825,7 +825,7 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 		// This is a legacy login request from an agent.
 		// We return a redirect to the backing Juju controller.
 		info := jujuparams.RedirectErrorInfo{
-			Servers: redirectInfo.Servers,
+			Servers: redirectInfo.Addresses,
 			CACert:  redirectInfo.CACert,
 		}.AsMap()
 		errRedirect := errors.E(
@@ -834,7 +834,7 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 			info,
 		)
 
-		zapctx.Debug(ctx, "Redirecting agent to controller", zap.Any("servers", redirectInfo.Servers))
+		zapctx.Debug(ctx, "Redirecting agent to controller", zap.Any("servers", redirectInfo.Addresses))
 		return nil, errRedirect
 	default:
 		return nil, fmt.Errorf("unsupported login request for tag %s", tag)

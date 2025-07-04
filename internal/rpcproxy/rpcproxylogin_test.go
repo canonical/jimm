@@ -533,7 +533,7 @@ type mockRedirectInfo struct{}
 
 func (m *mockRedirectInfo) GetRedirectInfo(_ context.Context) (rpcproxy.ControllerDetails, error) {
 	return rpcproxy.ControllerDetails{
-		Servers: [][]params.HostPort{{{
+		Addresses: [][]params.HostPort{{{
 			Address: params.Address{
 				Value: "controller-1",
 				Type:  "ipv4",

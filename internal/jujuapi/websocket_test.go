@@ -241,8 +241,13 @@ func (s *apiProxySuite) TestAgentLoginReturnsRedirect(c *gc.C) {
 	}
 	_, err = api.Open(&info, dialOpts)
 	c.Assert(err, gc.NotNil)
-	_, ok := errors.Cause(err).(*api.RedirectError)
+	redirectErr, ok := errors.Cause(err).(*api.RedirectError)
 	c.Check(ok, gc.Equals, true)
+	c.Assert(redirectErr.Servers, gc.HasLen, 1)
+	servers := redirectErr.Servers[0].HostPorts().Strings()
+	c.Assert(servers, gc.HasLen, 1)
+	c.Check(servers[0], gc.Matches, "localhost:[0-9]+")
+	c.Check(len(redirectErr.CACert), gc.Not(gc.Equals), 0)
 }
 
 func (s *apiProxySuite) TestAgentLoginModelDoesNotExist(c *gc.C) {

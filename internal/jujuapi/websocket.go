@@ -258,8 +258,8 @@ func (r redirectInfoAdapter) GetRedirectInfo(ctx context.Context) (rpcproxy.Cont
 		return rpcproxy.ControllerDetails{}, err
 	}
 	return rpcproxy.ControllerDetails{
-		Servers: model.Controller.Addresses,
-		CACert:  model.Controller.CACertificate,
+		Addresses: model.Controller.Addresses,
+		CACert:    model.Controller.CACertificate,
 	}, nil
 }
 
