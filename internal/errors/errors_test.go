@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package errors_test
 
@@ -34,4 +34,20 @@ func TestE(t *testing.T) {
 	err = errors.E(errors.Op("test.op2"), err)
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
+}
+
+func TestEWithInfo(t *testing.T) {
+	c := qt.New(t)
+
+	code := errors.Code("test code")
+	info := map[string]any{"key": "value"}
+	err := errors.E(errors.Op("test.op"), code, "an error happened", info)
+	c.Check(err, qt.ErrorMatches, `an error happened`)
+	c.Check(errors.ErrorCode(err), qt.Equals, code)
+	c.Check(err.(*errors.Error).Info, qt.DeepEquals, info)
+	c.Check(errors.ErrorInfo(err), qt.DeepEquals, info)
+
+	err = errors.E("plain-error")
+	c.Check(err, qt.ErrorMatches, `plain-error`)
+	c.Check(errors.ErrorInfo(err), qt.DeepEquals, map[string]any(nil))
 }
