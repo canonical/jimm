@@ -264,6 +264,7 @@ type JujuManager interface {
 	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
 	LatestLogTime(ctx context.Context, modelUUID string) (time.Time, error)
 	AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error
+	CleanupPartialModelMigrations(ctx context.Context) error
 
 	// Other methods
 	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error

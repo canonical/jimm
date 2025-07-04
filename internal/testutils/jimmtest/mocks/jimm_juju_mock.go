@@ -31,6 +31,7 @@ type JujuManager struct {
 	AddCloudToController_              func(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
 	AddHostedCloud_                    func(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
 	CopyCredential_                    func(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
+	CleanupPartialModelMigrations_     func(ctx context.Context) error
 	DestroyOffer_                      func(ctx context.Context, user *openfga.User, offerURL string, force bool) error
 	FindApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	FindAuditEvents_                   func(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
@@ -274,4 +275,11 @@ func (j *JujuManager) PrepareModelMigration(ctx context.Context, user *openfga.U
 		return nil
 	}
 	return j.PrepareModelMigration_(ctx, user, modelUUID, targetControllerName, userMapping)
+}
+
+func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
+	if j.CleanupPartialModelMigrations_ == nil {
+		return nil
+	}
+	return j.CleanupPartialModelMigrations_(ctx)
 }

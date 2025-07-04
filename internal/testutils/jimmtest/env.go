@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"strconv"
 	"strings"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -30,13 +31,14 @@ const (
 )
 
 type Environment struct {
-	ApplicationOffers []ApplicationOffer `json:"application-offers"`
-	Clouds            []Cloud            `json:"clouds"`
-	CloudCredentials  []CloudCredential  `json:"cloud-credentials"`
-	CloudDefaults     []CloudDefaults    `json:"cloud-defaults"`
-	Controllers       []Controller       `json:"controllers"`
-	Models            []Model            `json:"models"`
-	Users             []User             `json:"users"`
+	ApplicationOffers  []ApplicationOffer  `json:"application-offers"`
+	Clouds             []Cloud             `json:"clouds"`
+	CloudCredentials   []CloudCredential   `json:"cloud-credentials"`
+	CloudDefaults      []CloudDefaults     `json:"cloud-defaults"`
+	Controllers        []Controller        `json:"controllers"`
+	Models             []Model             `json:"models"`
+	Users              []User              `json:"users"`
+	IncomingMigrations []IncomingMigration `json:"incoming-migrations"`
 }
 
 func ParseEnvironment(c Tester, env string) *Environment {
@@ -266,6 +268,10 @@ func (e *Environment) PopulateDB(c Tester, db *db.Database) {
 	for i := range e.ApplicationOffers {
 		e.ApplicationOffers[i].env = e
 		e.ApplicationOffers[i].DBObject(c, db)
+	}
+	for i := range e.IncomingMigrations {
+		e.IncomingMigrations[i].env = e
+		e.IncomingMigrations[i].DBObject(c, db)
 	}
 }
 
@@ -538,6 +544,65 @@ func (u *User) DBObject(c Tester, db *db.Database) dbmodel.Identity {
 	}
 
 	return u.dbo
+}
+
+type IncomingMigration struct {
+	ModelUUID         string    `json:"model-uuid"`
+	TargetController  string    `json:"target-controller"`
+	UserMapping       []UserMap `json:"user-mapping"`
+	CreatedAt         time.Time `json:"created-at"`
+	CreateUserMapping bool      `json:"create-user-mapping"`
+
+	env *Environment
+	dbo dbmodel.IncomingModelMigration
+}
+
+type UserMap struct {
+	LocalUser        string `json:"local-user"`
+	ExternalUserName string `json:"external-user"`
+}
+
+func (im *IncomingMigration) DBObject(c Tester, db *db.Database) dbmodel.IncomingModelMigration {
+	if im.dbo.ID != 0 {
+		return im.dbo
+	}
+
+	im.dbo.ModelUUID = sql.NullString{String: im.ModelUUID, Valid: true}
+	im.dbo.TargetControllerID = 0
+	if im.TargetController != "" {
+		im.dbo.TargetController = im.env.Controller(im.TargetController).DBObject(c, db)
+		im.dbo.TargetControllerID = im.dbo.TargetController.ID
+	}
+	if im.CreatedAt.IsZero() {
+		im.CreatedAt = time.Now()
+	}
+	im.dbo.CreatedAt = im.CreatedAt
+
+	im.dbo.UserMapping = make(dbmodel.StringMap, len(im.UserMapping))
+	for um := range im.UserMapping {
+		im.dbo.UserMapping[im.UserMapping[um].LocalUser] = im.UserMapping[um].ExternalUserName
+	}
+
+	err := db.AddIncomingModelMigration(context.Background(), &im.dbo)
+	if err != nil {
+		c.Fatalf("err is not nil: %s", err)
+	}
+
+	if im.CreateUserMapping {
+		for _, um := range im.UserMapping {
+			userMapping := &dbmodel.UserMapping{
+				ModelUUID:        im.dbo.ModelUUID,
+				LocalUser:        um.LocalUser,
+				ExternalUserName: um.ExternalUserName,
+			}
+			err = db.AddUserMapping(context.Background(), userMapping)
+			if err != nil {
+				c.Fatalf("err is not nil: %s", err)
+			}
+		}
+	}
+
+	return im.dbo
 }
 
 // UserAccess represents user access to am object in a test environment.

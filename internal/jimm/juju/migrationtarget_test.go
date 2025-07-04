@@ -26,7 +26,30 @@ const (
 	migratingModelUUID = "00000000-0000-0000-0000-000000000001"
 )
 
-const testMigrationEnv = `clouds:
+const testEnvWithIncomingMigration = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+  agent-version: 3.2.1
+  public-address: foo.com
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+incoming-migrations:
+- model-uuid: ` + migratingModelUUID + `
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+`
+
+const testEnvNoIncomingMigration = `clouds:
 - name: test
   type: test
   regions:
@@ -63,20 +86,35 @@ func TestAbortMigration_Success(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigrationAndModel)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err = j.AbortMigration(ctx, user, migratingModelUUID)
+	err := j.AbortMigration(ctx, user, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(abortCalled, qt.IsTrue)
+
+	// Check the model migration has been removed from the database.
+	modelMigration := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+
+	// Check the model has been deleted from the database.
+	model := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: migratingModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(ctx, model)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 }
 
 func TestAbortMigration_MissingIncomingModel(t *testing.T) {
@@ -85,7 +123,7 @@ func TestAbortMigration_MissingIncomingModel(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
@@ -115,13 +153,8 @@ func TestCheckMachines_Success(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
@@ -138,7 +171,7 @@ func TestCheckMachines_MissingIncomingModel(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
@@ -154,19 +187,13 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	// Expect an error when there is no incoming model migration.
 	_, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-
-	// Create an incoming model migration in the database.
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err = j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	// Expect an error when the controller credentials are not set.
 	_, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
@@ -206,19 +233,14 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
 	model := newMigrationInfo("bob")
-	err = j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, model)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -238,19 +260,14 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
 	model := newMigrationInfo("bob")
-	err = j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, model)
 	c.Assert(err, qt.ErrorMatches, `.*controller unreachable`)
 }
 
@@ -260,20 +277,15 @@ func TestPrechecks_MissingUserMapping(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"random-user": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo("bob")
-	err = j.Prechecks(ctx, user, model)
-	c.Assert(err, qt.ErrorMatches, `.*no external user mapping found for local user "bob"`)
+	model := newMigrationInfo("not-found-user")
+	err := j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.ErrorMatches, `.*no external user mapping found for local user "not-found-user"`)
 }
 
 func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
@@ -282,7 +294,7 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvNoIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
@@ -315,18 +327,13 @@ func TestAdoptResources_Success(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err = j.AdoptResources(ctx, user, migratingModelUUID, controllerVersion)
+	err := j.AdoptResources(ctx, user, migratingModelUUID, controllerVersion)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -336,7 +343,7 @@ func TestAdoptResources_NoIncomingModelMigration(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvNoIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
@@ -346,7 +353,7 @@ func TestAdoptResources_NoIncomingModelMigration(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
-const testActivateEnv = `clouds:
+const testEnvWithIncomingMigrationAndModel = `clouds:
 - name: test-cloud
   type: test-provider
   regions:
@@ -378,6 +385,12 @@ models:
 users:
 - username: alice@canonical.com
   controller-access: superuser
+incoming-migrations:
+- model-uuid: ` + migratingModelUUID + `
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
 `
 
 func TestActivate_Success(t *testing.T) {
@@ -405,18 +418,13 @@ func TestActivate_Success(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testActivateEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigrationAndModel)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
+	err := j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
 	c.Assert(err, qt.IsNil)
 
-	err = j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
-	c.Assert(err, qt.IsNil)
-
-	modelMigration = dbmodel.IncomingModelMigration{
+	modelMigration := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: migratingModelUUID,
 			Valid:  true,
@@ -465,18 +473,13 @@ func TestActivate_APIFailure(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
-
-	err = j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
+	err := j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
 	c.Assert(err, qt.ErrorMatches, `.*API failure`)
 
-	modelMigration = dbmodel.IncomingModelMigration{
+	modelMigration := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: migratingModelUUID,
 			Valid:  true,
@@ -493,22 +496,11 @@ func TestActivate_NoIncomingModelMigration(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvNoIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	err := j.Activate(ctx, names.NewModelTag("foo"), migration.SourceControllerInfo{}, nil)
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
-}
-
-func newIncomingMigration(userMap map[string]string, ctl dbmodel.Controller) dbmodel.IncomingModelMigration {
-	return dbmodel.IncomingModelMigration{
-		ModelUUID: sql.NullString{
-			String: migratingModelUUID,
-			Valid:  true,
-		},
-		TargetControllerID: ctl.ID,
-		UserMapping:        userMap,
-	}
 }
 
 func newModelDescription(owner string) description.Model {
@@ -635,6 +627,12 @@ controllers:
 users:
 - username: alice@canonical.com
   controller-access: superuser
+incoming-migrations:
+- model-uuid: ` + migratingModelUUID + `
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
 `
 
 func TestImport_Success(t *testing.T) {
@@ -665,11 +663,6 @@ func TestImport_Success(t *testing.T) {
 
 	env := jimmtest.ParseEnvironment(c, testImportEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
@@ -707,11 +700,6 @@ func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
 
 	env := jimmtest.ParseEnvironment(c, testImportEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
@@ -752,11 +740,6 @@ func TestImport_UserNotFoundInUserMapping(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testImportEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
-
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
@@ -792,13 +775,8 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 	})
 
 	// we intentionally parse an environment that does not have the cloud credential.
-	env := jimmtest.ParseEnvironment(c, testMigrationEnv)
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
@@ -845,11 +823,6 @@ func TestImport_APIFailure(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testImportEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	userMap := map[string]string{"bob": "alice@canonical.com"}
-	modelMigration := newIncomingMigration(userMap, env.Controller("test1").DBObject(c, j.Database))
-	err := j.Database.AddIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.IsNil)
-
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
@@ -872,4 +845,153 @@ func TestImport_APIFailure(t *testing.T) {
 	err = j.Database.GetModel(ctx, m)
 	c.Assert(err, qt.IsNil)
 	c.Assert(m.MigrationMode, qt.Equals, state.MigrationModeImporting)
+}
+
+// environment for testing cleanup of partial model migrations.
+// It contains:
+// - one valid incoming migration to be kept
+// - one stale incoming migration without user-mapping and a model to be deleted
+// - one stale incoming migration with model to be deleted
+// - one stale incoming migration
+const testCleanupEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+  agent-version: 3.2.1
+  public-address: foo.com
+models:
+- name: test-model
+  uuid: "00000000-0000-0000-0000-000000000002"
+  controller: test1
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  owner: alice@canonical.com
+  migration-mode: importing
+- name: test-model-2
+  uuid: "00000000-0000-0000-0000-000000000003"
+  controller: test1
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  owner: alice@canonical.com
+  migration-mode: importing
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+incoming-migrations:
+- model-uuid: "00000000-0000-0000-0000-000000000001"
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+- model-uuid: "00000000-0000-0000-0000-000000000002"
+  target-controller: test1
+  created-at: 2024-01-01T00:00:00Z
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+  create-user-mapping: true
+- model-uuid: "00000000-0000-0000-0000-000000000003"
+  target-controller: test1
+  created-at: 2024-01-01T00:00:00Z
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+- model-uuid: "00000000-0000-0000-0000-000000000004"
+  target-controller: test1
+  created-at: 2024-01-01T00:00:00Z
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+`
+
+func TestCleanupPartialModelMigrations(t *testing.T) {
+	c := qt.New(t)
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testCleanupEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	err := j.CleanupPartialModelMigrations(t.Context())
+	c.Assert(err, qt.IsNil)
+
+	// Check the first incoming migration is kept.
+	modelMigration := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: env.IncomingMigrations[0].ModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
+	c.Assert(err, qt.IsNil)
+
+	// Check the second incoming migration has been deleted, with its mapping, and model.
+	modelMigration = dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: env.IncomingMigrations[1].ModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+
+	userMapping := dbmodel.UserMapping{
+		ModelUUID:        modelMigration.ModelUUID,
+		LocalUser:        "bob",
+		ExternalUserName: "alice@canonical.com",
+	}
+	err = j.Database.GetUserMapping(t.Context(), &userMapping)
+	c.Assert(err, qt.ErrorMatches, `.*user mapping not found`)
+
+	// Check the model has been deleted.
+	model := &dbmodel.Model{
+		UUID: sql.NullString{
+			String: env.IncomingMigrations[1].ModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(t.Context(), model)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+
+	// Check the third incoming migration has been deleted, with its model.
+	modelMigration = dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: env.IncomingMigrations[2].ModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+
+	model = &dbmodel.Model{
+		UUID: sql.NullString{
+			String: env.IncomingMigrations[2].ModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetModel(t.Context(), model)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+
+	// Check the fourth incoming migration has been deleted.
+	modelMigration = dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: env.IncomingMigrations[3].ModelUUID,
+			Valid:  true,
+		},
+	}
+	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }

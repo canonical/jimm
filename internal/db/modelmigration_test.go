@@ -5,6 +5,7 @@ package db_test
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 
@@ -84,6 +85,40 @@ func (s *dbSuite) TestGetModelMigration(c *qt.C) {
 	eError, ok := err.(*errors.Error)
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
+}
+
+func (s *dbSuite) TestGetModelMigrationsCreatedBefore(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = s.Database.AddCloud(context.Background(), &cloud)
+	c.Assert(err, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:      "test-controller",
+		UUID:      "00000000-0000-0000-0000-000000000001",
+		CloudName: cloud.Name,
+	}
+	c.Assert(s.Database.DB.Create(&controller).Error, qt.IsNil)
+
+	migration := dbmodel.IncomingModelMigration{
+		ModelUUID:          sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
+		TargetControllerID: controller.ID,
+		UserMapping:        dbmodel.StringMap{"local": "external"},
+	}
+	c.Assert(s.Database.DB.Create(&migration).Error, qt.IsNil)
+
+	migrations, err := s.Database.GetIncomingModelMigrationsCreatedBefore(context.Background(), migration.CreatedAt.Add(1*time.Hour))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(migrations, qt.HasLen, 1)
+	c.Assert(migrations[0].ModelUUID, qt.DeepEquals, migration.ModelUUID)
+
+	migrations, err = s.Database.GetIncomingModelMigrationsCreatedBefore(context.Background(), migration.CreatedAt.Add(-1*time.Hour))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(migrations, qt.HasLen, 0)
 }
 
 func (s *dbSuite) TestDeleteModelMigration(c *qt.C) {

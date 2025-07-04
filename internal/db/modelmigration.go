@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -76,4 +77,23 @@ func (d *Database) DeleteIncomingModelMigration(ctx context.Context, modelMigrat
 		return errors.E(op, dbError(err))
 	}
 	return nil
+}
+
+// GetIncomingModelMigrationsCreatedBefore returns all incoming model migrations created before the specified time.
+func (d *Database) GetIncomingModelMigrationsCreatedBefore(ctx context.Context, createBefore time.Time) (migrations []dbmodel.IncomingModelMigration, err error) {
+	const op = errors.Op("db.GetIncomingModelMigrations")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+
+	if err := db.Where("created_at < ?", createBefore).Find(&migrations).Error; err != nil {
+		return nil, errors.E(op, dbError(err))
+	}
+	return migrations, nil
 }

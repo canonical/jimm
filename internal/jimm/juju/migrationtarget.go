@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"database/sql"
+	goerr "errors"
 	"fmt"
 	"time"
 
@@ -25,8 +26,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+const TIMEOUT_PENDING_MIGRATION = 24 * time.Hour
+
 // AbortMigration aborts a model migration with the given model UUID.
-// It does this by calling the Abort methodon the target Juju controller.
+// It does this by calling the Abort method on the target Juju controller.
 // It also deletes the migration record from the database, but does not return an error
 // if the deletion fails, as the migration has already been aborted on the target controller.
 func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
@@ -60,7 +63,27 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 		// as the migration has already been aborted on the target controller.
 		zapctx.Error(ctx, "failed to delete incoming model migration", zap.Error(err), zap.String("modelUUID", modelUUID))
 	}
-	// TODO(SimoneDutto): delete the model from JIMM's state.
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelUUID,
+			Valid:  true,
+		},
+	}
+	// Don't return an error if we fail to delete the model from JIMM's state,
+	// as the migration has already been aborted on the target controller.
+	// The model will be cleanup eventually by JIMM's cleanup routine.
+	err = j.Database.GetModel(ctx, &model)
+	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return nil
+		}
+		zapctx.Error(ctx, "failed to get model for abort migration", zap.Error(err), zap.String("modelUUID", modelUUID))
+		return nil
+	}
+	err = j.Database.DeleteModel(ctx, &model)
+	if err != nil {
+		zapctx.Error(ctx, "failed to delete incoming model migration", zap.Error(err), zap.String("modelUUID", modelUUID))
+	}
 	return nil
 }
 
@@ -465,4 +488,65 @@ func (j *JujuManager) importModelFromDescription(ctx context.Context, targetCont
 		return errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
 	}
 	return nil
+}
+
+// CleanupPartialModelMigrations cleans up any partial model migrations that have exceeded the timeout.
+// It deletes the incoming model migration record, deletes the user mappings for the model,
+// and deletes the model record from JIMM's state.
+func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
+	const op = errors.Op("jimm.CleanupPartialModelMigrations")
+
+	// Get all incoming model migrations that have exceeded the timeout.
+	migrations, err := j.Database.GetIncomingModelMigrationsCreatedBefore(ctx, time.Now().Add(-TIMEOUT_PENDING_MIGRATION))
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to get incoming model migrations: %w", err))
+	}
+	var errs []error
+	for _, migration := range migrations {
+		err := j.cleanupPartialModelMigration(ctx, migration)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return goerr.Join(errs...)
+}
+
+// cleanupPartialModelMigration cleans up a partial model migration by deleting the incoming model migration record,
+// deleting the user mappings for the model, and deleting the model record from JIMM's state.
+func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migration dbmodel.IncomingModelMigration) error {
+	const op = errors.Op("jimm.cleanupPartialModelMigration")
+
+	return j.Database.Transaction(func(db *db.Database) error {
+		// Delete the incoming model migration record.
+		err := j.Database.DeleteIncomingModelMigration(ctx, &migration)
+		if err != nil {
+			return errors.E(op, err)
+		}
+
+		// Delete user mappings for the model.
+		err = j.Database.DeleteUserMappingsByModelUUID(ctx, migration.ModelUUID.String)
+		if err != nil {
+			return errors.E(op, err)
+		}
+
+		// Delete the model record from JIMM's state.
+		model := dbmodel.Model{
+			UUID: sql.NullString{
+				String: migration.ModelUUID.String,
+				Valid:  true,
+			},
+		}
+		err = j.Database.GetModel(ctx, &model)
+		if err != nil {
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				return nil
+			}
+			return errors.E(op, err)
+		}
+		err = j.Database.DeleteModel(ctx, &model)
+		if err != nil {
+			return errors.E(op, err)
+		}
+		return nil
+	})
 }

@@ -51,7 +51,8 @@ import (
 )
 
 const (
-	localDischargePath = "/macaroons"
+	localDischargePath                        = "/macaroons"
+	INTERVAL_BETWEEN_MODEL_MIGRATIONS_CLEANUP = 10 * time.Minute
 )
 
 // OpenFGAParams holds parameters needed to connect to the OpenFGA server.
@@ -285,6 +286,23 @@ func (s *Service) CleanupNotFoundModels(ctx context.Context, trigger <-chan time
 			}
 		case <-ctx.Done():
 			zapctx.Info(ctx, "exiting dying model cleanup polling")
+			return nil
+		}
+	}
+}
+
+// CleanupPartialModelMigrations triggers every `trigger` time and calls the jimm methods to cleanup partial model migrations.
+func (s *Service) CleanupPartialModelMigrations(ctx context.Context, trigger <-chan time.Time) error {
+	for {
+		select {
+		case <-trigger:
+			err := s.jimm.JujuManager().CleanupPartialModelMigrations(ctx)
+			if err != nil {
+				zapctx.Error(ctx, "partial model migrations cleanup", zap.Error(err))
+				continue
+			}
+		case <-ctx.Done():
+			zapctx.Info(ctx, "exiting partial model migration cleanup polling")
 			return nil
 		}
 	}
@@ -560,6 +578,11 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 		// CleanupNotFoundModels cleanup - cleans up all models not found on the respective controller.
 		svc.Go(func() error {
 			return s.CleanupNotFoundModels(ctx, time.NewTicker(time.Minute).C)
+		})
+
+		// CleanupPartialModelMigration cleanup - cleans up all partial model migrations.
+		svc.Go(func() error {
+			return s.CleanupPartialModelMigrations(ctx, time.NewTicker(INTERVAL_BETWEEN_MODEL_MIGRATIONS_CLEANUP).C)
 		})
 	}
 

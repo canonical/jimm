@@ -107,3 +107,40 @@ func (s *dbSuite) TestDeleteUserMapping(c *qt.C) {
 	err = s.Database.GetUserMapping(ctx, userMapping)
 	c.Assert(err, qt.ErrorMatches, ".*user mapping not found.*")
 }
+
+func (s *dbSuite) TestDeleteUserMappingsByModelUUID(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+
+	modelUUID := sql.NullString{String: "model-uuid-123", Valid: true}
+	localUser := "localuser1"
+	identityName := "externaluser@canonical.com"
+
+	u, err := dbmodel.NewIdentity(identityName)
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+
+	userMapping := &dbmodel.UserMapping{
+		ModelUUID:        modelUUID,
+		LocalUser:        localUser,
+		ExternalUserName: identityName,
+	}
+	c.Assert(s.Database.AddUserMapping(ctx, userMapping), qt.IsNil)
+
+	userMapping2 := &dbmodel.UserMapping{
+		ModelUUID:        modelUUID,
+		LocalUser:        "localuser2",
+		ExternalUserName: identityName,
+	}
+	c.Assert(s.Database.AddUserMapping(ctx, userMapping2), qt.IsNil)
+
+	err = s.Database.DeleteUserMappingsByModelUUID(ctx, modelUUID.String)
+	c.Assert(err, qt.IsNil)
+
+	// Check that both mappings are deleted
+	err = s.Database.GetUserMapping(ctx, userMapping)
+	c.Assert(err, qt.ErrorMatches, ".*user mapping not found.*")
+	err = s.Database.GetUserMapping(ctx, userMapping2)
+	c.Assert(err, qt.ErrorMatches, ".*user mapping not found.*")
+}

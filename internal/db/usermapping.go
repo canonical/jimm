@@ -79,3 +79,21 @@ func (d *Database) DeleteUserMapping(ctx context.Context, userMapping *dbmodel.U
 	}
 	return nil
 }
+
+// DeleteUserMappingsByModelUUID removes all user mappings for a given model UUID.
+func (d *Database) DeleteUserMappingsByModelUUID(ctx context.Context, modelUUID string) (err error) {
+	const op = errors.Op("db.DeleteUserMappingsByModelUUID")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("model_uuid = ?", modelUUID).Delete(&dbmodel.UserMapping{}).Error; err != nil {
+		return errors.E(op, dbError(err))
+	}
+	return nil
+}
