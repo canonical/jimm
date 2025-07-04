@@ -254,7 +254,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go v1.28.0 // indirect
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/go-linereader v0.0.0-20190213213312-1b945b3263eb // indirect
+	github.com/mitchellh/go-linereader v0.0.0-20190213213312-1b945b3263eb
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mittwald/vaultgo v0.1.4 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
@@ -350,7 +350,9 @@ require (
 	github.com/canonical/pebble v1.19.2 // indirect
 	github.com/canonical/x-go v0.0.0-20230522092633-7947a7587f5b // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
+	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/juju/packaging/v4 v4.0.0 // indirect
+	github.com/juju/terms-client/v2 v2.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
