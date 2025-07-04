@@ -72,14 +72,6 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 	// Don't return an error if we fail to delete the model from JIMM's state,
 	// as the migration has already been aborted on the target controller.
 	// The model will be cleanup eventually by JIMM's cleanup routine.
-	err = j.Database.GetModel(ctx, &model)
-	if err != nil {
-		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil
-		}
-		zapctx.Error(ctx, "failed to get model for abort migration", zap.Error(err), zap.String("modelUUID", modelUUID))
-		return nil
-	}
 	err = j.Database.DeleteModel(ctx, &model)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete incoming model migration", zap.Error(err), zap.String("modelUUID", modelUUID))
@@ -535,13 +527,6 @@ func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migratio
 				String: migration.ModelUUID.String,
 				Valid:  true,
 			},
-		}
-		err = j.Database.GetModel(ctx, &model)
-		if err != nil {
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				return nil
-			}
-			return errors.E(op, err)
 		}
 		err = j.Database.DeleteModel(ctx, &model)
 		if err != nil {

@@ -292,18 +292,82 @@ func (s *dbSuite) TestDeleteModel(c *qt.C) {
 		Life:              state.Alive.String(),
 	}
 
-	// model does not exist
-	err = s.Database.DeleteModel(context.Background(), &model)
-	c.Assert(err, qt.IsNil)
-
 	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 
-	model.UUID = sql.NullString{
-		String: "00000001-0000-0000-0000-0000-000000000001",
-		Valid:  true,
-	}
 	err = s.Database.DeleteModel(context.Background(), &model)
+	c.Assert(err, qt.Equals, nil)
+
+	var dbModel dbmodel.Model
+	result := s.Database.DB.Where("uuid = ?", model.UUID).First(&dbModel)
+	c.Assert(result.Error, qt.Equals, gorm.ErrRecordNotFound)
+
+	// model should not be found in the database but no error is returned.
+	err = s.Database.DeleteModel(context.Background(), &model)
+	c.Assert(err, qt.Equals, nil)
+}
+
+func (s *dbSuite) TestDeleteModelNotValid(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	err = s.Database.DeleteModel(context.Background(), &dbmodel.Model{})
+	c.Assert(err, qt.ErrorMatches, "^missing id or uuid$")
+}
+
+func (s *dbSuite) TestDeleteModelByModelUUID(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(i).Error, qt.IsNil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region",
+		}},
+	}
+	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	cred := dbmodel.CloudCredential{
+		Name:     "test-cred",
+		Cloud:    cloud,
+		Owner:    *i,
+		AuthType: "empty",
+	}
+	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+	}
+	err = s.Database.AddController(context.Background(), &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	model := dbmodel.Model{
+		Name:              "test-model-1",
+		OwnerIdentityName: i.Name,
+		ControllerID:      controller.ID,
+		Controller:        controller,
+		CloudRegionID:     cloud.Regions[0].ID,
+		CloudCredentialID: cred.ID,
+		Life:              state.Alive.String(),
+	}
+
+	err = s.Database.AddModel(context.Background(), &model)
+	c.Assert(err, qt.Equals, nil)
+	modelToDelete := dbmodel.Model{
+		UUID: sql.NullString{
+			Valid:  true,
+			String: model.UUID.String,
+		},
+	}
+	err = s.Database.DeleteModel(context.Background(), &modelToDelete)
 	c.Assert(err, qt.Equals, nil)
 
 	var dbModel dbmodel.Model

@@ -358,8 +358,6 @@ func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.Mo
 			Valid:  true,
 		},
 	}
-	err = s.JIMM.Database.GetModel(context.Background(), model)
-	c.Assert(err, gc.Equals, nil)
 	err = s.JIMM.Database.DeleteModel(context.Background(), model)
 	c.Assert(err, gc.Equals, nil)
 }

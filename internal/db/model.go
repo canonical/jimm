@@ -113,7 +113,7 @@ func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err e
 	return nil
 }
 
-// DeleteModel removes the model information from the database.
+// DeleteModel removes the model information from the database. It supports deletion by ID or UUID.
 func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = errors.Op("db.DeleteModel")
 	if err := d.ready(); err != nil {
@@ -123,9 +123,17 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err e
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
-
 	db := d.DB.WithContext(ctx)
-	if err := db.Delete(model, model.ID).Error; err != nil {
+	switch {
+	case model.UUID.Valid:
+		db = db.Where("uuid = ?", model.UUID.String)
+	case model.ID != 0:
+		db = db.Where("id = ?", model.ID)
+	default:
+		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
+	}
+
+	if err := db.Delete(model).Error; err != nil {
 		return errors.E(op, dbError(err))
 	}
 	return nil
