@@ -28,23 +28,30 @@ multipass launch --cpus 4 docker -n $VM_NAME
 echo "Setting up classic mount"
 mount_name="$VM_NAME:jimm"
 multipass umount $mount_name|| true
-multipass mount --type=classic ../../ $mount_name || true 
+multipass mount --type=classic ../../ $mount_name || true
 
 echo "Installing & setting up dependencies"
-multipass exec $VM_NAME -- sudo snap install juju
-multipass exec $VM_NAME -- sudo snap install go --classic
-multipass exec $VM_NAME -- sudo sudo apt-get -y install make
-multipass exec $VM_NAME -- sudo lxd init --auto
+multipass exec $VM_NAME -- bash <<- 'EOF'
+	sudo snap install juju
+	sudo snap install go --classic
+	sudo sudo apt-get -y install make
+	sudo lxd init --auto
+EOF
 
 echo "Setting up JIMM"
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make certs
-# Re-copy and update certs (workaround to keep the same generated certs but simply update the VM's certs only)
-multipass exec --working-directory /home/ubuntu/jimm/local/traefik/certs $VM_NAME -- sudo cp ca.crt /usr/local/share/ca-certificates
-multipass exec --working-directory /home/ubuntu/jimm/local/traefik/certs $VM_NAME -- sudo update-ca-certificates
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make version/commit.txt
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- make version/version.txt
-# TODO(ale8k): Have docker cache images somewhere that can be shared, the compose takes forever otherwise.
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- docker compose --profile dev up --wait -d 
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- bash <<- 'EOF'
+    make certs
+
+    # Re-copy and update certs (workaround to keep the same generated certs but simply update the VM's certs only)
+    sudo cp local/traefik/certs/ca.crt /usr/local/share/ca-certificates
+    sudo update-ca-certificates
+
+    make version/commit.txt
+    make version/version.txt
+
+    # TODO(ale8k): Have docker cache images somewhere that can be shared, the compose takes forever otherwise.
+    docker compose --profile dev up --wait -d
+EOF
 
 echo "Building JAAS CLI"
 GOOS="linux" go build ./cmd/jaas
@@ -77,7 +84,10 @@ cleanup_ssh_forward
 
 echo
 echo "Setting up LXD controller"
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- sudo iptables -I FORWARD -i lxdbr0 -j ACCEPT
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- sudo iptables -I FORWARD -o lxdbr0 -j ACCEPT
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- ./local/jimm/setup-controller.sh
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- ./local/jimm/add-controller.sh
+
+multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- bash <<- 'EOF'
+	sudo iptables -I FORWARD -i lxdbr0 -j ACCEPT
+	sudo iptables -I FORWARD -o lxdbr0 -j ACCEPT
+	./local/jimm/setup-controller.sh
+	./local/jimm/add-controller.sh
+EOF
