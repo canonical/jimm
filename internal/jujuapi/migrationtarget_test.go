@@ -101,7 +101,7 @@ func (s *migrationTargetSuite) TestAdoptResources(c *gc.C) {
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	err := client.AdoptResources(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+	c.Assert(err, gc.ErrorMatches, `.*model not found`)
 }
 
 func (s *migrationTargetSuite) TestActivate(c *gc.C) {

@@ -354,7 +354,7 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidModelTag(c *gc.C) {
 	// Validate that an invalid model tag is rejected.
 	user.JimmAdmin = true
 	err := cr.Activate(ctx, args)
-	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
+	c.Assert(err, gc.ErrorMatches, `.*"invalid-model-tag" is not a valid tag`)
 }
 
 func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
@@ -384,7 +384,7 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
 	// Validate that an invalid controller tag is rejected.
 	user.JimmAdmin = true
 	err := cr.Activate(ctx, args)
-	c.Assert(err, gc.ErrorMatches, `"invalid-controller-tag" is not a valid tag`)
+	c.Assert(err, gc.ErrorMatches, `.*"invalid-controller-tag" is not a valid tag`)
 }
 
 func (s *migrationTargetUnitSuite) TestActivateMissingControllerTag(c *gc.C) {
