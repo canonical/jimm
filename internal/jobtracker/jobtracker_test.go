@@ -34,12 +34,7 @@ func (s *jobTrackerSuite) Init(c *qt.C) {
 	s.tracker = tracker
 }
 
-// !!! --- For PR reviewers, currently we're polling the job status as we are waiting
-// for the forselect to update. We could use gomock / some mock and capture the call. What would you prefer?
-// Gomock would allow us to see the order of calls and expected params, so perhaps a bit cleaner.
-//
-// Or we leave it polling.
-func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetFailed_JobError(c *qt.C) {
+func (s *jobTrackerSuite) TestRun_JobError(c *qt.C) {
 	testCtx := c.Context()
 
 	aFastDyingJob := func(ctx context.Context) error {
@@ -66,7 +61,7 @@ func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetFailed_JobError(c *qt.C) {
 	c.Assert(jobErr, qt.Equals, "I died really fast")
 }
 
-func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetFailed_DeadlineExceeded(c *qt.C) {
+func (s *jobTrackerSuite) TestRun_DeadlineExceeded(c *qt.C) {
 	testCtx := c.Context()
 
 	aDeadendJob := func(ctx context.Context) error {
@@ -100,7 +95,7 @@ func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetFailed_DeadlineExceeded(c *
 	c.Assert(jobErr, qt.Equals, "context deadline exceeded")
 }
 
-func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetFailed_CancelledByStop(c *qt.C) {
+func (s *jobTrackerSuite) TestRun_CancelledJob(c *qt.C) {
 	testCtx := c.Context()
 
 	// Create a new tracker, specific to this test.
@@ -140,7 +135,7 @@ func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetFailed_CancelledByStop(c *q
 	c.Assert(jobErr, qt.Equals, "context canceled")
 }
 
-func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetRunning(c *qt.C) {
+func (s *jobTrackerSuite) TestRun_JobSetRunning(c *qt.C) {
 	testCtx := c.Context()
 
 	jobRunning := make(chan bool)
@@ -160,7 +155,7 @@ func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetRunning(c *qt.C) {
 	c.Assert(status, qt.Equals, dbmodel.StatusRunning)
 }
 
-func (s *jobTrackerSuite) TestJobTracker_Run_JobIsSetSuccessful(c *qt.C) {
+func (s *jobTrackerSuite) TestRun_JobSetSuccessful(c *qt.C) {
 	testCtx := c.Context()
 
 	aSuccessfulJob := func(ctx context.Context) error {

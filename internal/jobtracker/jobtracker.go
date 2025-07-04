@@ -2,7 +2,6 @@
 
 // Package jobtracker provides a way to run routines in one instance of JIMM and track them in another.
 // That is, their status can be checked and they can be stopped.
-
 package jobtracker
 
 import (
@@ -18,10 +17,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// JobTrackerStore defines the interface for tracking the lifecycle and status of jobs.
+// Store defines the interface for tracking the lifecycle and status of jobs.
 // It provides methods to add a new job, update its status (running, successful, or failed),
 // and retrieve a stop signal for a specific job.
-type JobTrackerStore interface {
+type Store interface {
 	AddJob(ctx context.Context, jobType string) (uuid.UUID, error)
 	SetJobRunning(ctx context.Context, jobId uuid.UUID) error
 	SetJobSuccessful(ctx context.Context, jobId uuid.UUID) error
@@ -32,13 +31,13 @@ type JobTrackerStore interface {
 // Tracker manages job tracking operations using a provided JobTrackerStore.
 // It periodically performs tasks based on the specified stopInterval duration.
 type Tracker struct {
-	store        JobTrackerStore
+	store        Store
 	stopInterval time.Duration
 }
 
 // NewJobTracker creates and returns a new Tracker instance using the provided JobTrackerStore and stopInterval.
 // It returns an error if the store is nil or if stopInterval is not greater than zero.
-func NewJobTracker(store JobTrackerStore, stopInterval time.Duration) (*Tracker, error) {
+func NewJobTracker(store Store, stopInterval time.Duration) (*Tracker, error) {
 	tracker := &Tracker{}
 	if store == nil {
 		return tracker, errors.New("store cannot be nil")
@@ -53,30 +52,30 @@ func NewJobTracker(store JobTrackerStore, stopInterval time.Duration) (*Tracker,
 }
 
 // Run runs a new job and reurns the job ID.
-func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.Context) error, deadline time.Duration) (uuid.UUID, error) {
+func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.Context) error, maxDuration time.Duration) (uuid.UUID, error) {
 	jobId, err := j.store.AddJob(ctx, jobType)
 	if err != nil {
 		return jobId, err
 	}
 
-	go j.manageJob(ctx, jobId, deadline, job)
+	go j.handleJob(ctx, jobId, maxDuration, job)
 
 	return jobId, nil
 }
 
-// manageJob runs a job with a given context, job ID, polling interval, and deadline.
+// handleJob runs a job with a given context, job ID, polling interval, and deadline.
 // It manages the job's lifecycle, including setting its status in the store, handling retries on store operations,
 // and responding to stop signals or context cancellations. The job is run in a separate goroutine, and its status
 // is updated as running, successful, or failed based on its result or context expiration.
 // If a stop signal is received or the context is canceled or times out, the job is marked as failed.
 // Store operations are retried up to 5 times with a 30-second delay between attempts in case of transient errors.
-func (j *Tracker) manageJob(
+func (j *Tracker) handleJob(
 	ctx context.Context,
 	id uuid.UUID,
-	deadline time.Duration,
+	maxDuration time.Duration,
 	job func(ctx context.Context) error,
 ) {
-	jobCtx, cancelJob := context.WithTimeout(ctx, deadline)
+	jobCtx, cancelJob := context.WithTimeout(ctx, maxDuration)
 	defer cancelJob()
 
 	jobErrCh := make(chan error)
@@ -104,22 +103,22 @@ func (j *Tracker) monitorJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh
 			switch err := jobCtx.Err(); err {
 			case context.Canceled:
 				if err := retryCall(func() error { return j.store.SetJobFailed(ctx, id, context.Canceled) }); err != nil {
-					zapctx.Error(ctx, "failed to set job failed", zap.Error(err))
+					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 				}
 			case context.DeadlineExceeded:
 				if err := retryCall(func() error { return j.store.SetJobFailed(ctx, id, context.DeadlineExceeded) }); err != nil {
-					zapctx.Error(ctx, "failed to set job failed", zap.Error(err))
+					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 				}
 			}
 			return
 		case err := <-jobErrCh:
 			if err != nil {
 				if err := retryCall(func() error { return j.store.SetJobFailed(ctx, id, err) }); err != nil {
-					zapctx.Error(ctx, "failed to set job failed", zap.Error(err))
+					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 				}
 			} else {
 				if err := retryCall(func() error { return j.store.SetJobSuccessful(ctx, id) }); err != nil {
-					zapctx.Error(ctx, "failed to set job successful", zap.Error(err))
+					zapctx.Error(ctx, "error marking the job as successful", zap.Error(err), zap.String("id", id.String()))
 				}
 			}
 			return
