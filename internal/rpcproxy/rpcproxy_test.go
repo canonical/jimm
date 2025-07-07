@@ -58,6 +58,7 @@ func TestProxySockets(t *testing.T) {
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
 		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
@@ -91,6 +92,8 @@ func TestProxySockets(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		c.Logf("took too long to read response")
 		c.FailNow()
+	case err := <-errChan:
+		c.Fatal(err)
 	}
 	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
 	ws.Close()
@@ -118,6 +121,7 @@ func TestProxySocketsControllerConnectionFails(t *testing.T) {
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
 		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
@@ -151,12 +155,18 @@ func TestProxySocketsControllerConnectionFails(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		c.Logf("took too long to read response")
 		c.FailNow()
+	case err := <-errChan:
+		c.Fatal(err)
 	}
 	c.Assert(resp.Response, qt.DeepEquals, msg.Params)
 
 	// Now close the connection to the controller and ensure the model proxy is cleaned up.
 	connController.Close()
-	<-errChan // Ensure go routines are cleaned up
+	select {
+	case <-time.After(5 * time.Second):
+		c.Fatalf("model proxy did not return in time")
+	case <-errChan: // Ensure go routines are cleaned up
+	}
 }
 
 func TestCancelProxySockets(t *testing.T) {
@@ -178,6 +188,7 @@ func TestCancelProxySockets(t *testing.T) {
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) {}
 		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
@@ -196,7 +207,11 @@ func TestCancelProxySockets(t *testing.T) {
 	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
 	defer ws.Close()
 	cancel()
-	<-errChan
+	select {
+	case <-time.After(5 * time.Second):
+		c.Fatalf("model proxy did not return in time")
+	case <-errChan: // Ensure go routines are cleaned up
+	}
 }
 
 func TestProxySocketsAuditLogs(t *testing.T) {
@@ -220,6 +235,7 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 		}
 		auditLogger := func(ale *dbmodel.AuditLogEntry) { auditLogs = append(auditLogs, ale) }
 		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: f,
@@ -246,7 +262,13 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 	err = ws.ReadJSON(&resp)
 	c.Assert(err, qt.IsNil)
 	ws.Close()
-	<-errChan // Ensure go routines are cleaned up
+
+	select {
+	case <-time.After(5 * time.Second):
+		c.Fatalf("model proxy did not return in time")
+	case <-errChan: // Ensure go routines are cleaned up
+	}
+
 	c.Assert(auditLogs, qt.HasLen, 2)
 	expectedEvents := []*dbmodel.AuditLogEntry{{
 		ID:             auditLogs[0].ID,
@@ -279,7 +301,6 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 	},
 	}
 	c.Assert(auditLogs, qt.DeepEquals, expectedEvents)
-
 }
 
 // TestProxySocketsSSHKeys verifies that the
@@ -306,6 +327,7 @@ func TestProxySocketsSSHKeys(t *testing.T) {
 			}, nil
 		}
 		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
 			ConnClient:        connClient,
 			TokenGen:          &testTokenGen,
 			ConnectController: connectControllerF,
@@ -422,7 +444,11 @@ func TestProxySocketsSSHKeys(t *testing.T) {
 		})
 	}
 	ws.Close()
-	<-errChan // Ensure go routines are cleaned up
+	select {
+	case <-time.After(5 * time.Second):
+		c.Fatalf("model proxy did not return in time")
+	case <-errChan: // Ensure go routines are cleaned up
+	}
 }
 
 func mustMarshal(data any) []byte {
