@@ -6,11 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
+	"github.com/juju/juju/cloud"
 	"github.com/juju/version/v2"
 
-	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -73,24 +74,40 @@ func (b BootstrapCmdParams) buildBootstrapCmdStr() string {
 	return builder.String()
 }
 
-func RunBootstrapCmd(ctx context.Context, u *openfga.User, p BootstrapCmdParams, jm juju.JujuManager) (<-chan outputLine, error) {
+func RunBootstrapCmd(
+	ctx context.Context,
+	u *openfga.User,
+	p BootstrapCmdParams,
+	cred cloud.Credential,
+) (<-chan outputLine, error) {
 	if err := p.validate(); err != nil {
 		return nil, err
 	}
 
-	// TODO: Cannot implement yet. JIMM needs to support adding clouds in general such that we can retrieve
-	// the users credential. As it stands, because JIMM doesn't support adding clouds, we cannot add a
-	// credential.
-	//
-	// Once the above is done, the flow is:
-	// 1. User wants to use cloud X
-	// 2. Get cloud (cred is refd to cloud)
-	// 3. Find a users credential for said cloud
-	// 4. Populate memstore cred
-	// 5. Populate temp PersonalClouds or Populate public-clouds.yaml.
-	// 	5.1. Juju flow is, add-cloud <public cloud/private cloud>
-	//		 If it's personal, clouds.yaml created. If not, it's just added to controller from public-clouds.yaml
-	// 5. Call bootstrap?
+	// memStore := jujuclient.NewMemStore()
+	// Update public clouds and set JUJU_HOME
+	os.Setenv("JUJU_HOME", "./")
+
+	// 1. Create clouds.yaml if cloud isn't a public cloud
+	// TODO: Create temp file and set JUJU_HOME and make a todo about how mem store gotta model clouds
+	// so we can run multiple bootstraps, cause we currently gotta use JUJU_HOME and clouds.yaml (PersonalCLoud w/e it called)
+	// will be location then delete it after
+
+	// 2. Add credential to mem store
+
+	// Add cloud call looks like:
+	// func (c *Client) AddCloud(cloud jujucloud.Cloud, force bool) error {
+	// args := params.AddCloudArgs{Name: cloud.Name, Cloud: cloudToParams(cloud)}
+	// if force {
+
+	// cloud.Cloud{}
+	// memStore.UpdateCredential(p.CloudName)
+
+	// Send cloud and creds on facade
+	// Call bootstrap with them in memory
+	// Add controller to db
+	// Add cloud to db (retrieve it from controller)
+	// Add credential to db
 
 	return nil, nil
 	// return runCmdWithOutputRetriever(memStore, cmdStr)
