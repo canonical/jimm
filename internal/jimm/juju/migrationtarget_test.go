@@ -309,13 +309,18 @@ func TestAdoptResources_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
+	// Note that adopt resources is called after the model
+	// has been activated so the incoming model migration
+	// row was deleted and the model has been created.
+
 	controllerVersion := version.MustParse("3.2.1")
+	modelUUID := "00000002-0000-0000-0000-000000000001"
 
 	// Validate that the API request to Juju is made with a modified version
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
 		AdoptResources_: func(uuid string, v version.Number) error {
-			c.Check(uuid, qt.Equals, migratingModelUUID)
+			c.Check(uuid, qt.Equals, modelUUID)
 			c.Check(v, qt.DeepEquals, controllerVersion)
 			return nil
 		},
@@ -327,30 +332,24 @@ func TestAdoptResources_Success(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env := jimmtest.ParseEnvironment(c, migratedModelEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err := j.AdoptResources(ctx, user, migratingModelUUID, controllerVersion)
+	err := j.AdoptResources(ctx, user, modelUUID, controllerVersion)
 	c.Assert(err, qt.IsNil)
 }
 
-func TestAdoptResources_NoIncomingModelMigration(t *testing.T) {
+func TestAdoptResources_NoModel(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testEnvNoIncomingMigration)
-	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	user := openfga.NewUser(&dbUser, nil)
-
-	err := j.AdoptResources(ctx, user, "foo", version.MustParse("3.2.1"))
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	err := j.AdoptResources(ctx, nil, "foo", version.MustParse("3.2.1"))
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 }
 
 const testEnvWithIncomingMigrationAndModel = `clouds:

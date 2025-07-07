@@ -40,12 +40,13 @@ func init() {
 		checkMachines := rpc.Method(r.CheckMachines)
 		importMethod := rpc.Method(r.Import)
 		latestLogTime := rpc.Method(r.LatestLogTime)
+		abort := rpc.Method(r.Abort)
 
 		r.AddMethod("MigrationTarget", 4, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 4, "CACert", caCert)
 		r.AddMethod("MigrationTarget", 4, "Activate", activate)
 		r.AddMethod("MigrationTarget", 4, "AdoptResources", adoptResources)
-		r.AddMethod("MigrationTarget", 4, "Abort", adoptResources)
+		r.AddMethod("MigrationTarget", 4, "Abort", abort)
 		r.AddMethod("MigrationTarget", 4, "CheckMachines", checkMachines)
 		r.AddMethod("MigrationTarget", 4, "Import", importMethod)
 		r.AddMethod("MigrationTarget", 4, "LatestLogTime", latestLogTime)
@@ -198,11 +199,17 @@ func (r *controllerRoot) Activate(ctx context.Context, args params.ActivateModel
 
 	modelTag, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("invalid model tag: %w", err))
 	}
-	controllerTag, err := names.ParseControllerTag(args.ControllerTag)
-	if err != nil {
-		return errors.E(op, err)
+	// The controller tag is optional, so we parse it only if provided.
+	// It is only provided when args.CrossModelUUIDs is not empty.
+	var controllerTag names.ControllerTag
+	if args.ControllerTag != "" {
+		controllerTag, err = names.ParseControllerTag(args.ControllerTag)
+		if err != nil {
+
+			return errors.E(op, fmt.Errorf("invalid controller tag: %w", err))
+		}
 	}
 
 	err = r.jimm.JujuManager().Activate(

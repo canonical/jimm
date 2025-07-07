@@ -181,21 +181,24 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 // and controller version. This is used to adopt resources from a
 // model that is being migrated. It calls the method of the same name
 // on the target Juju controller.
+//
+// Adopt resources is called after the model has been activated so the
+// incoming model migration does not exist and the model is used instead.
 func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error {
 	const op = errors.Op("jimm.AdoptResources")
 
-	modelMigration := dbmodel.IncomingModelMigration{
-		ModelUUID: sql.NullString{
+	model := dbmodel.Model{
+		UUID: sql.NullString{
 			String: modelUUID,
 			Valid:  true,
 		},
 	}
-	err := j.Database.GetIncomingModelMigration(ctx, &modelMigration)
+	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to get model migration for model %q: %w", modelUUID, err))
 	}
 
-	api, err := j.dialController(ctx, &modelMigration.TargetController)
+	api, err := j.dialController(ctx, &model.Controller)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
 	}

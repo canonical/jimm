@@ -354,7 +354,7 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidModelTag(c *gc.C) {
 	// Validate that an invalid model tag is rejected.
 	user.JimmAdmin = true
 	err := cr.Activate(ctx, args)
-	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag`)
+	c.Assert(err, gc.ErrorMatches, `.*"invalid-model-tag" is not a valid tag`)
 }
 
 func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
@@ -384,7 +384,42 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
 	// Validate that an invalid controller tag is rejected.
 	user.JimmAdmin = true
 	err := cr.Activate(ctx, args)
-	c.Assert(err, gc.ErrorMatches, `"invalid-controller-tag" is not a valid tag`)
+	c.Assert(err, gc.ErrorMatches, `.*"invalid-controller-tag" is not a valid tag`)
+}
+
+func (s *migrationTargetUnitSuite) TestActivateMissingControllerTag(c *gc.C) {
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			Activate_: func(ctx context.Context, modelTag names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error {
+				// This function should not be called
+				return nil
+			},
+		},
+	}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	// The only required field is the model tag.
+	args := jujuparams.ActivateModelArgs{
+		ModelTag: names.NewModelTag("00000001-0000-0000-0000-000000000001").String(),
+	}
+
+	// Validate that an invalid controller tag is rejected.
+	user.JimmAdmin = true
+	err := cr.Activate(ctx, args)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *migrationTargetUnitSuite) TestLatestLogTime(c *gc.C) {
