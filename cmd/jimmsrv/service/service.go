@@ -393,7 +393,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	})
 
 	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
-	if !strings.HasPrefix(redirectUrl, "https://") || !strings.HasPrefix(redirectUrl, "http://") {
+	if !strings.HasPrefix(redirectUrl, "https://") && !strings.HasPrefix(redirectUrl, "http://") {
 		redirectUrl = "https://" + redirectUrl
 	}
 
