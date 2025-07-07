@@ -60,6 +60,12 @@ qa-microk8s:
 qa-lxd:
 	@./local/jimm/qa-lxd.sh
 
+qa-multipass:
+	@cd local/jimm; ./qa-lxd-multipass.sh; cd -
+
+qa-multipass-forward:
+	@cd local/jimm; ./qa-lxd-multipass-forward.sh --wait; cd -
+
 integration-test-env: dev-env-setup
 	@JIMM_VERSION=$(JIMM_VERSION) docker compose --profile test up -d --force-recreate --wait
 
@@ -110,12 +116,12 @@ rock:
 	rockcraft pack
 	-rm ./rockcraft.yaml
 
-load-rock: 
+load-rock:
 	$(eval jimm_version := $(shell cat ./rocks/jimm.yaml | yq ".version"))
 	@sudo /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:jimm_${jimm_version}_amd64.rock docker-daemon:jimm:latest
 
 test-auth-model:
-	fga model test --tests ./openfga/tests.fga.yaml 
+	fga model test --tests ./openfga/tests.fga.yaml
 
 define check_dep
     if ! which $(1) > /dev/null; then\
