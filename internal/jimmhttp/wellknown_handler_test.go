@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package jimmhttp_test
 
 import (
@@ -81,6 +82,7 @@ func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 	c.Assert(b, qt.JSONEquals, map[string]any{
 		"Code":    errors.CodeNotFound,
 		"Err":     nil,
+		"Info":    nil,
 		"Message": "JWKS does not exist yet",
 		"Op":      "wellknownapi.JWKS",
 	})
@@ -110,6 +112,7 @@ func TestWellknownAPIJWKSJSONHandles500(t *testing.T) {
 	c.Assert(code, qt.Equals, http.StatusInternalServerError)
 	c.Assert(b, qt.JSONEquals, map[string]any{
 		"Code":    errors.CodeJWKSRetrievalFailed,
+		"Info":    nil,
 		"Err":     nil,
 		"Message": "something went wrong...",
 		"Op":      "wellknownapi.JWKS",
