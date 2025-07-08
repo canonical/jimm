@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/juju/errors"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/client"
 	"github.com/juju/juju/api/client/keymanager"
@@ -221,6 +222,49 @@ func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	c.Check(err, gc.Equals, nil)
 	outputNoNewLine := strings.ReplaceAll(output.String(), "\n", "")
 	c.Check(outputNoNewLine, gc.Matches, `Please visit .* and enter code.*`)
+}
+
+// TestAgentLoginReturnsRedirect verifies that the agent login returns a redirect error
+// when trying to connect to the model proxy. We don't use the helper methods
+// for opening the connection because we want to test authenticating as an agent.
+func (s *apiProxySuite) TestAgentLoginReturnsRedirect(c *gc.C) {
+	u, err := url.Parse(s.HTTP.URL)
+	c.Assert(err, gc.Equals, nil)
+
+	info := api.Info{
+		Tag:      names.NewUnitTag("ubuntu/1"),
+		ModelTag: s.Model.ResourceTag(),
+		Addrs:    []string{u.Host},
+	}
+	dialOpts := api.DialOpts{
+		InsecureSkipVerify: true,
+	}
+	_, err = api.Open(&info, dialOpts)
+	c.Assert(err, gc.NotNil)
+	redirectErr, ok := errors.Cause(err).(*api.RedirectError)
+	c.Check(ok, gc.Equals, true)
+	c.Assert(redirectErr.Servers, gc.HasLen, 1)
+	servers := redirectErr.Servers[0].HostPorts().Strings()
+	c.Assert(servers, gc.HasLen, 1)
+	c.Check(servers[0], gc.Matches, "localhost:[0-9]+")
+	c.Check(len(redirectErr.CACert), gc.Not(gc.Equals), 0)
+}
+
+func (s *apiProxySuite) TestAgentLoginModelDoesNotExist(c *gc.C) {
+	u, err := url.Parse(s.HTTP.URL)
+	c.Assert(err, gc.Equals, nil)
+
+	info := api.Info{
+		Tag:      names.NewUnitTag("ubuntu/1"),
+		ModelTag: names.NewModelTag("00000000-0000-0000-0000-000000000000"),
+		Addrs:    []string{u.Host},
+	}
+	dialOpts := api.DialOpts{
+		InsecureSkipVerify: true,
+	}
+	_, err = api.Open(&info, dialOpts)
+	c.Assert(err, gc.NotNil)
+	c.Check(err.Error(), gc.Matches, `model not found.*`)
 }
 
 type logger struct{}

@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/rpc/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -34,6 +35,22 @@ import (
 const (
 	accessRequiredErrorCode = "access required"
 )
+
+// ControllerDetails holds information about the controller
+// that is being proxied to.
+type ControllerDetails struct {
+	Addresses [][]jujuparams.HostPort
+	CACert    string
+}
+
+// RedirectInfoGetter provides information about the controller
+// that is being proxied to.T his information is useful
+// when we need to redirect a client to that controller
+// instead of proxying the request. This is the case during
+// model migration when receiving requests from agents.
+type RedirectInfoGetter interface {
+	GetRedirectInfo(ctx context.Context) (ControllerDetails, error)
+}
 
 // SSHKeyManager is an interface for managing SSH keys.
 type SSHKeyManager interface {
@@ -99,6 +116,7 @@ type ProxyHelpers struct {
 	AuditLog                func(*dbmodel.AuditLogEntry)
 	LoginService            LoginService
 	AuthenticatedIdentityID string
+	RedirectInfo            RedirectInfoGetter
 }
 
 // ProxySockets will proxy requests from a client connection through to a controller
@@ -122,6 +140,10 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		zapctx.Error(ctx, "Missing ssh key manager function")
 		return errors.E(op, "Missing ssh key manager function")
 	}
+	if helpers.RedirectInfo == nil {
+		zapctx.Error(ctx, "Missing redirect info function")
+		return errors.E(op, "Missing redirect info function")
+	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
 	client := writeLockConn{conn: helpers.ConnClient}
@@ -137,6 +159,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			sshKeyManager:           helpers.SSHKeyManager,
 			loginService:            helpers.LoginService,
 			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
+			redirectInfo:            helpers.RedirectInfo,
 		},
 		errChan:              errChan,
 		createControllerConn: helpers.ConnectController,
@@ -276,6 +299,7 @@ type modelProxy struct {
 	modelUUID               string
 	conversationId          string
 	authenticatedIdentityID string
+	redirectInfo            RedirectInfoGetter
 
 	deviceOAuthResponse *oauth2.DeviceAuthResponse
 }
@@ -379,6 +403,12 @@ func (p *clientProxy) start(ctx context.Context) error {
 			}
 			return nil
 		}
+		// TODO: In some scenarios we don't need to ever dial the controller.
+		// For example, if the client is only sending requests that are handled by JIMM
+		// itself, like SSH key management or scenarios where JIMM returns a redirect.
+		// But we currently need `makeControllerConnection` to set the model UUID and name
+		// so that we can generate JWTs when messages DO need to be forwarded.
+		// Refactor this to be avoid dialling the controller if we don't need to.
 		err := p.makeControllerConnection(ctx)
 		if err != nil {
 			zapctx.Error(ctx, "error connecting to controller", zap.Error(err))
@@ -631,6 +661,7 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 func createErrResponse(err error, req *message) *message {
 	errMsg := new(message)
 	errMsg.RequestID = req.RequestID
+	errMsg.ErrorInfo = errors.ErrorInfo(err)
 	errMsg.Error = err.Error()
 	errMsg.ErrorCode = string(errors.ErrorCode(err))
 	return errMsg
@@ -744,36 +775,70 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 
 		return controllerLoginMessageFnc(user)
 	case "Login":
-		controllerMessage, err := p.handleAnonymousLogin(msg)
-		if err != nil {
-			return errorFnc(err)
-		}
-		return nil, controllerMessage, nil
+		controllerMessage, err := p.handleLegacyLogin(ctx, msg)
+		return nil, controllerMessage, err
 	default:
 		return nil, nil, nil
 	}
 }
 
-// handleAnonymousLogin checks for the presence of an anonymous login request
-// and returns the message to be sent to the controller.
-// If the request is not an anonymous login request, it returns an error
-// indicating that JIMM does not support login from old clients.
-func (p *clientProxy) handleAnonymousLogin(msg *message) (*message, error) {
+// handleLegacyLogin handles old style username+password/macaroon login
+// requests and decides what to do based on the client's auth tag.
+//
+// If the request is an "anonymous login" request (i.e., the auth tag is
+// api.AnonymousUsername), it sets the anonymousLogin flag to true and returns
+// the message verbatim to the controller, allowing it to handle the login.
+// This supports login from a Juju controller during model migration.
+//
+// If the auth tag is a non-user entity e.g. a machine/unit then we return
+// a redirect to the backing Juju controller. This is also used for model migrations
+// but specifically for directing agents to speak to the backing Juju controller.
+//
+// Legacy login requests from users (i.e., those with a user tag) are not supported
+// in JIMM and will return an error.
+func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*message, error) {
 	var request params.LoginRequest
 	err := json.Unmarshal(msg.Params, &request)
 	if err != nil {
 		return nil, err
 	}
-	user, err := names.ParseUserTag(request.AuthTag)
+	tag, err := names.ParseTag(request.AuthTag)
 	if err != nil {
 		return nil, fmt.Errorf("invalid user tag: %v", err)
 	}
-	if user.Id() == api.AnonymousUsername {
-		p.anonymousLogin = true
-		// return the client's login message verbatim to the controller.
-		return msg, nil
+	switch tag := tag.(type) {
+	case names.UserTag:
+		if tag.Id() == api.AnonymousUsername {
+			p.anonymousLogin = true
+			// return the client's login message verbatim to the controller.
+			return msg, nil
+		}
+		return nil, errors.E("JIMM does not support login from old clients", errors.CodeNotSupported)
+	case names.ModelTag, names.MachineTag, names.UnitTag:
+		zapctx.Debug(ctx, "Legacy login request from agent", zap.String("tag", tag.String()))
+
+		redirectInfo, err := p.redirectInfo.GetRedirectInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get redirect info: %w", err)
+		}
+
+		// This is a legacy login request from an agent.
+		// We return a redirect to the backing Juju controller.
+		info := jujuparams.RedirectErrorInfo{
+			Servers: redirectInfo.Addresses,
+			CACert:  redirectInfo.CACert,
+		}.AsMap()
+		errRedirect := errors.E(
+			errors.CodeRedirect,
+			"redirection to alternative server required",
+			info,
+		)
+
+		zapctx.Debug(ctx, "Redirecting agent to controller", zap.Any("servers", redirectInfo.Addresses))
+		return nil, errRedirect
+	default:
+		return nil, fmt.Errorf("unsupported login request for tag %s", tag)
 	}
-	return nil, errors.E("JIMM does not support login from old clients", errors.CodeNotSupported)
 }
 
 // handleKeyManagerFacade processes the key manager facade call.

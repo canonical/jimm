@@ -205,6 +205,66 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			Params:    []byte(`{"auth-tag":"user-jujuanonymous"}`),
 		},
 	}, {
+		about: "login as unit agent returns redirect",
+		messageToSend: rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"unit-charm/1"}`),
+		},
+		expectedClientResponse: &rpcproxy.Message{
+			RequestID: 1,
+			Error:     "redirection to alternative server required",
+			ErrorCode: "redirection required",
+			ErrorInfo: expectedRedirectInfo(),
+		},
+	}, {
+		about: "login as machine agent returns redirect",
+		messageToSend: rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"machine-1"}`),
+		},
+		expectedClientResponse: &rpcproxy.Message{
+			RequestID: 1,
+			Error:     "redirection to alternative server required",
+			ErrorCode: "redirection required",
+			ErrorInfo: expectedRedirectInfo(),
+		},
+	}, {
+		about: "login as model agent returns redirect",
+		messageToSend: rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"model-f25de75d-5460-442f-a320-8584f8f985d7"}`),
+		},
+		expectedClientResponse: &rpcproxy.Message{
+			RequestID: 1,
+			Error:     "redirection to alternative server required",
+			ErrorCode: "redirection required",
+			ErrorInfo: expectedRedirectInfo(),
+		},
+	}, {
+		about: "login as agent with invalid tag returns error",
+		messageToSend: rpcproxy.Message{
+			RequestID: 1,
+			Type:      "Admin",
+			Version:   3,
+			Request:   "Login",
+			Params:    []byte(`{"auth-tag":"model-invalid"}`),
+		},
+		expectedClientResponse: &rpcproxy.Message{
+			RequestID: 1,
+			Error:     `invalid user tag: "model-invalid" is not a valid model tag`,
+			ErrorCode: "",
+			ErrorInfo: nil,
+		},
+	}, {
 		about: "any other message - gets forwarded directly to the controller",
 		messageToSend: rpcproxy.Message{
 			RequestID: 1,
@@ -295,6 +355,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				LoginService:            loginSvc,
 				AuthenticatedIdentityID: test.authenticateEntityID,
 				SSHKeyManager:           &mocks.SSHKeyManager{},
+				RedirectInfo:            &mockRedirectInfo{},
 			}
 			var wg sync.WaitGroup
 			wg.Add(1)
@@ -466,4 +527,35 @@ func (m *mockTokenGenerator) GetUser() names.UserTag {
 	defer m.mu.RUnlock()
 
 	return m.ut
+}
+
+type mockRedirectInfo struct{}
+
+func (m *mockRedirectInfo) GetRedirectInfo(_ context.Context) (rpcproxy.ControllerDetails, error) {
+	return rpcproxy.ControllerDetails{
+		Addresses: [][]params.HostPort{{{
+			Address: params.Address{
+				Value: "controller-1",
+				Type:  "ipv4",
+			},
+			Port: 17070,
+		}}},
+		CACert: "test-ca-cert",
+	}, nil
+}
+
+func expectedRedirectInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"servers": []any{
+			[]any{
+				map[string]any{
+					"port":  float64(17070),
+					"scope": string(""),
+					"type":  string("ipv4"),
+					"value": string("controller-1"),
+				},
+			},
+		},
+		"ca-cert": "test-ca-cert",
+	}
 }

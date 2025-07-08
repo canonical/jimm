@@ -24,6 +24,10 @@ type Error struct {
 	// Message is a human-readable error description.
 	Message string
 
+	// Info is additional information about the error
+	// that clients need to use.
+	Info map[string]any
+
 	// Err contains the underlying error, if there is one.
 	Err error
 }
@@ -80,6 +84,8 @@ func E(args ...interface{}) error {
 			e.Err = v
 		case string:
 			e.Message = v
+		case map[string]any:
+			e.Info = v
 		default:
 			zapctx.Default.DPanic("unknown type passed to errors.E", zap.String("type", fmt.Sprintf("%T", arg)), zap.Any("value", arg))
 			return fmt.Errorf("unknown type (%T) passed to errors.E", arg)
@@ -137,4 +143,13 @@ func ErrorCode(err error) Code {
 		return ""
 	}
 	return e.Code
+}
+
+// ErrorInfo returns additional information about the error.
+func ErrorInfo(err error) map[string]any {
+	e, ok := err.(*Error)
+	if !ok {
+		return nil
+	}
+	return e.Info
 }

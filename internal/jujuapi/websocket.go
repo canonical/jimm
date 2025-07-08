@@ -174,10 +174,12 @@ func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 // We act as a proxier, handling auth on requests before forwarding the
 // requests to the appropriate Juju controller.
 func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn) {
+	redirectInfo := redirectInfoAdapter{jimm: s.jimm}
 	jwtGenerator := s.jimm.NewJujuAuthenticator()
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
-	zapctx.Debug(ctx, "Starting proxier")
 	auditLogger := s.jimm.AuditLogManager().AddAuditLogEntry
+
+	zapctx.Debug(ctx, "Starting proxier")
 	proxyHelpers := rpcproxy.ProxyHelpers{
 		ConnClient:              clientConn,
 		TokenGen:                &jwtGenerator,
@@ -186,6 +188,7 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 		LoginService:            s.jimm.LoginManager(),
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 		SSHKeyManager:           s.jimm.SSHKeyManager(),
+		RedirectInfo:            redirectInfo,
 	}
 	if err := rpcproxy.ProxySockets(ctx, proxyHelpers); err != nil {
 		zapctx.Error(ctx, "failed to start jimm model proxy", zap.Error(err))
@@ -230,6 +233,34 @@ func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTok
 			ModelUUID:      uuid,
 		}, nil
 	}
+}
+
+// redirectInfoAdapter provides an implementation of rpcproxy.RedirectInfo
+// for retrieving the controller details needed for redirecting requests.
+type redirectInfoAdapter struct {
+	jimm *jimm.JIMM
+}
+
+// GetRedirectInfo implements rpcproxy.RedirectInfo.
+// It extracts the model UUID from the request context and retrieves the
+// controller details from JIMM's JujuManager.
+// It returns the controller's addresses and CA certificate.
+func (r redirectInfoAdapter) GetRedirectInfo(ctx context.Context) (rpcproxy.ControllerDetails, error) {
+	path := jimmhttp.PathElementFromContext(ctx)
+	uuid, _, err := modelInfoFromPath(path)
+	if err != nil {
+		zapctx.Error(ctx, "error parsing path", zap.Error(err))
+		return rpcproxy.ControllerDetails{}, err
+	}
+	model, err := r.jimm.JujuManager().GetModel(ctx, uuid)
+	if err != nil {
+		zapctx.Error(ctx, "failed to get model", zap.String("uuid", uuid), zap.Error(err))
+		return rpcproxy.ControllerDetails{}, err
+	}
+	return rpcproxy.ControllerDetails{
+		Addresses: model.Controller.Addresses,
+		CACert:    model.Controller.CACertificate,
+	}, nil
 }
 
 // Use a 64k frame size for the websockets while we need to deal
