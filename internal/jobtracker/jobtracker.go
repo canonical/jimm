@@ -94,7 +94,7 @@ func (j *Tracker) monitorJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh
 	ticker := time.NewTicker(j.stopInterval)
 	defer ticker.Stop()
 
-	// TODO(ale8k): Add mo
+	// TODO(ale8k): Add monitoring for failed status settings.
 	for {
 		select {
 		case <-jobCtx.Done():
