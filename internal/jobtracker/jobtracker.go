@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/juju/clock"
-	"github.com/juju/retry"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )
@@ -89,38 +87,36 @@ func (j *Tracker) runJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh cha
 		jobErrCh <- fmt.Errorf("failed to set job running, job not starting: %w", err)
 		return
 	}
-	err := job(jobCtx)
-	jobErrCh <- err
+	jobErrCh <- job(jobCtx)
 }
 
 func (j *Tracker) monitorJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh chan error, cancelJob context.CancelFunc) {
 	ticker := time.NewTicker(j.stopInterval)
 	defer ticker.Stop()
 
+	// TODO(ale8k): Add mo
 	for {
 		select {
 		case <-jobCtx.Done():
-			switch err := jobCtx.Err(); err {
-			case context.Canceled:
-				if err := retryCall(func() error { return j.store.SetJobFailed(ctx, id, context.Canceled) }); err != nil {
-					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
-				}
-			case context.DeadlineExceeded:
-				if err := retryCall(func() error { return j.store.SetJobFailed(ctx, id, context.DeadlineExceeded) }); err != nil {
+			err := jobCtx.Err()
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				if err := j.store.SetJobFailed(ctx, id, err); err != nil {
 					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 				}
 			}
 			return
 		case err := <-jobErrCh:
 			if err != nil {
-				if err := retryCall(func() error { return j.store.SetJobFailed(ctx, id, err) }); err != nil {
+				if err := j.store.SetJobFailed(ctx, id, err); err != nil {
 					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 				}
-			} else {
-				if err := retryCall(func() error { return j.store.SetJobSuccessful(ctx, id) }); err != nil {
-					zapctx.Error(ctx, "error marking the job as successful", zap.Error(err), zap.String("id", id.String()))
-				}
+				return
 			}
+
+			if err := j.store.SetJobSuccessful(ctx, id); err != nil {
+				zapctx.Error(ctx, "error marking the job as successful", zap.Error(err), zap.String("id", id.String()))
+			}
+
 			return
 		case <-ticker.C:
 			shouldStop, err := j.store.GetJobStopSignal(ctx, id)
@@ -135,16 +131,4 @@ func (j *Tracker) monitorJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh
 		}
 	}
 
-}
-
-func retryCall(f func() error) error {
-	if err := retry.Call(retry.CallArgs{
-		Attempts: 5,
-		Delay:    time.Second * 30,
-		Func:     f,
-		Clock:    clock.WallClock,
-	}); err != nil {
-		return err
-	}
-	return nil
 }

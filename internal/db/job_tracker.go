@@ -60,7 +60,7 @@ func (d *Database) GetJobStopSignal(ctx context.Context, jobId uuid.UUID) (stopS
 
 	db := d.DB.WithContext(ctx)
 	var entry dbmodel.JobTrackerEntry
-	if err := db.Select("stop_signal").First(&entry, "job_id = ?", jobId).Error; err != nil {
+	if err := db.Select("stop_signal").Where("job_id = ?", jobId).First(&entry).Error; err != nil {
 		return false, dbError(err)
 	}
 
@@ -164,7 +164,7 @@ func (d *Database) GetJobStatus(ctx context.Context, jobId uuid.UUID) (status db
 
 	db := d.DB.WithContext(ctx)
 	entry := &dbmodel.JobTrackerEntry{}
-	if err := db.First(entry, "job_id = ?", jobId).Error; err != nil {
+	if err := db.Where("job_id = ?", jobId).First(entry).Error; err != nil {
 		return status, dbError(err)
 	}
 
