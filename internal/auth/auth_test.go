@@ -520,11 +520,11 @@ func TestNewMigrationToken(t *testing.T) {
 	c.Assert(jwtToken.Subject(), qt.Equals, "alice@canonical.com")
 
 	// Generate a migration token for a service account
-	migrationToken, err = authSvc.NewMigrationToken(ctx, "cde78135-f1b1-436f-8461-58461fa95914")
+	migrationToken, err = authSvc.NewMigrationToken(ctx, "cde78135-f1b1-436f-8461-58461fa95914@serviceaccount")
 	c.Assert(err, qt.IsNil)
 	c.Assert(migrationToken, qt.Not(qt.Equals), "")
 
 	jwtToken, err = authSvc.VerifySessionToken(migrationToken)
 	c.Assert(err, qt.IsNil)
-	c.Assert(jwtToken.Subject(), qt.Equals, "cde78135-f1b1-436f-8461-58461fa95914")
+	c.Assert(jwtToken.Subject(), qt.Equals, "cde78135-f1b1-436f-8461-58461fa95914@serviceaccount")
 }
