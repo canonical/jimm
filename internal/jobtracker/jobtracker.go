@@ -38,20 +38,20 @@ type Tracker struct {
 // NewJobTracker creates and returns a new Tracker instance using the provided JobTrackerStore and stopInterval.
 // It returns an error if the store is nil or if stopInterval is not greater than zero.
 func NewJobTracker(store Store, stopInterval time.Duration) (*Tracker, error) {
-	tracker := &Tracker{}
 	if store == nil {
-		return tracker, errors.New("store cannot be nil")
+		return nil, errors.New("store cannot be nil")
 	}
 	if stopInterval <= 0 {
-		return tracker, errors.New("stopInterval must be greater than zero")
+		return nil, errors.New("stopInterval must be greater than zero")
 	}
-	tracker.stopInterval = stopInterval
-	tracker.store = store
 
-	return tracker, nil
+	return &Tracker{
+		stopInterval: stopInterval,
+		store:        store,
+	}, nil
 }
 
-// Run runs a new job and reurns the job ID.
+// Run runs a new job and returns the job ID.
 func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.Context) error, maxDuration time.Duration) (uuid.UUID, error) {
 	jobId, err := j.store.AddJob(ctx, jobType)
 	if err != nil {
@@ -63,7 +63,7 @@ func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.
 	return jobId, nil
 }
 
-// handleJob runs a job with a given context, job ID, polling interval, and deadline.
+// handleJob runs a job with a given context, job ID, and deadline.
 // It manages the job's lifecycle, including setting its status in the store, handling retries on store operations,
 // and responding to stop signals or context cancellations. The job is run in a separate goroutine, and its status
 // is updated as running, successful, or failed based on its result or context expiration.

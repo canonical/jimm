@@ -32,7 +32,10 @@ func (s *dbSuite) TestJobTracker_CreateJob(c *qt.C) {
 
 func (s *dbSuite) TestJobTracker_GetJobStopSignal(c *qt.C) {
 	ctx := c.Context()
-	err := s.Database.Migrate(ctx)
+	_, err := s.Database.GetJobStopSignal(ctx, uuid.New())
+	c.Assert(err, qt.ErrorMatches, "upgrade in progress")
+
+	err = s.Database.Migrate(ctx)
 	c.Assert(err, qt.IsNil)
 
 	_, err = s.Database.GetJobStopSignal(ctx, uuid.New())
