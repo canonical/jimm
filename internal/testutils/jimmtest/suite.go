@@ -150,8 +150,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Store:  credentialStore,
 		Expiry: time.Minute,
 	})
-
-	s.JIMM = NewJIMM(gct, &jimm.Parameters{
+	s.JIMM, err = jimm.New(jimm.Parameters{
 		UUID:     ControllerUUID,
 		Database: database,
 		Dialer: &jujuclient.Dialer{
@@ -163,11 +162,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		OpenFGAClient:           s.OFGAClient,
 		OAuthAuthenticator:      authenticator,
 		MigrationTokenGenerator: mockMigrationTokenGenerator{},
-
-		JWTService: jwtService,
-
-		CrossModelQueryTimeout: time.Second * 5,
+		JWTService:              jwtService,
+		CrossModelQueryTimeout:  time.Second * 5,
 	})
+	c.Assert(err, gc.IsNil)
+
 	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.JIMM.OfferAuthorizer())
 	localDischargePath := "/macaroons"
 	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
