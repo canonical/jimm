@@ -502,3 +502,29 @@ func TestAuthenticateBrowserSessionHandlesMissingOrExpiredRefreshTokens(t *testi
 	_, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
 	c.Assert(err, qt.ErrorMatches, ".*failed to refresh token: oauth2: token expired and refresh token is not set")
 }
+
+func TestNewMigrationToken(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
+
+	// Generate a migration token for a user
+	migrationToken, err := authSvc.NewMigrationToken(ctx, "alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationToken, qt.Not(qt.Equals), "")
+
+	jwtToken, err := authSvc.VerifySessionToken(migrationToken)
+	c.Assert(err, qt.IsNil)
+	c.Assert(jwtToken.Subject(), qt.Equals, "alice@canonical.com")
+
+	// Generate a migration token for a service account
+	migrationToken, err = authSvc.NewMigrationToken(ctx, "cde78135-f1b1-436f-8461-58461fa95914@serviceaccount")
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationToken, qt.Not(qt.Equals), "")
+
+	jwtToken, err = authSvc.VerifySessionToken(migrationToken)
+	c.Assert(err, qt.IsNil)
+	c.Assert(jwtToken.Subject(), qt.Equals, "cde78135-f1b1-436f-8461-58461fa95914@serviceaccount")
+}

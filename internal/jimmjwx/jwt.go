@@ -86,6 +86,10 @@ type JWTParams struct {
 	// ExtraClaims contain any extra claims that should be added to the JWT.
 	// "access" is a reserved claim and will cause an error if used.
 	ExtraClaims map[string]interface{}
+	// Expiry is the duration after which the JWT will expire.
+	// If not set, it will default to the configured default expiry.
+	// If set, it will override the JWTServiceParams.Expiry.
+	Expiry time.Duration
 }
 
 // NewJWTService returns a new JWT service for handling JIMMs JWTs.
@@ -149,13 +153,18 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		return nil, err
 	}
 
+	expiry := j.Expiry
+	if params.Expiry != time.Duration(0) {
+		expiry = params.Expiry
+	}
+
 	builder := jwt.NewBuilder().
 		Audience([]string{params.Controller}).
 		Subject(params.User).
 		Issuer(j.Host).
 		JwtID(jti).
 		Claim(accessClaim, params.Access).
-		Expiration(time.Now().Add(j.Expiry))
+		Expiration(time.Now().Add(expiry))
 
 	for k, v := range params.ExtraClaims {
 		if k == accessClaim {

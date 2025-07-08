@@ -21,7 +21,7 @@ func (s *jimmSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
 
 	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", false)
 
-	err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{})
+	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{})
 
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 }
@@ -31,7 +31,7 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 
 	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", true)
 
-	err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
+	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
 		ModelTag: "blah",
 	})
 
@@ -43,9 +43,9 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
 
 	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", true)
 
-	err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "---bad wolf---",
+	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
+		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
+		BackingControllerName: "---bad wolf---",
 	})
 
 	c.Assert(err, gc.ErrorMatches, "invalid controller name")
@@ -56,26 +56,26 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
 
 	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", true)
 
-	err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "controller",
-		UserMapping:          map[string]string{"--bad local--": "alice@canonical.com"},
+	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
+		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
+		BackingControllerName: "controller",
+		UserMapping:           map[string]string{"--bad local--": "alice@canonical.com"},
 	})
 
 	c.Assert(err, gc.ErrorMatches, `--bad local-- is not a valid local user name`)
 
-	err = root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "controller",
-		UserMapping:          map[string]string{"alice": "alice"},
+	_, err = root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
+		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
+		BackingControllerName: "controller",
+		UserMapping:           map[string]string{"alice": "alice"},
 	})
 
 	c.Assert(err, gc.ErrorMatches, `alice is not a valid external user name`)
 
-	err = root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
-		TargetControllerName: "controller",
-		UserMapping:          map[string]string{"alice": "--badwolf--@canonical.com"},
+	_, err = root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
+		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
+		BackingControllerName: "controller",
+		UserMapping:           map[string]string{"alice": "--badwolf--@canonical.com"},
 	})
 
 	c.Assert(err, gc.ErrorMatches, `--badwolf--@canonical.com is not a valid external user name`)

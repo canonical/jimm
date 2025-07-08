@@ -23,6 +23,10 @@ type parameters struct {
 	CrossModelQueryTimeout time.Duration
 }
 
+// newTestJujuManager creates a new JujuManager for testing purposes.
+//
+// TODO: Return a struct that includes the JujuManager and any mock
+// resources needed for validation during testing.
 func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	if p == nil {
 		p = &parameters{}
@@ -58,8 +62,17 @@ func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	jujuManager, err := juju.NewJujuManager(db, ofgaClient,
 		p.CredentialStore, permissionManager,
 		jimmResourceTag, []string{},
-		p.Dialer, p.CrossModelQueryTimeout)
+		p.Dialer, p.CrossModelQueryTimeout,
+		&mockMigrationTokenGenerator{})
 	c.Assert(err, qt.IsNil)
 
 	return jujuManager
+}
+
+type mockMigrationTokenGenerator struct{}
+
+func (m *mockMigrationTokenGenerator) NewMigrationToken(ctx context.Context, username string) (string, error) {
+	// Simulate a token generation by returning a simple string.
+	// In a real implementation, this would be a JWT or similar token.
+	return "test-migration-token", nil
 }

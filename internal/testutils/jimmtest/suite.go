@@ -150,23 +150,23 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Store:  credentialStore,
 		Expiry: time.Minute,
 	})
-
-	s.JIMM = NewJIMM(gct, &jimm.Parameters{
+	s.JIMM, err = jimm.New(jimm.Parameters{
 		UUID:     ControllerUUID,
 		Database: database,
 		Dialer: &jujuclient.Dialer{
 			ControllerCredentialsStore: credentialStore,
 			JWTService:                 jwtService,
 		},
-		CredentialStore:    credentialStore,
-		Pubsub:             &pubsub.Hub{MaxConcurrency: 10},
-		OpenFGAClient:      s.OFGAClient,
-		OAuthAuthenticator: authenticator,
-
-		JWTService: jwtService,
-
-		CrossModelQueryTimeout: time.Second * 5,
+		CredentialStore:         credentialStore,
+		Pubsub:                  &pubsub.Hub{MaxConcurrency: 10},
+		OpenFGAClient:           s.OFGAClient,
+		OAuthAuthenticator:      authenticator,
+		MigrationTokenGenerator: mockMigrationTokenGenerator{},
+		JWTService:              jwtService,
+		CrossModelQueryTimeout:  time.Second * 5,
 	})
+	c.Assert(err, gc.IsNil)
+
 	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.JIMM.OfferAuthorizer())
 	localDischargePath := "/macaroons"
 	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
@@ -444,4 +444,12 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.Model.SetTag(mt)
 	err = s.JIMM.Database.GetModel(ctx, s.Model)
 	c.Assert(err, gc.Equals, nil)
+}
+
+type mockMigrationTokenGenerator struct{}
+
+func (m mockMigrationTokenGenerator) NewMigrationToken(ctx context.Context, username string) (string, error) {
+	// Simulate a token generation by returning a simple string.
+	// In a real implementation, this would be a JWT or similar token.
+	return "test-migration-token", nil
 }

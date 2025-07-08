@@ -36,10 +36,13 @@ import (
 type JimmCmdSuite struct {
 	corejujutesting.JujuConnSuite
 
-	Params      service.Params
-	HTTP        *httptest.Server
-	Service     *service.Service
-	AdminUser   *dbmodel.Identity
+	Params    service.Params
+	HTTP      *httptest.Server
+	Service   *service.Service
+	AdminUser *dbmodel.Identity
+	// ClientStore is a function that returns a new in-memory store
+	// on every invocation. This is necessary because the store is updated
+	// on every controller connection, and we want keep the store details.
 	ClientStore func() *jjclient.MemStore
 	JIMM        *jimm.JIMM
 	cancel      context.CancelFunc

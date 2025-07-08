@@ -216,3 +216,11 @@ type PermissionChecker interface {
 	// GetUserModelAccess returns the user's level of access to a model.
 	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
 }
+
+// MigrationTokenGenerator is an interface for generating migration tokens
+// that are used to authenticate Juju controllers with JIMM during model migrations.
+type MigrationTokenGenerator interface {
+	// NewToken generates a new migration token with the specified user and model tag.
+	// The token allows a client to authenticate with JIMM as the specified user.
+	NewMigrationToken(ctx context.Context, username string) (string, error)
+}

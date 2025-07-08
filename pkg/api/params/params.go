@@ -549,7 +549,14 @@ type VersionResponse struct {
 // PrepareModelMigrationRequest holds the details to prepare JIMM
 // for a model migration.
 type PrepareModelMigrationRequest struct {
-	ModelTag             string            `json:"model-tag" yaml:"model-tag"`
-	TargetControllerName string            `json:"target-controller-name" yaml:"target-controller-name"`
-	UserMapping          map[string]string `json:"user-mapping" yaml:"user-mapping"`
+	ModelTag              string            `json:"model-tag" yaml:"model-tag"`
+	BackingControllerName string            `json:"backing-controller-name" yaml:"backing-controller-name"`
+	UserMapping           map[string]string `json:"user-mapping" yaml:"user-mapping"`
+}
+
+// PrepareModelMigrationResponse holds the response for a model migration.
+type PrepareModelMigrationResponse struct {
+	// Token is the token that should be used to initiate the migration
+	// as it allows the source controller to authenticate with JIMM.
+	Token string `json:"token" yaml:"token"`
 }

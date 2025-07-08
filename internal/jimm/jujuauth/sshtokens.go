@@ -1,11 +1,5 @@
 // Copyright 2025 Canonical.
 
-// Package jujuauth generates JWT tokens to
-// authenticate and authorize messages to Juju controllers.
-// This package is more specialised than a generic
-// JWT token generator as it crafts Juju specific
-// permissions that are added as claims to the JWT
-// and therefore exists in JIMM's business logic layer.
 package jujuauth
 
 import (

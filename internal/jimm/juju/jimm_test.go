@@ -754,7 +754,7 @@ func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
 
 	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
 
-	err := j.PrepareModelMigration(
+	_, err := j.PrepareModelMigration(
 		ctx,
 		user,
 		fakeModelUUID,
@@ -783,7 +783,7 @@ func TestPrepareModelMigration_Success(t *testing.T) {
 	userMapping := map[string]string{"alice": "alice@canonical.com"}
 	targetController := env.Controllers[0].DBObject(c, j.Database)
 
-	err := j.PrepareModelMigration(
+	migrationToken, err := j.PrepareModelMigration(
 		ctx,
 		user,
 		fakeModelUUID,
@@ -791,6 +791,7 @@ func TestPrepareModelMigration_Success(t *testing.T) {
 		userMapping,
 	)
 	c.Assert(err, qt.IsNil)
+	c.Assert(string(migrationToken), qt.Equals, "test-migration-token")
 
 	incomingMigration := &dbmodel.IncomingModelMigration{
 		ModelUUID:          sql.NullString{String: fakeModelUUID, Valid: true},

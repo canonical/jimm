@@ -256,7 +256,7 @@ type JujuManager interface {
 	// Please MAINTAIN this order as it is helpful to understand the migration flow and which methods
 	// can use the IncomingModelMigration table versus which must use the plain Models table.
 
-	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) error
+	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
 	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
@@ -338,6 +338,10 @@ type Parameters struct {
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator login.OAuthAuthenticator
 
+	// MigrationTokenGenerator is used to generate migration tokens for
+	// authentication between Juju and JIMM during model migration.
+	MigrationTokenGenerator juju.MigrationTokenGenerator
+
 	// AuditLogRetentionDays is the number of days to keep audit logs.
 	// The default value of 0 indicates that logs will never be deleted.
 	AuditLogRetentionDays int
@@ -381,6 +385,10 @@ func (p *Parameters) Validate() error {
 
 	if p.OAuthAuthenticator == nil {
 		return errors.E("missing oauth authenticator")
+	}
+
+	if p.MigrationTokenGenerator == nil {
+		return errors.E("missing migration token generator")
 	}
 
 	if p.CrossModelQueryTimeout <= 0 {
@@ -449,6 +457,7 @@ func New(p Parameters) (*JIMM, error) {
 		p.ReservedCloudNames,
 		j.Dialer,
 		p.CrossModelQueryTimeout,
+		j.MigrationTokenGenerator,
 	)
 	if err != nil {
 		return nil, err

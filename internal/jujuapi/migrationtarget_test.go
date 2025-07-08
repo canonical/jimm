@@ -72,13 +72,14 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
 
 	prepareModelMigration := params.PrepareModelMigrationRequest{
-		ModelTag:             names.NewModelTag(modelUUID).String(),
-		TargetControllerName: "controller-1", // Default name of the initial controller added to JIMM.
-		UserMapping:          map[string]string{"alice": "alice@canonical.com"},
+		ModelTag:              names.NewModelTag(modelUUID).String(),
+		BackingControllerName: "controller-1", // Default name of the initial controller added to JIMM.
+		UserMapping:           map[string]string{"alice": "alice@canonical.com"},
 	}
 	jimmClient := api.NewClient(conn)
-	err = jimmClient.PrepareModelMigration(&prepareModelMigration)
+	migrationToken, err := jimmClient.PrepareModelMigration(&prepareModelMigration)
 	c.Assert(err, gc.IsNil)
+	c.Assert(migrationToken, gc.Not(gc.Equals), "")
 
 	err = client.Prechecks(model)
 	c.Assert(err, gc.IsNil)
