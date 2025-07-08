@@ -142,7 +142,8 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 }
 
 // Prechecks checks that the model can be migrated to the target controller.
-// It does this by calling the method of the same name on the target Juju controller.
+// It does this by checking cloud, cloudregion and cloud credentials exists in JIMM, then
+// calling the method of the same name on the target Juju controller.
 // As part of all model migrations passing through JIMM, it modifies the model description
 // to replace any local user references with their external mapping.
 func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
@@ -162,6 +163,22 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 	err = j.modifyMigrationInfo(&model, incomingModel.UserMapping)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to modify migration info: %w", err))
+	}
+
+	_, err = j.Database.FindRegionByCloudName(ctx, model.ModelDescription.CloudCredential().Cloud(), model.ModelDescription.CloudRegion())
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to find region for cloud %q: %w", model.ModelDescription.CloudCredential().Cloud(), err))
+	}
+
+	cloudCredential := &dbmodel.CloudCredential{
+		CloudName:         model.ModelDescription.CloudCredential().Cloud(),
+		OwnerIdentityName: model.ModelDescription.Owner().Id(),
+		Name:              model.ModelDescription.CloudCredential().Name(),
+	}
+
+	err = j.Database.GetCloudCredential(ctx, cloudCredential)
+	if err != nil {
+		return errors.E(op, err)
 	}
 
 	api, err := j.dialController(ctx, &incomingModel.TargetController)

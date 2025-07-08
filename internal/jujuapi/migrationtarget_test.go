@@ -6,6 +6,7 @@ import (
 	"github.com/juju/description/v9"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 	gc "gopkg.in/check.v1"
@@ -45,6 +46,11 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
+	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
+		AuthType: "empty",
+	})
+
 	modelDescriptionArgs := description.ModelArgs{
 		Type:        description.IAAS,
 		Owner:       names.NewUserTag("alice"),
@@ -55,7 +61,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	modelDescription := description.NewModel(modelDescriptionArgs)
 	modelDescription.SetStatus(description.StatusArgs{Value: "available"})
 	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
-		Name:  jimmtest.TestCloudName + "/alice@canonical.com/cred",
+		Name:  "cred",
 		Cloud: names.NewCloudTag(jimmtest.TestCloudName),
 		Owner: names.NewUserTag("alice@canonical.com"),
 	})

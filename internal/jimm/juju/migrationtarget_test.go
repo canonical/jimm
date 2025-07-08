@@ -31,6 +31,10 @@ const testEnvWithIncomingMigration = `clouds:
   type: test
   regions:
   - name: test-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: test-cred
+  cloud: test
 controllers:
 - name: test1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -239,9 +243,105 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo("bob")
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	err := j.Prechecks(ctx, user, model)
 	c.Assert(err, qt.IsNil)
+}
+
+func TestPrechecks_MissingCloudRegion(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	api := &jimmtest.API{}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model-2",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region-not-found",
+	})
+
+	err := j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test".*`)
+}
+
+func TestPrechecks_MissingCloud(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	api := &jimmtest.API{}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model-2",
+		CloudName:           "test-not-found",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
+
+	err := j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test-not-found".*`)
+}
+
+func TestPrechecks_MissingCloudCredential(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	api := &jimmtest.API{}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model-2",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred-not-found",
+		CloudRegionName:     "test-region",
+	})
+
+	err := j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.ErrorMatches, `^cloudcredential "test/alice@canonical.com/test-cred-not-found" not found$`)
 }
 
 func TestPrechecks_ControllerUnreachable(t *testing.T) {
@@ -266,7 +366,13 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo("bob")
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	err := j.Prechecks(ctx, user, model)
 	c.Assert(err, qt.ErrorMatches, `.*controller unreachable`)
 }
@@ -283,7 +389,13 @@ func TestPrechecks_MissingUserMapping(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo("not-found-user")
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "not-found-user",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	err := j.Prechecks(ctx, user, model)
 	c.Assert(err, qt.ErrorMatches, `.*no external user mapping found for local user "not-found-user"`)
 }
@@ -300,7 +412,13 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo("bob")
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	err := j.Prechecks(ctx, user, model)
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
@@ -502,41 +620,49 @@ func TestActivate_NoIncomingModelMigration(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
-func newModelDescription(owner string) description.Model {
+type modelDescriptionArgs struct {
+	Owner               string
+	ModelName           string
+	CloudName           string
+	CloudCredentialName string
+	CloudRegionName     string
+}
+
+func newModelDescription(args modelDescriptionArgs) description.Model {
 	descriptionArgs := description.ModelArgs{
 		AgentVersion: "3.2.1",
-		Owner:        names.NewUserTag(owner),
+		Owner:        names.NewUserTag(args.Owner),
 		Type:         description.IAAS,
-		Cloud:        "test",
+		Cloud:        args.CloudName,
 		Config: map[string]interface{}{
 			"uuid": migratingModelUUID,
-			"name": "test-model",
+			"name": args.ModelName,
 		},
-		CloudRegion: "test-region",
+		CloudRegion: args.CloudRegionName,
 	}
 	modelDescription := description.NewModel(descriptionArgs)
 	userArgs := description.UserArgs{
-		Name:        names.NewUserTag("bob"),
-		DisplayName: "bob",
+		Name:        names.NewUserTag(args.Owner),
+		DisplayName: args.Owner,
 		Access:      "admin",
 	}
 	modelDescription.AddUser(userArgs)
 	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
-		Owner: names.NewUserTag(owner),
-		Name:  "test-cred",
-		Cloud: names.NewCloudTag("test"),
+		Owner: names.NewUserTag(args.Owner),
+		Name:  args.CloudCredentialName,
+		Cloud: names.NewCloudTag(args.CloudName),
 	})
 	return modelDescription
 }
 
-func newMigrationInfo(owner string) migration.ModelInfo {
+func newMigrationInfo(args modelDescriptionArgs) migration.ModelInfo {
 	modelInfo := migration.ModelInfo{
 		UUID:                   migratingModelUUID,
-		Owner:                  names.NewUserTag(owner),
+		Owner:                  names.NewUserTag(args.Owner),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.2.1"),
 		ControllerAgentVersion: version.MustParse("3.2.1"),
-		ModelDescription:       newModelDescription(owner),
+		ModelDescription:       newModelDescription(args),
 	}
 	return modelInfo
 }
@@ -666,7 +792,13 @@ func TestImport_Success(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	desc := newModelDescription("bob")
+	desc := newModelDescription(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	desc.SetStatus(description.StatusArgs{Value: "available"})
 	bytes, err := description.Serialize(desc)
 	c.Assert(err, qt.IsNil)
@@ -704,7 +836,13 @@ func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	// Check cloud credential are checked.
-	desc := newModelDescription("bob")
+	desc := newModelDescription(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	desc.SetStatus(description.StatusArgs{Value: "available"})
 	// Intentionally resetting cloud credential to simulate missing cloud credential.
 	desc.SetCloudCredential(description.CloudCredentialArgs{})
@@ -743,7 +881,13 @@ func TestImport_UserNotFoundInUserMapping(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	// Check cloud credential are checked.
-	desc := newModelDescription("not-in-mapping")
+	desc := newModelDescription(modelDescriptionArgs{
+		Owner:               "not-in-mapping",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	desc.SetStatus(description.StatusArgs{Value: "available"})
 	bytes, err := description.Serialize(desc)
 	c.Assert(err, qt.IsNil)
@@ -781,7 +925,13 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	// Check cloud credential are checked.
-	desc := newModelDescription("bob")
+	desc := newModelDescription(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred-not-found",
+		CloudRegionName:     "test-region",
+	})
 	desc.SetStatus(description.StatusArgs{Value: "available"})
 	bytes, err := description.Serialize(desc)
 	c.Assert(err, qt.IsNil)
@@ -825,7 +975,13 @@ func TestImport_APIFailure(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	desc := newModelDescription("bob")
+	desc := newModelDescription(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
 	desc.SetStatus(description.StatusArgs{Value: "available"})
 	bytes, err := description.Serialize(desc)
 	c.Assert(err, qt.IsNil)
