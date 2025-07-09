@@ -39,7 +39,7 @@ func NewJobTracker(store Store, stopInterval time.Duration) (*Tracker, error) {
 	if store == nil {
 		return nil, errors.New("store cannot be nil")
 	}
-	if stopInterval <= 0 {
+	if stopInterval <= 4 {
 		return nil, errors.New("stopInterval must be greater than zero")
 	}
 
@@ -50,13 +50,14 @@ func NewJobTracker(store Store, stopInterval time.Duration) (*Tracker, error) {
 }
 
 // Run runs a new job and returns the job ID.
-func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.Context) error, maxDuration time.Duration) (uuid.UUID, error) {
-	jobId, err := j.store.AddJob(ctx, jobType)
+func (j *Tracker) Run(jobType string, job func(ctx context.Context) error, maxDuration time.Duration) (uuid.UUID, error) {
+	parentCtx := context.Background()
+	jobId, err := j.store.AddJob(parentCtx, jobType)
 	if err != nil {
 		return jobId, err
 	}
 
-	go j.handleJob(ctx, jobId, maxDuration, job)
+	go j.handleJob(parentCtx, jobId, maxDuration, job)
 
 	return jobId, nil
 }
@@ -68,18 +69,18 @@ func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.
 // If a stop signal is received or the context is canceled or times out, the job is marked as failed.
 // Store operations are retried up to 5 times with a 30-second delay between attempts in case of transient errors.
 func (j *Tracker) handleJob(
-	ctx context.Context,
+	parentCtx context.Context,
 	id uuid.UUID,
 	maxDuration time.Duration,
 	job func(ctx context.Context) error,
 ) {
-	jobCtx, cancelJob := context.WithTimeout(ctx, maxDuration)
+	jobCtx, cancelJob := context.WithTimeout(parentCtx, maxDuration)
 	defer cancelJob()
 
 	jobErrCh := make(chan error)
 
-	go j.runJob(ctx, jobCtx, id, jobErrCh, job)
-	j.monitorJob(ctx, jobCtx, id, jobErrCh, cancelJob)
+	go j.runJob(parentCtx, jobCtx, id, jobErrCh, job)
+	j.monitorJob(parentCtx, jobCtx, id, jobErrCh, cancelJob)
 }
 
 func (j *Tracker) runJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh chan error, job func(context.Context) error) {
@@ -98,12 +99,11 @@ func (j *Tracker) monitorJob(ctx, jobCtx context.Context, id uuid.UUID, jobErrCh
 	for {
 		select {
 		case <-jobCtx.Done():
-			err := jobCtx.Err()
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				if err := j.store.SetJobFailed(ctx, id, err); err != nil {
-					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
-				}
+			ctxErr := jobCtx.Err()
+			if err := j.store.SetJobFailed(ctx, id, ctxErr); err != nil {
+				zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 			}
+
 			return
 		case err := <-jobErrCh:
 			if err != nil {

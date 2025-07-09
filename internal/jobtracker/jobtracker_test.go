@@ -56,7 +56,7 @@ func (s *jobTrackerSuite) TestRun_JobError(c *qt.C) {
 		return errors.New("I died really fast")
 	}
 
-	id, err := s.tracker.Run(testCtx, "test-job-type", aFastDyingJob, time.Second*1000)
+	id, err := s.tracker.Run("test-job-type", aFastDyingJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
@@ -79,7 +79,7 @@ func (s *jobTrackerSuite) TestRun_DeadlineExceeded(c *qt.C) {
 		}
 	}
 
-	id, err := s.tracker.Run(testCtx, "test-job-type", aDeadendJob, time.Millisecond*100)
+	id, err := s.tracker.Run("test-job-type", aDeadendJob, time.Millisecond*100)
 	c.Assert(err, qt.IsNil)
 
 	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
@@ -106,7 +106,7 @@ func (s *jobTrackerSuite) TestRun_CancelledJob(c *qt.C) {
 		}
 	}
 
-	id, err := tracker.Run(testCtx, "test-job-type", aStoppedJob, time.Second*1000)
+	id, err := tracker.Run("test-job-type", aStoppedJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(s.db.StopJob(testCtx, id), qt.IsNil)
@@ -123,20 +123,25 @@ func (s *jobTrackerSuite) TestRun_JobSetRunning(c *qt.C) {
 	testCtx := c.Context()
 
 	jobRunning := make(chan bool)
-	aRunnignJob := func(ctx context.Context) error {
+	jobCtx, cancelJobCtx := context.WithCancel(testCtx)
+	aRunnignJob := func(_ context.Context) error {
 		jobRunning <- true
-		for range ctx.Done() {
+		for range jobCtx.Done() {
 		}
 		return nil
 	}
 
-	id, err := s.tracker.Run(testCtx, "test-job-type", aRunnignJob, time.Second*1000)
+	id, err := s.tracker.Run("test-job-type", aRunnignJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	<-jobRunning
 	status, err := s.db.GetJobStatus(testCtx, id)
 	c.Assert(err, qt.IsNil)
 	c.Assert(status, qt.Equals, dbmodel.StatusRunning)
+
+	// Check the job is marked successful on completion.
+	cancelJobCtx()
+	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
 }
 
 func (s *jobTrackerSuite) TestRun_JobSetSuccessful(c *qt.C) {
@@ -146,7 +151,7 @@ func (s *jobTrackerSuite) TestRun_JobSetSuccessful(c *qt.C) {
 		return nil
 	}
 
-	id, err := s.tracker.Run(testCtx, "test-job-type", aSuccessfulJob, time.Second*1000)
+	id, err := s.tracker.Run("test-job-type", aSuccessfulJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
