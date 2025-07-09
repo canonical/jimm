@@ -235,25 +235,40 @@ func (s *openFGATestSuite) TestRemoveModel(c *gc.C) {
 
 	controller := names.NewControllerTag(controllerUUID.String())
 	model := names.NewModelTag(modelUUID.String())
+	appOffer := names.NewApplicationOfferTag("c7af7fc3-5e40-4de7-98f3-a693a83e0a4f")
 
 	err = s.ofgaClient.AddControllerModel(context.Background(), controller, model)
 	c.Assert(err, gc.IsNil)
 
-	tuple := openfga.Tuple{
-		Object:   ofganames.ConvertTag(controller),
-		Relation: "controller",
-		Target:   ofganames.ConvertTag(model),
-	}
-	allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
+	err = s.ofgaClient.AddModelApplicationOffer(context.Background(), model, appOffer)
 	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, true)
+
+	tuples := []openfga.Tuple{
+		{
+			Object:   ofganames.ConvertTag(controller),
+			Relation: "controller",
+			Target:   ofganames.ConvertTag(model),
+		},
+		{
+			Object:   ofganames.ConvertTag(model),
+			Relation: "model",
+			Target:   ofganames.ConvertTag(appOffer),
+		},
+	}
+	for _, tuple := range tuples {
+		allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
+		c.Assert(err, gc.IsNil)
+		c.Assert(allowed, gc.Equals, true)
+	}
 
 	err = s.ofgaClient.RemoveModel(context.Background(), model)
 	c.Assert(err, gc.IsNil)
 
-	allowed, err = s.ofgaClient.CheckRelation(context.Background(), tuple, false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, false)
+	for _, tuple := range tuples {
+		allowed, err := s.ofgaClient.CheckRelation(context.Background(), tuple, false)
+		c.Assert(err, gc.IsNil)
+		c.Assert(allowed, gc.Equals, false)
+	}
 }
 
 func (s *openFGATestSuite) TestAddModelApplicationOffer(c *gc.C) {
