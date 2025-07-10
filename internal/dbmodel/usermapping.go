@@ -17,6 +17,7 @@ type UserMapping struct {
 
 	// ModelUUID is the UUID of the model the mapping applies to.
 	ModelUUID sql.NullString
+	Model     Model `gorm:"foreignkey:ModelUUID;references:UUID"`
 
 	// LocalUser is the local user that this mapping applies to.
 	LocalUser string

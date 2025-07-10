@@ -12,17 +12,12 @@ import (
 )
 
 func (s *dbSuite) TestAddUserMapping(c *qt.C) {
-	err := s.Database.Migrate(context.Background())
-	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
+	env := initTestEnvironment(c, s.Database)
 
-	modelUUID := sql.NullString{String: "model-uuid-123", Valid: true}
+	modelUUID := env.model.UUID
 	localUser := "localuser1"
-	identityName := "bob@canonical.com"
-
-	u, err := dbmodel.NewIdentity(identityName)
-	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	identityName := env.u.Name
 
 	userMapping := &dbmodel.UserMapping{
 		ModelUUID:        modelUUID,
@@ -30,7 +25,7 @@ func (s *dbSuite) TestAddUserMapping(c *qt.C) {
 		ExternalUserName: identityName,
 	}
 
-	err = s.Database.AddUserMapping(ctx, userMapping)
+	err := s.Database.AddUserMapping(ctx, userMapping)
 	c.Assert(err, qt.IsNil)
 	c.Assert(userMapping.ID, qt.Not(qt.Equals), 0)
 
@@ -40,17 +35,12 @@ func (s *dbSuite) TestAddUserMapping(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetUserMapping(c *qt.C) {
-	err := s.Database.Migrate(context.Background())
-	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
+	env := initTestEnvironment(c, s.Database)
 
-	modelUUID := sql.NullString{String: "model-uuid-123", Valid: true}
+	modelUUID := env.model.UUID
 	localUser := "localuser1"
-	identityName := "bob@canonical.com"
-
-	u, err := dbmodel.NewIdentity(identityName)
-	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	identityName := env.u.Name
 
 	// Insert mapping first
 	userMapping := &dbmodel.UserMapping{
@@ -64,7 +54,7 @@ func (s *dbSuite) TestGetUserMapping(c *qt.C) {
 		ModelUUID: modelUUID,
 		LocalUser: localUser,
 	}
-	err = s.Database.GetUserMapping(ctx, lookup)
+	err := s.Database.GetUserMapping(ctx, lookup)
 	c.Assert(err, qt.IsNil)
 	c.Assert(lookup.ExternalUserName, qt.Equals, identityName)
 	c.Assert(lookup.ModelUUID.String, qt.Equals, modelUUID.String)
@@ -80,17 +70,12 @@ func (s *dbSuite) TestGetUserMapping(c *qt.C) {
 }
 
 func (s *dbSuite) TestDeleteUserMapping(c *qt.C) {
-	err := s.Database.Migrate(context.Background())
-	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
+	env := initTestEnvironment(c, s.Database)
 
-	modelUUID := sql.NullString{String: "model-uuid-123", Valid: true}
+	modelUUID := env.model.UUID
 	localUser := "localuser1"
-	identityName := "externaluser@canonical.com"
-
-	u, err := dbmodel.NewIdentity(identityName)
-	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	identityName := env.u.Name
 
 	userMapping := &dbmodel.UserMapping{
 		ModelUUID:        modelUUID,
@@ -100,7 +85,7 @@ func (s *dbSuite) TestDeleteUserMapping(c *qt.C) {
 	c.Assert(s.Database.AddUserMapping(ctx, userMapping), qt.IsNil)
 
 	// Delete
-	err = s.Database.DeleteUserMapping(ctx, userMapping)
+	err := s.Database.DeleteUserMapping(ctx, userMapping)
 	c.Assert(err, qt.IsNil)
 
 	// Read after delete
@@ -109,17 +94,12 @@ func (s *dbSuite) TestDeleteUserMapping(c *qt.C) {
 }
 
 func (s *dbSuite) TestDeleteUserMappingsByModelUUID(c *qt.C) {
-	err := s.Database.Migrate(context.Background())
-	c.Assert(err, qt.Equals, nil)
 	ctx := context.Background()
+	env := initTestEnvironment(c, s.Database)
 
-	modelUUID := sql.NullString{String: "model-uuid-123", Valid: true}
+	modelUUID := env.model.UUID
 	localUser := "localuser1"
-	identityName := "externaluser@canonical.com"
-
-	u, err := dbmodel.NewIdentity(identityName)
-	c.Assert(err, qt.IsNil)
-	c.Assert(s.Database.DB.Create(&u).Error, qt.IsNil)
+	identityName := env.u.Name
 
 	userMapping := &dbmodel.UserMapping{
 		ModelUUID:        modelUUID,
@@ -135,7 +115,7 @@ func (s *dbSuite) TestDeleteUserMappingsByModelUUID(c *qt.C) {
 	}
 	c.Assert(s.Database.AddUserMapping(ctx, userMapping2), qt.IsNil)
 
-	err = s.Database.DeleteUserMappingsByModelUUID(ctx, modelUUID.String)
+	err := s.Database.DeleteUserMappingsByModelUUID(ctx, modelUUID.String)
 	c.Assert(err, qt.IsNil)
 
 	// Check that both mappings are deleted
