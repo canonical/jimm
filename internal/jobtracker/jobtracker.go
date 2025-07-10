@@ -56,7 +56,7 @@ func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.
 		return jobId, err
 	}
 
-	// no context is passed to handleJob as this is a background
+	// No context is passed to handleJob as this is a background
 	// job and is not tied to the request context.
 	go j.handleJob(jobId, maxDuration, job)
 
@@ -83,7 +83,6 @@ func (j *Tracker) handleJob(
 }
 
 func (j *Tracker) runJob(ctx context.Context, id uuid.UUID, jobErrCh chan error, job func(context.Context) error) {
-
 	if err := j.store.SetJobRunning(ctx, id); err != nil {
 		jobErrCh <- fmt.Errorf("failed to set job running, job not starting: %w", err)
 		return

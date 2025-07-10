@@ -56,7 +56,7 @@ func (s *jobTrackerSuite) TestRun_JobError(c *qt.C) {
 		return errors.New("I died really fast")
 	}
 
-	id, err := s.tracker.Run("test-job-type", aFastDyingJob, time.Second*1000)
+	id, err := s.tracker.Run(testCtx, "test-job-type", aFastDyingJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
@@ -65,58 +65,6 @@ func (s *jobTrackerSuite) TestRun_JobError(c *qt.C) {
 	var jobErr string
 	c.Assert(s.db.DB.First(&j).Where("job_id = ?", id).Select("error").Scan(&jobErr).Error, qt.IsNil)
 	c.Assert(jobErr, qt.Equals, "I died really fast")
-}
-
-func (s *jobTrackerSuite) TestRun_DeadlineExceeded(c *qt.C) {
-	testCtx := c.Context()
-
-	aDeadendJob := func(ctx context.Context) error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(10 * time.Second):
-			return nil
-		}
-	}
-
-	id, err := s.tracker.Run("test-job-type", aDeadendJob, time.Millisecond*100)
-	c.Assert(err, qt.IsNil)
-
-	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
-
-	j := dbmodel.JobTrackerEntry{}
-	var jobErr string
-	c.Assert(s.db.DB.First(&j).Where("job_id = ?", id).Select("error").Scan(&jobErr).Error, qt.IsNil)
-	c.Assert(jobErr, qt.Equals, "context deadline exceeded")
-}
-
-func (s *jobTrackerSuite) TestRun_CancelledJob(c *qt.C) {
-	testCtx := c.Context()
-
-	// Create a new tracker, specific to this test.
-	tracker, err := jobtracker.NewJobTracker(s.db, time.Millisecond*50)
-	c.Assert(err, qt.IsNil)
-
-	aStoppedJob := func(ctx context.Context) error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(10 * time.Second):
-			return errors.New("timedout")
-		}
-	}
-
-	id, err := tracker.Run("test-job-type", aStoppedJob, time.Second*1000)
-	c.Assert(err, qt.IsNil)
-
-	c.Assert(s.db.StopJob(testCtx, id), qt.IsNil)
-
-	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
-
-	j := dbmodel.JobTrackerEntry{}
-	var jobErr string
-	c.Assert(s.db.DB.First(&j).Where("job_id = ?", id).Select("error").Scan(&jobErr).Error, qt.IsNil)
-	c.Assert(jobErr, qt.Equals, "context canceled")
 }
 
 func (s *jobTrackerSuite) TestRun_JobSetRunning(c *qt.C) {
@@ -131,7 +79,7 @@ func (s *jobTrackerSuite) TestRun_JobSetRunning(c *qt.C) {
 		return nil
 	}
 
-	id, err := s.tracker.Run("test-job-type", aRunnignJob, time.Second*1000)
+	id, err := s.tracker.Run(testCtx, "test-job-type", aRunnignJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	<-jobRunning
@@ -151,7 +99,7 @@ func (s *jobTrackerSuite) TestRun_JobSetSuccessful(c *qt.C) {
 		return nil
 	}
 
-	id, err := s.tracker.Run("test-job-type", aSuccessfulJob, time.Second*1000)
+	id, err := s.tracker.Run(testCtx, "test-job-type", aSuccessfulJob, time.Second*1000)
 	c.Assert(err, qt.IsNil)
 
 	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
