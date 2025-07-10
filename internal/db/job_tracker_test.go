@@ -30,6 +30,35 @@ func (s *dbSuite) TestJobTracker_CreateJob(c *qt.C) {
 	c.Assert(entry.Error, qt.Equals, "")
 }
 
+func (s *dbSuite) TestJobTracker_GetJobStopSignal(c *qt.C) {
+	ctx := c.Context()
+	_, err := s.Database.GetJobStopSignal(ctx, uuid.New())
+	c.Assert(err, qt.ErrorMatches, "upgrade in progress")
+
+	err = s.Database.Migrate(ctx)
+	c.Assert(err, qt.IsNil)
+
+	_, err = s.Database.GetJobStopSignal(ctx, uuid.New())
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+
+	jobId, err := s.Database.AddJob(ctx, "test-job-type")
+	c.Assert(err, qt.IsNil)
+
+	// By default, stop signal should be false
+	stopSignal, err := s.Database.GetJobStopSignal(ctx, jobId)
+	c.Assert(err, qt.IsNil)
+	c.Assert(stopSignal, qt.IsFalse)
+
+	// Set stop signal
+	err = s.Database.StopJob(ctx, jobId)
+	c.Assert(err, qt.IsNil)
+
+	// Now stop signal should be true
+	stopSignal, err = s.Database.GetJobStopSignal(ctx, jobId)
+	c.Assert(err, qt.IsNil)
+	c.Assert(stopSignal, qt.IsTrue)
+}
+
 func (s *dbSuite) TestJobTracker_StopJob(c *qt.C) {
 	ctx := c.Context()
 	err := s.Database.Migrate(ctx)

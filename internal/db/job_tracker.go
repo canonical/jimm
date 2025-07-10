@@ -46,6 +46,27 @@ func (d *Database) AddJob(ctx context.Context, jobType string) (jobId uuid.UUID,
 	return jobId, nil
 }
 
+// GetJobStopSignal retrieves the stop signal for a job by its ID.
+// It returns true if the stop signal is set, false otherwise, and an error if the job does not exist or if the query fails.
+func (d *Database) GetJobStopSignal(ctx context.Context, jobId uuid.UUID) (stopSignal bool, err error) {
+	const op = errors.Op("db.GetJobStopSignal")
+	if err := d.ready(); err != nil {
+		return false, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	var entry dbmodel.JobTrackerEntry
+	if err := db.Select("stop_signal").Where("job_id = ?", jobId).First(&entry).Error; err != nil {
+		return false, dbError(err)
+	}
+
+	return entry.StopSignal, nil
+}
+
 // StopJob marks a job as stopped.
 // It returns an error if the job does not exist or if the update fails.
 func (d *Database) StopJob(ctx context.Context, jobId uuid.UUID) (err error) {
@@ -143,7 +164,7 @@ func (d *Database) GetJobStatus(ctx context.Context, jobId uuid.UUID) (status db
 
 	db := d.DB.WithContext(ctx)
 	entry := &dbmodel.JobTrackerEntry{}
-	if err := db.First(entry, "job_id = ?", jobId).Error; err != nil {
+	if err := db.Where("job_id = ?", jobId).First(entry).Error; err != nil {
 		return status, dbError(err)
 	}
 
