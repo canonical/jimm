@@ -405,16 +405,6 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 	return nil
 }
 
-// modelMigrationImport is a struct that holds the JujuManager and the model description
-// that is being imported. It is used to encapsulate the logic for importing a model
-// from a serialized description.
-// This helps to keep the import logic and associated methods separate from the JujuManager
-// methods.
-type modelMigrationImport struct {
-	*JujuManager
-	modelDescription description.Model
-}
-
 // Import imports a model from a serialized description.
 //   - Checks the incoming model migration record in the database.
 //   - Modifies the model description to replace local user references with their external mapping for owner and
@@ -430,59 +420,41 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 		return errors.E(op, fmt.Errorf("failed to deserialize model description: %w", err))
 	}
 
-	importer := modelMigrationImport{
-		JujuManager:      j,
-		modelDescription: modelDescription,
-	}
-	err = importer.migrationImport(ctx, user)
-	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to import resources: %w", err))
-	}
-	return nil
-}
-
-// migrationImport imports resources from the model description into JIMM's state
-// and adds the necessary permissions for the model and application offers
-// before calling the import method on the target Juju controller.
-// Since `import` is a reserved word in Go, we use `migrationImport`.
-func (mmi *modelMigrationImport) migrationImport(ctx context.Context, user *openfga.User) error {
-	const op = errors.Op("jimm.migrationImport")
-
 	incomingMigration := &dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
-			String: mmi.modelDescription.Tag().Id(),
+			String: modelDescription.Tag().Id(),
 			Valid:  true,
 		},
 	}
 
-	err := mmi.Database.GetIncomingModelMigration(ctx, incomingMigration)
+	err = j.Database.GetIncomingModelMigration(ctx, incomingMigration)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to add incoming model migration: %w", err))
 	}
 
-	err = mmi.modifyModelDescription(mmi.modelDescription, incomingMigration.UserMapping)
+	err = j.modifyModelDescription(modelDescription, incomingMigration.UserMapping)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to modify model description: %w", err))
 	}
 
-	resources, err := mmi.importFromDescription(ctx, incomingMigration.TargetController.ID, mmi.modelDescription)
+	model, offers, err := j.importFromDescription(ctx, incomingMigration.TargetController.ID, modelDescription)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
 	}
 
-	err = mmi.addResourcePermissions(ctx, user, resources, incomingMigration.TargetController.ResourceTag())
+	err = j.addModelAndOfferPermissions(ctx, user, model, offers)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to add resource permissions: %w", err))
 	}
 
 	// Call the import method on the target controller to import the model.
-	api, err := mmi.dialController(ctx, &incomingMigration.TargetController)
+	api, err := j.dialController(ctx, &incomingMigration.TargetController)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
-	serializedDescrition, err := description.Serialize(mmi.modelDescription)
+	serializedDescrition, err := description.Serialize(modelDescription)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to serialize model description: %w", err))
 	}
@@ -495,31 +467,26 @@ func (mmi *modelMigrationImport) migrationImport(ctx context.Context, user *open
 	return nil
 }
 
-type importedResources struct {
-	model  dbmodel.Model
-	offers []dbmodel.ApplicationOffer
-}
-
 // importFromDescription imports resources into JIMM's state from a model description.
 // It creates a new model record in the database with the given target controller ID
 // and model description and sets the migration mode to importing.
 // Application offers are created for any offers in the model description.
 // It also ensures that the cloud credential and region are present in the database.
-func (mmi *modelMigrationImport) importFromDescription(ctx context.Context, targetControllerID uint, description description.Model) (*importedResources, error) {
+func (j *JujuManager) importFromDescription(ctx context.Context, targetControllerID uint, description description.Model) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
 	op := errors.Op("jimm.importFromDescription")
 
 	modelNameStr, ok := description.Config()[config.NameKey].(string)
 	if !ok {
-		return nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.NameKey))
+		return nil, nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.NameKey))
 	}
 
 	modelUUIDStr, ok := description.Config()[config.UUIDKey].(string)
 	if !ok {
-		return nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.UUIDKey))
+		return nil, nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.UUIDKey))
 	}
 
 	if description.CloudCredential() == nil {
-		return nil, errors.E(op, fmt.Errorf("model description must contain a cloud credential"))
+		return nil, nil, errors.E(op, fmt.Errorf("model description must contain a cloud credential"))
 	}
 	cloudCredential := &dbmodel.CloudCredential{
 		CloudName:         description.CloudCredential().Cloud(),
@@ -527,18 +494,19 @@ func (mmi *modelMigrationImport) importFromDescription(ctx context.Context, targ
 		Name:              description.CloudCredential().Name(),
 	}
 
-	err := mmi.Database.GetCloudCredential(ctx, cloudCredential)
+	err := j.Database.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
-	region, err := mmi.Database.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
+	region, err := j.Database.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 
-	appAndOffers := importedResources{}
+	var importedModel *dbmodel.Model
+	var importedOffers []*dbmodel.ApplicationOffer
 
-	err = mmi.Database.Transaction(func(db *db.Database) error {
+	err = j.Database.Transaction(func(db *db.Database) error {
 		model := dbmodel.Model{
 			UUID: sql.NullString{
 				String: modelUUIDStr,
@@ -555,7 +523,7 @@ func (mmi *modelMigrationImport) importFromDescription(ctx context.Context, targ
 		if err != nil {
 			return errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
 		}
-		appAndOffers.model = model
+		importedModel = &model
 
 		for _, app := range description.Applications() {
 			for _, offer := range app.Offers() {
@@ -575,28 +543,30 @@ func (mmi *modelMigrationImport) importFromDescription(ctx context.Context, targ
 					return err
 				}
 
-				appAndOffers.offers = append(appAndOffers.offers, dbOffer)
+				importedOffers = append(importedOffers, &dbOffer)
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
+		return nil, nil, errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
 	}
 
-	return &appAndOffers, nil
+	return importedModel, importedOffers, nil
 }
 
-func (mmi *modelMigrationImport) addResourcePermissions(ctx context.Context, user *openfga.User, resources *importedResources, targetControllerTag names.ControllerTag) error {
+// addModelAndOfferPermissions grants the user access to the model
+// and adds the necesary relations between the model and app offers.
+func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *openfga.User, model *dbmodel.Model, offers []*dbmodel.ApplicationOffer) error {
 	const op = errors.Op("jimm.addResourcePermissions")
 
-	modelTag := resources.model.ResourceTag()
-	if err := mmi.addModelPermissions(ctx, user, modelTag, targetControllerTag); err != nil {
+	modelTag := model.ResourceTag()
+	if err := j.addModelPermissions(ctx, user, modelTag, model.Controller.ResourceTag()); err != nil {
 		return errors.E(op, fmt.Errorf("failed to add model permissions: %w", err))
 	}
 
-	for _, offer := range resources.offers {
-		err := mmi.OpenFGAClient.AddModelApplicationOffer(ctx, modelTag, offer.ResourceTag())
+	for _, offer := range offers {
+		err := j.OpenFGAClient.AddModelApplicationOffer(ctx, modelTag, offer.ResourceTag())
 		if err != nil {
 			return errors.E(op, fmt.Errorf("failed to add application offer permissions: %w", err))
 		}
