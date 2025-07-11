@@ -94,9 +94,9 @@ func RunBootstrapCmd(
 	cred jujucloud.CloudCredential,
 	pubKey []byte,
 	privKey []byte,
-) (<-chan outputLine, func(), error) {
+) (<-chan outputLine, jujuclient.ClientStore, func(), error) {
 	if err := p.validate(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	memStore := jujuclient.NewMemStore()
@@ -104,7 +104,7 @@ func RunBootstrapCmd(
 	// Setup JUJU_DATA
 	tmpJujuData, err := os.MkdirTemp("", "juju-data-*")
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create temp JUJU_DATA: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to create temp JUJU_DATA: %w", err)
 	}
 
 	zapctx.Debug(ctx, "Setting JUJU_DATA path", zap.String("path", tmpJujuData))
@@ -118,33 +118,33 @@ func RunBootstrapCmd(
 	// them in, we're creating them manually.
 	sshDir := osenv.JujuXDGDataHomePath("ssh")
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		return nil, nil, fmt.Errorf("failed to create .ssh directory: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to create .ssh directory: %w", err)
 	}
 
 	if err := os.WriteFile(sshDir+"/juju_id_rsa.pub", []byte(pubKey), 0600); err != nil {
-		return nil, nil, fmt.Errorf("writing public key failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("writing public key failed: %w", err)
 	}
 
 	if err = os.WriteFile(sshDir+"/juju_id_rsa", []byte(privKey), 0600); err != nil {
-		return nil, nil, fmt.Errorf("writing private key failed: %w", err)
+		return nil, nil, nil, fmt.Errorf("writing private key failed: %w", err)
 	}
 
 	// After generation (if they don't exist), they're loaded into memory during the juju (main)
 	// command. Since we're not running main, we need to load them ourselves.
 	if err := ssh.LoadClientKeys(sshDir); err != nil {
-		return nil, nil, fmt.Errorf("failed to load ssh keys: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to load ssh keys: %w", err)
 	}
 
 	// Update public clouds
 	// TODO: Make this a command of this package
 	outputCh, err := runCmdWithOutputRetriever(memStore, "update-public-clouds --client")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	for line := range outputCh {
 		if line.Err != nil {
-			return nil, nil, fmt.Errorf("failed to update public clouds: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to update public clouds: %w", err)
 		}
 	}
 
@@ -152,7 +152,7 @@ func RunBootstrapCmd(
 	cloudName, regionName := splitCloudNameAndRegion(p.CloudNameAndRegion)
 	isAPublicCloud, err := isAValidPublicCloud(cloudName, regionName)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if !isAPublicCloud {
 		// We presume it is a personal cloud
@@ -160,13 +160,13 @@ func RunBootstrapCmd(
 		if err := jujucloud.WritePersonalCloudMetadata(map[string]jujucloud.Cloud{
 			cloudName: personalCloud,
 		}); err != nil {
-			return nil, nil, fmt.Errorf("failed to write personal cloud: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed to write personal cloud: %w", err)
 		}
 	}
 
 	// TODO: check if cloudName should include region, presuming not right now
 	if err := memStore.UpdateCredential(cloudName, cred); err != nil {
-		return nil, nil, fmt.Errorf("failed to set credential: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
 	}
 
 	// With the clouds set, credentials updated, we now bootstrap.
@@ -179,7 +179,7 @@ func RunBootstrapCmd(
 
 	fmt.Println("CMD string is: ", cmdStr)
 	outputRetriever, err := runCmdWithOutputRetriever(memStore, cmdStr)
-	return outputRetriever, cleanupTmpJujuData, err
+	return outputRetriever, memStore, cleanupTmpJujuData, err
 }
 
 // isAValidPublicCloud checks if the cloud name (and possibly region) is a valid
