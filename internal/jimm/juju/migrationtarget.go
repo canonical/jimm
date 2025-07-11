@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/juju/description/v9"
+	jujucrossmodel "github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
 	"github.com/juju/juju/environs/config"
@@ -69,12 +70,16 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 			Valid:  true,
 		},
 	}
-	// Don't return an error if we fail to delete the model from JIMM's state,
-	// as the migration has already been aborted on the target controller.
+	// Don't return an error if we fail to delete the model/permissions from
+	// JIMM's state, the migration has already been aborted on the target controller.
 	// The model will be cleanup eventually by JIMM's cleanup routine.
 	err = j.Database.DeleteModel(ctx, &model)
 	if err != nil {
 		zapctx.Error(ctx, "failed to delete incoming model migration", zap.Error(err), zap.String("modelUUID", modelUUID))
+	}
+	err = j.OpenFGAClient.RemoveModel(ctx, model.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "failed to remove model from OpenFGA", zap.Error(err), zap.String("modelUUID", modelUUID))
 	}
 	return nil
 }
@@ -405,6 +410,7 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 //   - Modifies the model description to replace local user references with their external mapping for owner and
 //     cloud credential owner.
 //   - Imports the model into JIMM's state.
+//   - Adds permissions for the model and application offers.
 //   - Calls the import method on the target Juju controller to import the model.
 func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error {
 	const op = errors.Op("jimm.Import")
@@ -413,25 +419,38 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to deserialize model description: %w", err))
 	}
+
 	incomingMigration := &dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: modelDescription.Tag().Id(),
 			Valid:  true,
 		},
 	}
+
 	err = j.Database.GetIncomingModelMigration(ctx, incomingMigration)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to add incoming model migration: %w", err))
 	}
+
 	err = j.modifyModelDescription(modelDescription, incomingMigration.UserMapping)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to modify model description: %w", err))
 	}
-	err = j.importModelFromDescription(ctx, incomingMigration.TargetController.ID, modelDescription)
+
+	model, offers, err := j.importFromDescription(ctx, incomingMigration.TargetController.ID, modelDescription)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
 	}
 
+	// Pass the controller tag as the controller details
+	// are not populated on the model after creation.
+	controllerTag := incomingMigration.TargetController.ResourceTag()
+	err = j.addModelAndOfferPermissions(ctx, user, model, offers, controllerTag)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to add resource permissions: %w", err))
+	}
+
+	// Call the import method on the target controller to import the model.
 	api, err := j.dialController(ctx, &incomingMigration.TargetController)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
@@ -447,28 +466,30 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 		// TODO: handle migration failure in a cleanup routine.
 		return errors.E(op, fmt.Errorf("failed to import model: %w", err))
 	}
+
 	return nil
 }
 
-// importModelFromDescription imports a model into JIMM's state from a model description.
-// It creates a new model record in the database with the given target controller ID and model description
-// and sets the migration mode to importing.
+// importFromDescription imports resources into JIMM's state from a model description.
+// It creates a new model record in the database with the given target controller ID
+// and model description and sets the migration mode to importing.
+// Application offers are created for any offers in the model description.
 // It also ensures that the cloud credential and region are present in the database.
-func (j *JujuManager) importModelFromDescription(ctx context.Context, targetControllerID uint, description description.Model) error {
-	op := errors.Op("jimm.importModelFromDescription")
+func (j *JujuManager) importFromDescription(ctx context.Context, targetControllerID uint, description description.Model) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
+	op := errors.Op("jimm.importFromDescription")
+
 	modelNameStr, ok := description.Config()[config.NameKey].(string)
 	if !ok {
-		return errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.NameKey))
+		return nil, nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.NameKey))
 	}
-	// TODO: create the offers in JIMM's state. Card: https://warthogs.atlassian.net/browse/JUJU-8192
 
 	modelUUIDStr, ok := description.Config()[config.UUIDKey].(string)
 	if !ok {
-		return errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.UUIDKey))
+		return nil, nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.UUIDKey))
 	}
 
 	if description.CloudCredential() == nil {
-		return errors.E(op, fmt.Errorf("model description must contain a cloud credential"))
+		return nil, nil, errors.E(op, fmt.Errorf("model description must contain a cloud credential"))
 	}
 	cloudCredential := &dbmodel.CloudCredential{
 		CloudName:         description.CloudCredential().Cloud(),
@@ -478,26 +499,80 @@ func (j *JujuManager) importModelFromDescription(ctx context.Context, targetCont
 
 	err := j.Database.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
-		return errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
 	region, err := j.Database.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
 	if err != nil {
-		return errors.E(op, err)
+		return nil, nil, errors.E(op, err)
 	}
-	err = j.Database.AddModel(ctx, &dbmodel.Model{
-		UUID: sql.NullString{
-			String: modelUUIDStr,
-			Valid:  true,
-		},
-		Name:              modelNameStr,
-		OwnerIdentityName: description.Owner().Id(),
-		ControllerID:      targetControllerID,
-		CloudCredentialID: cloudCredential.ID,
-		CloudRegionID:     region.ID,
-		MigrationMode:     state.MigrationModeImporting,
+
+	var importedModel *dbmodel.Model
+	var importedOffers []*dbmodel.ApplicationOffer
+
+	err = j.Database.Transaction(func(db *db.Database) error {
+		model := dbmodel.Model{
+			UUID: sql.NullString{
+				String: modelUUIDStr,
+				Valid:  true,
+			},
+			Name:              modelNameStr,
+			OwnerIdentityName: description.Owner().Id(),
+			ControllerID:      targetControllerID,
+			CloudCredentialID: cloudCredential.ID,
+			CloudRegionID:     region.ID,
+			MigrationMode:     state.MigrationModeImporting,
+		}
+		err = db.AddModel(ctx, &model)
+		if err != nil {
+			return errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
+		}
+		importedModel = &model
+
+		for _, app := range description.Applications() {
+			for _, offer := range app.Offers() {
+				// construct the offer URL with the same logic as Juju (modelOwner, modelName, offerName, <blank-controller-name>)
+				offerURL := jujucrossmodel.MakeURL(description.Owner().Id(), modelNameStr, offer.OfferName(), "")
+
+				dbOffer := dbmodel.ApplicationOffer{
+					UUID:    offer.OfferUUID(),
+					Name:    offer.OfferName(),
+					URL:     offerURL,
+					ModelID: model.ID,
+				}
+				if err := db.AddApplicationOffer(ctx, &dbOffer); err != nil {
+					if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+						return fmt.Errorf("offer with URL %s already exists", dbOffer.URL)
+					}
+					return err
+				}
+
+				importedOffers = append(importedOffers, &dbOffer)
+			}
+		}
+		return nil
 	})
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
+		return nil, nil, errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
+	}
+
+	return importedModel, importedOffers, nil
+}
+
+// addModelAndOfferPermissions grants the user access to the model
+// and adds the necesary relations between the model and app offers.
+func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *openfga.User, model *dbmodel.Model, offers []*dbmodel.ApplicationOffer, ct names.ControllerTag) error {
+	const op = errors.Op("jimm.addResourcePermissions")
+
+	modelTag := model.ResourceTag()
+	if err := j.addModelPermissions(ctx, user, modelTag, ct); err != nil {
+		return errors.E(op, fmt.Errorf("failed to add model permissions: %w", err))
+	}
+
+	for _, offer := range offers {
+		err := j.OpenFGAClient.AddModelApplicationOffer(ctx, modelTag, offer.ResourceTag())
+		if err != nil {
+			return errors.E(op, fmt.Errorf("failed to add application offer permissions: %w", err))
+		}
 	}
 	return nil
 }

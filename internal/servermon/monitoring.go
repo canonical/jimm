@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // The servermon package is used to update statistics used
 // for monitoring the API server.
@@ -153,7 +153,7 @@ func DurationObserver(m *prometheus.HistogramVec, labelValues ...string) func() 
 
 // ErrorCount increases the specified counter if the error is not nil.
 func ErrorCounter(m *prometheus.CounterVec, err *error, labelValues ...string) {
-	if *err == nil {
+	if err == nil || *err == nil {
 		return
 	}
 

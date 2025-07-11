@@ -24,6 +24,7 @@ import (
 
 const (
 	migratingModelUUID = "00000000-0000-0000-0000-000000000001"
+	offerUUID          = "00000012-0000-0000-0000-000000000001"
 )
 
 const testEnvWithIncomingMigration = `clouds:
@@ -94,7 +95,7 @@ func TestAbortMigration_Success(t *testing.T) {
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	user := openfga.NewUser(&dbUser, nil)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	err := j.AbortMigration(ctx, user, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
@@ -119,6 +120,14 @@ func TestAbortMigration_Success(t *testing.T) {
 	}
 	err = j.Database.GetModel(ctx, model)
 	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+
+	// Check that permissions for the user have been removed.
+	ok, err := user.IsModelAdmin(ctx, names.NewModelTag(migratingModelUUID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsFalse)
+	ok, err = user.IsApplicationOfferConsumer(ctx, names.NewApplicationOfferTag(offerUUID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsFalse)
 }
 
 func TestAbortMigration_MissingIncomingModel(t *testing.T) {
@@ -499,6 +508,14 @@ models:
     access: admin
   - user: bob@canonical.com
     access: write
+application-offers:
+- name: offer-1
+  url: test-offer-url
+  uuid: 00000012-0000-0000-0000-000000000001
+  model-name: model-1
+  model-owner: alice@canonical.com
+  application-name: application-1
+  application-description: app description 1
 users:
 - username: alice@canonical.com
   controller-access: superuser
@@ -790,7 +807,7 @@ func TestImport_Success(t *testing.T) {
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	user := openfga.NewUser(&dbUser, nil)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	desc := newModelDescription(modelDescriptionArgs{
 		Owner:               "bob",
@@ -800,8 +817,24 @@ func TestImport_Success(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 	desc.SetStatus(description.StatusArgs{Value: "available"})
+	app := desc.AddApplication(description.ApplicationArgs{
+		Tag: names.NewApplicationTag("test-app"),
+	})
+	appOfferUUID := "00000000-0000-0000-0000-000000000001"
+	app.SetStatus(description.StatusArgs{
+		Value: "active",
+	})
+	app.AddOffer(description.ApplicationOfferArgs{
+		OfferUUID:              appOfferUUID,
+		OfferName:              "test-offer",
+		ApplicationName:        "test-app",
+		ApplicationDescription: "some description",
+		Endpoints:              map[string]string{"foo": "bar"},
+		ACL:                    map[string]string{"bob": "write"},
+	})
 	bytes, err := description.Serialize(desc)
 	c.Assert(err, qt.IsNil)
+
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
@@ -817,6 +850,23 @@ func TestImport_Success(t *testing.T) {
 	err = j.Database.GetModel(ctx, m)
 	c.Assert(err, qt.IsNil)
 	c.Assert(m.MigrationMode, qt.Equals, state.MigrationModeImporting)
+
+	// Check that the application is created in the database.
+	appOffer := &dbmodel.ApplicationOffer{
+		ModelID: m.ID,
+		UUID:    appOfferUUID,
+	}
+	err = j.Database.GetApplicationOffer(ctx, appOffer)
+	c.Assert(err, qt.IsNil)
+	c.Assert(appOffer.Name, qt.Equals, "test-offer")
+
+	// Check that the user has access to the model and offer(s).
+	ok, err := user.IsModelAdmin(ctx, m.ResourceTag())
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsTrue)
+	ok, err = user.IsApplicationOfferConsumer(ctx, appOffer.ResourceTag())
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsTrue)
 }
 
 func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
@@ -851,7 +901,7 @@ func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, "^failed to modify model description.*")
+	c.Assert(err, qt.ErrorMatches, ".*failed to modify model description.*")
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{
@@ -894,7 +944,7 @@ func TestImport_UserNotFoundInUserMapping(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, "^failed to modify model description.*")
+	c.Assert(err, qt.ErrorMatches, ".*failed to modify model description.*")
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{
@@ -938,7 +988,7 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, `^failed to import model from description: cloudcredential \S+ not found$`)
+	c.Assert(err, qt.ErrorMatches, `.*failed to import model from description: cloudcredential \S+ not found$`)
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{
@@ -973,7 +1023,7 @@ func TestImport_APIFailure(t *testing.T) {
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	user := openfga.NewUser(&dbUser, nil)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	desc := newModelDescription(modelDescriptionArgs{
 		Owner:               "bob",
@@ -988,7 +1038,7 @@ func TestImport_APIFailure(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, `^failed to import model: API failure$`)
+	c.Assert(err, qt.ErrorMatches, `.*failed to import model: API failure$`)
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{

@@ -287,12 +287,27 @@ func (o *OFGAClient) RemoveControllerModel(ctx context.Context, controller names
 	return o.unsetResourceAccess(ctx, controller, model, ofganames.ControllerRelation)
 }
 
-// RemoveModel removes a model.
+// RemoveModel removes all tuples that contain a model as the target
+// as well as tuples that relate a model to an application offer.
 func (o *OFGAClient) RemoveModel(ctx context.Context, model names.ModelTag) error {
 	if err := o.removeTuples(
 		ctx,
 		Tuple{
 			Target: ofganames.ConvertTag(model),
+		},
+	); err != nil {
+		return errors.E(err)
+	}
+	// Remove the relation between the model and any application offers.
+	offerKind, err := ofganames.BlankKindTag(names.ApplicationOfferTagKind)
+	if err != nil {
+		return errors.E(err)
+	}
+	if err := o.removeTuples(
+		ctx,
+		Tuple{
+			Object: ofganames.ConvertTag(model),
+			Target: offerKind,
 		},
 	); err != nil {
 		return errors.E(err)
