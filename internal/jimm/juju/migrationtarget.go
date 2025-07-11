@@ -420,26 +420,41 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 		return errors.E(op, fmt.Errorf("failed to deserialize model description: %w", err))
 	}
 
-	incomingMigration := &dbmodel.IncomingModelMigration{
-		ModelUUID: sql.NullString{
-			String: modelDescription.Tag().Id(),
-			Valid:  true,
-		},
-	}
+	var (
+		model             *dbmodel.Model
+		offers            []*dbmodel.ApplicationOffer
+		incomingMigration *dbmodel.IncomingModelMigration
+	)
 
-	err = j.Database.GetIncomingModelMigration(ctx, incomingMigration)
-	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to add incoming model migration: %w", err))
-	}
+	// Start a transaction to acquire the incoming model migration record with a
+	// lock to prevent it from being modified while we are importing the model.
+	// Then import the model and app offers into JIMM's state - the existence
+	// of the model implies that the migration record can no longer be modified.
+	err = j.Database.Transaction(func(d *db.Database) error {
+		incomingMigration = &dbmodel.IncomingModelMigration{
+			ModelUUID: sql.NullString{String: modelDescription.Tag().Id(), Valid: true},
+		}
 
-	err = j.modifyModelDescription(modelDescription, incomingMigration.UserMapping)
-	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to modify model description: %w", err))
-	}
+		// Set noWait to false to allow the transaction to wait for the lock.
+		noWait := false
+		err = j.Database.GetIncomingModelMigrationWithLock(ctx, incomingMigration, noWait)
+		if err != nil {
+			return errors.E(op, fmt.Errorf("failed to get incoming model migration: %w", err))
+		}
 
-	model, offers, err := j.importFromDescription(ctx, incomingMigration.TargetController.ID, modelDescription)
+		err = j.modifyModelDescription(modelDescription, incomingMigration.UserMapping)
+		if err != nil {
+			return errors.E(op, fmt.Errorf("failed to modify model description: %w", err))
+		}
+
+		model, offers, err = j.importFromDescription(ctx, incomingMigration.TargetController.ID, modelDescription)
+		if err != nil {
+			return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
+		}
+		return nil
+	})
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
+		return err
 	}
 
 	// Pass the controller tag as the controller details
@@ -509,50 +524,44 @@ func (j *JujuManager) importFromDescription(ctx context.Context, targetControlle
 	var importedModel *dbmodel.Model
 	var importedOffers []*dbmodel.ApplicationOffer
 
-	err = j.Database.Transaction(func(db *db.Database) error {
-		model := dbmodel.Model{
-			UUID: sql.NullString{
-				String: modelUUIDStr,
-				Valid:  true,
-			},
-			Name:              modelNameStr,
-			OwnerIdentityName: description.Owner().Id(),
-			ControllerID:      targetControllerID,
-			CloudCredentialID: cloudCredential.ID,
-			CloudRegionID:     region.ID,
-			MigrationMode:     state.MigrationModeImporting,
-		}
-		err = db.AddModel(ctx, &model)
-		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
-		}
-		importedModel = &model
-
-		for _, app := range description.Applications() {
-			for _, offer := range app.Offers() {
-				// construct the offer URL with the same logic as Juju (modelOwner, modelName, offerName, <blank-controller-name>)
-				offerURL := jujucrossmodel.MakeURL(description.Owner().Id(), modelNameStr, offer.OfferName(), "")
-
-				dbOffer := dbmodel.ApplicationOffer{
-					UUID:    offer.OfferUUID(),
-					Name:    offer.OfferName(),
-					URL:     offerURL,
-					ModelID: model.ID,
-				}
-				if err := db.AddApplicationOffer(ctx, &dbOffer); err != nil {
-					if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-						return fmt.Errorf("offer with URL %s already exists", dbOffer.URL)
-					}
-					return err
-				}
-
-				importedOffers = append(importedOffers, &dbOffer)
-			}
-		}
-		return nil
-	})
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelUUIDStr,
+			Valid:  true,
+		},
+		Name:              modelNameStr,
+		OwnerIdentityName: description.Owner().Id(),
+		ControllerID:      targetControllerID,
+		CloudCredentialID: cloudCredential.ID,
+		CloudRegionID:     region.ID,
+		MigrationMode:     state.MigrationModeImporting,
+	}
+	err = j.Database.AddModel(ctx, &model)
 	if err != nil {
-		return nil, nil, errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
+		return nil, nil, errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
+	}
+	importedModel = &model
+
+	for _, app := range description.Applications() {
+		for _, offer := range app.Offers() {
+			// construct the offer URL with the same logic as Juju (modelOwner, modelName, offerName, <blank-controller-name>)
+			offerURL := jujucrossmodel.MakeURL(description.Owner().Id(), modelNameStr, offer.OfferName(), "")
+
+			dbOffer := dbmodel.ApplicationOffer{
+				UUID:    offer.OfferUUID(),
+				Name:    offer.OfferName(),
+				URL:     offerURL,
+				ModelID: model.ID,
+			}
+			if err := j.Database.AddApplicationOffer(ctx, &dbOffer); err != nil {
+				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+					return nil, nil, fmt.Errorf("offer with URL %s already exists", dbOffer.URL)
+				}
+				return nil, nil, errors.E(op, fmt.Errorf("failed to add application offer %q: %w", dbOffer.Name, err))
+			}
+
+			importedOffers = append(importedOffers, &dbOffer)
+		}
 	}
 
 	return importedModel, importedOffers, nil

@@ -55,7 +55,7 @@ func (s *migrationHTTPProxySuite) SetUpTest(c *gc.C) {
 		ModelUUID:          sql.NullString{String: incomingModelUUID, Valid: true},
 		UserMapping:        map[string]string{"bob": "alice@canonical.com"},
 	}
-	err := s.JIMM.Database.AddIncomingModelMigration(ctx, incomingModel)
+	err := s.JIMM.Database.AddOrUpdateIncomingModelMigration(ctx, incomingModel)
 	c.Assert(err, gc.IsNil)
 	s.incomingModel = incomingModel
 

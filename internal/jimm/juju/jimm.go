@@ -287,7 +287,20 @@ func (j *JujuManager) PrepareModelMigration(
 			return err
 		}
 
-		if err := j.Database.AddIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
+		// Verify the model doesn't exist (implies a migration is in progress
+		// or completed) - it could also mean the model failed to be removed
+		// during migration ABORT but that problem should be dealt with separately.
+		model := &dbmodel.Model{
+			UUID: sql.NullString{String: modelUUID, Valid: true},
+		}
+		err := j.Database.GetModel(ctx, model)
+		if err == nil {
+			return errors.E(op, "model migration for the specified model is already in progress/completed")
+		} else if errors.ErrorCode(err) != errors.CodeNotFound {
+			return err
+		}
+
+		if err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
 			ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
 			TargetControllerID: ctl.ID,
 			UserMapping:        dbmodel.StringMap(userMapping),

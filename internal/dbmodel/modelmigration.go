@@ -15,6 +15,7 @@ type IncomingModelMigration struct {
 	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
 	ID        uint `gorm:"primarykey"`
 	CreatedAt time.Time
+	UpdatedAt time.Time
 
 	// ModelUUID is the UUID of the incoming model.
 	ModelUUID sql.NullString

@@ -6,15 +6,18 @@ import (
 	"context"
 	"time"
 
+	"gorm.io/gorm/clause"
+
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
-// AddIncomingModelMigration stores information about an incoming model migration.
-//   - returns an error with code errors.CodeAlreadyExists if
-//     a migration row with the same model UUID already exists.
-func (d *Database) AddIncomingModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
+// AddOrUpdateIncomingModelMigration stores information about an incoming model migration
+// if it does not already exist, or updates it if it does.
+// It must be run within a transaction as it will lock the existing row for updates
+// if the model migration already exists.
+func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
 	const op = errors.Op("db.AddIncomingModelMigration")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -24,10 +27,56 @@ func (d *Database) AddIncomingModelMigration(ctx context.Context, modelMigration
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
+	lookup := dbmodel.IncomingModelMigration{
+		ModelUUID: modelMigration.ModelUUID,
+	}
+	// Set noWait to true to ensure that if the row is locked by another transaction,
+	// we will return an error immediately instead of waiting.
+	err = d.GetIncomingModelMigrationWithLock(ctx, &lookup, true)
+	if err == nil {
+		// If the model migration already exists, update it.
+		modelMigration.ID = lookup.ID
+	} else if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+		return errors.E(op, err)
+	}
+
 	db := d.DB.WithContext(ctx)
 
-	if err := db.Create(modelMigration).Error; err != nil {
+	if err := db.Save(modelMigration).Error; err != nil {
 		return errors.E(op, dbError(err))
+	}
+	return nil
+}
+
+// GetIncomingMigrationWithLock retrieves an incoming model migration locking the row for updates.
+// This must be run within a transaction for the lock to be effective.
+// if `noWait` is true, the function will return an error if the lock cannot be acquired immediately.
+func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration, noWait bool) (err error) {
+	const op = errors.Op("db.GetIncomingMigrationWithLock")
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	switch {
+	case modelMigration.ModelUUID.Valid:
+		db = db.Where("model_uuid = ?", modelMigration.ModelUUID.String)
+	default:
+		return errors.E(op, "missing uuid", errors.CodeBadRequest)
+	}
+
+	if noWait {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE", Options: "NOWAIT"})
+	} else {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+	if err := db.First(&modelMigration).Error; err != nil {
+		err = dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(op, err, "model migration not found")
+		}
+		return errors.E(op, err)
 	}
 	return nil
 }
@@ -56,7 +105,7 @@ func (d *Database) GetIncomingModelMigration(ctx context.Context, modelMigration
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(op, err, "model migration not found")
 		}
-		return errors.E(op, dbError(err))
+		return errors.E(op, err)
 	}
 	return nil
 }
