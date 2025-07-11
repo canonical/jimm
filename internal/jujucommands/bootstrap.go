@@ -11,8 +11,10 @@ import (
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/juju/jujuclient"
 	_ "github.com/juju/juju/provider/lxd"
+	"github.com/juju/utils/v3/ssh"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -112,20 +114,26 @@ func RunBootstrapCmd(
 	// 	return nil, nil, err
 	// }
 
-	// Setup SSH keys
-	// TODO: This isn't working, it's using hosts SSH keys (how do I specify this?)
-	// sshDir := filepath.Join(tmpJujuData, "ssh")
-	// if err := os.MkdirAll(sshDir, 0700); err != nil {
-	// 	return nil, nil, fmt.Errorf("failed to create .ssh directory: %w", err)
-	// }
+	// Juju generates these keys if they don't exist, but as we want to programatically pass
+	// them in, we're creating them manually.
+	sshDir := osenv.JujuXDGDataHomePath("ssh")
+	if err := os.MkdirAll(sshDir, 0700); err != nil {
+		return nil, nil, fmt.Errorf("failed to create .ssh directory: %w", err)
+	}
 
-	// if err := os.WriteFile(sshDir+"/juju_id_rsa.pub", []byte(pubKey), 0600); err != nil {
-	// 	return nil, nil, fmt.Errorf("writing public key failed: %w", err)
-	// }
+	if err := os.WriteFile(sshDir+"/juju_id_rsa.pub", []byte(pubKey), 0600); err != nil {
+		return nil, nil, fmt.Errorf("writing public key failed: %w", err)
+	}
 
-	// if err = os.WriteFile(sshDir+"/juju_id_rsa", []byte(privKey), 0600); err != nil {
-	// 	return nil, nil, fmt.Errorf("writing private key failed: %w", err)
-	// }
+	if err = os.WriteFile(sshDir+"/juju_id_rsa", []byte(privKey), 0600); err != nil {
+		return nil, nil, fmt.Errorf("writing private key failed: %w", err)
+	}
+
+	// After generation (if they don't exist), they're loaded into memory during the juju (main)
+	// command. Since we're not running main, we need to load them ourselves.
+	if err := ssh.LoadClientKeys(sshDir); err != nil {
+		return nil, nil, fmt.Errorf("failed to load ssh keys: %w", err)
+	}
 
 	// Update public clouds
 	// TODO: Make this a command of this package
@@ -169,6 +177,7 @@ func RunBootstrapCmd(
 		os.RemoveAll(tmpJujuData)
 	}
 
+	fmt.Println("CMD string is: ", cmdStr)
 	outputRetriever, err := runCmdWithOutputRetriever(memStore, cmdStr)
 	return outputRetriever, cleanupTmpJujuData, err
 }
