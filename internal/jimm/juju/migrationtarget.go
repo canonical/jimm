@@ -442,7 +442,10 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 		return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
 	}
 
-	err = j.addModelAndOfferPermissions(ctx, user, model, offers)
+	// Pass the controller tag as the controller details
+	// are not populated on the model after creation.
+	controllerTag := incomingMigration.TargetController.ResourceTag()
+	err = j.addModelAndOfferPermissions(ctx, user, model, offers, controllerTag)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to add resource permissions: %w", err))
 	}
@@ -557,11 +560,11 @@ func (j *JujuManager) importFromDescription(ctx context.Context, targetControlle
 
 // addModelAndOfferPermissions grants the user access to the model
 // and adds the necesary relations between the model and app offers.
-func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *openfga.User, model *dbmodel.Model, offers []*dbmodel.ApplicationOffer) error {
+func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *openfga.User, model *dbmodel.Model, offers []*dbmodel.ApplicationOffer, ct names.ControllerTag) error {
 	const op = errors.Op("jimm.addResourcePermissions")
 
 	modelTag := model.ResourceTag()
-	if err := j.addModelPermissions(ctx, user, modelTag, model.Controller.ResourceTag()); err != nil {
+	if err := j.addModelPermissions(ctx, user, modelTag, ct); err != nil {
 		return errors.E(op, fmt.Errorf("failed to add model permissions: %w", err))
 	}
 
