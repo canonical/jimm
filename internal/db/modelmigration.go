@@ -66,11 +66,11 @@ func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelM
 		return errors.E(op, "missing uuid", errors.CodeBadRequest)
 	}
 
+	lockingClause := clause.Locking{Strength: "UPDATE"}
 	if noWait {
-		db = db.Clauses(clause.Locking{Strength: "UPDATE", Options: "NOWAIT"})
-	} else {
-		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+		lockingClause.Options = "NOWAIT"
 	}
+	db = db.Clauses(lockingClause)
 	if err := db.First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
