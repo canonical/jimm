@@ -58,20 +58,17 @@ func runCmdWithOutputRetriever(store jujuclient.ClientStore, cmdAndArgs string) 
 	cmdCtx.Stdout = cmdWriter
 
 	outputCh := make(chan outputLine)
-	// We buffer cmdFinishedCh with capacity 1 to avoid a deadlock here.
-	// In runCmd, the writer (cmdWriter) is deferred to close only after runCmd completes.
-	// When sending the final error down cmdFinishedCh, if it's unbuffered,
-	// the send blocks because no goroutine is receiving yet.
-	// This blocks runCmd from completing, so the deferred writer.Close() never runs,
-	// meaning no EOF is sent to the reader, which keeps blocking forever.
-	// By buffering cmdFinishedCh, the send won't block, allowing runCmd to complete,
-	// the writer to close, and the reader to receive EOF and finish reading.
+	// We buffer cmdFinishedCh (capacity 1) to avoid deadlock.
+	// runCmd defers cmdWriter.Close(), which only runs after runCmd finishes.
+	// If cmdFinishedCh were unbuffered, sending the final error would block
+	// (since no goroutine is receiving yet), which prevents runCmd from finishing.
+	// This means cmdWriter.Close() never runs, so the reader never gets EOF and hangs.
+	// With a buffered channel, the send doesn't block, allowing runCmd to finish,
+	// the writer to close, and the reader to eventually see EOF and exit.
 	//
-	// There's no need to worry about it blocking, as we'll only ever send one value down
-	// once the command completes.
-	//
-	// We could alternatively manually call cmdWriter.Close() immediately after running the command.
-	cmdFinishedCh := make(chan error, 1)
+	// This is safe because we only send once, after the command finishes.
+	// Alternatively, we could manually close cmdWriter right after the command.
+	cmdFinishedCh := make(chan int, 1)
 
 	go func() {
 		// Read cmdoutput.
@@ -81,9 +78,9 @@ func runCmdWithOutputRetriever(store jujuclient.ClientStore, cmdAndArgs string) 
 		}
 
 		// Wait for cmd to finish.
-		err := <-cmdFinishedCh
-		if err != nil {
-			outputCh <- outputLine{Err: err}
+		code := <-cmdFinishedCh
+		if code != 0 {
+			outputCh <- outputLine{Err: fmt.Errorf("cmd failed with code: %d", code)}
 		}
 
 		close(outputCh)
@@ -98,14 +95,14 @@ func runCmdWithOutputRetriever(store jujuclient.ClientStore, cmdAndArgs string) 
 // The function splits cmdAndArgs into arguments, constructs a Juju command, and runs it.
 // On non-zero exit code, it sends an error to cmdFinishedCh; otherwise, it signals successful completion.
 //
-// Note, the cmdAndArgs argument expects a fully-qualified command strings. I.e.,
+// Note, the cmdAndArgs argument expects a fully-qualified command string. I.e.,
 //
 //	"bootstrap lxd a --add-model=\"my-initial-model\""
 func runCmd(
 	cmdCtx *cmd.Context,
 	cmdWriter *io.PipeWriter,
 	store jujuclient.ClientStore,
-	cmdFinishedCh chan<- error,
+	cmdFinishedCh chan<- int,
 	cmdAndArgs string,
 ) {
 	defer cmdWriter.Close()
@@ -128,9 +125,5 @@ func runCmd(
 
 	code := cmd.Main(jujuCmd, cmdCtx, strings.Split(cmdAndArgs, " "))
 
-	if code != 0 {
-		cmdFinishedCh <- fmt.Errorf("cmd failed with code %d", code)
-	} else {
-		cmdFinishedCh <- nil
-	}
+	cmdFinishedCh <- code
 }
