@@ -46,6 +46,8 @@ type outputLine struct {
 //	}
 //
 // The OutputLine channel is closed once all output from the command has finished an the error has been captured.
+//
+// Lines returned are returned with no newlines.
 func runCmdWithOutputRetriever(store jujuclient.ClientStore, cmdAndArgs string) (<-chan outputLine, error) {
 	cmdReader, cmdWriter := io.Pipe()
 
