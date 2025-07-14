@@ -120,17 +120,7 @@ func runCmd(
 		"",        // no help hint
 		whitelist, // whitelist
 		// We set embedded false because some commands can targets either a controller or client.
-		// I.e.,:
-		// SetFlags initializes the flags supported by the command.
-		// func (c *OptionalControllerCommand) SetFlags(f *gnuflag.FlagSet) {
-		// 	c.CommandBase.SetFlags(f)
-		// 	// Embedded commands do not use the --client or --controller options.
-		// 	if !c.Embedded {
-		// 		f.BoolVar(&c.Client, "client", false, "Client operation")
-		// 		f.StringVar(&c.ControllerName, "c", "", "Controller to operate in")
-		// 		f.StringVar(&c.ControllerName, "controller", "", "")
-		// 	}
-		// }
+		// See: https://github.com/juju/juju/blob/1abcb8c5f1f187fd1443e12d6324a47780b43740/cmd/modelcmd/controller.go#L451
 		// And whilst we are "technically" embedding the CLI, without setting this to false,
 		// You must run without --client/--controller and it defaults to updating the client
 		// in update-public-clouds. So, we set it false to allow us to explicitly set
