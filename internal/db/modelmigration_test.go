@@ -180,7 +180,7 @@ func (s *dbSuite) TestGetModelMigrationWithLock_Wait(c *qt.C) {
 	c.Check(err, qt.IsNotNil)
 	c.Check(err, qt.ErrorMatches, ".*could not obtain lock on row.*")
 
-	// Now we should be able to obtain the if we wait
+	// Now we should be able to obtain the lock if we wait
 	err = s.Database.GetIncomingModelMigrationWithLock(context.Background(), &lookup, noWait)
 	c.Check(err, qt.Equals, nil)
 	c.Check(lookup.ModelUUID, qt.DeepEquals, migration.ModelUUID)

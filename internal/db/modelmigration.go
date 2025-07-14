@@ -71,7 +71,7 @@ func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelM
 		lockingClause.Options = "NOWAIT"
 	}
 	db = db.Clauses(lockingClause)
-	if err := db.First(&modelMigration).Error; err != nil {
+	if err := db.Preload("TargetController").First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(op, err, "model migration not found")
