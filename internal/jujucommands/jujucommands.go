@@ -2,7 +2,6 @@
 
 // Package jujucommands provides functions run juju cmds from a JIMM instance.
 // Each command function is run with its own isolated in-mem store.
-
 package jujucommands
 
 import (
@@ -48,7 +47,6 @@ type outputLine struct {
 //
 // The OutputLine channel is closed once all output from the command has finished an the error has been captured.
 func runCmdWithOutputRetriever(store jujuclient.ClientStore, cmdAndArgs string) (<-chan outputLine, error) {
-	// memStore := jujuclient.NewEmbeddedMemStore()
 	cmdReader, cmdWriter := io.Pipe()
 
 	cmdCtx, err := cmd.DefaultContext()
