@@ -892,7 +892,7 @@ func TestPrepareMigration_MigrationLocked(t *testing.T) {
 
 	<-notifyChan // Wait for the migration to be locked
 	_, err = j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
-	c.Assert(err, qt.IsNotNil)
+	c.Assert(err, qt.ErrorMatches, `.*could not obtain lock on row.*`)
 }
 
 func TestPrepareMigration_MultipleCalls(t *testing.T) {

@@ -287,8 +287,8 @@ func (j *JujuManager) PrepareModelMigration(
 			return err
 		}
 
-		// Verify the model doesn't exist (implies a migration is in progress
-		// or completed) - it could also mean the model failed to be removed
+		// Verify the model doesn't exist - if it does that means a migration is
+		// in progress or completed or it could also mean the model failed to be removed
 		// during migration ABORT but that problem should be dealt with separately.
 		model := &dbmodel.Model{
 			UUID: sql.NullString{String: modelUUID, Valid: true},
