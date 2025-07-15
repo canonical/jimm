@@ -583,7 +583,7 @@ func (im *IncomingMigration) DBObject(c Tester, db *db.Database) dbmodel.Incomin
 		im.dbo.UserMapping[im.UserMapping[um].LocalUser] = im.UserMapping[um].ExternalUserName
 	}
 
-	err := db.AddIncomingModelMigration(context.Background(), &im.dbo)
+	err := db.AddOrUpdateIncomingModelMigration(context.Background(), &im.dbo)
 	if err != nil {
 		c.Fatalf("err is not nil: %s", err)
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"gorm.io/gorm/clause"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -803,4 +804,121 @@ func TestPrepareModelMigration_Success(t *testing.T) {
 	c.Assert(incomingMigration.ModelUUID.String, qt.Equals, fakeModelUUID)
 	c.Assert(incomingMigration.TargetController.UUID, qt.Equals, targetController.UUID)
 	c.Assert(incomingMigration.UserMapping, qt.DeepEquals, dbmodel.StringMap(userMapping))
+}
+
+const prepareMigrationModelExistsEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+  - owner: alice@canonical.com
+    name: cred-1
+    cloud: test-cloud
+controllers:
+- name: myController
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@canonical.com
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  controller: myController
+`
+
+func TestPrepareMigration_ModelExists(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	store := jimmtest.NewInMemoryCredentialStore()
+	j := newTestJujuManager(c, &parameters{
+		CredentialStore: store,
+	})
+
+	env := jimmtest.ParseEnvironment(c, prepareMigrationModelExistsEnv)
+	env.PopulateDB(c, j.Database)
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	fakeModelUUID := env.Models[0].UUID
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
+	targetController := env.Controllers[0].DBObject(c, j.Database)
+
+	_, err := j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
+	c.Assert(err, qt.IsNotNil)
+}
+
+func TestPrepareMigration_MigrationLocked(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	store := jimmtest.NewInMemoryCredentialStore()
+	j := newTestJujuManager(c, &parameters{
+		CredentialStore: store,
+	})
+
+	env := jimmtest.ParseEnvironment(c, prepareModelMigrationTestEnv)
+	env.PopulateDB(c, j.Database)
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
+	targetController := env.Controllers[0].DBObject(c, j.Database)
+
+	// First call to PrepareModelMigration should succeed
+	_, err := j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
+	c.Assert(err, qt.IsNil)
+
+	notifyChan := make(chan struct{})
+	go func() {
+		// Lock the migration
+		err := j.Database.Transaction(func(d *db.Database) error {
+			db := d.DB
+			db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+			mig := &dbmodel.IncomingModelMigration{ModelUUID: sql.NullString{String: fakeModelUUID, Valid: true}}
+			err := db.First(mig).Error
+			c.Check(err, qt.IsNil)
+			close(notifyChan)
+			<-ctx.Done()
+			return nil
+		})
+		c.Check(err, qt.IsNil)
+	}()
+
+	<-notifyChan // Wait for the migration to be locked
+	_, err = j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
+	c.Assert(err, qt.ErrorMatches, `.*could not obtain lock on row.*`)
+}
+
+func TestPrepareMigration_MultipleCalls(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	store := jimmtest.NewInMemoryCredentialStore()
+	j := newTestJujuManager(c, &parameters{
+		CredentialStore: store,
+	})
+
+	env := jimmtest.ParseEnvironment(c, prepareModelMigrationTestEnv)
+	env.PopulateDB(c, j.Database)
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	fakeModelUUID := "d9a0bd29-a76e-451f-a186-7216cac77e29"
+	userMapping := map[string]string{"alice": "alice@canonical.com"}
+	targetController := env.Controllers[0].DBObject(c, j.Database)
+
+	// First call to PrepareModelMigration should succeed
+	_, err := j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
+	c.Assert(err, qt.IsNil)
+
+	// Second call with an updated mapping should succeed
+	userMapping["bob"] = "alice@canonical.com"
+	_, err = j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
+	c.Assert(err, qt.IsNil)
 }
