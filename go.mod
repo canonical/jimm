@@ -254,7 +254,7 @@ require (
 	github.com/microsoftgraph/msgraph-sdk-go v1.28.0 // indirect
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.0.1 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/mitchellh/go-linereader v0.0.0-20190213213312-1b945b3263eb // indirect
+	github.com/mitchellh/go-linereader v0.0.0-20190213213312-1b945b3263eb
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mittwald/vaultgo v0.1.4 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
@@ -344,24 +344,18 @@ require (
 	cloud.google.com/go/auth v0.13.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.6 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi v1.2.0 // indirect
-	github.com/GehirnInc/crypt v0.0.0-20230320061759-8cc1b52080c5 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
-	github.com/canonical/go-flags v0.0.0-20230403090104-105d09a091b8 // indirect
-	github.com/canonical/pebble v1.19.2 // indirect
-	github.com/canonical/x-go v0.0.0-20230522092633-7947a7587f5b // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
+	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/juju/packaging/v4 v4.0.0 // indirect
+	github.com/juju/terms-client/v2 v2.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
-	github.com/pkg/term v1.1.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/zitadel/logging v0.6.1 // indirect
 	github.com/zitadel/oidc/v3 v3.35.0 // indirect
 	github.com/zitadel/schema v1.3.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	golang.org/x/mod v0.25.0 // indirect
-	golang.org/x/tools v0.34.0 // indirect
 )
 
 replace (
