@@ -91,6 +91,9 @@ func (s *dbSuite) TestGetModelMigration(c *qt.C) {
 	lookup := dbmodel.IncomingModelMigration{ModelUUID: migration.ModelUUID}
 	err := s.Database.GetIncomingModelMigration(context.Background(), &lookup)
 	c.Assert(err, qt.Equals, nil)
+	c.Assert(lookup.ModelUUID, qt.DeepEquals, migration.ModelUUID)
+	c.Assert(lookup.TargetControllerID, qt.Equals, controller.ID)
+	c.Assert(lookup.UserMapping, qt.DeepEquals, migration.UserMapping)
 
 	// Not found
 	lookup = dbmodel.IncomingModelMigration{ModelUUID: sql.NullString{String: "no-such-uuid", Valid: true}}

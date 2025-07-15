@@ -15,10 +15,8 @@ import (
 
 // AddOrUpdateIncomingModelMigration stores information about an incoming model migration
 // if it does not already exist, or updates it if it does.
-// It must be run within a transaction as it will lock the existing row for updates
-// if the model migration already exists.
 func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
-	const op = errors.Op("db.AddIncomingModelMigration")
+	const op = errors.Op("db.AddOrUpdateIncomingModelMigration")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
 	}
@@ -27,25 +25,29 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	lookup := dbmodel.IncomingModelMigration{
-		ModelUUID: modelMigration.ModelUUID,
-	}
-	// Set noWait to true to ensure that if the row is locked by another transaction,
-	// we will return an error immediately instead of waiting.
-	err = d.GetIncomingModelMigrationWithLock(ctx, &lookup, true)
-	if err == nil {
-		// If the model migration already exists, update it.
-		modelMigration.ID = lookup.ID
-	} else if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return errors.E(op, err)
-	}
+	err = d.Transaction(func(d *Database) error {
+		lookup := dbmodel.IncomingModelMigration{
+			ModelUUID: modelMigration.ModelUUID,
+		}
+		// Set noWait to true to ensure that if the row is locked by another transaction,
+		// we will return an error immediately instead of waiting.
+		err = d.GetIncomingModelMigrationWithLock(ctx, &lookup, true)
+		if err == nil {
+			// If the model migration already exists, update it.
+			modelMigration.ID = lookup.ID
+		} else if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			return errors.E(op, err)
+		}
 
-	db := d.DB.WithContext(ctx)
+		db := d.DB.WithContext(ctx)
 
-	if err := db.Save(modelMigration).Error; err != nil {
-		return errors.E(op, dbError(err))
-	}
-	return nil
+		if err := db.Save(modelMigration).Error; err != nil {
+			return errors.E(op, dbError(err))
+		}
+
+		return nil
+	})
+	return err
 }
 
 // GetIncomingMigrationWithLock retrieves an incoming model migration locking the row for updates.
