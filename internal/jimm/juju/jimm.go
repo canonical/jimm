@@ -283,7 +283,7 @@ func (j *JujuManager) PrepareModelMigration(
 
 	err := j.Database.Transaction(func(d *db.Database) error {
 		ctl := dbmodel.Controller{Name: targetControllerName}
-		if err := j.Database.GetController(ctx, &ctl); err != nil {
+		if err := d.GetController(ctx, &ctl); err != nil {
 			return err
 		}
 
@@ -293,14 +293,14 @@ func (j *JujuManager) PrepareModelMigration(
 		model := &dbmodel.Model{
 			UUID: sql.NullString{String: modelUUID, Valid: true},
 		}
-		err := j.Database.GetModel(ctx, model)
+		err := d.GetModel(ctx, model)
 		if err == nil {
 			return errors.E(op, "model migration for the specified model is already in progress/completed")
 		} else if errors.ErrorCode(err) != errors.CodeNotFound {
 			return err
 		}
 
-		if err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
+		if err := d.AddOrUpdateIncomingModelMigration(ctx, &dbmodel.IncomingModelMigration{
 			ModelUUID:          sql.NullString{String: modelUUID, Valid: true},
 			TargetControllerID: ctl.ID,
 			UserMapping:        dbmodel.StringMap(userMapping),

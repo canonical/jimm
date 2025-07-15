@@ -252,7 +252,7 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 
 	newOwnerTag := names.NewUserTag(newOwner)
 	model.Owner = newOwnerTag
-	err := j.modifyModelDescription(model.ModelDescription, userMapping)
+	err := modifyModelDescription(model.ModelDescription, userMapping)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to modify model description: %w", err))
 	}
@@ -261,7 +261,7 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 
 // modifyModelDescription modifies the model description to replace local user references
 // with their external mapping for both the model owner and the cloud credential owner.
-func (j *JujuManager) modifyModelDescription(modelDescription description.Model, userMapping dbmodel.StringMap) error {
+func modifyModelDescription(modelDescription description.Model, userMapping dbmodel.StringMap) error {
 	// change the owner of the model description if it is a local user
 	if modelDescription.Owner().IsLocal() {
 		// If the owner is a local user, we replace it with the external mapping.
@@ -437,17 +437,17 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 
 		// Set noWait to false to allow the transaction to wait for the lock.
 		noWait := false
-		err = j.Database.GetIncomingModelMigrationWithLock(ctx, incomingMigration, noWait)
+		err = d.GetIncomingModelMigrationWithLock(ctx, incomingMigration, noWait)
 		if err != nil {
 			return errors.E(op, fmt.Errorf("failed to get incoming model migration: %w", err))
 		}
 
-		err = j.modifyModelDescription(modelDescription, incomingMigration.UserMapping)
+		err = modifyModelDescription(modelDescription, incomingMigration.UserMapping)
 		if err != nil {
 			return errors.E(op, fmt.Errorf("failed to modify model description: %w", err))
 		}
 
-		model, offers, err = j.importFromDescription(ctx, incomingMigration.TargetController.ID, modelDescription)
+		model, offers, err = importFromDescription(ctx, d, incomingMigration.TargetController.ID, modelDescription)
 		if err != nil {
 			return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
 		}
@@ -490,7 +490,7 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 // and model description and sets the migration mode to importing.
 // Application offers are created for any offers in the model description.
 // It also ensures that the cloud credential and region are present in the database.
-func (j *JujuManager) importFromDescription(ctx context.Context, targetControllerID uint, description description.Model) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
+func importFromDescription(ctx context.Context, tx *db.Database, targetControllerID uint, description description.Model) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
 	op := errors.Op("jimm.importFromDescription")
 
 	modelNameStr, ok := description.Config()[config.NameKey].(string)
@@ -512,11 +512,11 @@ func (j *JujuManager) importFromDescription(ctx context.Context, targetControlle
 		Name:              description.CloudCredential().Name(),
 	}
 
-	err := j.Database.GetCloudCredential(ctx, cloudCredential)
+	err := tx.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
 		return nil, nil, errors.E(op, err)
 	}
-	region, err := j.Database.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
+	region, err := tx.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
 	if err != nil {
 		return nil, nil, errors.E(op, err)
 	}
@@ -536,7 +536,7 @@ func (j *JujuManager) importFromDescription(ctx context.Context, targetControlle
 		CloudRegionID:     region.ID,
 		MigrationMode:     state.MigrationModeImporting,
 	}
-	err = j.Database.AddModel(ctx, &model)
+	err = tx.AddModel(ctx, &model)
 	if err != nil {
 		return nil, nil, errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
 	}
@@ -553,7 +553,7 @@ func (j *JujuManager) importFromDescription(ctx context.Context, targetControlle
 				URL:     offerURL,
 				ModelID: model.ID,
 			}
-			if err := j.Database.AddApplicationOffer(ctx, &dbOffer); err != nil {
+			if err := tx.AddApplicationOffer(ctx, &dbOffer); err != nil {
 				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 					return nil, nil, fmt.Errorf("offer with URL %s already exists", dbOffer.URL)
 				}

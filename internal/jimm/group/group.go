@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 // The group package provides business logic for handling group related methods..
 package group
@@ -96,12 +96,12 @@ func (j *groupManager) RenameGroup(ctx context.Context, user *openfga.User, oldN
 	}
 
 	err := j.store.Transaction(func(d *db.Database) error {
-		err := j.store.GetGroup(ctx, group)
+		err := d.GetGroup(ctx, group)
 		if err != nil {
 			return err
 		}
 
-		if err := j.store.UpdateGroupName(ctx, group.UUID, newName); err != nil {
+		if err := d.UpdateGroupName(ctx, group.UUID, newName); err != nil {
 			return err
 		}
 		return nil
