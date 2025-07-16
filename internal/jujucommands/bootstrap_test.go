@@ -7,6 +7,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"os"
+	"path/filepath"
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
@@ -102,14 +104,19 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdStr(c *qt.C)
 	)
 }
 
-func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd(c *qt.C) {
+func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloudWritten(c *qt.C) {
 	c.Patch(jujucommands.RunCmdWithOutputRetriever, func(store jujuclient.ClientStore, cmdAndArgs string) (<-chan jujucommands.OutputLine, error) {
 		// Return chan that has one line inside
-		return nil, nil
+		outputCh := make(chan jujucommands.OutputLine, 1)
+		outputCh <- jujucommands.OutputLine{
+			Line: "testing",
+		}
+		close(outputCh)
+		return outputCh, nil
 	})
 
 	p := jujucommands.BootstrapCmdParams{
-		CloudNameAndRegion:   "testregion/testcloud",
+		CloudNameAndRegion:   "testcloud/testregion",
 		ControllerName:       "my-controller",
 		AgentVersion:         "1.1.1",
 		BootstrapTimeout:     1000,
@@ -135,10 +142,14 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd(c *qt.C) {
 	}
 
 	cloudCred := *jujucloud.NewEmptyCloudCredential()
-	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.CertificateAuthType, map[string]string{})
+	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.CertificateAuthType, map[string]string{
+		"server-cert": "server-cert",
+		"client-cert": "client-cert",
+		"client-key":  "client-key",
+	})
 
 	pub, priv := getsMeSomeKeysBrah(c)
-	_, _, cleanup, err := jujucommands.RunBootstrapCmd(
+	_, store, cleanup, err := jujucommands.RunBootstrapCmd(
 		testCtx,
 		p,
 		personalCloud,
@@ -151,4 +162,81 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd(c *qt.C) {
 	})
 
 	c.Assert(err, qt.IsNil)
+
+	// Now we check the cred is added
+	personalCloudCred, err := store.CredentialForCloud("testcloud")
+	c.Assert(err, qt.IsNil)
+	// Check just attributes, if the populated in memory credential is set for the "testcloud",
+	// then we're sure the default credential to be used is the one we provided for our provided cloud.
+	// (Given it also exists in the temp directory)
+	c.Assert(
+		personalCloudCred.AuthCredentials["default"].Attributes(),
+		qt.DeepEquals,
+		cloudCred.AuthCredentials["default"].Attributes(),
+	)
+
+	// This was set to a temp dir until cleanup runs. We can use it to check the file exists.
+	_, err = os.Stat(filepath.Join(os.Getenv("JUJU_DATA"), "clouds.yaml"))
+	c.Assert(err, qt.IsNil)
+}
+
+func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWritten(c *qt.C) {
+	callCounter := 0
+	c.Patch(jujucommands.RunCmdWithOutputRetriever, func(store jujuclient.ClientStore, cmdAndArgs string) (<-chan jujucommands.OutputLine, error) {
+		callCounter++
+		if callCounter == 1 {
+			// This is only called once within bootstrap, so we can be pretty sure the public-clouds.yaml was written.
+			c.Assert(cmdAndArgs, qt.Equals, "update-public-clouds --client")
+		}
+		// Return chan that has one line inside
+		outputCh := make(chan jujucommands.OutputLine, 1)
+		outputCh <- jujucommands.OutputLine{
+			Line: "testing",
+		}
+		close(outputCh)
+		return outputCh, nil
+	})
+
+	p := jujucommands.BootstrapCmdParams{
+		CloudNameAndRegion:   "aws/us-east-1",
+		ControllerName:       "my-controller",
+		AgentVersion:         "1.1.1",
+		BootstrapTimeout:     1000,
+		LoginTokenRefreshURL: "myurl.com",
+	}
+
+	testCtx := c.Context()
+
+	cloudCred := *jujucloud.NewEmptyCloudCredential()
+	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
+		"aws-secret": "my-secret",
+	})
+
+	pub, priv := getsMeSomeKeysBrah(c)
+	_, store, cleanup, err := jujucommands.RunBootstrapCmd(
+		testCtx,
+		p,
+		jujucloud.Cloud{}, // no-op
+		cloudCred,
+		pub,
+		priv,
+	)
+	c.Cleanup(func() {
+		cleanup()
+	})
+
+	c.Assert(err, qt.IsNil)
+
+	// Now we check the cred is added for the cloud (excluding region)
+	personalCloudCred, err := store.CredentialForCloud("aws")
+	c.Assert(err, qt.IsNil)
+	c.Assert(
+		personalCloudCred.AuthCredentials["default"].Attributes(),
+		qt.DeepEquals,
+		cloudCred.AuthCredentials["default"].Attributes(),
+	)
+
+	// Make sure no personal cloud was written.
+	_, err = os.Stat(filepath.Join(os.Getenv("JUJU_DATA"), "clouds.yaml"))
+	c.Assert(err, qt.ErrorMatches, ".*no such file or directory.*")
 }
