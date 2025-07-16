@@ -29,7 +29,7 @@ type BootstrapCmdParams struct {
 	LoginTokenRefreshURL string
 }
 
-func (b BootstrapCmdParams) validate() error {
+func (b BootstrapCmdParams) Validate() error {
 	if b.CloudNameAndRegion == "" {
 		return errors.New("cloud [and region] name cannot be empty")
 	}
@@ -57,17 +57,16 @@ func (b BootstrapCmdParams) validate() error {
 	return nil
 }
 
-func (b BootstrapCmdParams) buildBootstrapCmdStr() string {
+func (b BootstrapCmdParams) BuildBootstrapCmdStr() string {
 	var builder strings.Builder
 	builder.WriteString("bootstrap")
+
+	builder.WriteString(fmt.Sprintf(" --login-token-refresh-url=%s", b.LoginTokenRefreshURL))
 
 	// Conditionally add --agent-version if set
 	if b.AgentVersion != "" {
 		builder.WriteString(fmt.Sprintf(" --agent-version=%s", b.AgentVersion))
 	}
-
-	defaultModelName := fmt.Sprintf("%s-%s", b.ControllerName, "default")
-	builder.WriteString(fmt.Sprintf(" --add-model=%s", defaultModelName))
 
 	// Conditionally add bootstrap-timeout if set
 	if b.BootstrapTimeout > 0 {
@@ -94,8 +93,8 @@ func RunBootstrapCmd(
 	cred jujucloud.CloudCredential,
 	pubKey []byte,
 	privKey []byte,
-) (<-chan outputLine, jujuclient.ClientStore, func(), error) {
-	if err := p.validate(); err != nil {
+) (<-chan OutputLine, jujuclient.ClientStore, func(), error) {
+	if err := p.Validate(); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -137,7 +136,7 @@ func RunBootstrapCmd(
 
 	// Update public clouds
 	// TODO: Make this a command of this package
-	outputCh, err := runCmdWithOutputRetriever(memStore, "update-public-clouds --client")
+	outputCh, err := runCmdWithOutputRetrieverFunc(memStore, "update-public-clouds --client")
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -170,7 +169,7 @@ func RunBootstrapCmd(
 	}
 
 	// With the clouds set, credentials updated, we now bootstrap.
-	cmdStr := p.buildBootstrapCmdStr()
+	cmdStr := p.BuildBootstrapCmdStr()
 
 	cleanupTmpJujuData := func() {
 		os.Unsetenv("JUJU_DATA")
@@ -178,7 +177,7 @@ func RunBootstrapCmd(
 	}
 
 	fmt.Println("CMD string is: ", cmdStr)
-	outputRetriever, err := runCmdWithOutputRetriever(memStore, cmdStr)
+	outputRetriever, err := runCmdWithOutputRetrieverFunc(memStore, cmdStr)
 	return outputRetriever, memStore, cleanupTmpJujuData, err
 }
 

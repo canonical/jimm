@@ -13,7 +13,7 @@ import (
 	"github.com/mitchellh/go-linereader"
 )
 
-type outputLine struct {
+type OutputLine struct {
 	Line string
 	Err  error
 }
