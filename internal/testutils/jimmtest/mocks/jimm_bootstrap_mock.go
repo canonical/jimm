@@ -1,0 +1,24 @@
+// Copyright 2025 Canonical.
+
+package mocks
+
+import (
+	"context"
+
+	"github.com/google/uuid"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/pkg/api/params"
+)
+
+type BootstapManager struct {
+	GetBootstrapStatusAndLogs_ func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error)
+}
+
+func (b *BootstapManager) GetBootstrapStatusAndLogs(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error) {
+	if b.GetBootstrapStatusAndLogs_ == nil {
+		return params.BootstrapStatusResponse{}, errors.E(errors.CodeNotImplemented)
+	}
+	return b.GetBootstrapStatusAndLogs_(ctx, user, jobId, offset)
+}

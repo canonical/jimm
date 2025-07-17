@@ -6,20 +6,27 @@ package jobtracker
 
 import (
 	"context"
-	"errors"
+	goerr "errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 )
+
+// JobIdContextKey is a context key for storing job IDs.
+type JobIdContextKey struct{}
 
 // Store defines the interface for tracking the lifecycle and status of jobs.
 // It provides methods to add a new job, update its status (running, successful, or failed),
 // and retrieve a stop signal for a specific job.
 type Store interface {
 	AddJob(ctx context.Context, jobType string) (uuid.UUID, error)
+	GetJob(ctx context.Context, job *dbmodel.JobTrackerEntry) (err error)
 	SetJobRunning(ctx context.Context, jobId uuid.UUID) error
 	SetJobSuccessful(ctx context.Context, jobId uuid.UUID) error
 	SetJobFailed(ctx context.Context, jobId uuid.UUID, jobErr error) error
@@ -37,10 +44,10 @@ type Tracker struct {
 // It returns an error if the store is nil or if stopInterval is not greater than zero.
 func NewJobTracker(store Store, stopInterval time.Duration) (*Tracker, error) {
 	if store == nil {
-		return nil, errors.New("store cannot be nil")
+		return nil, goerr.New("store cannot be nil")
 	}
 	if stopInterval <= 4 {
-		return nil, errors.New("stopInterval must be greater than zero")
+		return nil, goerr.New("stopInterval must be greater than zero")
 	}
 
 	return &Tracker{
@@ -75,7 +82,7 @@ func (j *Tracker) handleJob(
 ) {
 	jobCtx, cancelJob := context.WithTimeout(context.Background(), maxDuration)
 	defer cancelJob()
-
+	jobCtx = ContextWithJobId(jobCtx, id)
 	jobErrCh := make(chan error)
 
 	go j.runJob(jobCtx, id, jobErrCh, job)
@@ -129,5 +136,28 @@ func (j *Tracker) monitorJob(id uuid.UUID, jobErrCh chan error, cancelJob contex
 			}
 		}
 	}
+}
 
+// GetJob retrieves a Job via its jobId.
+func (j *Tracker) GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrackerEntry, error) {
+	const op = errors.Op("jimm.GetJobStatus")
+
+	job := dbmodel.JobTrackerEntry{JobID: jobId}
+	err := j.store.GetJob(ctx, &job)
+	if err != nil {
+		return job, errors.E(op, "failed to get job status", err)
+	}
+
+	return job, nil
+}
+
+// ContextWithJobId adds the job ID to the context for later retrieval.
+func ContextWithJobId(ctx context.Context, jobId uuid.UUID) context.Context {
+	return context.WithValue(ctx, JobIdContextKey{}, jobId)
+}
+
+// JobIdFromContext retrieves the job ID from the context.
+func JobIdFromContext(ctx context.Context) (uuid.UUID, bool) {
+	jobId, ok := ctx.Value(JobIdContextKey{}).(uuid.UUID)
+	return jobId, ok
 }

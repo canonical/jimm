@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/google/uuid"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
@@ -26,6 +27,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/auditlog"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
@@ -39,6 +41,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
@@ -299,6 +302,12 @@ type JujuManager interface {
 	CleanupNotFoundModels(ctx context.Context) error
 }
 
+// BootstrapManager provides methods to manage bootstrap jobs.
+type BootstrapManager interface {
+	// GetBootstrapStatusAndLogs retrieves the status and logs of a bootstrap job.
+	GetBootstrapStatusAndLogs(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -501,6 +510,16 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.offerAuthorizer = offerAuthorizer
 
+	jobTracker, err := jobtracker.NewJobTracker(j.Database, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	bootstrapManager, err := bootstrap.NewBootstrapManager(j.Database, j.OpenFGAClient, jobTracker)
+	if err != nil {
+		return nil, err
+	}
+	j.bootstrapManager = bootstrapManager
+
 	return j, nil
 }
 
@@ -544,6 +563,9 @@ type JIMM struct {
 
 	// offerAuthorizer provides a means to check if a user is a consumer of an application offer.
 	offerAuthorizer OfferAuthorizer
+
+	// bootstrapManager provides a means to manage bootstrap jobs.
+	bootstrapManager BootstrapManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -620,4 +642,9 @@ func (j *JIMM) ConfigManager() ConfigManager {
 // OfferAuthorizer returns an authorizer that enables checking if a user is a consumer of an application offer.
 func (j *JIMM) OfferAuthorizer() OfferAuthorizer {
 	return j.offerAuthorizer
+}
+
+// BootstrapManager returns a manager that enables operations related to bootstrap jobs.
+func (j *JIMM) BootstrapManager() BootstrapManager {
+	return j.bootstrapManager
 }

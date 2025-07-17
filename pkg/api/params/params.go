@@ -560,3 +560,23 @@ type PrepareModelMigrationResponse struct {
 	// as it allows the source controller to authenticate with JIMM.
 	Token string `json:"token" yaml:"token"`
 }
+
+// BootstrapStatusRequest holds the request to get the status of a bootstrap job.
+type BootstrapStatusRequest struct {
+	// JobID is the ID of the bootstrap job to get the status for.
+	JobID string `json:"job-id"`
+	// Watermark is the line number to start reading logs from.
+	Watermark int `json:"watermark"`
+}
+
+// BootstrapStatusResponse holds the response for a bootstrap job status.
+type BootstrapStatusResponse struct {
+	// Status is the status of the bootstrap job.
+	Status string `json:"status"`
+	// Logs are the logs for the bootstrap job.
+	Logs []string `json:"logs"`
+	// Watermark is the line number to use for the next request.
+	Watermark int `json:"watermark"`
+	// Error is the error message if the bootstrap job failed.
+	Error string `json:"error,omitempty"`
+}

@@ -46,6 +46,29 @@ func (d *Database) AddJob(ctx context.Context, jobType string) (jobId uuid.UUID,
 	return jobId, nil
 }
 
+// GetJob retrieves a job entry by its ID.
+func (d *Database) GetJob(ctx context.Context, job *dbmodel.JobTrackerEntry) error {
+	const op = errors.Op("db.GetJob")
+	var err error
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	if job.JobID == uuid.Nil {
+		return errors.E(op, errors.CodeBadRequest, "job ID cannot be empty")
+	}
+	db := d.DB.WithContext(ctx)
+	if err := db.Where("job_id = ?", job.JobID).First(&job).Error; err != nil {
+		return dbError(err)
+	}
+
+	return nil
+}
+
 // GetJobStopSignal retrieves the stop signal for a job by its ID.
 // It returns true if the stop signal is set, false otherwise, and an error if the job does not exist or if the query fails.
 func (d *Database) GetJobStopSignal(ctx context.Context, jobId uuid.UUID) (stopSignal bool, err error) {

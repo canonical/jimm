@@ -26,6 +26,7 @@ type JIMM struct {
 	ResourceTag_       func() names.ControllerTag
 	ConfigManager_     func() jimm.ConfigManager
 	OfferAuthorizer_   func() jimm.OfferAuthorizer
+	BootstapManager_   func() jimm.BootstrapManager
 }
 
 func (j *JIMM) RoleManager() jimm.RoleManager {
@@ -103,4 +104,11 @@ func (j *JIMM) OfferAuthorizer() jimm.OfferAuthorizer {
 		return nil
 	}
 	return j.OfferAuthorizer_()
+}
+
+func (j *JIMM) BootstrapManager() jimm.BootstrapManager {
+	if j.BootstapManager_ == nil {
+		return nil
+	}
+	return j.BootstapManager_()
 }

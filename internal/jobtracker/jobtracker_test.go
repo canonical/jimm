@@ -105,6 +105,21 @@ func (s *jobTrackerSuite) TestRun_JobSetSuccessful(c *qt.C) {
 	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
 }
 
+func (s *jobTrackerSuite) TestRun_JobIdSetInContext(c *qt.C) {
+	testCtx := c.Context()
+
+	aJobWithIdInContext := func(ctx context.Context) error {
+		_, ok := jobtracker.JobIdFromContext(ctx)
+		c.Check(ok, qt.IsTrue)
+		return nil
+	}
+
+	id, err := s.tracker.Run(testCtx, "test-job-type", aJobWithIdInContext, time.Second*1000)
+	c.Assert(err, qt.IsNil)
+
+	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
+}
+
 func TestJobTrackerSuite(t *testing.T) {
 	qtsuite.Run(qt.New(t), &jobTrackerSuite{})
 }

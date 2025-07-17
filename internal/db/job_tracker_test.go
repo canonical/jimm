@@ -141,3 +141,23 @@ func (s *dbSuite) TestJobTracker_GetStatus(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(status, qt.Equals, dbmodel.StatusPending)
 }
+
+func (s *dbSuite) TestJobTracker_GetJob(c *qt.C) {
+	ctx := c.Context()
+	err := s.Database.Migrate(ctx)
+	c.Assert(err, qt.IsNil)
+
+	_, err = s.Database.GetJobStatus(ctx, uuid.New())
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+
+	jobId, err := s.Database.AddJob(ctx, "test-job-type")
+	c.Assert(err, qt.IsNil)
+
+	job := &dbmodel.JobTrackerEntry{
+		JobID: jobId,
+	}
+	err = s.Database.GetJob(ctx, job)
+	c.Assert(err, qt.IsNil)
+	c.Assert(job.Status, qt.Equals, dbmodel.StatusPending)
+	c.Assert(job.JobType, qt.Equals, "test-job-type")
+}

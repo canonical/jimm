@@ -5,10 +5,16 @@ package jujuapi_test
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -18,8 +24,12 @@ var _ = gc.Suite(&jimmUnitTestSuite{})
 
 func (s *jimmSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
 	ctx := context.Background()
-
-	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", false)
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
 
 	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{})
 
@@ -29,7 +39,12 @@ func (s *jimmSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
 func (s *jimmSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 	ctx := context.Background()
 
-	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", true)
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
 		ModelTag: "blah",
@@ -41,7 +56,12 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 func (s *jimmSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
 	ctx := context.Background()
 
-	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", true)
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
 		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
@@ -54,7 +74,12 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
 func (s *jimmSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
 	ctx := context.Background()
 
-	root := newTestControllerRoot(mocks.JujuManager{}, "alice@canonical.com", true)
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
 		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
@@ -79,4 +104,49 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
 	})
 
 	c.Assert(err, gc.ErrorMatches, `--badwolf--@canonical.com is not a valid external user name`)
+}
+
+func (s *jimmSuite) TestBootstrapStatus(c *gc.C) {
+	ctx := context.Background()
+	uuidGenerated := uuid.New()
+	jimm := &jimmtest.JIMM{
+		BootstapManager_: func() jimm.BootstrapManager {
+			return &mocks.BootstapManager{
+				GetBootstrapStatusAndLogs_: func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error) {
+					if jobId != uuidGenerated {
+						return params.BootstrapStatusResponse{}, errors.E(errors.CodeNotFound, "job not found")
+					}
+					return params.BootstrapStatusResponse{
+						Status: "running",
+						Logs:   []string{"bootstrap logs"},
+					}, nil
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	response, err := root.BootstrapStatus(ctx, params.BootstrapStatusRequest{
+		JobID:     uuidGenerated.String(),
+		Watermark: 0,
+	})
+
+	c.Assert(err, gc.IsNil)
+	c.Assert(response.Status, gc.Equals, "running")
+	c.Assert(response.Logs, gc.DeepEquals, []string{"bootstrap logs"})
+
+	// Test job not found
+	_, err = root.BootstrapStatus(ctx, params.BootstrapStatusRequest{
+		JobID:     uuid.New().String(),
+		Watermark: 0,
+	})
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
+
+	// Test unauthorized user
+	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
+	_, err = root.BootstrapStatus(ctx, params.BootstrapStatusRequest{
+		JobID:     uuidGenerated.String(),
+		Watermark: 0,
+	})
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }

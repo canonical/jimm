@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -99,6 +100,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "Version", version)
 		// JIMM Model Migrations
 		r.AddMethod("JIMM", 4, "PrepareModelMigration", prepareModelMigration)
+		// JIMM Bootstrap
+		r.AddMethod("JIMM", 4, "BootstrapStatus", rpc.Method(r.BootstrapStatus))
 
 		return []int{4}
 	}
@@ -557,4 +560,20 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 	}
 
 	return resp, nil
+}
+
+// BootstrapStatus retrieves the status of a bootstrap job and its logs.
+func (r *controllerRoot) BootstrapStatus(ctx context.Context, req apiparams.BootstrapStatusRequest) (apiparams.BootstrapStatusResponse, error) {
+	const op = errors.Op("jujuapi.BootstrapStatus")
+
+	if !r.user.JimmAdmin {
+		return apiparams.BootstrapStatusResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	jobId, err := uuid.Parse(req.JobID)
+	if err != nil {
+		return apiparams.BootstrapStatusResponse{}, errors.E(op, errors.CodeBadRequest, "invalid job ID", err)
+	}
+
+	return r.jimm.BootstrapManager().GetBootstrapStatusAndLogs(ctx, r.user, jobId, req.Watermark)
 }
