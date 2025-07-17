@@ -6,7 +6,7 @@
 # to access jaas commands.
 
 # Exit immediately if a command exits with a non-zero status.
-set -e  
+set -e
 
 if command -v jaas >/dev/null 2>&1; then
     echo "jaas available, skipping build"

@@ -202,6 +202,9 @@ func (c *migrateModelCommand) parseUserMappingFile() (map[string]string, error) 
 	if err != nil {
 		return nil, fmt.Errorf("could not parse user mapping file: %v", err)
 	}
+	if len(userMapping) < 1 {
+		return nil, fmt.Errorf("user mapping file is empty or not properly formatted")
+	}
 	return userMapping, nil
 }
 
@@ -219,6 +222,7 @@ func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (
 	}
 
 	return controller.MigrationSpec{
+		SkipUserChecks:        true,
 		TargetControllerUUID:  controllerInfo.ControllerUUID,
 		TargetControllerAlias: c.targetController,
 		TargetAddrs:           controllerInfo.APIEndpoints,

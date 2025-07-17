@@ -30,6 +30,10 @@ inputs:
       to bootstrap a controller.
     required: false
     default: 'true'
+  jimm-controller-name:
+    description: 'Name of the JIMM controller - this is the name that will appear in the output of the juju controller command.'
+    required: false
+    default: "jimm"
 
 outputs:
   url:
@@ -44,6 +48,12 @@ outputs:
   ca-cert:
     description: 'The CA certificate used to genereate the JIMM server cert.'
     value: ${{ steps.fetch-cert.outputs.jimm-ca }}
+  backing-controller-name:
+    description: 'The name of the backing controller connected to JIMM.'
+    value: ${{ steps.lxd-controller.outputs.name }}
+  jimm-controller-name:
+    description: 'The name of the JIMM controller.'
+    value: ${{ inputs.jimm-controller-name }}
 
 runs:
   using: "composite"
@@ -144,6 +154,7 @@ runs:
       # Below is a hardcoded JWT using the same test-secret used in JIMM's docker compose and allows the CLI to authenticate as the jimm-test@canonical.com user.
       env:
         JWT: ZXlKMGVYQWlPaUpLVjFRaUxDSmhiR2NpT2lKSVV6STFOaUo5LmV5SnBjM01pT2lKUGJteHBibVVnU2xkVUlFSjFhV3hrWlhJaUxDSnBZWFFpT2pFM01qUXlNamcyTmpBc0ltVjRjQ0k2TXprMk5EYzFNelEyTUN3aVlYVmtJam9pYW1sdGJTSXNJbk4xWWlJNkltcHBiVzB0ZEdWemRFQmpZVzV2Ym1sallXd3VZMjl0SW4wLkpTWVhXcGF6T0FnX1VFZ2hkbjlOZkVQdWxhWWlJQVdaX3BuSmRDbnJvWEk=
+        JIMM_CONTROLLER_NAME: ${{ inputs.jimm-controller-name }}
 
     - name: Add LXD Juju controller to JIMM
       run: ./local/jimm/add-controller.sh

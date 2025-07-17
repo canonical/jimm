@@ -6,6 +6,7 @@
 
 CLOUDINIT_FILE=${CLOUDINIT_FILE:-"cloudinit.temp.yaml"}
 CONTROLLER_NAME="${CONTROLLER_NAME:-qa-lxd}"
+SKIP_CONNECT_JIMM="${SKIP_CONNECT_JIMM:-false}"
 CLOUDINIT_TEMPLATE=$'cloudinit-userdata: |
   preruncmd:
     - echo "%s    jimm.localhost" >> /etc/hosts
@@ -23,6 +24,14 @@ if [ "${SKIP_BOOTSTRAP:-false}" == true ]; then
   exit 0
 fi
 
+BOOTSTRAP_ARGS=(lxd "${CONTROLLER_NAME}" --config "${CLOUDINIT_FILE}")
+
+if [[ "$SKIP_CONNECT_JIMM" != "true" ]]; then
+  BOOTSTRAP_ARGS+=(--config "login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json")
+else
+  echo "Skipping connecting the controller to JIMM"
+fi
+
 echo "Bootstrapping controller"
-JUJU_DEV_FEATURE_FLAGS=ssh-jump juju bootstrap lxd "${CONTROLLER_NAME}" --config "${CLOUDINIT_FILE}" --config login-token-refresh-url=https://jimm.localhost/.well-known/jwks.json
+JUJU_DEV_FEATURE_FLAGS=ssh-jump juju bootstrap "${BOOTSTRAP_ARGS[@]}"
 rm "$CLOUDINIT_FILE"

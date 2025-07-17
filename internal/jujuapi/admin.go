@@ -9,6 +9,8 @@ import (
 	"github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -22,6 +24,17 @@ func unsupportedLogin() error {
 		Code:    jujuparams.CodeNotSupported,
 		Message: "JIMM does not support login from old clients",
 	}
+}
+
+// unsupportedLoginWithInfo is a version of unsupportedLogin that logs the
+// auth tag and client version for debugging purposes. This is useful for
+// identifying which clients are attempting to use the old login method.
+func unsupportedLoginWithInfo(ctx context.Context, req jujuparams.LoginRequest) error {
+	zapctx.Debug(ctx, "unsupported login attempt",
+		zap.String("auth_tag", req.AuthTag),
+		zap.String("client_version", req.ClientVersion),
+	)
+	return unsupportedLogin()
 }
 
 var facadeInit = make(map[string]func(r *controllerRoot) []int)

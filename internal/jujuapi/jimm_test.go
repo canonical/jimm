@@ -230,7 +230,7 @@ func (s *jimmSuite) TestAddControllerCustomTLSHostname(c *gc.C) {
 	}
 
 	_, err := client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, "failed to dial the controller")
+	c.Assert(err, gc.ErrorMatches, "failed to dial the controller.*")
 	acr.TLSHostname = "juju-apiserver"
 	ci, err := client.AddController(&acr)
 	c.Assert(err, gc.IsNil)

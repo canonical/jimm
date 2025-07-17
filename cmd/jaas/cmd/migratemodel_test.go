@@ -44,6 +44,20 @@ bob: bob@canonical.com
 	})
 }
 
+func (s *migrateModelSuite) TestReadUserMappingFailsWithEmptyYaml(c *gc.C) {
+	userMappingFile, err := os.CreateTemp(c.MkDir(), "")
+	c.Assert(err, gc.IsNil)
+
+	// Invalid YAML content
+	_, err = userMappingFile.WriteString("")
+	c.Assert(err, gc.IsNil)
+
+	migrateCmd := NewMigrateModelCommandForTesting(jjclient.NewMemStore(), nil)
+	migrateCmd.userMappingFile = userMappingFile.Name()
+	_, err = migrateCmd.parseUserMappingFile()
+	c.Assert(err, gc.ErrorMatches, "user mapping file is empty or not properly formatted")
+}
+
 func (s *migrateModelSuite) TestCommandsFailsWithMissingArgs(c *gc.C) {
 	_, err := cmdtesting.RunCommand(c, NewMigrateModelCommandForTesting(jjclient.NewMemStore(), nil), "myController")
 	c.Assert(err, gc.ErrorMatches, "Missing controller name and model target arguments")

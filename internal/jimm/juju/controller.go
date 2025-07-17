@@ -229,18 +229,18 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 
 	api, err := j.dialController(ctx, ctl)
 	if err != nil {
-		return errors.E(op, "failed to dial the controller", err)
+		return errors.E(op, fmt.Errorf("failed to dial the controller: %v", err))
 	}
 	defer api.Close()
 
 	modelSummary, err := getControllerModelSummary(ctx, api)
 	if err != nil {
-		return errors.E(op, err, "failed to get model summary")
+		return errors.E(op, fmt.Errorf("failed to get model summary: %v", err))
 	}
 
 	cloudName, err := getCloudNameFromModelSummary(modelSummary)
 	if err != nil {
-		return errors.E(op, err, "failed to parse the cloud tag")
+		return errors.E(op, fmt.Errorf("failed to parse the cloud tag: %v", err))
 	}
 
 	ctl.CloudName = cloudName
