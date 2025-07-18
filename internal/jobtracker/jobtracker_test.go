@@ -109,7 +109,8 @@ func (s *jobTrackerSuite) TestRun_JobIdSetInContext(c *qt.C) {
 	testCtx := c.Context()
 
 	aJobWithIdInContext := func(ctx context.Context) error {
-		_, ok := jobtracker.JobIdFromContext(ctx)
+		jobId, ok := jobtracker.JobIdFromContext(ctx)
+		c.Check(jobId, qt.Not(qt.Equals), uuid.Nil)
 		c.Check(ok, qt.IsTrue)
 		return nil
 	}

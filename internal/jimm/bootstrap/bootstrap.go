@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -20,19 +19,26 @@ type JobTracker interface {
 	GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrackerEntry, error)
 }
 
+type Store interface {
+	QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error)
+}
+
 type bootstrapManager struct {
 	jobtracker JobTracker
-	store      *db.Database
+	store      Store
 	authSvc    *openfga.OFGAClient
 }
 
 // NewBootstrapManager creates a new BootstrapManager instance.
-func NewBootstrapManager(store *db.Database, authSvc *openfga.OFGAClient, jobtracker JobTracker) (*bootstrapManager, error) {
+func NewBootstrapManager(store Store, authSvc *openfga.OFGAClient, jobtracker JobTracker) (*bootstrapManager, error) {
 	if store == nil {
 		return nil, errors.E("store cannot be nil")
 	}
 	if authSvc == nil {
 		return nil, errors.E("authorisation service cannot be nil")
+	}
+	if jobtracker == nil {
+		return nil, errors.E("job tracker cannot be nil")
 	}
 	return &bootstrapManager{
 		store:      store,
@@ -52,14 +58,14 @@ func (b *bootstrapManager) GetBootstrapStatusAndLogs(ctx context.Context, _ *ope
 		return params.BootstrapStatusResponse{}, errors.E(op, "failed to get job status", err)
 	}
 
-	logs, newOffset, err := b.store.QueryBootstrapLog(ctx, jobId, offset)
+	loggies, newOffset, err := b.store.QueryBootstrapLog(ctx, jobId, offset)
 	if err != nil {
 		return params.BootstrapStatusResponse{}, errors.E(op, "failed to query bootstrap logs", err)
 	}
 	return params.BootstrapStatusResponse{
 		Status:    string(job.Status),
 		Error:     job.Error,
-		Logs:      logs,
+		Logs:      loggies,
 		Watermark: newOffset,
 	}, nil
 }

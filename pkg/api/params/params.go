@@ -572,11 +572,11 @@ type BootstrapStatusRequest struct {
 // BootstrapStatusResponse holds the response for a bootstrap job status.
 type BootstrapStatusResponse struct {
 	// Status is the status of the bootstrap job.
-	Status string `json:"status"`
+	Status string `json:"status" yaml:"status"`
 	// Logs are the logs for the bootstrap job.
-	Logs []string `json:"logs"`
+	Logs []string `json:"logs" yaml:"logs"`
 	// Watermark is the line number to use for the next request.
-	Watermark int `json:"watermark"`
+	Watermark int `json:"watermark" yaml:"watermark"`
 	// Error is the error message if the bootstrap job failed.
-	Error string `json:"error,omitempty"`
+	Error string `json:"error,omitempty" yaml:"error,omitempty"`
 }

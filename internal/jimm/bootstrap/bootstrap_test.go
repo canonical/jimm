@@ -57,8 +57,10 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	defer close(read)
 	write := make(chan struct{})
 	defer close(write)
+
 	numLogs := 101
 	batchSize := 10
+
 	jobId, err := s.jobTracker.Run(ctx,
 		"bootstrap-job",
 		func(ctx context.Context) error {
@@ -73,6 +75,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 				err := s.db.AddBootstrapLog(ctx, jobId, "bootstrap logs "+fmt.Sprint(rune(i)))
 				c.Check(err, qt.IsNil)
 			}
+			// We need to signal that we've written the last batch of logs.
 			write <- struct{}{}
 			<-read
 			return nil
@@ -81,17 +84,19 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	)
 	c.Assert(err, qt.IsNil)
 	watermark := 0
-	for i := 0; i < numLogs/batchSize+1; i++ {
+	for batch := 0; batch < numLogs/batchSize+1; batch++ {
 		<-write // Wait for the batch of logs to be written.
+
 		response, err := s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
 		c.Assert(err, qt.IsNil)
 		logs := []string{}
-		for j := 0; j < int(math.Min(float64(batchSize), float64(numLogs-i*batchSize))); j++ {
-			logs = append(logs, "bootstrap logs "+fmt.Sprint(rune(i*batchSize+j)))
+		for j := 0; j < int(math.Min(float64(batchSize), float64(numLogs-batch*batchSize))); j++ {
+			logs = append(logs, "bootstrap logs "+fmt.Sprint(rune(batch*batchSize+j)))
 		}
 		c.Check(response.Logs, qt.DeepEquals, logs)
 		c.Assert(response.Status, qt.Equals, string(dbmodel.StatusRunning))
 		watermark = response.Watermark
+
 		read <- struct{}{} // Signal it has been read.
 	}
 

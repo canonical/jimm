@@ -562,7 +562,8 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 	return resp, nil
 }
 
-// BootstrapStatus retrieves the status of a bootstrap job and its logs.
+// BootstrapStatus retrieves the status of a bootstrap job, its logs and the watermark
+// for the logs.
 func (r *controllerRoot) BootstrapStatus(ctx context.Context, req apiparams.BootstrapStatusRequest) (apiparams.BootstrapStatusResponse, error) {
 	const op = errors.Op("jujuapi.BootstrapStatus")
 
