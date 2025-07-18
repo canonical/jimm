@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	cofga "github.com/canonical/ofga"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v4"
 	"github.com/oklog/ulid/v2"
 	sdk "github.com/openfga/go-sdk"
@@ -58,6 +59,12 @@ func SetupTestOFGAClient(names ...string) (*openfga.OFGAClient, *cofga.Client, *
 
 	testName := strings.NewReplacer(" ", "_", "'", "_").Replace(strings.Join(names, "_"))
 
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		return nil, nil, nil, errgo.Notef(err, "failed to generate random UUID for test name %s", testName)
+	}
+	testName = fmt.Sprintf("%s_%s", testName, uuid.String()[0:8])
+
 	setupsMu.Lock()
 	defer setupsMu.Unlock()
 	setup, ok := setups[testName]
@@ -65,7 +72,7 @@ func SetupTestOFGAClient(names ...string) (*openfga.OFGAClient, *cofga.Client, *
 		return setup.client, setup.cofgaClient, setup.cofgaParams, nil
 	}
 
-	err := RemoveStore(ctx, testName)
+	err = RemoveStore(ctx, testName)
 	if err != nil {
 		return nil, nil, nil, err
 	}

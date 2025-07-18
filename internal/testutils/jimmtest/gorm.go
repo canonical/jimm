@@ -67,7 +67,6 @@ func PostgresDBWithDbName(t Tester, nowFunc func() time.Time) (*gorm.DB, string)
 	if err != nil {
 		t.Fatalf("template database does not exist: %s", err)
 	}
-
 	suggestedName := "jimm_test_" + t.Name()
 	t.Logf("suggested db name: %s", suggestedName)
 	databaseName, dsn, err := createDatabaseFromTemplate(suggestedName, templateDatabaseName)
