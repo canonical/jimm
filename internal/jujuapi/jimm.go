@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -62,6 +63,8 @@ func init() {
 		migrateModel := rpc.Method(r.MigrateModel)
 		version := rpc.Method(r.Version)
 		prepareModelMigration := rpc.Method(r.PrepareModelMigration)
+		bootstrapStatus := rpc.Method(r.BootstrapStatus)
+		bootstrapStart := rpc.Method(r.BootstrapStart)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -101,7 +104,8 @@ func init() {
 		// JIMM Model Migrations
 		r.AddMethod("JIMM", 4, "PrepareModelMigration", prepareModelMigration)
 		// JIMM Bootstrap
-		r.AddMethod("JIMM", 4, "BootstrapStatus", rpc.Method(r.BootstrapStatus))
+		r.AddMethod("JIMM", 4, "BootstrapStatus", bootstrapStatus)
+		r.AddMethod("JIMM", 4, "BootstrapStart", bootstrapStart)
 
 		return []int{4}
 	}
@@ -577,4 +581,29 @@ func (r *controllerRoot) BootstrapStatus(ctx context.Context, req apiparams.Boot
 	}
 
 	return r.jimm.BootstrapManager().GetBootstrapStatusAndLogs(ctx, r.user, jobId, req.Watermark)
+}
+
+// BootstrapStart starts a bootstrap job.
+func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.BootstrapStartParams) (apiparams.BootstrapStartResponse, error) {
+	const op = errors.Op("jujuapi.BootstrapStart")
+
+	if !r.user.JimmAdmin {
+		return apiparams.BootstrapStartResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	params := bootstrap.BootstrapParams{
+		ControllerName: req.ControllerName,
+		CloudName:      req.CloudName,
+		CloudRegion:    req.RegionName,
+		AgentVersion:   req.Flags.AgentVersion,
+		TimeoutSeconds: req.Flags.Timeout,
+	}
+
+	jobID, err := r.jimm.BootstrapManager().StartBootstrap(ctx, r.user, params)
+	if err != nil {
+		return apiparams.BootstrapStartResponse{}, errors.E(op, fmt.Errorf("failed to start bootstrap job: %v", err))
+	}
+	return apiparams.BootstrapStartResponse{
+		JobID: jobID,
+	}, nil
 }

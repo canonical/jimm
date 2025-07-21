@@ -4,6 +4,7 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -68,4 +69,16 @@ func (b *bootstrapManager) GetBootstrapStatusAndLogs(ctx context.Context, _ *ope
 		Logs:      loggies,
 		Watermark: newOffset,
 	}, nil
+}
+
+// StartBootstrap starts a bootstrap job with the provided parameters.
+func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.User, params BootstrapParams) (string, error) {
+	const op = errors.Op("jimm.StartBootstrap")
+
+	err := params.validate()
+	if err != nil {
+		return "", errors.E(op, fmt.Errorf("invalid bootstrap parameters: %v", err))
+	}
+
+	return "", errors.E(op, "not implemented")
 }

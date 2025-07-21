@@ -11,6 +11,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -22,7 +23,7 @@ type jimmUnitTestSuite struct{}
 
 var _ = gc.Suite(&jimmUnitTestSuite{})
 
-func (s *jimmSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
+func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
 	ctx := context.Background()
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jimm.JujuManager {
@@ -36,7 +37,7 @@ func (s *jimmSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 }
 
-func (s *jimmSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
+func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
@@ -53,7 +54,7 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "invalid model tag")
 }
 
-func (s *jimmSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
+func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
@@ -71,7 +72,7 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "invalid controller name")
 }
 
-func (s *jimmSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
+func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
@@ -106,7 +107,7 @@ func (s *jimmSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `--badwolf--@canonical.com is not a valid external user name`)
 }
 
-func (s *jimmSuite) TestBootstrapStatus(c *gc.C) {
+func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	ctx := context.Background()
 	uuidGenerated := uuid.New()
 	jimm := &jimmtest.JIMM{
@@ -148,5 +149,50 @@ func (s *jimmSuite) TestBootstrapStatus(c *gc.C) {
 		JobID:     uuidGenerated.String(),
 		Watermark: 0,
 	})
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+}
+
+func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
+	ctx := context.Background()
+	var startBootstrapErr error
+
+	jimm := &jimmtest.JIMM{
+		BootstapManager_: func() jimm.BootstrapManager {
+			return &mocks.BootstapManager{
+				StartBootstrap_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
+					if startBootstrapErr != nil {
+						return "", startBootstrapErr
+					}
+					return uuid.New().String(), nil
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	params := params.BootstrapStartParams{
+		ControllerName: "controller",
+		CloudName:      "cloud",
+		RegionName:     "region",
+		Flags: params.BootstrapFlags{
+			AgentVersion: "1.0.0",
+			Timeout:      3600,
+		},
+	}
+
+	response, err := root.BootstrapStart(ctx, params)
+	c.Assert(err, gc.IsNil)
+	c.Assert(response.JobID, gc.Not(gc.Equals), "")
+
+	// Test start bootstrap fails
+	startBootstrapErr = errors.E("foo")
+	_, err = root.BootstrapStart(ctx, params)
+	c.Assert(err, gc.NotNil)
+	c.Assert(err.Error(), gc.Matches, "failed to start bootstrap job: foo")
+
+	startBootstrapErr = nil
+	// Test unauthorized user
+	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
+	_, err = root.BootstrapStart(ctx, params)
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }
