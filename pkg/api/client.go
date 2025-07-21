@@ -253,3 +253,10 @@ func (c *Client) PrepareModelMigration(req *params.PrepareModelMigrationRequest)
 	err := c.caller.APICall("JIMM", 4, "", "PrepareModelMigration", req, &response)
 	return response, err
 }
+
+// BootstrapStatus retrieves the status and logs of a bootstrap job.
+func (c *Client) BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error) {
+	var response params.BootstrapStatusResponse
+	err := c.caller.APICall("JIMM", 4, "", "BootstrapStatus", req, &response)
+	return response, err
+}

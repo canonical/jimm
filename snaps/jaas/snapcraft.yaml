@@ -70,3 +70,4 @@ parts:
       ln -sf jaas bin/juju-unregister-controller
       ln -sf jaas bin/juju-update-migrated-model
       ln -sf jaas bin/juju-update-service-account-credential
+      ln -sf jaas bin/juju-bootstrap-status

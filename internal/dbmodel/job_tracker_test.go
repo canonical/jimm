@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 type jobTrackerSuite struct {
@@ -80,6 +81,13 @@ func (j *jobTrackerSuite) TestJobTracker_StatusesSetCorrectly(c *qt.C) {
 
 	entry.Status = dbmodel.StatusPending
 	c.Assert(entry.GetStatus(), qt.Equals, dbmodel.StatusPending)
+}
+
+func (j *jobTrackerSuite) TestJobTrackerStatusMatchesParamsJobStatus(c *qt.C) {
+	c.Assert(string(dbmodel.StatusFailed), qt.Equals, string(params.StatusFailed))
+	c.Assert(string(dbmodel.StatusRunning), qt.Equals, string(params.StatusRunning))
+	c.Assert(string(dbmodel.StatusSuccessful), qt.Equals, string(params.StatusSuccessful))
+	c.Assert(string(dbmodel.StatusPending), qt.Equals, string(params.StatusPending))
 }
 
 func TestJobTrackerSuite(t *testing.T) {

@@ -132,7 +132,7 @@ func (s *jimmSuite) TestBootstrapStatus(c *gc.C) {
 	})
 
 	c.Assert(err, gc.IsNil)
-	c.Assert(response.Status, gc.Equals, "running")
+	c.Assert(response.Status, gc.Equals, params.StatusRunning)
 	c.Assert(response.Logs, gc.DeepEquals, []string{"bootstrap logs"})
 
 	// Test job not found

@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -94,15 +93,14 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 			logs = append(logs, "bootstrap logs "+fmt.Sprint(rune(batch*batchSize+j)))
 		}
 		c.Check(response.Logs, qt.DeepEquals, logs)
-		c.Assert(response.Status, qt.Equals, string(dbmodel.StatusRunning))
+		c.Assert(response.Status, qt.Equals, params.StatusRunning)
 		watermark = response.Watermark
-
 		read <- struct{}{} // Signal it has been read.
 	}
 
 	// check last batch is empty.
 	response, err := s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
-	c.Assert(response.Status == string(dbmodel.StatusSuccessful) || response.Status == string(dbmodel.StatusRunning), qt.IsTrue)
+	c.Assert(response.Status == params.StatusSuccessful || response.Status == params.StatusRunning, qt.IsTrue)
 	c.Assert(err, qt.IsNil)
 	c.Assert(response.Logs, qt.HasLen, 0)
 }
@@ -121,12 +119,12 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C)
 	for range 10 {
 		response, err = s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
 		c.Assert(err, qt.IsNil)
-		if response.Status == string(dbmodel.StatusFailed) {
+		if response.Status == params.StatusFailed {
 			break
 		}
 		time.Sleep(100 * time.Millisecond) // Wait for the job to be marked as failed.
 	}
-	c.Assert(response.Status, qt.Equals, string(dbmodel.StatusFailed))
+	c.Assert(response.Status, qt.Equals, params.StatusFailed)
 	c.Assert(response.Error, qt.Equals, "I died really fast")
 }
 
