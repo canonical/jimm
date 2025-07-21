@@ -580,3 +580,26 @@ type BootstrapStatusResponse struct {
 	// Error is the error message if the bootstrap job failed.
 	Error string `json:"error,omitempty" yaml:"error,omitempty"`
 }
+
+// BootstrapFlags holds the flags that can be used
+// when bootstrapping a new controller.
+type BootstrapFlags struct {
+	AgentVersion string `json:"agent-version,omitempty"`
+	Timeout      string `json:"timeout,omitempty"`
+}
+
+// BootstrapStartParams holds parameters for starting
+// a controller bootstrap job.
+type BoostrapStartParams struct {
+	CloudName      string         `json:"cloud-name"`
+	RegionName     string         `json:"region-name"`
+	ControllerName string         `json:"controller-name"`
+	Flags          BootstrapFlags `json:"flags"`
+}
+
+// BootstrapStartResponse holds the response for starting
+// a controller bootstrap job.
+type BootstrapStartResponse struct {
+	JobID string `json:"job-id"`
+	Error string `json:"error,omitempty"`
+}
