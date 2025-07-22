@@ -40,6 +40,45 @@ func (m *MockJIMMClient) EXPECT() *MockJIMMClientMockRecorder {
 	return m.recorder
 }
 
+// Bootstrap mocks base method.
+func (m *MockJIMMClient) Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Bootstrap", req)
+	ret0, _ := ret[0].(*params.BootstrapStartResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Bootstrap indicates an expected call of Bootstrap.
+func (mr *MockJIMMClientMockRecorder) Bootstrap(req any) *MockJIMMClientBootstrapCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Bootstrap", reflect.TypeOf((*MockJIMMClient)(nil).Bootstrap), req)
+	return &MockJIMMClientBootstrapCall{Call: call}
+}
+
+// MockJIMMClientBootstrapCall wrap *gomock.Call
+type MockJIMMClientBootstrapCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMClientBootstrapCall) Return(arg0 *params.BootstrapStartResponse, arg1 error) *MockJIMMClientBootstrapCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMClientBootstrapCall) Do(f func(*params.BootstrapStartParams) (*params.BootstrapStartResponse, error)) *MockJIMMClientBootstrapCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMClientBootstrapCall) DoAndReturn(f func(*params.BootstrapStartParams) (*params.BootstrapStartResponse, error)) *MockJIMMClientBootstrapCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // BootstrapStatus mocks base method.
 func (m *MockJIMMClient) BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error) {
 	m.ctrl.T.Helper()

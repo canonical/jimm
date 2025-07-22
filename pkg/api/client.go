@@ -260,3 +260,10 @@ func (c *Client) BootstrapStatus(req *params.BootstrapStatusRequest) (params.Boo
 	err := c.caller.APICall("JIMM", 4, "", "BootstrapStatus", req, &response)
 	return response, err
 }
+
+// Bootstrap starts a bootstrap operation on the JIMM server.
+func (c *Client) Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error) {
+	var response params.BootstrapStartResponse
+	err := c.caller.APICall("JIMM", 4, "", "BootstrapStart", req, &response)
+	return &response, err
+}

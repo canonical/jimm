@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/juju/cmd/v3"
@@ -13,7 +15,7 @@ import (
 	"github.com/juju/juju/jujuclient"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/pkg/api"
+	jimmAPI "github.com/canonical/jimm/v3/pkg/api"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -34,6 +36,7 @@ func NewBootstrapStatusCommand() cmd.Command {
 	cmd := &bootstrapStatusCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.bootstrapAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -42,10 +45,10 @@ func NewBootstrapStatusCommand() cmd.Command {
 type bootstrapStatusCommand struct {
 	modelcmd.ControllerCommandBase
 
-	store    jujuclient.ClientStore
-	dialOpts *jujuapi.DialOpts
-	jobId    string
-	client   JIMMClient
+	store            jujuclient.ClientStore
+	dialOpts         *jujuapi.DialOpts
+	jobId            string
+	bootstrapAPIFunc func() (JIMMClient, error)
 
 	sleepBetweenGetLogs time.Duration
 	follow              bool
@@ -77,17 +80,6 @@ func (c *bootstrapStatusCommand) Init(args []string) error {
 	if len(args) > 0 {
 		return errors.E("unknown arguments")
 	}
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine controller")
-	}
-
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
-	if err != nil {
-		return err
-	}
-
-	c.client = api.NewClient(apiCaller)
 
 	c.sleepBetweenGetLogs = sleepBetweenGetLogs
 	return nil
@@ -95,48 +87,86 @@ func (c *bootstrapStatusCommand) Init(args []string) error {
 
 // Run implements cmd.Command.Run interface.
 func (c *bootstrapStatusCommand) Run(ctxt *cmd.Context) error {
+	client, err := c.bootstrapAPIFunc()
+	if err != nil {
+		return fmt.Errorf("failed to create JIMM client: %v", err)
+	}
+	poller := logPoller{
+		client:              client,
+		jobId:               c.jobId,
+		sleepBetweenGetLogs: c.sleepBetweenGetLogs,
+		out:                 ctxt.Stdout,
+		follow:              c.follow,
+	}
+	return poller.watchBootstrapLogs()
+}
+
+type logPoller struct {
+	client              JIMMClient
+	jobId               string
+	sleepBetweenGetLogs time.Duration
+	out                 io.Writer
+	follow              bool
+}
+
+func (p logPoller) watchBootstrapLogs() error {
 	watermark := 0
+
 	for {
-		response, err := c.client.BootstrapStatus(&params.BootstrapStatusRequest{
-			JobID:     c.jobId,
+		response, err := p.client.BootstrapStatus(&params.BootstrapStatusRequest{
+			JobID:     p.jobId,
 			Watermark: watermark,
 		})
 		if err != nil {
 			return errors.E(err, "failed to get bootstrap status")
 		}
+		for _, log := range response.Logs {
+			_, err = p.out.Write([]byte(log + "\n"))
+			if err != nil {
+				return errors.E(err, "failed to write bootstrap log")
+			}
+		}
+		watermark = response.Watermark
 		switch response.Status {
 		case params.StatusRunning:
-			for _, log := range response.Logs {
-				_, err = ctxt.Stdout.Write([]byte(log + "\n"))
-				if err != nil {
-					return errors.E(err, "failed to write bootstrap log")
-				}
-			}
-			watermark = response.Watermark
+			// If the job is still running, we just continue to the next iteration.
 		case params.StatusSuccessful:
-			_, err = ctxt.Stdout.Write([]byte("Bootstrap job completed successfully.\n"))
+			_, err = p.out.Write([]byte("Bootstrap job completed successfully.\n"))
 			if err != nil {
 				return errors.E(err, "failed to write bootstrap success message")
 			}
 			return nil
 		case params.StatusFailed:
-			_, err = ctxt.Stdout.Write([]byte("Bootstrap job failed: " + response.Error + "\n"))
+			_, err = p.out.Write([]byte("Bootstrap job failed: " + response.Error + "\n"))
 			if err != nil {
 				return errors.E(err, "failed to write bootstrap error")
 			}
 			return nil
 		case params.StatusPending:
-			_, err := ctxt.Stdout.Write([]byte("Bootstrap job is pending...\n"))
+			_, err := p.out.Write([]byte("Bootstrap job is pending...\n"))
 			if err != nil {
 				return errors.E(err, "failed to write bootstrap pending message")
 			}
 		default:
 			return errors.E("unknown bootstrap job status: %s", response.Status)
 		}
-		if !c.follow {
+		if !p.follow {
 			return nil
 		}
-		time.Sleep(c.sleepBetweenGetLogs)
+		time.Sleep(p.sleepBetweenGetLogs)
+	}
+}
+
+func (s *bootstrapStatusCommand) newClient() (JIMMClient, error) {
+	currentController, err := s.store.CurrentController()
+	if err != nil {
+		return nil, errors.E(err, "could not determine controller")
 	}
 
+	apiCaller, err := s.NewAPIRootWithDialOpts(s.store, currentController, "", s.dialOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return jimmAPI.NewClient(apiCaller), nil
 }
