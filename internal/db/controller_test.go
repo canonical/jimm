@@ -60,6 +60,9 @@ func (s *dbSuite) TestGetController(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
+	err = s.Database.GetController(context.Background(), &dbmodel.Controller{})
+	c.Assert(err, qt.ErrorMatches, `controller UUID or name must be provided`)
+
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
 	}

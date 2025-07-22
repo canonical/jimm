@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -201,7 +202,10 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 	ctx := context.Background()
 	err := db.GetController(ctx, &dbController)
 	if err != nil {
-		return jujuparams.MigrationTargetInfo{}, 0, err
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return jujuparams.MigrationTargetInfo{}, 0, err
+		}
+		return jujuparams.MigrationTargetInfo{}, 0, errors.E(err, fmt.Errorf("failed to get controller with name %q", controllerName))
 	}
 	adminUser, adminPass, err := credStore.GetControllerCredentials(ctx, controllerName)
 	if err != nil {

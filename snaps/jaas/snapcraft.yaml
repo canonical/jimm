@@ -52,6 +52,7 @@ parts:
       ln -sf jaas bin/juju-list-roles
       ln -sf jaas bin/juju-list-service-account-credentials
       ln -sf jaas bin/juju-migrate
+      ln -sf jaas bin/juju-migrate-internal
       ln -sf jaas bin/juju-model-status
       ln -sf jaas bin/juju-permissions
       ln -sf jaas bin/juju-purge-audit-logs

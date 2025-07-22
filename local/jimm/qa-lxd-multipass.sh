@@ -39,7 +39,7 @@ multipass exec $VM_NAME -- bash <<- 'EOF'
 EOF
 
 echo "Setting up JIMM"
-multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- bash <<- 'EOF'
+multipass exec --working-directory /home/ubuntu/jimm "$VM_NAME" -- bash <<- EOF
     make certs
 
     # Re-copy and update certs (workaround to keep the same generated certs but simply update the VM's certs only)
@@ -49,6 +49,7 @@ multipass exec --working-directory /home/ubuntu/jimm $VM_NAME -- bash <<- 'EOF'
     make version/commit.txt
     make version/version.txt
 
+    export INSECURE_SECRET_STORAGE=${INSECURE_SECRET_STORAGE}
     # TODO(ale8k): Have docker cache images somewhere that can be shared, the compose takes forever otherwise.
     docker compose --profile dev up --wait -d
 EOF
