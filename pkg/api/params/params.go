@@ -590,3 +590,32 @@ type BootstrapStatusResponse struct {
 	// Error is the error message if the bootstrap job failed.
 	Error string `json:"error,omitempty"`
 }
+
+// BootstrapFlags holds the flags that can be used
+// when bootstrapping a new controller.
+type BootstrapFlags struct {
+	// The agent version to use for the bootstrap.
+	AgentVersion string `json:"agent-version,omitempty"`
+	// The timeout in seconds for the bootstrap.
+	Timeout int `json:"timeout,omitempty"`
+}
+
+// BootstrapStartParams holds parameters for starting
+// a controller bootstrap job.
+type BootstrapStartParams struct {
+	// CloudName specifies the target cloud for the controller.
+	CloudName string `json:"cloud-name"`
+	// RegionName specifies the target region for the controller.
+	RegionName string `json:"region-name"`
+	// ControllerName specifies the name of the controller as recorded in JIMM.
+	ControllerName string `json:"controller-name"`
+	// Flags hold modifiers for the bootstrap job.
+	Flags BootstrapFlags `json:"flags"`
+}
+
+// BootstrapStartResponse holds the response for starting
+// a controller bootstrap job.
+type BootstrapStartResponse struct {
+	// JobID is the ID of the bootstrap job that was started.
+	JobID string `json:"job-id"`
+}
