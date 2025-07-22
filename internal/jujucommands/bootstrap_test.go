@@ -3,6 +3,7 @@
 package jujucommands_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -12,7 +13,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/juju/jujuclient"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/jujucommands"
@@ -105,7 +105,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdStr(c *qt.C)
 }
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloudWritten(c *qt.C) {
-	c.Patch(jujucommands.RunCmdWithOutputRetriever, func(store jujuclient.ClientStore, cmdAndArgs string) (<-chan jujucommands.OutputLine, error) {
+	c.Patch(jujucommands.RunJujuCmd, func(ctx context.Context, cmdStr string, jujuDataDir string) (<-chan jujucommands.OutputLine, error) {
 		// Return chan that has one line inside
 		outputCh := make(chan jujucommands.OutputLine, 1)
 		outputCh <- jujucommands.OutputLine{
@@ -182,11 +182,11 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWritten(c *qt.C) {
 	callCounter := 0
-	c.Patch(jujucommands.RunCmdWithOutputRetriever, func(store jujuclient.ClientStore, cmdAndArgs string) (<-chan jujucommands.OutputLine, error) {
+	c.Patch(jujucommands.RunJujuCmd, func(ctx context.Context, cmdStr string, jujuDataDir string) (<-chan jujucommands.OutputLine, error) {
 		callCounter++
 		if callCounter == 1 {
 			// This is only called once within bootstrap, so we can be pretty sure the public-clouds.yaml was written.
-			c.Assert(cmdAndArgs, qt.Equals, "update-public-clouds --client")
+			c.Assert(cmdStr, qt.Equals, "update-public-clouds --client")
 		}
 		// Return chan that has one line inside
 		outputCh := make(chan jujucommands.OutputLine, 1)

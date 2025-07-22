@@ -14,7 +14,6 @@ import (
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/juju/jujuclient"
 	_ "github.com/juju/juju/provider/lxd"
-	"github.com/juju/utils/v3/ssh"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -98,8 +97,6 @@ func RunBootstrapCmd(
 		return nil, nil, nil, err
 	}
 
-	memStore := jujuclient.NewMemStore()
-
 	// Setup JUJU_DATA
 	tmpJujuData, err := os.MkdirTemp("", "juju-data-*")
 	if err != nil {
@@ -108,10 +105,6 @@ func RunBootstrapCmd(
 
 	zapctx.Debug(ctx, "Setting JUJU_DATA path", zap.String("path", tmpJujuData))
 	os.Setenv("JUJU_DATA", tmpJujuData)
-	// This didn't work... Need to figure a way to not use env var.
-	// if err := cmdCtx.Setenv("JUJU_DATA", tmpJujuData); err != nil {
-	// 	return nil, nil, err
-	// }
 
 	// Juju generates these keys if they don't exist, but as we want to programatically pass
 	// them in, we're creating them manually.
@@ -130,13 +123,14 @@ func RunBootstrapCmd(
 
 	// After generation (if they don't exist), they're loaded into memory during the juju (main)
 	// command. Since we're not running main, we need to load them ourselves.
-	if err := ssh.LoadClientKeys(sshDir); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to load ssh keys: %w", err)
-	}
+	// if err := ssh.LoadClientKeys(sshDir); err != nil {
+	// 	return nil, nil, nil, fmt.Errorf("failed to load ssh keys: %w", err)
+	// }
 
 	// Update public clouds
 	// TODO: Make this a command of this package
-	outputCh, err := runCmdWithOutputRetrieverFunc(memStore, "update-public-clouds --client")
+
+	outputCh, err := runJujuCmd(ctx, "update-public-clouds --client", tmpJujuData)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -163,8 +157,10 @@ func RunBootstrapCmd(
 		}
 	}
 
+	store := jujuclient.NewFileClientStore()
+
 	// TODO: check if cloudName should include region, presuming not right now
-	if err := memStore.UpdateCredential(cloudName, cred); err != nil {
+	if err := store.UpdateCredential(cloudName, cred); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
 	}
 
@@ -176,9 +172,8 @@ func RunBootstrapCmd(
 		os.RemoveAll(tmpJujuData)
 	}
 
-	fmt.Println("CMD string is: ", cmdStr)
-	outputRetriever, err := runCmdWithOutputRetrieverFunc(memStore, cmdStr)
-	return outputRetriever, memStore, cleanupTmpJujuData, err
+	outputRetriever, err := runJujuCmd(ctx, cmdStr, tmpJujuData)
+	return outputRetriever, store, cleanupTmpJujuData, err
 }
 
 // isAValidPublicCloud checks if the cloud name (and possibly region) is a valid

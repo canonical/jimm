@@ -13,6 +13,10 @@ import (
 	"github.com/mitchellh/go-linereader"
 )
 
+var (
+	runJujuCmd = runJujuCmdPriv
+)
+
 type OutputLine struct {
 	Line string
 	Err  error
@@ -43,7 +47,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
 
-	outputCh := make(chan outputLine, 10) // buffered to avoid blocking
+	outputCh := make(chan OutputLine, 10) // buffered to avoid blocking
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -52,7 +56,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		defer wg.Done()
 		for line := range r.Ch {
 			select {
-			case outputCh <- outputLine{Line: line}:
+			case outputCh <- OutputLine{Line: line}:
 			case <-ctx.Done():
 				return
 			}
@@ -69,7 +73,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		wg.Wait()
 
 		if err := cmd.Wait(); err != nil {
-			outputCh <- outputLine{Err: err}
+			outputCh <- OutputLine{Err: err}
 		}
 
 		close(outputCh)
