@@ -19,22 +19,21 @@ type outputLine struct {
 	Err  error
 }
 
+var (
+	cmdPrefix = "juju"
+)
+
 // runJujuCmd runs a juju command with the given command string and JUJU_DATA directory.
 // It returns a channel that will receive output lines from the command's stdout and stderr.
 // The command is run in a separate goroutine, and the context can be used to cancel the command.
 func runJujuCmd(ctx context.Context, cmdStr, jujuDataDir string) (<-chan outputLine, error) {
-	env := func(key string) string {
-		if key == "JUJU_DATA" {
-			return jujuDataDir
-		}
-		return ""
-	}
-	args, err := shell.Fields(cmdStr, env)
+	args, err := shell.Fields(cmdStr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse command: %w", err)
 	}
 
-	cmd := exec.Command("juju", args...)
+	cmd := exec.Command(cmdPrefix, args...)
+	cmd.Env = append(cmd.Env, "JUJU_DATA="+jujuDataDir)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
