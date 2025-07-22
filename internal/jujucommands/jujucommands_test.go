@@ -8,7 +8,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"github.com/juju/juju/jujuclient"
 
 	"github.com/canonical/jimm/v3/internal/jujucommands"
 )
@@ -16,7 +15,8 @@ import (
 type jujucommandsSuite struct{}
 
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
-	outputCh, err := jujucommands.RunCmdWithOutputRetriever(jujuclient.NewEmbeddedMemStore(), "help")
+	testCtx := c.Context()
+	outputCh, err := jujucommands.RunJujuCmd(testCtx, "help", "")
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.
