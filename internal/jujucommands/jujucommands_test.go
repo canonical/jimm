@@ -79,48 +79,6 @@ func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	c.Assert(b.String(), qt.Equals, "JUJU_DATA=testing-data-is-set\n")
 }
 
-func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
-	testCtx := c.Context()
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, "help -blahhhhh", "")
-	c.Assert(err, qt.IsNil)
-
-	lines := make([]string, 0)
-	errs := make([]error, 0)
-
-	for out := range outputCh {
-		lines = append(lines, out.Line)
-		if out.Err != nil {
-			errs = append(errs, out.Err)
-		}
-	}
-
-	// 0 holds the error line
-	// 1 is the exist status (but we're just filtering them into two slices to see
-	// that the output from errors is how we expect, i.e., the line before is the actual
-	// error message).
-	c.Assert(len(lines), qt.Equals, 2)
-	c.Assert(lines[0], qt.Equals, "ERROR option provided but not defined: -b")
-	c.Assert(len(errs), qt.Equals, 1)
-	c.Assert(errs[0].Error(), qt.Equals, "exit status 2")
-}
-
-func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
-	testCtx := c.Context()
-	c.Patch(jujucommands.CmdPrefix, "env")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, "", "testing-data-is-set")
-	c.Assert(err, qt.IsNil)
-
-	// Use a builder to collect streamed output & test entire string.
-	var b strings.Builder
-
-	for out := range outputCh {
-		c.Assert(out.Err, qt.IsNil)
-		b.WriteString(out.Line + "\n")
-	}
-
-	c.Assert(b.String(), qt.Equals, "JUJU_DATA=testing-data-is-set\n")
-}
-
 func TestJujucommandsSuite(t *testing.T) {
 	qtsuite.Run(qt.New(t), &jujucommandsSuite{})
 }

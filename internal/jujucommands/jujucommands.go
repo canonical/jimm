@@ -71,6 +71,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		if err := cmd.Wait(); err != nil {
 			outputCh <- outputLine{Err: err}
 		}
+
 		close(outputCh)
 	}()
 
