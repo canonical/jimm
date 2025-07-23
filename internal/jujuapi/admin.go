@@ -6,7 +6,6 @@ import (
 	"context"
 	"sort"
 
-	"github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -20,10 +19,10 @@ import (
 // unsupportedLogin returns an appropriate error for login attempts using
 // old version of the Admin facade.
 func unsupportedLogin() error {
-	return &rpc.RequestError{
-		Code:    jujuparams.CodeNotSupported,
-		Message: "JIMM does not support login from old clients",
-	}
+	return errors.E(
+		errors.CodeNotSupported,
+		"JIMM does not support login from old clients",
+	)
 }
 
 // unsupportedLoginWithInfo is a version of unsupportedLogin that logs the
