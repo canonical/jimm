@@ -4,6 +4,7 @@
 package errors
 
 import (
+	stderr "errors"
 	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -138,18 +139,18 @@ const (
 
 // ErrorCode returns the error code from the given error.
 func ErrorCode(err error) Code {
-	e, ok := err.(*Error)
-	if !ok {
-		return ""
+	var errCode interface{ ErrorCode() string }
+	if stderr.As(err, &errCode) {
+		return Code(errCode.ErrorCode())
 	}
-	return e.Code
+	return ""
 }
 
 // ErrorInfo returns additional information about the error.
 func ErrorInfo(err error) map[string]any {
-	e, ok := err.(*Error)
-	if !ok {
-		return nil
+	var errInfo interface{ ErrorInfo() map[string]any }
+	if stderr.As(err, &errInfo) {
+		return errInfo.ErrorInfo()
 	}
-	return e.Info
+	return nil
 }
