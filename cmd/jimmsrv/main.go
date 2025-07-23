@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -120,8 +121,12 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	insecureSecretStorage := false
-	if _, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok {
-		insecureSecretStorage = true
+	insecureSecretStorage, err = strconv.ParseBool(os.Getenv("INSECURE_SECRET_STORAGE"))
+	if err != nil {
+		return fmt.Errorf("failed to parse INSECURE_SECRET_STORAGE env var: %v", err)
+	}
+	if insecureSecretStorage {
+		zapctx.Warn(ctx, "insecure secret storage is enabled, this is not recommended for production use")
 	}
 
 	secureSessionCookies := false

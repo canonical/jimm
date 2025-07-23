@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db
 
@@ -45,11 +45,13 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 
 	db := d.DB.WithContext(ctx)
 
-	if controller.UUID != "" {
+	switch {
+	case controller.UUID != "":
 		db = db.Where("uuid = ?", controller.UUID)
-	}
-	if controller.Name != "" {
+	case controller.Name != "":
 		db = db.Where("name = ?", controller.Name)
+	default:
+		return errors.E(op, errors.CodeBadRequest, "controller UUID or name must be provided")
 	}
 	db = db.Preload("CloudRegions").Preload("CloudRegions.CloudRegion").Preload("CloudRegions.CloudRegion.Cloud")
 	if err := db.First(&controller).Error; err != nil {
