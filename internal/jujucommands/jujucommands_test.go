@@ -16,7 +16,8 @@ type jujucommandsSuite struct{}
 
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 	testCtx := c.Context()
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, "help", "")
+	dir := c.TempDir()
+	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{"help"}, dir)
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.
@@ -70,7 +71,8 @@ For the full list of supported commands run:
 
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 	testCtx := c.Context()
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, "help -blahhhhh", "")
+	dir := c.TempDir()
+	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{"help", "-blahhhhh"}, dir)
 	c.Assert(err, qt.IsNil)
 
 	lines := make([]string, 0)
@@ -84,7 +86,7 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 	}
 
 	// 0 holds the error line
-	// 1 is the exist status (but we're just filtering them into two slices to see
+	// 1 is the exit status (but we're just filtering them into two slices to see
 	// that the output from errors is how we expect, i.e., the line before is the actual
 	// error message).
 	c.Assert(len(lines), qt.Equals, 2)
@@ -96,7 +98,7 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	testCtx := c.Context()
 	c.Patch(jujucommands.CmdPrefix, "env")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, "", "testing-data-is-set")
+	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{}, "testing-data-is-set")
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.

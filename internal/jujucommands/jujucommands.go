@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/mitchellh/go-linereader"
-	"mvdan.cc/sh/v3/shell"
 )
 
 type outputLine struct {
@@ -26,13 +25,8 @@ var (
 // runJujuCmd runs a juju command with the given command string and JUJU_DATA directory.
 // It returns a channel that will receive output lines from the command's stdout and stderr.
 // The command is run in a separate goroutine, and the context can be used to cancel the command.
-func runJujuCmd(ctx context.Context, cmdStr, jujuDataDir string) (<-chan outputLine, error) {
-	args, err := shell.Fields(cmdStr, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse command: %w", err)
-	}
-
-	cmd := exec.Command(cmdPrefix, args...)
+func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan outputLine, error) {
+	cmd := exec.CommandContext(ctx, cmdPrefix, args...)
 	cmd.Env = append(cmd.Env, "JUJU_DATA="+jujuDataDir)
 
 	stdOut, err := cmd.StdoutPipe()
@@ -50,11 +44,6 @@ func runJujuCmd(ctx context.Context, cmdStr, jujuDataDir string) (<-chan outputL
 	}
 
 	outputCh := make(chan outputLine, 10) // buffered to avoid blocking
-
-	go func() {
-		<-ctx.Done()
-		_ = cmd.Process.Kill()
-	}()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -82,6 +71,7 @@ func runJujuCmd(ctx context.Context, cmdStr, jujuDataDir string) (<-chan outputL
 		if err := cmd.Wait(); err != nil {
 			outputCh <- outputLine{Err: err}
 		}
+
 		close(outputCh)
 	}()
 
