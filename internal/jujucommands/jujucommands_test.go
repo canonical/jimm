@@ -18,7 +18,8 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 	testCtx := c.Context()
 	dir := c.TempDir()
 	c.Patch(jujucommands.CmdPrefix, "echo")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{"i am an output"}, dir)
+	runner := jujucommands.NewCommandRunner(dir)
+	outputCh, err := runner.RunJujuCmd(testCtx, []string{"i am an output"})
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.
@@ -38,7 +39,8 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 	testCtx := c.Context()
 	dir := c.TempDir()
 	c.Patch(jujucommands.CmdPrefix, "ls")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{"-idontexist"}, dir)
+	runner := jujucommands.NewCommandRunner(dir)
+	outputCh, err := runner.RunJujuCmd(testCtx, []string{"-idontexist"})
 	c.Assert(err, qt.IsNil)
 
 	// The assertion for this test works such that we know we're going to receive 2 lines exactly.

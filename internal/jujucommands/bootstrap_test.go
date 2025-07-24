@@ -80,7 +80,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
 	c.Assert(p.Validate(), qt.IsNil)
 }
 
-func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdStr(c *qt.C) {
+func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C) {
 	p := jujucommands.BootstrapCmdParams{
 		CloudNameAndRegion:   "testregion/testcloud",
 		ControllerName:       "my-controller",
