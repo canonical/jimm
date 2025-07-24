@@ -5,18 +5,12 @@
 package jujucommands
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"strings"
+	"os/exec"
+	"sync"
 
-	"github.com/juju/cmd/v3"
-	"github.com/juju/juju/cmd/juju/commands"
-	"github.com/juju/juju/jujuclient"
 	"github.com/mitchellh/go-linereader"
-)
-
-var (
-	whitelist = []string{"help", "bootstrap"}
 )
 
 type outputLine struct {
@@ -24,108 +18,62 @@ type outputLine struct {
 	Err  error
 }
 
-// runCmdWithOutputRetriever runs the command given by cmdAndArgs using the provided jujuclient.ClientStore.
-// It returns a channel that streams OutputLine values for each line of command output and any final error.
-//
-// Upon receiving an error in an OutputLine, the line previously streamed is guaranteed to be the error line written by
-// the command.
-// I.e., if you run: "help -b"
-// You will get:
-//
-//	Output line: ERROR option provided but not defined: -b // The error line from juju (Which is a none-erroneous OutputLine)
-//	Command finished with error: cmd failed with code 2 // The command error code line (Contains an error in the OutputLine)
-//
-// Consumers are expected to simply read from the OutputLine channel and check for an error like so:
-//
-//	for out := range outputCh {
-//		if out.Err != nil {
-//			fmt.Println("Command finished with error:", out.Err)
-//			break
-//		}
-//		fmt.Println("Output line:", out.Line)
-//	}
-//
-// The OutputLine channel is closed once all output from the command has finished an the error has been captured.
-//
-// Lines returned are returned with no newlines.
-func runCmdWithOutputRetriever(store jujuclient.ClientStore, cmdAndArgs string) (<-chan outputLine, error) {
-	cmdReader, cmdWriter := io.Pipe()
+var (
+	cmdPrefix = "juju"
+)
 
-	cmdCtx, err := cmd.DefaultContext()
+// runJujuCmd runs a juju command with the given command string and JUJU_DATA directory.
+// It returns a channel that will receive output lines from the command's stdout and stderr.
+// The command is run in a separate goroutine, and the context can be used to cancel the command.
+func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan outputLine, error) {
+	cmd := exec.CommandContext(ctx, cmdPrefix, args...)
+	cmd.Env = append(cmd.Env, "JUJU_DATA="+jujuDataDir)
+
+	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get stdout: %w", err)
 	}
 
-	cmdCtx.Stderr = cmdWriter
-	cmdCtx.Stdout = cmdWriter
+	stdErr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stderr: %w", err)
+	}
 
-	outputCh := make(chan outputLine)
-	// We buffer cmdFinishedCh (capacity 1) to avoid deadlock.
-	// runCmd defers cmdWriter.Close(), which only runs after runCmd finishes.
-	// If cmdFinishedCh were unbuffered, sending the final error would block
-	// (since no goroutine is receiving yet), which prevents runCmd from finishing.
-	// This means cmdWriter.Close() never runs, so the reader never gets EOF and hangs.
-	// With a buffered channel, the send doesn't block, allowing runCmd to finish,
-	// the writer to close, and the reader to eventually see EOF and exit.
-	//
-	// This is safe because we only send once, after the command finishes.
-	// Alternatively, we could manually close cmdWriter right after the command.
-	cmdFinishedCh := make(chan int, 1)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
+
+	outputCh := make(chan outputLine, 10) // buffered to avoid blocking
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	readLines := func(r *linereader.Reader) {
+		defer wg.Done()
+		for line := range r.Ch {
+			select {
+			case outputCh <- outputLine{Line: line}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+
+	go readLines(linereader.New(stdOut))
+	go readLines(linereader.New(stdErr))
 
 	go func() {
-		// Read cmdoutput.
-		lr := linereader.New(cmdReader)
-		for line := range lr.Ch {
-			outputCh <- outputLine{Line: line}
-		}
+		// We wait for readers to finished in the case the command exits but
+		// the readers are still processing output. Small chance this could happen,
+		// but this protects us.
+		wg.Wait()
 
-		// Wait for cmd to finish.
-		code := <-cmdFinishedCh
-		if code != 0 {
-			outputCh <- outputLine{Err: fmt.Errorf("cmd failed with code: %d", code)}
+		if err := cmd.Wait(); err != nil {
+			outputCh <- outputLine{Err: err}
 		}
 
 		close(outputCh)
 	}()
-	go runCmd(cmdCtx, cmdWriter, store, cmdFinishedCh, cmdAndArgs)
 
 	return outputCh, nil
-}
-
-// runCmd executes a Juju command using the provided context, client store, and command arguments.
-// It writes command output to the given io.PipeWriter and signals completion or error via cmdFinishedCh.
-// The function splits cmdAndArgs into arguments, constructs a Juju command, and runs it.
-// On non-zero exit code, it sends an error to cmdFinishedCh; otherwise, it signals successful completion.
-//
-// Note, the cmdAndArgs argument expects a fully-qualified command string. I.e.,
-//
-//	"bootstrap lxd a --add-model=\"my-initial-model\""
-func runCmd(
-	cmdCtx *cmd.Context,
-	cmdWriter *io.PipeWriter,
-	store jujuclient.ClientStore,
-	cmdFinishedCh chan<- int,
-	cmdAndArgs string,
-) {
-	defer cmdWriter.Close()
-
-	jujuCmd := commands.NewJujuCommandWithStore(
-		cmdCtx,
-		store,
-		nil,       // quiet?
-		"",        // unknown param
-		"",        // no help hint
-		whitelist, // whitelist
-		// We set embedded false because some commands can targets either a controller or client.
-		// See: https://github.com/juju/juju/blob/1abcb8c5f1f187fd1443e12d6324a47780b43740/cmd/modelcmd/controller.go#L451
-		// And whilst we are "technically" embedding the CLI, without setting this to false,
-		// You must run without --client/--controller and it defaults to updating the client
-		// in update-public-clouds. So, we set it false to allow us to explicitly set
-		// "--client" and not have it ignored.
-		false,
-	)
-
-	code := cmd.Main(jujuCmd, cmdCtx, strings.Split(cmdAndArgs, " "))
-
-	cmdFinishedCh <- code
 }

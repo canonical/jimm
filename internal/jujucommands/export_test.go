@@ -3,5 +3,6 @@
 package jujucommands
 
 var (
-	RunCmdWithOutputRetriever = runCmdWithOutputRetriever
+	RunJujuCmd = runJujuCmd
+	CmdPrefix  = &cmdPrefix
 )
