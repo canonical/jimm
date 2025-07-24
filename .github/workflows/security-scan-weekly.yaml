@@ -53,11 +53,25 @@ jobs:
         with:
           name: govuln-security-scan-results
           path: 'govuln-results.sarif'
+      
+      # Filter the SARIF to exclude rules that cause
+      # a large threadflow count and prevent the file
+      # from being uploaded to the Security tab.
+      # See https://github.com/github/codeql-action/issues/1245
+      - name: filter-sarif
+        uses: advanced-security/filter-sarif@v1
+        with:
+          patterns: |
+            -go.mod:GO-2024-3010
+            -go.mod:GO-2024-3040
+            -go.mod:GO-2024-3175
+          input: 'govuln-results.sarif'
+          output: 'govuln-results-filtered.sarif'
   
       - name: Upload govuln scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'govuln-results.sarif'
+          sarif_file: 'govuln-results-filtered.sarif'
       
       #############
       # KEV Check #
