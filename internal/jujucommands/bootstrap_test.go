@@ -38,6 +38,14 @@ func getsMeSomeKeysBrah(c *qt.C) ([]byte, []byte) {
 	return ssh.MarshalAuthorizedKey(pub), privPEM
 }
 
+type runnerMock struct {
+	impl func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error)
+}
+
+func (r *runnerMock) RunJujuCmd(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
+	return r.impl(ctx, args)
+}
+
 func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
 	p := jujucommands.BootstrapCmdParams{}
 
@@ -82,62 +90,60 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdStr(c *qt.C)
 	}
 
 	c.Assert(
-		p.BuildBootstrapCmdStr(),
-		qt.Equals,
-		"bootstrap --login-token-refresh-url=myurl.com --agent-version=1.1.1 --config bootstrap-timeout=1000 testregion/testcloud my-controller",
+		p.BuildBootstrapCmdArgs(),
+		qt.DeepEquals,
+		[]string{
+			"bootstrap",
+			"--login-token-refresh-url=myurl.com",
+			"--agent-version=1.1.1",
+			"--config bootstrap-timeout=1000",
+			"testregion/testcloud",
+			"my-controller",
+		},
 	)
 
 	p.AgentVersion = ""
 
 	c.Assert(
-		p.BuildBootstrapCmdStr(),
-		qt.Equals,
-		"bootstrap --login-token-refresh-url=myurl.com --config bootstrap-timeout=1000 testregion/testcloud my-controller",
+		p.BuildBootstrapCmdArgs(),
+		qt.DeepEquals,
+		[]string{
+			"bootstrap",
+			"--login-token-refresh-url=myurl.com",
+			"--config bootstrap-timeout=1000",
+			"testregion/testcloud",
+			"my-controller",
+		},
 	)
 
 	p.BootstrapTimeout = 0
 
 	c.Assert(
-		p.BuildBootstrapCmdStr(),
-		qt.Equals,
-		"bootstrap --login-token-refresh-url=myurl.com testregion/testcloud my-controller",
+		p.BuildBootstrapCmdArgs(),
+		qt.DeepEquals,
+		[]string{
+			"bootstrap",
+			"--login-token-refresh-url=myurl.com",
+			"testregion/testcloud",
+			"my-controller",
+		},
 	)
 }
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloudWritten(c *qt.C) {
-	c.Patch(jujucommands.RunJujuCmd, func(ctx context.Context, cmdStr string, jujuDataDir string) (<-chan jujucommands.OutputLine, error) {
-		// Return chan that has one line inside
-		outputCh := make(chan jujucommands.OutputLine, 1)
-		outputCh <- jujucommands.OutputLine{
-			Line: "testing",
-		}
-		close(outputCh)
-		return outputCh, nil
-	})
-
-	p := jujucommands.BootstrapCmdParams{
-		CloudNameAndRegion:   "testcloud/testregion",
-		ControllerName:       "my-controller",
-		AgentVersion:         "1.1.1",
-		BootstrapTimeout:     1000,
-		LoginTokenRefreshURL: "myurl.com",
-	}
-
 	testCtx := c.Context()
 
-	personalCloud := jujucloud.Cloud{
-		Type: "lxd",
-		AuthTypes: jujucloud.AuthTypes{
-			jujucloud.CertificateAuthType,
-		},
-		// Some fake addr.
-		Endpoint: "https://127.0.0.1:8443",
-		Regions: []jujucloud.Region{
-			{
-				Name: "default",
-				// Some fake addr.
-				Endpoint: "https://127.0.0.1:8443",
-			},
+	pub, priv := getsMeSomeKeysBrah(c)
+
+	mock := runnerMock{
+		impl: func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
+			// Return chan that has one line inside
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{
+				Line: "testing",
+			}
+			close(outputCh)
+			return outputCh, nil
 		},
 	}
 
@@ -148,15 +154,36 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 		"client-key":  "client-key",
 	})
 
-	pub, priv := getsMeSomeKeysBrah(c)
-	_, store, cleanup, err := jujucommands.RunBootstrapCmd(
-		testCtx,
-		p,
-		personalCloud,
-		cloudCred,
-		pub,
-		priv,
-	)
+	p := jujucommands.BootstrapCmdParams{
+		CloudNameAndRegion:   "testcloud/testregion",
+		ControllerName:       "my-controller",
+		AgentVersion:         "1.1.1",
+		BootstrapTimeout:     1000,
+		LoginTokenRefreshURL: "myurl.com",
+
+		PersonalCloud: jujucloud.Cloud{
+			Type: "lxd",
+			AuthTypes: jujucloud.AuthTypes{
+				jujucloud.CertificateAuthType,
+			},
+			// Some fake addr.
+			Endpoint: "https://127.0.0.1:8443",
+			Regions: []jujucloud.Region{
+				{
+					Name: "default",
+					// Some fake addr.
+					Endpoint: "https://127.0.0.1:8443",
+				},
+			},
+		},
+		CloudCred: cloudCred,
+		PubKey:    pub,
+		PrivKey:   priv,
+	}
+
+	cmd := jujucommands.NewBootstrapCmd(&mock)
+
+	_, store, cleanup, err := cmd.Run(testCtx, p)
 	c.Cleanup(func() {
 		cleanup()
 	})
@@ -181,45 +208,48 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 }
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWritten(c *qt.C) {
-	callCounter := 0
-	c.Patch(jujucommands.RunJujuCmd, func(ctx context.Context, cmdStr string, jujuDataDir string) (<-chan jujucommands.OutputLine, error) {
-		callCounter++
-		if callCounter == 1 {
-			// This is only called once within bootstrap, so we can be pretty sure the public-clouds.yaml was written.
-			c.Assert(cmdStr, qt.Equals, "update-public-clouds --client")
-		}
-		// Return chan that has one line inside
-		outputCh := make(chan jujucommands.OutputLine, 1)
-		outputCh <- jujucommands.OutputLine{
-			Line: "testing",
-		}
-		close(outputCh)
-		return outputCh, nil
-	})
+	testCtx := c.Context()
 
+	pub, priv := getsMeSomeKeysBrah(c)
+	callCounter := 0
+	mock := runnerMock{
+		impl: func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
+			callCounter++
+			if callCounter == 1 {
+				// This is only called once within bootstrap, so we can be pretty sure the public-clouds.yaml was written.
+				c.Assert(args, qt.DeepEquals, []string{"update-public-clouds", "--client"})
+			}
+			// Return chan that has one line inside
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{
+				Line: "testing",
+			}
+			close(outputCh)
+			return outputCh, nil
+		},
+	}
+
+	cloudCred := *jujucloud.NewEmptyCloudCredential()
+	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
+		"aws-secret": "my-secret",
+	})
 	p := jujucommands.BootstrapCmdParams{
 		CloudNameAndRegion:   "aws/us-east-1",
 		ControllerName:       "my-controller",
 		AgentVersion:         "1.1.1",
 		BootstrapTimeout:     1000,
 		LoginTokenRefreshURL: "myurl.com",
+
+		CloudCred: cloudCred,
+		PubKey:    pub,
+		PrivKey:   priv,
 	}
 
-	testCtx := c.Context()
+	cmd := jujucommands.NewBootstrapCmd(&mock)
 
-	cloudCred := *jujucloud.NewEmptyCloudCredential()
-	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
-		"aws-secret": "my-secret",
-	})
-
-	pub, priv := getsMeSomeKeysBrah(c)
-	_, store, cleanup, err := jujucommands.RunBootstrapCmd(
+	_, store, cleanup, err := cmd.Run(
 		testCtx,
 		p,
-		jujucloud.Cloud{}, // no-op
-		cloudCred,
-		pub,
-		priv,
 	)
 	c.Cleanup(func() {
 		cleanup()

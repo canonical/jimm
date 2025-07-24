@@ -65,7 +65,9 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	testCtx := c.Context()
 	c.Patch(jujucommands.CmdPrefix, "env")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{}, "testing-data-is-set")
+
+	runner := jujucommands.NewCommandRunner("testing-data-is-set")
+	outputCh, err := runner.RunJujuCmd(testCtx, []string{})
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.

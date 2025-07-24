@@ -14,24 +14,35 @@ import (
 )
 
 var (
-	runJujuCmd = runJujuCmdPriv
+	cmdPrefix = "juju"
 )
 
+// OutputLine represents a line of output from a juju command.
 type OutputLine struct {
 	Line string
 	Err  error
 }
 
-var (
-	cmdPrefix = "juju"
-)
+// CommandRunner is a struct that runs juju commands and JUJU_DATA directory.
+type CommandRunner struct {
+	prefix      string
+	jujuDataDir string
+}
+
+// NewCommandRunner creates a new CommandRunner with the specified command prefix.
+func NewCommandRunner(dataDir string) *CommandRunner {
+	return &CommandRunner{
+		prefix:      cmdPrefix,
+		jujuDataDir: dataDir,
+	}
+}
 
 // runJujuCmd runs a juju command with the given command string and JUJU_DATA directory.
 // It returns a channel that will receive output lines from the command's stdout and stderr.
 // The command is run in a separate goroutine, and the context can be used to cancel the command.
-func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan outputLine, error) {
-	cmd := exec.CommandContext(ctx, cmdPrefix, args...)
-	cmd.Env = append(cmd.Env, "JUJU_DATA="+jujuDataDir)
+func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan OutputLine, error) {
+	cmd := exec.CommandContext(ctx, b.prefix, args...)
+	cmd.Env = append(cmd.Env, "JUJU_DATA="+b.jujuDataDir)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {

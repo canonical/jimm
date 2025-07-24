@@ -3,6 +3,5 @@
 package jujucommands
 
 var (
-	RunJujuCmd = runJujuCmd
-	CmdPrefix  = &cmdPrefix
+	CmdPrefix = &cmdPrefix
 )
