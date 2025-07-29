@@ -8,4 +8,5 @@ import "github.com/canonical/jimm/v3/pkg/api/params"
 type JIMMClient interface {
 	BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error)
 	Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error)
+	BootstrapStop(req *params.BootstrapStopRequest) error
 }

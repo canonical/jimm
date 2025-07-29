@@ -267,3 +267,8 @@ func (c *Client) Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapS
 	err := c.caller.APICall("JIMM", 4, "", "BootstrapStart", req, &response)
 	return &response, err
 }
+
+// BootstrapStop stops a bootstrap operation on the JIMM server.
+func (c *Client) BootstrapStop(req *params.BootstrapStopRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "BootstrapStop", req, nil)
+}

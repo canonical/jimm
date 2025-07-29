@@ -117,3 +117,41 @@ func (c *MockJIMMClientBootstrapStatusCall) DoAndReturn(f func(*params.Bootstrap
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// BootstrapStop mocks base method.
+func (m *MockJIMMClient) BootstrapStop(req *params.BootstrapStopRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BootstrapStop", req)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BootstrapStop indicates an expected call of BootstrapStop.
+func (mr *MockJIMMClientMockRecorder) BootstrapStop(req any) *MockJIMMClientBootstrapStopCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BootstrapStop", reflect.TypeOf((*MockJIMMClient)(nil).BootstrapStop), req)
+	return &MockJIMMClientBootstrapStopCall{Call: call}
+}
+
+// MockJIMMClientBootstrapStopCall wrap *gomock.Call
+type MockJIMMClientBootstrapStopCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMClientBootstrapStopCall) Return(arg0 error) *MockJIMMClientBootstrapStopCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMClientBootstrapStopCall) Do(f func(*params.BootstrapStopRequest) error) *MockJIMMClientBootstrapStopCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMClientBootstrapStopCall) DoAndReturn(f func(*params.BootstrapStopRequest) error) *MockJIMMClientBootstrapStopCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
