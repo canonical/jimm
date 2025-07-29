@@ -30,11 +30,21 @@ type CommandRunner struct {
 }
 
 // NewCommandRunner creates a new CommandRunner with the specified command prefix.
+//
+// dataDir is the JUJU_DATA directory where juju commands will store their data.
+// It must be an ABSOLUTE path.
 func NewCommandRunner(dataDir string) *CommandRunner {
 	return &CommandRunner{
 		prefix:      cmdPrefix,
 		jujuDataDir: dataDir,
 	}
+}
+
+// JujuDataDir returns the JUJU_DATA directory used by the CommandRunner.
+//
+// This is exposed so that commands that may need to know the JUJU_DATA directory can access it.
+func (b *CommandRunner) JujuDataDir() string {
+	return b.jujuDataDir
 }
 
 // runJujuCmd runs a juju command with the given command string and JUJU_DATA directory.

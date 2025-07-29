@@ -4,46 +4,26 @@ package jujucommands_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/pem"
 	"os"
 	"path/filepath"
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
-	"golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/jujucommands"
 )
 
-func getsMeSomeKeysBrah(c *qt.C) ([]byte, []byte) {
-	// Generate RSA private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	c.Assert(err, qt.IsNil)
-
-	// Getz a priv key pemmy
-	privPEM := pem.EncodeToMemory(
-		&pem.Block{
-			Type:  "RSA PRIVATE KEY",
-			Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
-		},
-	)
-
-	// OpenSSH pub key so Juju doesn't scream
-	pub, err := ssh.NewPublicKey(&privateKey.PublicKey)
-	c.Assert(err, qt.IsNil)
-
-	return ssh.MarshalAuthorizedKey(pub), privPEM
-}
-
 type runnerMock struct {
-	impl func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error)
+	impl    func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error)
+	dataDir string
 }
 
 func (r *runnerMock) RunJujuCmd(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
 	return r.impl(ctx, args)
+}
+
+func (r *runnerMock) JujuDataDir() string {
+	return r.dataDir
 }
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
@@ -89,41 +69,50 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 		LoginTokenRefreshURL: "myurl.com",
 	}
 
+	args := p.BuildBootstrapCmdArgs()
+
 	c.Assert(
-		p.BuildBootstrapCmdArgs(),
+		args,
 		qt.DeepEquals,
 		[]string{
 			"bootstrap",
-			"--login-token-refresh-url=myurl.com",
+			"--config",
+			"login-token-refresh-url=myurl.com",
 			"--agent-version=1.1.1",
-			"--config bootstrap-timeout=1000",
+			"--config",
+			"bootstrap-timeout=1000",
 			"testregion/testcloud",
 			"my-controller",
 		},
 	)
 
 	p.AgentVersion = ""
+	args = p.BuildBootstrapCmdArgs()
 
 	c.Assert(
-		p.BuildBootstrapCmdArgs(),
+		args,
 		qt.DeepEquals,
 		[]string{
 			"bootstrap",
-			"--login-token-refresh-url=myurl.com",
-			"--config bootstrap-timeout=1000",
+			"--config",
+			"login-token-refresh-url=myurl.com",
+			"--config",
+			"bootstrap-timeout=1000",
 			"testregion/testcloud",
 			"my-controller",
 		},
 	)
 
 	p.BootstrapTimeout = 0
+	args = p.BuildBootstrapCmdArgs()
 
 	c.Assert(
-		p.BuildBootstrapCmdArgs(),
+		args,
 		qt.DeepEquals,
 		[]string{
 			"bootstrap",
-			"--login-token-refresh-url=myurl.com",
+			"--config",
+			"login-token-refresh-url=myurl.com",
 			"testregion/testcloud",
 			"my-controller",
 		},
@@ -132,8 +121,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloudWritten(c *qt.C) {
 	testCtx := c.Context()
-
-	pub, priv := getsMeSomeKeysBrah(c)
 
 	mock := runnerMock{
 		impl: func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
@@ -145,6 +132,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 			close(outputCh)
 			return outputCh, nil
 		},
+		dataDir: c.TempDir(),
 	}
 
 	cloudCred := *jujucloud.NewEmptyCloudCredential()
@@ -177,8 +165,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 			},
 		},
 		CloudCred: cloudCred,
-		PubKey:    pub,
-		PrivKey:   priv,
 	}
 
 	cmd := jujucommands.NewBootstrapCmd(&mock)
@@ -210,7 +196,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWritten(c *qt.C) {
 	testCtx := c.Context()
 
-	pub, priv := getsMeSomeKeysBrah(c)
 	callCounter := 0
 	mock := runnerMock{
 		impl: func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
@@ -227,6 +212,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 			close(outputCh)
 			return outputCh, nil
 		},
+		dataDir: c.TempDir(),
 	}
 
 	cloudCred := *jujucloud.NewEmptyCloudCredential()
@@ -241,8 +227,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 		LoginTokenRefreshURL: "myurl.com",
 
 		CloudCred: cloudCred,
-		PubKey:    pub,
-		PrivKey:   priv,
 	}
 
 	cmd := jujucommands.NewBootstrapCmd(&mock)

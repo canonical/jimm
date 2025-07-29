@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -20,7 +19,6 @@ import (
 // BootstrapCmdParams holds the parameters to bootstrap a controller for JIMM.
 type BootstrapCmdParams struct {
 	// Arguments to be turned into an actual command str.
-
 	CloudNameAndRegion   string
 	ControllerName       string
 	AgentVersion         string
@@ -33,10 +31,6 @@ type BootstrapCmdParams struct {
 	PersonalCloud jujucloud.Cloud
 	// The credential to use for the cloud.
 	CloudCred jujucloud.CloudCredential
-	// The public SSH keys to use for the bootstrap.
-	PubKey []byte
-	// The private SSH key to use for the bootstrap.
-	PrivKey []byte
 }
 
 // Validate validates the BootstrapCmdParams.
@@ -65,8 +59,6 @@ func (b BootstrapCmdParams) Validate() error {
 		return errors.New("login-token-refresh-url cannot be empty")
 	}
 
-	// TODO: Validate no args shit
-
 	return nil
 }
 
@@ -75,7 +67,8 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	var args []string
 	args = append(args, "bootstrap")
 
-	args = append(args, fmt.Sprintf("--login-token-refresh-url=%s", b.LoginTokenRefreshURL))
+	args = append(args, "--config")
+	args = append(args, fmt.Sprintf("login-token-refresh-url=%s", b.LoginTokenRefreshURL))
 
 	// Conditionally add --agent-version if set
 	if b.AgentVersion != "" {
@@ -84,11 +77,13 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 
 	// Conditionally add bootstrap-timeout if set
 	if b.BootstrapTimeout > 0 {
-		args = append(args, fmt.Sprintf("--config bootstrap-timeout=%d", b.BootstrapTimeout))
+		args = append(args, "--config")
+		args = append(args, fmt.Sprintf("bootstrap-timeout=%d", b.BootstrapTimeout))
 	}
 
 	// Always add controller name & cloud at the end
 	args = append(args, b.CloudNameAndRegion, b.ControllerName)
+
 	return args
 }
 
@@ -110,45 +105,23 @@ func NewBootstrapCmd(runner Runner) *bootstrapCmd {
 // It returns a output channel which is closed once the command completes. Additionally,
 // it returns a closure which cleans up the temporary $JUJU_DATA directory created for the
 // lifetime of this command.
+//
+// User SSH keys will be added after the bootstrap utilising JIMM's JWT authentication.
 func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan OutputLine, jujuclient.ClientStore, func(), error) {
 	if err := p.Validate(); err != nil {
 		return nil, nil, nil, err
 	}
 
-	// Setup JUJU_DATA
-	tmpJujuData, err := os.MkdirTemp("", "juju-data-*")
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create temp JUJU_DATA: %w", err)
-	}
+	dataDir := c.runner.JujuDataDir()
 
 	// This is required because
 	// 		store := jujuclient.NewFileClientStore() Looks for JUJU_DATA env var
 	// And
 	// 		jujucloud.WritePersonalCloudMetadata
 	// TODO: Remove this dependency and write the files manually?
-	os.Setenv("JUJU_DATA", tmpJujuData)
-
-	// Juju generates these keys if they don't exist, but as we want to programatically pass
-	// them in, we're creating them manually.
-	sshDir := filepath.Join(tmpJujuData, "ssh")
-
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create .ssh directory: %w", err)
+	if err := os.Setenv("JUJU_DATA", dataDir); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to set JUJU_DATA env var: %w", err)
 	}
-
-	if err := os.WriteFile(sshDir+"/juju_id_rsa.pub", []byte(p.PubKey), 0600); err != nil {
-		return nil, nil, nil, fmt.Errorf("writing public key failed: %w", err)
-	}
-
-	if err = os.WriteFile(sshDir+"/juju_id_rsa", []byte(p.PrivKey), 0600); err != nil {
-		return nil, nil, nil, fmt.Errorf("writing private key failed: %w", err)
-	}
-
-	// After generation (if they don't exist), they're loaded into memory during the juju (main)
-	// command. Since we're not running main, we need to load them ourselves.
-	// if err := ssh.LoadClientKeys(sshDir); err != nil {
-	// 	return nil, nil, nil, fmt.Errorf("failed to load ssh keys: %w", err)
-	// }
 
 	// Update public clouds
 	// TODO: Make this a command of this package
@@ -162,6 +135,8 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 			return nil, nil, nil, fmt.Errorf("failed to update public clouds: %w", err)
 		}
 	}
+
+	store := jujuclient.NewFileClientStore()
 
 	// Check if we can get the cloud as a public cloud.
 	cloudName, regionName := splitCloudNameAndRegion(p.CloudNameAndRegion)
@@ -179,8 +154,6 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 		}
 	}
 
-	store := jujuclient.NewFileClientStore()
-
 	// TODO: check if cloudName should include region, presuming not right now
 	if err := store.UpdateCredential(cloudName, p.CloudCred); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
@@ -190,7 +163,8 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	args := p.BuildBootstrapCmdArgs()
 
 	cleanupTmpJujuData := func() {
-		os.RemoveAll(tmpJujuData)
+		os.RemoveAll(dataDir)
+		os.Unsetenv("JUJU_DATA")
 	}
 
 	outputRetriever, err := c.runner.RunJujuCmd(ctx, args)
