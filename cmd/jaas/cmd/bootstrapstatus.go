@@ -91,6 +91,8 @@ func (c *bootstrapStatusCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create JIMM client: %v", err)
 	}
+	defer client.Close()
+
 	poller := logPoller{
 		client:              client,
 		jobId:               c.jobId,

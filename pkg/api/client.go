@@ -9,21 +9,26 @@ import (
 )
 
 // An APICaller implements the interface required to make API calls.
-type APICaller interface {
+type APICallCloser interface {
 	// APICall makes a call to the API server with the given object type,
 	// id, request and parameters. The response is filled in with the
 	// call's result if the call is successful.
 	APICall(objType string, version int, id, request string, params, response interface{}) error
+	Close() error
 }
 
 // Client is a client for the JIMM API.
 type Client struct {
-	caller APICaller
+	caller APICallCloser
 }
 
 // NewClient creates a new API client for the JIMM API.
-func NewClient(c APICaller) *Client {
+func NewClient(c APICallCloser) *Client {
 	return &Client{caller: c}
+}
+
+func (c *Client) Close() error {
+	return c.caller.Close()
 }
 
 // AddCloudToController adds the specified cloud to a specific controller in JIMM.

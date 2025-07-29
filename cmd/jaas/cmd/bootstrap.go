@@ -121,6 +121,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not create JIMM client: %v", err)
 	}
+	defer client.Close()
 
 	resp, err := client.Bootstrap(&req)
 	if err != nil {

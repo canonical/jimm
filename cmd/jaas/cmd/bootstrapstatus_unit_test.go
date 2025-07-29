@@ -35,6 +35,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus(c *gc.C) {
 	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
 		Status: params.StatusSuccessful,
 	}, nil)
+	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
 
 	command := &bootstrapStatusCommand{
@@ -61,6 +62,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Failed(c *gc.C) {
 		Status: params.StatusFailed,
 		Error:  "Bootstrap job failed",
 	}, nil)
+	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("Bootstrap job failed: Bootstrap job failed\n"))
 
 	command := &bootstrapStatusCommand{
@@ -88,6 +90,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
 	}, nil)
+	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("log1\n"))
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
@@ -138,6 +141,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_NoFollow(c *gc.C) {
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
 	}, nil)
+	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("log1\n"))
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
@@ -168,6 +172,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_AfterCompletion(c *gc.C) {
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
 	}, nil)
+	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("log1\n"))
 	s.writer.EXPECT().Write([]byte("log2\n"))
 	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))

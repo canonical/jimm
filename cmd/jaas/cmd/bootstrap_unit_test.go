@@ -96,6 +96,8 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 			JobID: "test-job-id",
 		}, nil
 	})
+	s.client.EXPECT().Close().Return(nil)
+
 	s.writer.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
 		resp := &params.BootstrapStartResponse{}
 		err := json.Unmarshal(b, resp)
@@ -135,6 +137,7 @@ func (s *bootstrapCmdSuite) TestBootstrapWatchLogs(c *gc.C) {
 	s.client.EXPECT().Bootstrap(gomock.Any()).Return(&params.BootstrapStartResponse{
 		JobID: "test-job-id",
 	}, nil)
+	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
 		resp := &params.BootstrapStartResponse{}
 		err := json.Unmarshal(b, resp)

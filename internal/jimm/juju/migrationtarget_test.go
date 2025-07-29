@@ -525,6 +525,8 @@ incoming-migrations:
   user-mapping:
   - local-user: bob
     external-user: alice@canonical.com
+  - local-user: jane
+    external-user: ""
 `
 
 func TestActivate_Success(t *testing.T) {
@@ -555,7 +557,12 @@ func TestActivate_Success(t *testing.T) {
 	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigrationAndModel)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	err := j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
+	incomingModelMigration := dbmodel.IncomingModelMigration{}
+	err := j.Database.DB.First(&incomingModelMigration).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(incomingModelMigration.UserMapping["jane"], qt.Equals, "")
+
+	err = j.Activate(ctx, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
 	c.Assert(err, qt.IsNil)
 
 	modelMigration := dbmodel.IncomingModelMigration{
@@ -567,6 +574,12 @@ func TestActivate_Success(t *testing.T) {
 	// Check the model migration has been removed from the database.
 	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+
+	var count int64
+	err = j.Database.DB.Model(&dbmodel.UserMapping{}).Count(&count).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(count, qt.Equals, int64(1))
+
 	userMapping := dbmodel.UserMapping{
 		ModelUUID: modelMigration.ModelUUID,
 		LocalUser: "bob",
