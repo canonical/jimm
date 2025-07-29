@@ -18,6 +18,9 @@ import (
 type JobTracker interface {
 	// GetJob retrieves a job entry by its ID.
 	GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrackerEntry, error)
+
+	// StopJob stops a job by its ID.
+	StopJob(ctx context.Context, jobId uuid.UUID) error
 }
 
 type Store interface {
@@ -81,4 +84,24 @@ func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.Use
 	}
 
 	return "", errors.E(op, "not implemented")
+}
+
+// StopBootstrap stops a bootstrap job by its ID.
+func (b *bootstrapManager) StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
+	const op = errors.Op("jimm.StopBootstrap")
+
+	if user == nil {
+		return errors.E(op, "user cannot be nil")
+	}
+
+	if jobId == uuid.Nil {
+		return errors.E(op, "job ID cannot be nil")
+	}
+
+	err := b.jobtracker.StopJob(ctx, jobId)
+	if err != nil {
+		return errors.E(op, "failed to stop job", err)
+	}
+
+	return nil
 }

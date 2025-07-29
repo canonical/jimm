@@ -308,6 +308,8 @@ type BootstrapManager interface {
 	GetBootstrapStatusAndLogs(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error)
 	// StartBootstrap starts a bootstrap job and returns the job ID.
 	StartBootstrap(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
+	// StopBootstrap stops a bootstrap job.
+	StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.

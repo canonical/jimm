@@ -16,6 +16,7 @@ import (
 type BootstapManager struct {
 	GetBootstrapStatusAndLogs_ func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error)
 	StartBootstrap_            func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
+	StopBootstrap_             func(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
 }
 
 func (b *BootstapManager) GetBootstrapStatusAndLogs(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error) {
@@ -30,4 +31,11 @@ func (b *BootstapManager) StartBootstrap(ctx context.Context, user *openfga.User
 		return "", errors.E(errors.CodeNotImplemented)
 	}
 	return b.StartBootstrap_(ctx, user, params)
+}
+
+func (b *BootstapManager) StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
+	if b.StopBootstrap_ == nil {
+		return errors.E(errors.CodeNotImplemented)
+	}
+	return b.StopBootstrap_(ctx, user, jobId)
 }

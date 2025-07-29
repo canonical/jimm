@@ -18,6 +18,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
+const minimumRefreshIntervalseconds = 5
+
 // JobIdContextKey is a context key for storing job IDs.
 type JobIdContextKey struct{}
 
@@ -27,6 +29,7 @@ type JobIdContextKey struct{}
 type Store interface {
 	AddJob(ctx context.Context, jobType string) (uuid.UUID, error)
 	GetJob(ctx context.Context, job *dbmodel.JobTrackerEntry) (err error)
+	StopJob(ctx context.Context, jobId uuid.UUID) (err error)
 	SetJobRunning(ctx context.Context, jobId uuid.UUID) error
 	SetJobSuccessful(ctx context.Context, jobId uuid.UUID) error
 	SetJobFailed(ctx context.Context, jobId uuid.UUID, jobErr error) error
@@ -34,25 +37,26 @@ type Store interface {
 }
 
 // Tracker manages job tracking operations using a provided JobTrackerStore.
-// It periodically performs tasks based on the specified stopInterval duration.
+// It periodically performs tasks based on the specified refreshInterval duration.
 type Tracker struct {
-	store        Store
-	stopInterval time.Duration
+	store           Store
+	refreshInterval time.Duration
 }
 
-// NewJobTracker creates and returns a new Tracker instance using the provided JobTrackerStore and stopInterval.
-// It returns an error if the store is nil or if stopInterval is not greater than zero.
-func NewJobTracker(store Store, stopInterval time.Duration) (*Tracker, error) {
+// NewJobTracker creates and returns a new Tracker instance using the provided JobTrackerStore and refreshInterval.
+// refreshInterval is the interval between successive checks for job status.
+// It returns an error if the store is nil or if refreshInterval is not greater than zero.
+func NewJobTracker(store Store, refreshInterval time.Duration) (*Tracker, error) {
 	if store == nil {
 		return nil, goerr.New("store cannot be nil")
 	}
-	if stopInterval <= 4 {
-		return nil, goerr.New("stopInterval must be greater than zero")
+	if refreshInterval < minimumRefreshIntervalseconds*time.Second {
+		return nil, fmt.Errorf("refreshInterval must be greater than %d seconds", minimumRefreshIntervalseconds)
 	}
 
 	return &Tracker{
-		stopInterval: stopInterval,
-		store:        store,
+		refreshInterval: refreshInterval,
+		store:           store,
 	}, nil
 }
 
@@ -98,7 +102,7 @@ func (j *Tracker) runJob(ctx context.Context, id uuid.UUID, jobErrCh chan error,
 }
 
 func (j *Tracker) monitorJob(id uuid.UUID, jobErrCh chan error, cancelJob context.CancelFunc) {
-	ticker := time.NewTicker(j.stopInterval)
+	ticker := time.NewTicker(j.refreshInterval)
 	defer ticker.Stop()
 
 	ctx := context.Background()
@@ -149,6 +153,17 @@ func (j *Tracker) GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrack
 	}
 
 	return job, nil
+}
+
+// StopJob stops a job by its ID.
+func (j *Tracker) StopJob(ctx context.Context, jobId uuid.UUID) error {
+	const op = errors.Op("jimm.StopJob")
+
+	if err := j.store.StopJob(ctx, jobId); err != nil {
+		return errors.E(op, "failed to stop job", err)
+	}
+
+	return nil
 }
 
 // ContextWithJobId adds the job ID to the context for later retrieval.

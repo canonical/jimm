@@ -196,3 +196,47 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	_, err = root.BootstrapStart(ctx, params)
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }
+
+func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
+	ctx := context.Background()
+	uuidGenerated := uuid.New()
+
+	jimm := &jimmtest.JIMM{
+		BootstapManager_: func() jimm.BootstrapManager {
+			return &mocks.BootstapManager{
+				StopBootstrap_: func(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
+					if jobId != uuidGenerated {
+						return errors.E(errors.CodeNotFound, "job not found")
+					}
+					return nil
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
+	// Test stop bootstrap job unauthorized user
+	err := root.BootstrapStop(ctx, params.BootstrapStopRequest{
+		JobID: uuidGenerated.String(),
+	})
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+
+	// Test stop bootstrap job
+	root = newTestControllerRoot(jimm, "alice@canonical.com", true)
+	err = root.BootstrapStop(ctx, params.BootstrapStopRequest{
+		JobID: uuidGenerated.String(),
+	})
+	c.Assert(err, gc.IsNil)
+
+	// Test job not found
+	err = root.BootstrapStop(ctx, params.BootstrapStopRequest{
+		JobID: uuid.New().String(),
+	})
+	c.Assert(err, gc.ErrorMatches, ".*job not found.*")
+
+	// Test stop bootstrap not valid job ID
+	err = root.BootstrapStop(ctx, params.BootstrapStopRequest{
+		JobID: "not-a-valid-uuid",
+	})
+	c.Assert(err, gc.NotNil)
+	c.Assert(err.Error(), gc.Matches, "invalid job ID")
+}

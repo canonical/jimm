@@ -30,7 +30,9 @@ func (s *jobTrackerSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.db = db
-	tracker, err := jobtracker.NewJobTracker(db, time.Second*5)
+	tracker, err := jobtracker.NewJobTracker(db, 5*time.Second)
+	// Set a short interval for testing purposes.
+	jobtracker.ChangeRefreshInterval(tracker, 10*time.Millisecond)
 	c.Assert(err, qt.IsNil)
 	s.tracker = tracker
 }
@@ -119,6 +121,27 @@ func (s *jobTrackerSuite) TestRun_JobIdSetInContext(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.pollJob(testCtx, id, c, dbmodel.StatusSuccessful)
+}
+
+func (s *jobTrackerSuite) TestStopJob(c *qt.C) {
+	testCtx := c.Context()
+
+	aJobThatCanBeStopped := func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			return errors.New("job was stopped")
+		case <-time.After(time.Second * 100):
+			return nil
+		}
+	}
+
+	id, err := s.tracker.Run(testCtx, "test-job-type", aJobThatCanBeStopped, time.Second*100)
+	c.Assert(err, qt.IsNil)
+
+	err = s.tracker.StopJob(testCtx, id)
+	c.Assert(err, qt.IsNil)
+
+	s.pollJob(testCtx, id, c, dbmodel.StatusFailed)
 }
 
 func TestJobTrackerSuite(t *testing.T) {

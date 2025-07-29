@@ -65,6 +65,7 @@ func init() {
 		prepareModelMigration := rpc.Method(r.PrepareModelMigration)
 		bootstrapStatus := rpc.Method(r.BootstrapStatus)
 		bootstrapStart := rpc.Method(r.BootstrapStart)
+		bootstrapStop := rpc.Method(r.BootstrapStop)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -106,6 +107,7 @@ func init() {
 		// JIMM Bootstrap
 		r.AddMethod("JIMM", 4, "BootstrapStatus", bootstrapStatus)
 		r.AddMethod("JIMM", 4, "BootstrapStart", bootstrapStart)
+		r.AddMethod("JIMM", 4, "BootstrapStop", bootstrapStop)
 
 		return []int{4}
 	}
@@ -606,4 +608,24 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 	return apiparams.BootstrapStartResponse{
 		JobID: jobID,
 	}, nil
+}
+
+// BootstrapStop stops a bootstrap job.
+func (r *controllerRoot) BootstrapStop(ctx context.Context, req apiparams.BootstrapStopRequest) error {
+	const op = errors.Op("jujuapi.BootstrapStop")
+
+	if !r.user.JimmAdmin {
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	jobID, err := uuid.Parse(req.JobID)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, "invalid job ID", err)
+	}
+
+	err = r.jimm.BootstrapManager().StopBootstrap(ctx, r.user, jobID)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to stop bootstrap job: %v", err))
+	}
+	return nil
 }

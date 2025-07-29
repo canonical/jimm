@@ -619,3 +619,9 @@ type BootstrapStartResponse struct {
 	// JobID is the ID of the bootstrap job that was started.
 	JobID string `json:"job-id"`
 }
+
+// BootstrapStopRequest holds the request to stop a bootstrap job.
+type BootstrapStopRequest struct {
+	// JobID is the ID of the bootstrap job to stop.
+	JobID string `json:"job-id"`
+}
