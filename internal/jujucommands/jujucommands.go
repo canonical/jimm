@@ -13,10 +13,6 @@ import (
 	"github.com/mitchellh/go-linereader"
 )
 
-var (
-	cmdPrefix = "juju"
-)
-
 // OutputLine represents a line of output from a juju command.
 type OutputLine struct {
 	Line string
@@ -33,9 +29,9 @@ type CommandRunner struct {
 //
 // dataDir is the JUJU_DATA directory where juju commands will store their data.
 // It must be an ABSOLUTE path.
-func NewCommandRunner(dataDir string) *CommandRunner {
+func NewCommandRunner(prefix, dataDir string) *CommandRunner {
 	return &CommandRunner{
-		prefix:      cmdPrefix,
+		prefix:      prefix,
 		jujuDataDir: dataDir,
 	}
 }

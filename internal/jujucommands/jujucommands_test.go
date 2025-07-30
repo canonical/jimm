@@ -17,8 +17,8 @@ type jujucommandsSuite struct{}
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 	testCtx := c.Context()
 	dir := c.TempDir()
-	c.Patch(jujucommands.CmdPrefix, "echo")
-	runner := jujucommands.NewCommandRunner(dir)
+
+	runner := jujucommands.NewCommandRunner("echo", dir)
 	outputCh, err := runner.RunJujuCmd(testCtx, []string{"i am an output"})
 	c.Assert(err, qt.IsNil)
 
@@ -38,8 +38,8 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 	testCtx := c.Context()
 	dir := c.TempDir()
-	c.Patch(jujucommands.CmdPrefix, "ls")
-	runner := jujucommands.NewCommandRunner(dir)
+
+	runner := jujucommands.NewCommandRunner("ls", dir)
 	outputCh, err := runner.RunJujuCmd(testCtx, []string{"-idontexist"})
 	c.Assert(err, qt.IsNil)
 
@@ -66,9 +66,8 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 
 func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	testCtx := c.Context()
-	c.Patch(jujucommands.CmdPrefix, "env")
 
-	runner := jujucommands.NewCommandRunner("testing-data-is-set")
+	runner := jujucommands.NewCommandRunner("env", "testing-data-is-set")
 	outputCh, err := runner.RunJujuCmd(testCtx, []string{})
 	c.Assert(err, qt.IsNil)
 
@@ -83,6 +82,7 @@ func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	c.Assert(b.String(), qt.Equals, "JUJU_DATA=testing-data-is-set\n")
 }
 
+//go:generate mockgen -destination=./mocks/runner.go -package=mocks . Runner
 func TestJujucommandsSuite(t *testing.T) {
 	qtsuite.Run(qt.New(t), &jujucommandsSuite{})
 }

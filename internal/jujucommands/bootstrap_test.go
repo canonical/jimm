@@ -9,131 +9,123 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
+	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/jujucommands"
+	"github.com/canonical/jimm/v3/internal/jujucommands/mocks"
 )
-
-type runnerMock struct {
-	impl    func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error)
-	dataDir string
-}
-
-func (r *runnerMock) RunJujuCmd(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
-	return r.impl(ctx, args)
-}
-
-func (r *runnerMock) JujuDataDir() string {
-	return r.dataDir
-}
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
 	p := jujucommands.BootstrapCmdParams{}
-
 	c.Assert(p.Validate(), qt.ErrorMatches, ".*cloud \\[and region\\] name cannot be empty.*")
 
 	p.CloudNameAndRegion = "testregion/testcloud"
-
 	c.Assert(p.Validate(), qt.ErrorMatches, ".*controller name name cannot be empty.*")
 
 	p.ControllerName = "my-controller"
-
 	c.Assert(p.Validate(), qt.ErrorMatches, ".*login-token-refresh-url cannot be empty.*")
 
 	p.LoginTokenRefreshURL = "myurl.com"
-
 	c.Assert(p.Validate(), qt.IsNil)
 
 	p.AgentVersion = "bad version"
-
 	c.Assert(p.Validate(), qt.ErrorMatches, "invalid version \"bad version\"")
 
 	p.AgentVersion = "1.1.1"
-
 	c.Assert(p.Validate(), qt.IsNil)
 
 	p.BootstrapTimeout = -1
-
 	c.Assert(p.Validate(), qt.ErrorMatches, "bootstrap timeout cannot be less than or equal to 0")
 
 	p.BootstrapTimeout = 1
-
 	c.Assert(p.Validate(), qt.IsNil)
 }
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C) {
-	p := jujucommands.BootstrapCmdParams{
-		CloudNameAndRegion:   "testregion/testcloud",
-		ControllerName:       "my-controller",
-		AgentVersion:         "1.1.1",
-		BootstrapTimeout:     1000,
-		LoginTokenRefreshURL: "myurl.com",
+	tests := []struct {
+		name   string
+		params jujucommands.BootstrapCmdParams
+		expect []string
+	}{
+		{
+			name: "all fields set",
+			params: jujucommands.BootstrapCmdParams{
+				CloudNameAndRegion:   "testregion/testcloud",
+				ControllerName:       "my-controller",
+				AgentVersion:         "1.1.1",
+				BootstrapTimeout:     1000,
+				LoginTokenRefreshURL: "myurl.com",
+			},
+			expect: []string{
+				"bootstrap",
+				"--config",
+				"login-token-refresh-url=myurl.com",
+				"--agent-version=1.1.1",
+				"--config",
+				"bootstrap-timeout=1000",
+				"testregion/testcloud",
+				"my-controller",
+			},
+		},
+		{
+			name: "no agent version",
+			params: jujucommands.BootstrapCmdParams{
+				CloudNameAndRegion:   "testregion/testcloud",
+				ControllerName:       "my-controller",
+				AgentVersion:         "",
+				BootstrapTimeout:     1000,
+				LoginTokenRefreshURL: "myurl.com",
+			},
+			expect: []string{
+				"bootstrap",
+				"--config",
+				"login-token-refresh-url=myurl.com",
+				"--config",
+				"bootstrap-timeout=1000",
+				"testregion/testcloud",
+				"my-controller",
+			},
+		},
+		{
+			name: "no agent version and no bootstrap timeout",
+			params: jujucommands.BootstrapCmdParams{
+				CloudNameAndRegion:   "testregion/testcloud",
+				ControllerName:       "my-controller",
+				AgentVersion:         "",
+				BootstrapTimeout:     0,
+				LoginTokenRefreshURL: "myurl.com",
+			},
+			expect: []string{
+				"bootstrap",
+				"--config",
+				"login-token-refresh-url=myurl.com",
+				"testregion/testcloud",
+				"my-controller",
+			},
+		},
 	}
 
-	args := p.BuildBootstrapCmdArgs()
-
-	c.Assert(
-		args,
-		qt.DeepEquals,
-		[]string{
-			"bootstrap",
-			"--config",
-			"login-token-refresh-url=myurl.com",
-			"--agent-version=1.1.1",
-			"--config",
-			"bootstrap-timeout=1000",
-			"testregion/testcloud",
-			"my-controller",
-		},
-	)
-
-	p.AgentVersion = ""
-	args = p.BuildBootstrapCmdArgs()
-
-	c.Assert(
-		args,
-		qt.DeepEquals,
-		[]string{
-			"bootstrap",
-			"--config",
-			"login-token-refresh-url=myurl.com",
-			"--config",
-			"bootstrap-timeout=1000",
-			"testregion/testcloud",
-			"my-controller",
-		},
-	)
-
-	p.BootstrapTimeout = 0
-	args = p.BuildBootstrapCmdArgs()
-
-	c.Assert(
-		args,
-		qt.DeepEquals,
-		[]string{
-			"bootstrap",
-			"--config",
-			"login-token-refresh-url=myurl.com",
-			"testregion/testcloud",
-			"my-controller",
-		},
-	)
+	for _, tt := range tests {
+		c.Run(tt.name, func(c *qt.C) {
+			args := tt.params.BuildBootstrapCmdArgs()
+			c.Assert(args, qt.DeepEquals, tt.expect)
+		})
+	}
 }
 
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloudWritten(c *qt.C) {
 	testCtx := c.Context()
 
-	mock := runnerMock{
-		impl: func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
-			// Return chan that has one line inside
-			outputCh := make(chan jujucommands.OutputLine, 1)
-			outputCh <- jujucommands.OutputLine{
-				Line: "testing",
-			}
-			close(outputCh)
-			return outputCh, nil
-		},
-		dataDir: c.TempDir(),
-	}
+	ctrl := gomock.NewController(c)
+	defer ctrl.Finish()
+	mockRunner := mocks.NewMockRunner(ctrl)
+
+	mockRunner.EXPECT().JujuDataDir().Return(c.TempDir()).AnyTimes()
+	mockRunner.EXPECT().RunJujuCmd(testCtx, gomock.Any()).DoAndReturn(func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
+		outputCh := make(chan jujucommands.OutputLine, 1)
+		close(outputCh)
+		return outputCh, nil
+	}).AnyTimes()
 
 	cloudCred := *jujucloud.NewEmptyCloudCredential()
 	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.CertificateAuthType, map[string]string{
@@ -167,7 +159,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 		CloudCred: cloudCred,
 	}
 
-	cmd := jujucommands.NewBootstrapCmd(&mock)
+	cmd := jujucommands.NewBootstrapCmd(mockRunner)
 
 	_, store, cleanup, err := cmd.Run(testCtx, p)
 	c.Cleanup(func() {
@@ -196,24 +188,24 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWritten(c *qt.C) {
 	testCtx := c.Context()
 
+	ctrl := gomock.NewController(c)
+	defer ctrl.Finish()
+	mockRunner := mocks.NewMockRunner(ctrl)
+
+	mockRunner.EXPECT().JujuDataDir().Return(c.TempDir()).AnyTimes()
+
 	callCounter := 0
-	mock := runnerMock{
-		impl: func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
-			callCounter++
-			if callCounter == 1 {
-				// This is only called once within bootstrap, so we can be pretty sure the public-clouds.yaml was written.
-				c.Assert(args, qt.DeepEquals, []string{"update-public-clouds", "--client"})
-			}
-			// Return chan that has one line inside
-			outputCh := make(chan jujucommands.OutputLine, 1)
-			outputCh <- jujucommands.OutputLine{
-				Line: "testing",
-			}
-			close(outputCh)
-			return outputCh, nil
-		},
-		dataDir: c.TempDir(),
-	}
+	mockRunner.EXPECT().RunJujuCmd(testCtx, gomock.Any()).DoAndReturn(func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
+		callCounter++
+		if callCounter == 1 {
+			// This is only called once within bootstrap, so we can be pretty sure the public-clouds.yaml was written.
+			c.Assert(args, qt.DeepEquals, []string{"update-public-clouds", "--client"})
+		}
+
+		outputCh := make(chan jujucommands.OutputLine, 1)
+		close(outputCh)
+		return outputCh, nil
+	}).AnyTimes()
 
 	cloudCred := *jujucloud.NewEmptyCloudCredential()
 	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
@@ -229,7 +221,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 		CloudCred: cloudCred,
 	}
 
-	cmd := jujucommands.NewBootstrapCmd(&mock)
+	cmd := jujucommands.NewBootstrapCmd(mockRunner)
 
 	_, store, cleanup, err := cmd.Run(
 		testCtx,

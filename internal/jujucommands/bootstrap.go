@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/juju/jujuclient"
 	_ "github.com/juju/juju/provider/lxd"
 	"github.com/juju/version/v2"
@@ -113,15 +114,7 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	}
 
 	dataDir := c.runner.JujuDataDir()
-
-	// This is required because
-	// 		store := jujuclient.NewFileClientStore() Looks for JUJU_DATA env var
-	// And
-	// 		jujucloud.WritePersonalCloudMetadata
-	// TODO: Remove this dependency and write the files manually?
-	if err := os.Setenv("JUJU_DATA", dataDir); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to set JUJU_DATA env var: %w", err)
-	}
+	osenv.SetJujuXDGDataHome(dataDir)
 
 	// Update public clouds
 	// TODO: Make this a command of this package
@@ -146,7 +139,6 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	}
 	if !isAPublicCloud {
 		// We presume it is a personal cloud
-		// TODO: Check if credential should be cloudname or include region
 		if err := jujucloud.WritePersonalCloudMetadata(map[string]jujucloud.Cloud{
 			cloudName: p.PersonalCloud,
 		}); err != nil {
@@ -154,7 +146,6 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 		}
 	}
 
-	// TODO: check if cloudName should include region, presuming not right now
 	if err := store.UpdateCredential(cloudName, p.CloudCred); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
 	}
@@ -164,19 +155,19 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 
 	cleanupTmpJujuData := func() {
 		os.RemoveAll(dataDir)
-		os.Unsetenv("JUJU_DATA")
 	}
 
 	outputRetriever, err := c.runner.RunJujuCmd(ctx, args)
-	return outputRetriever, store, cleanupTmpJujuData, err
+	if err != nil {
+		return nil, nil, cleanupTmpJujuData, fmt.Errorf("failed to run bootstrap command: %w", err)
+	}
+	return outputRetriever, store, cleanupTmpJujuData, nil
 }
 
 // isAValidPublicCloud checks if the cloud name (and possibly region) is a valid
 // public cloud and region. If it is a public cloud without the region specified,
 // just the cloud name is checked. If a region is specified, but it isn't valid,
 // an error is returned.
-//
-// TODO: Is there a better way to do this? (Rather than look up metadata and loop through)
 func isAValidPublicCloud(cloudName, regionName string) (bool, error) {
 	var isAPublicCloud bool
 
