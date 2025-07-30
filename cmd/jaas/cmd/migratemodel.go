@@ -55,12 +55,12 @@ the model.
 You can also use the "juju show-offer <offer-name>" command to see the users that have access
 to each offer.
 
-Any users that you do not wish to be mapped must still be included but with the value null 
-in place of the external user. This indicates that you are intentionally skipping this local
-user, for example:
+Any users that you do not wish to be mapped must still be included with a null value or empty
+string in place of the external user. This indicates that you are intentionally skipping this
+local user, for example:
 '''
 alice: alice@canonical.com
-bob: null
+bob: null # or ""
 '''
 
 The user mapping is consulted when relations are periodically validated. I.e. if an offer

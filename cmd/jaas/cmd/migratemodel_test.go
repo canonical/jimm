@@ -150,6 +150,27 @@ bob: bob@canonical.com
 	c.Assert(err, gc.IsNil)
 }
 
+func (s *migrateModelSuite) TestMigrate_ReadUserMappingFileWithNull(c *gc.C) {
+	userMappingFile, err := os.CreateTemp(c.MkDir(), "")
+	c.Assert(err, gc.IsNil)
+
+	userMappingContent := `
+alice: alice@canonical.com
+bob: null
+`
+	_, err = userMappingFile.WriteString(userMappingContent)
+	c.Assert(err, gc.IsNil)
+
+	migrateCmd := &migrateModelCommand{
+		userMappingFile: userMappingFile.Name(),
+	}
+	userMapping, err := migrateCmd.parseUserMappingFile()
+	c.Assert(err, gc.IsNil)
+	c.Assert(userMapping, gc.HasLen, 2)
+	c.Assert(userMapping["alice"], gc.Equals, "alice@canonical.com")
+	c.Assert(userMapping["bob"], gc.Equals, "")
+}
+
 func (s *migrateModelSuite) TestValidateUserMapping_SkipUsers(c *gc.C) {
 	defer s.SetupMocks(c).Finish()
 
