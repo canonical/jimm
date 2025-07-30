@@ -469,7 +469,35 @@ func TestPrechecks_MissingUserMapping(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 	err := j.Prechecks(ctx, user, model)
-	c.Assert(err, qt.ErrorMatches, `.*no external user mapping found for local user "not-found-user"`)
+	c.Assert(err, qt.ErrorMatches, `(?s).*user mapping is missing the following users.*`)
+}
+
+func TestPrechecks_InvalidOwner(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	incomingModel := env.IncomingMigrations[0].DBObject(c, j.Database)
+	incomingModel.UserMapping["bob"] = ""
+	err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &incomingModel)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
+	err = j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.ErrorMatches, `.*invalid external user mapping "" for local user "bob"`)
 }
 
 func TestPrechecks_NoIncomingModelMigration(t *testing.T) {

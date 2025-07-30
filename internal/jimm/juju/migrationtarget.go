@@ -283,6 +283,9 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 		// This is to ensure that the migration does not proceed with an invalid owner.
 		return errors.E(fmt.Errorf("no external user mapping found for local user %q", model.Owner.Id()))
 	}
+	if !names.IsValidUser(newOwner) {
+		return errors.E(fmt.Errorf("invalid external user mapping %q for local user %q", newOwner, model.Owner.Id()))
+	}
 
 	newOwnerTag := names.NewUserTag(newOwner)
 	model.Owner = newOwnerTag
