@@ -47,6 +47,9 @@ func (b *CommandRunner) JujuDataDir() string {
 // It returns a channel that will receive output lines from the command's stdout and stderr.
 // The command is run in a separate goroutine, and the context can be used to cancel the command.
 func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan OutputLine, error) {
+	//nolint:gosec
+	// G204: Subprocess launched with a potential tainted input or cmd arguments (gosec)
+	// We manage the args via specific <command>.go files, so the args are not tainted.
 	cmd := exec.CommandContext(ctx, b.prefix, args...)
 	cmd.Env = append(cmd.Env, "JUJU_DATA="+b.jujuDataDir)
 
