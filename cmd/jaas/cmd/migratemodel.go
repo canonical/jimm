@@ -23,6 +23,7 @@ import (
 	"github.com/juju/names/v5"
 	"gopkg.in/yaml.v3"
 
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmAPI "github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -94,6 +95,7 @@ func NewMigrateModelCommand() cmd.Command {
 	}
 	cmd.jimmAPIFunc = cmd.newJIMMClient
 	cmd.jujuApiFunc = cmd.newJujuClient
+	cmd.everyoneUser = "everyone@external"
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -102,9 +104,10 @@ func NewMigrateModelCommand() cmd.Command {
 // a controller that isn't registered with JAAS.
 type migrateModelCommand struct {
 	modelcmd.ControllerCommandBase
-	out         cmd.Output
-	jimmAPIFunc func() (JIMMClient, error)
-	jujuApiFunc func() (MigrateAPI, error)
+	out          cmd.Output
+	jimmAPIFunc  func() (JIMMClient, error)
+	jujuApiFunc  func() (MigrateAPI, error)
+	everyoneUser string
 
 	store             jujuclient.ClientStore
 	dialOpts          *jujuapi.DialOpts
@@ -279,6 +282,9 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 	var missingUserMessages []string
 
 	for _, user := range modelUsers {
+		if user.UserName == ofganames.EveryoneUser {
+			continue
+		}
 		if _, ok := userMapping[user.UserName]; !ok {
 			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to the model", user.UserName, user.Access))
 		}
@@ -290,6 +296,9 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 	}
 	for _, offer := range offers {
 		for _, user := range offer.Users {
+			if user.UserName == ofganames.EveryoneUser {
+				continue
+			}
 			if _, ok := userMapping[user.UserName]; !ok {
 				missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to offer %q", user.UserName, user.Access, offer.OfferName))
 			}

@@ -174,7 +174,33 @@ func (s *migrateModelSuite) TestValidateUserMapping_SkipUsers(c *gc.C) {
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 	err := migrateCmd.validateUserMapping(userMapping, testUUID, s.migrateClient)
 	c.Assert(err, gc.IsNil)
+}
 
+func (s *migrateModelSuite) TestValidateUserMapping_HandleEveryoneUser(c *gc.C) {
+	defer s.SetupMocks(c).Finish()
+
+	userMapping := map[string]string{
+		"alice": "alice@canonical.com",
+	}
+	s.migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
+		Result: &jujuparams.ModelInfo{
+			Users: []jujuparams.ModelUserInfo{
+				{UserName: "alice"},
+				{UserName: "everyone@external"},
+			},
+		}},
+	}, nil)
+	s.migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{{
+		Users: []crossmodel.OfferUserDetails{
+			{
+				UserName: "everyone@external",
+			},
+		}},
+	}, nil)
+	migrateCmd := &migrateModelCommand{}
+	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, s.migrateClient)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *migrateModelSuite) TestValidateUserMapping_MissingUsers(c *gc.C) {
