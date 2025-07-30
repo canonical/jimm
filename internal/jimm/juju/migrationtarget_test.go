@@ -224,6 +224,69 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
+func TestPreChecks_ValidateUserMapping(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	err := j.Prechecks(ctx, user, modelInfoWithUnmappedUsers())
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jane\" who has admin access to the model$.*`)
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jack\" who has admin access to offer "test-offer"$.*`)
+}
+
+func modelInfoWithUnmappedUsers() migration.ModelInfo {
+	descriptionArgs := description.ModelArgs{
+		AgentVersion: "3.2.1",
+		Owner:        names.NewUserTag("bob"),
+		Type:         description.IAAS,
+		Cloud:        "test",
+		Config: map[string]interface{}{
+			"uuid": migratingModelUUID,
+			"name": "test-model",
+		},
+		CloudRegion: "test-region",
+	}
+	modelDescription := description.NewModel(descriptionArgs)
+
+	// Add a user with admin access that is not mapped.
+	userArgs := description.UserArgs{
+		Name:        names.NewUserTag("jane"),
+		DisplayName: "jane",
+		Access:      "admin",
+	}
+	modelDescription.AddUser(userArgs)
+	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+		Owner: names.NewUserTag("bob"),
+		Name:  "test-cred",
+		Cloud: names.NewCloudTag("test"),
+	})
+	appArgs := description.ApplicationArgs{}
+	app := modelDescription.AddApplication(appArgs)
+
+	// Add an offer with an ACL for a user that is not mapped.
+	offerArgs := description.ApplicationOfferArgs{
+		OfferName: "test-offer",
+		ACL:       map[string]string{"jack": "admin"},
+	}
+	app.AddOffer(offerArgs)
+	modelInfo := migration.ModelInfo{
+		UUID:                   migratingModelUUID,
+		Owner:                  names.NewUserTag("bob"),
+		Name:                   "test-model",
+		AgentVersion:           version.MustParse("3.2.1"),
+		ControllerAgentVersion: version.MustParse("3.2.1"),
+		ModelDescription:       modelDescription,
+	}
+	return modelInfo
+}
+
 func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
