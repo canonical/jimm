@@ -119,8 +119,8 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 	mockRunner := mocks.NewMockRunner(ctrl)
-
-	mockRunner.EXPECT().JujuDataDir().Return(c.TempDir()).AnyTimes()
+	dir := c.TempDir()
+	mockRunner.EXPECT().JujuDataDir().Return(dir).AnyTimes()
 	mockRunner.EXPECT().RunJujuCmd(testCtx, gomock.Any()).DoAndReturn(func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
 		outputCh := make(chan jujucommands.OutputLine, 1)
 		close(outputCh)
@@ -181,7 +181,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 	)
 
 	// This was set to a temp dir until cleanup runs. We can use it to check the file exists.
-	_, err = os.Stat(filepath.Join(os.Getenv("JUJU_DATA"), "clouds.yaml"))
+	_, err = os.Stat(filepath.Join(dir, "clouds.yaml"))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -191,8 +191,8 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 	mockRunner := mocks.NewMockRunner(ctrl)
-
-	mockRunner.EXPECT().JujuDataDir().Return(c.TempDir()).AnyTimes()
+	dir := c.TempDir()
+	mockRunner.EXPECT().JujuDataDir().Return(dir).AnyTimes()
 
 	callCounter := 0
 	mockRunner.EXPECT().RunJujuCmd(testCtx, gomock.Any()).DoAndReturn(func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
@@ -243,6 +243,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 	)
 
 	// Make sure no personal cloud was written.
-	_, err = os.Stat(filepath.Join(os.Getenv("JUJU_DATA"), "clouds.yaml"))
+	_, err = os.Stat(filepath.Join(dir, "clouds.yaml"))
 	c.Assert(err, qt.ErrorMatches, ".*no such file or directory.*")
 }

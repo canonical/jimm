@@ -3,6 +3,7 @@
 package jujucommands_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -33,6 +34,19 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 	expected := `i am an output`
 
 	c.Assert(b.String(), qt.Equals, expected)
+}
+
+func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_ContextCancelled(c *qt.C) {
+	testCtx := c.Context()
+	dir := c.TempDir()
+
+	cancelledCtx, cancel := context.WithCancel(testCtx)
+	cancel()
+
+	runner := jujucommands.NewCommandRunner("echo", dir)
+	_, err := runner.RunJujuCmd(cancelledCtx, []string{"i am an output"})
+	c.Assert(err, qt.ErrorMatches, "failed to start command: context canceled")
+
 }
 
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
