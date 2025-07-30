@@ -224,7 +224,7 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
-func TestPreChecks_ValidateUserMapping(t *testing.T) {
+func TestPreChecks_ValidatesUserMapping(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -285,6 +285,55 @@ func modelInfoWithUnmappedUsers() migration.ModelInfo {
 		ModelDescription:       modelDescription,
 	}
 	return modelInfo
+}
+
+func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	api := &jimmtest.API{
+		Prechecks_: func(mi migration.ModelInfo) error {
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
+	everyoneUserArgs := description.UserArgs{
+		Name:   names.NewUserTag("everyone@external"),
+		Access: "read",
+	}
+	model.ModelDescription.AddUser(everyoneUserArgs)
+
+	appArgs := description.ApplicationArgs{}
+	app := model.ModelDescription.AddApplication(appArgs)
+
+	// Add an offer with an ACL for the everyone@external user.
+	offerArgs := description.ApplicationOfferArgs{
+		OfferName: "test-offer",
+		ACL:       map[string]string{"everyone@external": "read"},
+	}
+	app.AddOffer(offerArgs)
+
+	err := j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.IsNil)
 }
 
 func TestPrechecks_ModifiesModelDescription(t *testing.T) {

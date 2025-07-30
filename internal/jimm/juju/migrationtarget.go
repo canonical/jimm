@@ -26,6 +26,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 const TIMEOUT_PENDING_MIGRATION = 24 * time.Hour
@@ -212,6 +213,9 @@ func (j *JujuManager) validateUserMapping(modelDescription description.Model, us
 
 	modelUsers := modelDescription.Users()
 	for _, user := range modelUsers {
+		if user.Name().Id() == ofganames.EveryoneUser {
+			continue
+		}
 		if _, ok := userMapping[user.Name().Id()]; !ok {
 			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to the model", user.Name().Id(), user.Access()))
 		}
@@ -221,6 +225,9 @@ func (j *JujuManager) validateUserMapping(modelDescription description.Model, us
 	for _, app := range apps {
 		for _, offer := range app.Offers() {
 			for user, access := range offer.ACL() {
+				if user == ofganames.EveryoneUser {
+					continue
+				}
 				if _, ok := userMapping[user]; !ok {
 					missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to offer %q", user, access, offer.OfferName()))
 				}
