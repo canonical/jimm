@@ -16,8 +16,7 @@ import (
 )
 
 // CleanupNotFoundModels loops over models, contacting the respective controller.
-// And deleting the model from our database if the error is `NotFound` which means the model was successfully deleted.
-// Before we were cleaning up models in a dying state, but this is not enough if people delete models directly from the controller.
+// And deleting the model from our database and openfga if the error is `NotFound` which means the model was successfully deleted.
 func (j *JujuManager) CleanupNotFoundModels(ctx context.Context) (err error) {
 	const op = errors.Op("jimm.CleanupNotFoundModels")
 	zapctx.Info(ctx, string(op))
@@ -37,7 +36,7 @@ func (j *JujuManager) CleanupNotFoundModels(ctx context.Context) (err error) {
 		if err := api.ModelInfo(ctx, &jujuparams.ModelInfo{UUID: m.UUID.String}); err != nil {
 			// Some versions of juju return unauthorized for models that cannot be found.
 			if errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeUnauthorized {
-				if err := j.Database.DeleteModel(ctx, m); err != nil {
+				if err := j.deleteModel(ctx, m.ResourceTag()); err != nil {
 					zapctx.Error(ctx, fmt.Sprintf("cannot delete model %s: %s\n", m.UUID.String, err))
 				} else {
 					return nil

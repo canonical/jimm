@@ -20,7 +20,7 @@ type JujuManager struct {
 	Database                *db.Database
 	OpenFGAClient           *openfga.OFGAClient
 	CredentialStore         credentials.CredentialStore
-	permissionManager       PermissionChecker
+	permissionManager       PermissionManager
 	resourceTag             names.ControllerTag
 	ReservedCloudNames      []string
 	Dialer                  Dialer
@@ -34,7 +34,7 @@ func NewJujuManager(
 	store *db.Database,
 	authSvc *openfga.OFGAClient,
 	credentialStore credentials.CredentialStore,
-	permissionManager PermissionChecker,
+	permissionManager PermissionManager,
 	resourceTag names.ControllerTag,
 	reservedCloudNames []string,
 	dialer Dialer,

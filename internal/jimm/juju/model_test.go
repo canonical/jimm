@@ -1679,6 +1679,92 @@ func TestModelInfo(t *testing.T) {
 	}
 }
 
+func TestModelInfoNotFound(t *testing.T) {
+	c := qt.New(t)
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+					return errors.E(errors.CodeNotFound, "model not found")
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, modelInfoTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+	dbUser, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(dbUser, j.OpenFGAClient)
+	mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
+
+	ok, err := user.IsModelReader(c.Context(), mt)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsTrue)
+
+	_, err = j.ModelInfo(context.Background(), user, mt)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Check the model is deleted as a consequence of the error
+	model := env.Models[0].DBObject(c, j.Database)
+	err = j.Database.GetModel(context.Background(), &model)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Check the openfga tuple is deleted as a consequence of the error
+	ok, err = user.IsModelReader(c.Context(), mt)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsFalse)
+
+	_, err = j.ModelInfo(context.Background(), user, mt)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+}
+
+func TestModelStatusNotFound(t *testing.T) {
+	c := qt.New(t)
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				ModelStatus_: func(_ context.Context, ms *jujuparams.ModelStatus) error {
+					return errors.E(errors.CodeNotFound, "model not found")
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, modelInfoTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+	dbUser, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(dbUser, j.OpenFGAClient)
+
+	mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
+
+	ok, err := user.IsModelReader(c.Context(), mt)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsTrue)
+
+	_, err = j.ModelStatus(context.Background(), user, mt)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Check the model is deleted as a consequence of the error
+	model := env.Models[0].DBObject(c, j.Database)
+	err = j.Database.GetModel(context.Background(), &model)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+
+	// Check the openfga tuple is deleted as a consequence of the error
+	ok, err = user.IsModelReader(c.Context(), mt)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsFalse)
+
+	_, err = j.ModelStatus(context.Background(), user, mt)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
 const modelStatusTestEnv = `clouds:
 - name: test-cloud
   type: test-provider

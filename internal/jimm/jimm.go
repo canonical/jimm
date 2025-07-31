@@ -460,7 +460,6 @@ func New(p Parameters) (*JIMM, error) {
 	j.permissionManager = permissionManager
 
 	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
-
 	jujuManager, err := juju.NewJujuManager(
 		j.Database,
 		j.OpenFGAClient,

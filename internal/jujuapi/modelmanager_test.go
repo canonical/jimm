@@ -1069,8 +1069,6 @@ func (s *modelManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 var zeroDuration = time.Duration(0)
 
 func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
-	ctx := context.Background()
-
 	conn := s.open(c, nil, "bob")
 	defer conn.Close()
 
@@ -1085,10 +1083,6 @@ func (s *modelManagerSuite) TestDestroyModel(c *gc.C) {
 	c.Assert(mis, gc.HasLen, 1)
 	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
-
-	// Kill the model.
-	err = s.JIMM.Database.DeleteModel(ctx, s.Model)
-	c.Assert(err, gc.Equals, nil)
 
 	// Make sure it's not an error if you destroy a model that't not there.
 	err = client.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, &zeroDuration)

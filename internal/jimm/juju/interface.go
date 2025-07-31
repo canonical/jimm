@@ -210,7 +210,7 @@ type API interface {
 }
 
 // PermissionManager provides a way to manage permissions within JIMM.
-type PermissionChecker interface {
+type PermissionManager interface {
 	// GetUserCloudAccess returns the user's level of access to a cloud.
 	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
 	// GetUserModelAccess returns the user's level of access to a model.
