@@ -21,17 +21,17 @@ type OutputLine struct {
 
 // CommandRunner is a struct that runs juju commands and JUJU_DATA directory.
 type CommandRunner struct {
-	prefix      string
+	command     string
 	jujuDataDir string
 }
 
-// NewCommandRunner creates a new CommandRunner with the specified command prefix.
+// NewCommandRunner creates a new CommandRunner with the specified command command.
 //
 // dataDir is the JUJU_DATA directory where juju commands will store their data.
 // It must be an ABSOLUTE path.
-func NewCommandRunner(prefix, dataDir string) *CommandRunner {
+func NewCommandRunner(command, dataDir string) *CommandRunner {
 	return &CommandRunner{
-		prefix:      prefix,
+		command:     command,
 		jujuDataDir: dataDir,
 	}
 }
@@ -50,7 +50,7 @@ func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan O
 	//nolint:gosec
 	// G204: Subprocess launched with a potential tainted input or cmd arguments (gosec)
 	// We manage the args via specific <command>.go files, so the args are not tainted.
-	cmd := exec.CommandContext(ctx, b.prefix, args...)
+	cmd := exec.CommandContext(ctx, b.command, args...)
 	cmd.Env = append(cmd.Env, "JUJU_DATA="+b.jujuDataDir)
 
 	stdOut, err := cmd.StdoutPipe()

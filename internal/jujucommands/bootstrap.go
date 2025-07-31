@@ -117,7 +117,7 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	osenv.SetJujuXDGDataHome(dataDir)
 
 	// Update public clouds
-	// TODO: Make this a command of this package
+	// TODO: Move this command to it's own file.
 	outputCh, err := c.runner.RunJujuCmd(ctx, []string{"update-public-clouds", "--client"})
 	if err != nil {
 		return nil, nil, nil, err
