@@ -65,7 +65,7 @@ bob: bob@canonical.com
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 
 	s.store.EXPECT().CurrentController().Return("target-controller", nil)
-	s.store.EXPECT().ModelByName("target-controller", "test-model").Return(&jjclient.ModelDetails{
+	s.store.EXPECT().ModelByName("target-controller", "owner/test-model").Return(&jjclient.ModelDetails{
 		ModelUUID: testUUID,
 	}, nil)
 
@@ -103,8 +103,6 @@ bob: bob@canonical.com
 		APIEndpoints:   []string{"endpoint1"},
 		CACert:         "test-ca-cert",
 	}, nil)
-	// 	Got: {93608db4-f1cb-4da5-9926-8233981aef0a true target-controller-uuid target-controller [endpoint1] test-ca-cert test-user  [] migration-token} (controller.MigrationSpec)
-	// Want: {93608db4-f1cb-4da5-9926-8233981aef0a true target-controller-uuid  [endpoint1] test-ca-cert   [] migration-token} (controller.MigrationSpec)
 
 	migrationSpec := controllerapi.MigrationSpec{
 		ModelUUID:             testUUID,
@@ -138,7 +136,7 @@ bob: bob@canonical.com
 
 	// Set args after settings flags to avoid resetting them.
 	migrateCmd.targetController = "target-controller"
-	migrateCmd.modelName = "test-model"
+	migrateCmd.modelName = "owner/test-model"
 	migrateCmd.backingController = "backing-controller"
 	migrateCmd.userMappingFile = userMappingFile.Name()
 
@@ -193,7 +191,7 @@ func (s *migrateModelSuite) TestValidateUserMapping_SkipUsers(c *gc.C) {
 	}, nil)
 	migrateCmd := &migrateModelCommand{}
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-	err := migrateCmd.validateUserMapping(userMapping, testUUID, s.migrateClient)
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", s.migrateClient)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -220,7 +218,7 @@ func (s *migrateModelSuite) TestValidateUserMapping_HandleEveryoneUser(c *gc.C) 
 	}, nil)
 	migrateCmd := &migrateModelCommand{}
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-	err := migrateCmd.validateUserMapping(userMapping, testUUID, s.migrateClient)
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", s.migrateClient)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -247,7 +245,7 @@ func (s *migrateModelSuite) TestValidateUserMapping_MissingUsers(c *gc.C) {
 	}, nil)
 	migrateCmd := &migrateModelCommand{}
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-	err := migrateCmd.validateUserMapping(userMapping, testUUID, s.migrateClient)
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", s.migrateClient)
 	c.Assert(err, gc.ErrorMatches, `(?ms).*^expected user "alice" who has admin access to the model$.*`)
 	c.Assert(err, gc.ErrorMatches, `(?ms).*^expected user "bob" who has consume access to offer "test-offer"$.*`)
 }
