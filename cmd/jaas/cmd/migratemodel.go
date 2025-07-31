@@ -179,7 +179,7 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 	}
 	defer jujuAPI.Close()
 
-	err = c.validateUserMapping(userMapping, modelInfo.ModelUUID, jujuAPI)
+	err = c.validateUserMapping(userMapping, modelInfo.ModelUUID, c.modelName, jujuAPI)
 	if err != nil {
 		// validateUserMapping returns an error with suitable formatting for display.
 		return err
@@ -272,8 +272,8 @@ func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (
 
 // validateUserMapping checks that the user mapping contains all necessary users
 // that have access to the model and its offers.
-func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string, modelUUID string, jujuClient MigrateAPI) error {
-	modelInfo, err := jujuClient.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID)})
+func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string, modelUUID, modelName string, jujuAPI MigrateAPI) error {
+	modelInfo, err := jujuAPI.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID)})
 	if err != nil {
 		return fmt.Errorf("could not get model info: %v", err)
 	}
@@ -282,6 +282,8 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 	var missingUserMessages []string
 
 	for _, user := range modelUsers {
+		// Skip checks for the "everyone" since the user
+		// shouldn't need to map this special case user.
 		if user.UserName == ofganames.EveryoneUser {
 			continue
 		}
@@ -290,7 +292,17 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 		}
 	}
 
-	offers, err := jujuClient.ListOffers()
+	// To list the model offers, we need the model name and owner as unfortunately
+	// the model UUID is not sufficient to query the offers.
+	unqualifiedModelName, ownerTag, err := jujuclient.SplitModelName(modelName)
+	if err != nil {
+		return err
+	}
+	filter := crossmodel.ApplicationOfferFilter{
+		OwnerName: ownerTag.Id(),
+		ModelName: unqualifiedModelName,
+	}
+	offers, err := jujuAPI.ListOffers(filter)
 	if err != nil {
 		return fmt.Errorf("could not list application offers: %v", err)
 	}
