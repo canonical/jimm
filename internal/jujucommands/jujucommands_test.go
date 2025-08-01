@@ -3,6 +3,7 @@
 package jujucommands_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -17,8 +18,9 @@ type jujucommandsSuite struct{}
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 	testCtx := c.Context()
 	dir := c.TempDir()
-	c.Patch(jujucommands.CmdPrefix, "echo")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{"i am an output"}, dir)
+
+	runner := jujucommands.NewCommandRunner("echo", dir)
+	outputCh, err := runner.RunJujuCmd(testCtx, []string{"i am an output"})
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.
@@ -34,11 +36,25 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever(c *qt.C) {
 	c.Assert(b.String(), qt.Equals, expected)
 }
 
+func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_ContextCancelled(c *qt.C) {
+	testCtx := c.Context()
+	dir := c.TempDir()
+
+	cancelledCtx, cancel := context.WithCancel(testCtx)
+	cancel()
+
+	runner := jujucommands.NewCommandRunner("echo", dir)
+	_, err := runner.RunJujuCmd(cancelledCtx, []string{"i am an output"})
+	c.Assert(err, qt.ErrorMatches, "failed to start command: context canceled")
+
+}
+
 func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 	testCtx := c.Context()
 	dir := c.TempDir()
-	c.Patch(jujucommands.CmdPrefix, "ls")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{"-idontexist"}, dir)
+
+	runner := jujucommands.NewCommandRunner("ls", dir)
+	outputCh, err := runner.RunJujuCmd(testCtx, []string{"-idontexist"})
 	c.Assert(err, qt.IsNil)
 
 	// The assertion for this test works such that we know we're going to receive 2 lines exactly.
@@ -64,8 +80,9 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 
 func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	testCtx := c.Context()
-	c.Patch(jujucommands.CmdPrefix, "env")
-	outputCh, err := jujucommands.RunJujuCmd(testCtx, []string{}, "testing-data-is-set")
+
+	runner := jujucommands.NewCommandRunner("env", "testing-data-is-set")
+	outputCh, err := runner.RunJujuCmd(testCtx, []string{})
 	c.Assert(err, qt.IsNil)
 
 	// Use a builder to collect streamed output & test entire string.
@@ -79,6 +96,7 @@ func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	c.Assert(b.String(), qt.Equals, "JUJU_DATA=testing-data-is-set\n")
 }
 
+//go:generate mockgen -destination=./mocks/runner.go -package=mocks . Runner
 func TestJujucommandsSuite(t *testing.T) {
 	qtsuite.Run(qt.New(t), &jujucommandsSuite{})
 }

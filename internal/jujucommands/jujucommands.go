@@ -13,21 +13,45 @@ import (
 	"github.com/mitchellh/go-linereader"
 )
 
-type outputLine struct {
+// OutputLine represents a line of output from a juju command.
+type OutputLine struct {
 	Line string
 	Err  error
 }
 
-var (
-	cmdPrefix = "juju"
-)
+// CommandRunner is a struct that runs juju commands and JUJU_DATA directory.
+type CommandRunner struct {
+	command     string
+	jujuDataDir string
+}
+
+// NewCommandRunner creates a new CommandRunner with the specified command command.
+//
+// dataDir is the JUJU_DATA directory where juju commands will store their data.
+// It must be an ABSOLUTE path.
+func NewCommandRunner(command, dataDir string) *CommandRunner {
+	return &CommandRunner{
+		command:     command,
+		jujuDataDir: dataDir,
+	}
+}
+
+// JujuDataDir returns the JUJU_DATA directory used by the CommandRunner.
+//
+// This is exposed so that commands that may need to know the JUJU_DATA directory can access it.
+func (b *CommandRunner) JujuDataDir() string {
+	return b.jujuDataDir
+}
 
 // runJujuCmd runs a juju command with the given command string and JUJU_DATA directory.
 // It returns a channel that will receive output lines from the command's stdout and stderr.
 // The command is run in a separate goroutine, and the context can be used to cancel the command.
-func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan outputLine, error) {
-	cmd := exec.CommandContext(ctx, cmdPrefix, args...)
-	cmd.Env = append(cmd.Env, "JUJU_DATA="+jujuDataDir)
+func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan OutputLine, error) {
+	//nolint:gosec
+	// G204: Subprocess launched with a potential tainted input or cmd arguments (gosec)
+	// We manage the args via specific <command>.go files, so the args are not tainted.
+	cmd := exec.CommandContext(ctx, b.command, args...)
+	cmd.Env = append(cmd.Env, "JUJU_DATA="+b.jujuDataDir)
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
@@ -43,7 +67,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
 
-	outputCh := make(chan outputLine, 10) // buffered to avoid blocking
+	outputCh := make(chan OutputLine, 10) // buffered to avoid blocking
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -52,7 +76,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		defer wg.Done()
 		for line := range r.Ch {
 			select {
-			case outputCh <- outputLine{Line: line}:
+			case outputCh <- OutputLine{Line: line}:
 			case <-ctx.Done():
 				return
 			}
@@ -69,7 +93,7 @@ func runJujuCmd(ctx context.Context, args []string, jujuDataDir string) (<-chan 
 		wg.Wait()
 
 		if err := cmd.Wait(); err != nil {
-			outputCh <- outputLine{Err: err}
+			outputCh <- OutputLine{Err: err}
 		}
 
 		close(outputCh)
