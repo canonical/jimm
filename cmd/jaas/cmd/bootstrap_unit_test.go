@@ -107,7 +107,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 	})
 
 	command := &bootstrapCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}
@@ -163,7 +163,7 @@ func (s *bootstrapCmdSuite) TestBootstrapWatchLogs(c *gc.C) {
 	})
 
 	command := &bootstrapCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}

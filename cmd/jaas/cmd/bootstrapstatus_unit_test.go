@@ -39,7 +39,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
 
 	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -66,7 +66,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Failed(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("Bootstrap job failed: Bootstrap job failed\n"))
 
 	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -117,7 +117,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
 
 	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -146,7 +146,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_NoFollow(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
 	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -178,7 +178,7 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_AfterCompletion(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
 
 	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMClient, error) {
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",

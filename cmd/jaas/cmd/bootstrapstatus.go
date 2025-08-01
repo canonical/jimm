@@ -48,7 +48,7 @@ type bootstrapStatusCommand struct {
 	store            jujuclient.ClientStore
 	dialOpts         *jujuapi.DialOpts
 	jobId            string
-	bootstrapAPIFunc func() (JIMMClient, error)
+	bootstrapAPIFunc func() (JIMMAPI, error)
 
 	sleepBetweenGetLogs time.Duration
 	follow              bool
@@ -104,7 +104,7 @@ func (c *bootstrapStatusCommand) Run(ctxt *cmd.Context) error {
 }
 
 type logPoller struct {
-	client              JIMMClient
+	client              JIMMAPI
 	jobId               string
 	sleepBetweenGetLogs time.Duration
 	out                 io.Writer
@@ -159,7 +159,7 @@ func (p logPoller) watchBootstrapLogs() error {
 	}
 }
 
-func (s *bootstrapStatusCommand) newClient() (JIMMClient, error) {
+func (s *bootstrapStatusCommand) newClient() (JIMMAPI, error) {
 	currentController, err := s.store.CurrentController()
 	if err != nil {
 		return nil, errors.E(err, "could not determine controller")

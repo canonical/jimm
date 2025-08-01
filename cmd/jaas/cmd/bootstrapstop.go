@@ -42,7 +42,7 @@ type bootstrapStopCommand struct {
 	store            jujuclient.ClientStore
 	dialOpts         *jujuapi.DialOpts
 	jobId            string
-	bootstrapAPIFunc func() (JIMMClient, error)
+	bootstrapAPIFunc func() (JIMMAPI, error)
 }
 
 // Info implements cmd.Info interface.
@@ -89,7 +89,7 @@ func (c *bootstrapStopCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func (s *bootstrapStopCommand) newClient() (JIMMClient, error) {
+func (s *bootstrapStopCommand) newClient() (JIMMAPI, error) {
 	currentController, err := s.store.CurrentController()
 	if err != nil {
 		return nil, errors.E(err, "could not determine controller")

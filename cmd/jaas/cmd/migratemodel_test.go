@@ -122,7 +122,7 @@ bob: bob@canonical.com
 	})
 
 	migrateCmd := &migrateModelCommand{
-		jimmAPIFunc: func() (JIMMClient, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return s.jimmClient, nil
 		},
 		jujuApiFunc: func() (MigrateAPI, error) {

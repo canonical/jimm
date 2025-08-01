@@ -49,11 +49,12 @@ alice: alice@canonical.com
 bob: bob@canonical.com
 '''
 
-The mapping must contain entries for all users that have access to the model and its offers.
+The mapping must contain entries for all users that have access to the model and any offers
+hosted within that model. 
 You can use the "juju show-model <model-name>" command to see the users that have access to
 the model.
-You can also use the "juju show-offer <offer-name>" command to see the users that have access
-to each offer.
+You can also use the "juju list-offers" command alongside "juju show-offer <offer-name>" 
+to see the users that have access to each offer.
 
 Any users that you do not wish to be mapped must still be included with a null value or empty
 string in place of the external user. This indicates that you are intentionally skipping this
@@ -105,7 +106,7 @@ func NewMigrateModelCommand() cmd.Command {
 type migrateModelCommand struct {
 	modelcmd.ControllerCommandBase
 	out          cmd.Output
-	jimmAPIFunc  func() (JIMMClient, error)
+	jimmAPIFunc  func() (JIMMAPI, error)
 	jujuApiFunc  func() (MigrateAPI, error)
 	everyoneUser string
 
@@ -277,13 +278,16 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 	if err != nil {
 		return fmt.Errorf("could not get model info: %v", err)
 	}
+	if len(modelInfo) == 0 {
+		return fmt.Errorf("model %q not found", modelName)
+	}
 	modelUsers := modelInfo[0].Result.Users
 
 	var missingUserMessages []string
 
 	for _, user := range modelUsers {
-		// Skip checks for the "everyone" since the user
-		// shouldn't need to map this special case user.
+		// Skip checks for the "everyone user" since the
+		// supplied user mapping only needs specific users.
 		if user.UserName == ofganames.EveryoneUser {
 			continue
 		}
@@ -337,6 +341,8 @@ func (c *migrateModelCommand) newJujuClient() (MigrateAPI, error) {
 	return jujuMigrateAPI{apiCaller: apiCaller}, nil
 }
 
+// jujuMigrateAPI is an implementation of the MigrateAPI interface
+// that uses multiple Juju API clients to perform the necessary operations.
 type jujuMigrateAPI struct {
 	apiCaller jujuapi.Connection
 }
@@ -366,7 +372,7 @@ func (j jujuMigrateAPI) ListOffers(filters ...crossmodel.ApplicationOfferFilter)
 
 // newJIMMClient creates a new JIMM client for the migration command.
 // It assumes the target controller is a JIMM controller.
-func (c *migrateModelCommand) newJIMMClient() (JIMMClient, error) {
+func (c *migrateModelCommand) newJIMMClient() (JIMMAPI, error) {
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, c.targetController, "", nil)
 	if err != nil {
 		return nil, err
