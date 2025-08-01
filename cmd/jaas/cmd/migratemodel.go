@@ -6,19 +6,25 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujuapi "github.com/juju/juju/api"
+	"github.com/juju/juju/api/client/applicationoffers"
+	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/api/controller/controller"
 	controllerapi "github.com/juju/juju/api/controller/controller"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/jujuclient"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"gopkg.in/yaml.v3"
 
-	jimmapi "github.com/canonical/jimm/v3/pkg/api"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmAPI "github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -43,7 +49,20 @@ alice: alice@canonical.com
 bob: bob@canonical.com
 '''
 
-The mapping must, at a minimum, contain an entry for the model owner.
+The mapping must contain entries for all users that have access to the model and any offers
+hosted within that model. 
+You can use the "juju show-model <model-name>" command to see the users that have access to
+the model.
+You can also use the "juju list-offers" command alongside "juju show-offer <offer-name>" 
+to see the users that have access to each offer.
+
+Any users that you do not wish to be mapped must still be included with a null value or empty
+string in place of the external user. This indicates that you are intentionally skipping this
+local user, for example:
+'''
+alice: alice@canonical.com
+bob: null # or ""
+'''
 
 The user mapping is consulted when relations are periodically validated. I.e. if an offer
 was consumed by user "alice", when JIMM validates the relation it will understand that user
@@ -62,11 +81,22 @@ updated after migration to use the new external username or refer to models by t
 `
 )
 
+// MigrateAPI is an interface for the Juju API methods used by the migrate command.
+type MigrateAPI interface {
+	Close() error
+	InitiateMigration(spec controllerapi.MigrationSpec) (string, error)
+	ModelInfo(tags []names.ModelTag) ([]jujuparams.ModelInfoResult, error)
+	ListOffers(filters ...crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
+}
+
 // NewMigrateModelCommand returns a command to migrate models.
 func NewMigrateModelCommand() cmd.Command {
 	cmd := &migrateModelCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.jimmAPIFunc = cmd.newJIMMClient
+	cmd.jujuApiFunc = cmd.newJujuClient
+	cmd.everyoneUser = "everyone@external"
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -75,7 +105,10 @@ func NewMigrateModelCommand() cmd.Command {
 // a controller that isn't registered with JAAS.
 type migrateModelCommand struct {
 	modelcmd.ControllerCommandBase
-	out cmd.Output
+	out          cmd.Output
+	jimmAPIFunc  func() (JIMMAPI, error)
+	jujuApiFunc  func() (MigrateAPI, error)
+	everyoneUser string
 
 	store             jujuclient.ClientStore
 	dialOpts          *jujuapi.DialOpts
@@ -123,7 +156,6 @@ func (c *migrateModelCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
-
 	// Validate that the current controller exists.
 	// This is the controller where the model currently resides.
 	currentController, err := c.store.CurrentController()
@@ -142,6 +174,18 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 
+	jujuAPI, err := c.jujuApiFunc()
+	if err != nil {
+		return fmt.Errorf("could not create Juju API client: %v", err)
+	}
+	defer jujuAPI.Close()
+
+	err = c.validateUserMapping(userMapping, modelInfo.ModelUUID, c.modelName, jujuAPI)
+	if err != nil {
+		// validateUserMapping returns an error with suitable formatting for display.
+		return err
+	}
+
 	token, err := c.prepareMigration(userMapping, modelInfo.ModelUUID)
 	if err != nil {
 		return fmt.Errorf("failure preparing migration: %v", err)
@@ -152,16 +196,7 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 		return fmt.Errorf("could not get migration spec: %v", err)
 	}
 
-	// Dial the source controller and start the migration.
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
-	if err != nil {
-		return fmt.Errorf("could not connect to controller %q: %w", currentController, err)
-	}
-
-	client := controllerapi.NewClient(apiCaller)
-	defer client.Close()
-
-	events, err := client.InitiateMigration(spec)
+	events, err := jujuAPI.InitiateMigration(spec)
 	if err != nil {
 		return fmt.Errorf("could not initiate migration from controller %q: %v", currentController, err)
 	}
@@ -176,12 +211,12 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 // prepareMigration contacts the target controller (JIMM) to prepare
 // it for migration and receive a migration token.
 func (c *migrateModelCommand) prepareMigration(userMapping map[string]string, modelUUID string) (string, error) {
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, c.targetController, "", c.dialOpts)
+	jimmClient, err := c.jimmAPIFunc()
 	if err != nil {
-		return "", fmt.Errorf("could not connect to target controller %q: %w", c.targetController, err)
+		return "", fmt.Errorf("could not create JIMM client: %v", err)
 	}
-	client := jimmapi.NewClient(apiCaller)
-	response, err := client.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
+	defer jimmClient.Close()
+	response, err := jimmClient.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
 		BackingControllerName: c.backingController,
 		UserMapping:           userMapping,
 		ModelTag:              names.NewModelTag(modelUUID).String(),
@@ -234,4 +269,114 @@ func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (
 		// But Juju requires this field to be set, so we provide the user running the migration.
 		TargetUser: accountDetails.User,
 	}, nil
+}
+
+// validateUserMapping checks that the user mapping contains all necessary users
+// that have access to the model and its offers.
+func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string, modelUUID, modelName string, jujuAPI MigrateAPI) error {
+	modelInfo, err := jujuAPI.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID)})
+	if err != nil {
+		return fmt.Errorf("could not get model info: %v", err)
+	}
+	if len(modelInfo) == 0 {
+		return fmt.Errorf("model %q not found", modelName)
+	}
+	modelUsers := modelInfo[0].Result.Users
+
+	var missingUserMessages []string
+
+	for _, user := range modelUsers {
+		// Skip checks for the "everyone user" since the
+		// supplied user mapping only needs specific users.
+		if user.UserName == ofganames.EveryoneUser {
+			continue
+		}
+		if _, ok := userMapping[user.UserName]; !ok {
+			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to the model", user.UserName, user.Access))
+		}
+	}
+
+	// To list the model offers, we need the model name and owner as unfortunately
+	// the model UUID is not sufficient to query the offers.
+	unqualifiedModelName, ownerTag, err := jujuclient.SplitModelName(modelName)
+	if err != nil {
+		return err
+	}
+	filter := crossmodel.ApplicationOfferFilter{
+		OwnerName: ownerTag.Id(),
+		ModelName: unqualifiedModelName,
+	}
+	offers, err := jujuAPI.ListOffers(filter)
+	if err != nil {
+		return fmt.Errorf("could not list application offers: %v", err)
+	}
+	for _, offer := range offers {
+		for _, user := range offer.Users {
+			if user.UserName == ofganames.EveryoneUser {
+				continue
+			}
+			if _, ok := userMapping[user.UserName]; !ok {
+				missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to offer %q", user.UserName, user.Access, offer.OfferName))
+			}
+		}
+	}
+	if len(missingUserMessages) > 0 {
+		return fmt.Errorf("user mapping is missing the following users:\n%s\n", strings.Join(missingUserMessages, "\n"))
+	}
+
+	return nil
+}
+
+func (c *migrateModelCommand) newJujuClient() (MigrateAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %v", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return jujuMigrateAPI{apiCaller: apiCaller}, nil
+}
+
+// jujuMigrateAPI is an implementation of the MigrateAPI interface
+// that uses multiple Juju API clients to perform the necessary operations.
+type jujuMigrateAPI struct {
+	apiCaller jujuapi.Connection
+}
+
+// Close implements the MigrateAPI interface.
+func (j jujuMigrateAPI) Close() error {
+	return j.apiCaller.Close()
+}
+
+// InitiateMigration implements the MigrateAPI interface.
+func (j jujuMigrateAPI) InitiateMigration(spec controllerapi.MigrationSpec) (string, error) {
+	client := controllerapi.NewClient(j.apiCaller)
+	return client.InitiateMigration(spec)
+}
+
+// ModelInfo implements the MigrateAPI interface.
+func (j jujuMigrateAPI) ModelInfo(tags []names.ModelTag) ([]jujuparams.ModelInfoResult, error) {
+	client := modelmanager.NewClient(j.apiCaller)
+	return client.ModelInfo(tags)
+}
+
+// ListOffers implements the MigrateAPI interface.
+func (j jujuMigrateAPI) ListOffers(filters ...crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
+	client := applicationoffers.NewClient(j.apiCaller)
+	return client.ListOffers(filters...)
+}
+
+// newJIMMClient creates a new JIMM client for the migration command.
+// It assumes the target controller is a JIMM controller.
+func (c *migrateModelCommand) newJIMMClient() (JIMMAPI, error) {
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, c.targetController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return jimmAPI.NewClient(apiCaller), nil
 }

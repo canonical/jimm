@@ -185,7 +185,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/juju/ansiterm v1.0.0 // indirect
 	github.com/juju/blobstore/v3 v3.0.2 // indirect
-	github.com/juju/clock v1.1.1 // indirect
+	github.com/juju/clock v1.1.1
 	github.com/juju/collections v1.0.4 // indirect
 	github.com/juju/featureflag v1.0.0 // indirect
 	github.com/juju/go4 v0.0.0-20160222163258-40d72ab9641a // indirect
@@ -208,7 +208,7 @@ require (
 	github.com/juju/pubsub/v2 v2.0.0 // indirect
 	github.com/juju/ratelimit v1.0.2 // indirect
 	github.com/juju/replicaset/v3 v3.0.1 // indirect
-	github.com/juju/retry v1.0.1 // indirect
+	github.com/juju/retry v1.0.1
 	github.com/juju/rfc/v2 v2.0.0 // indirect
 	github.com/juju/romulus v1.0.0 // indirect
 	github.com/juju/schema v1.2.0 // indirect
@@ -338,8 +338,6 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-require mvdan.cc/sh/v3 v3.12.0
 
 require (
 	cloud.google.com/go/auth v0.16.2 // indirect

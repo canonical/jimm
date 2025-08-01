@@ -165,6 +165,8 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 		return errors.E(op, fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
 	}
 
+	// TODO(Kian): Validate user mapping contains all local users in the model description.
+
 	err = j.modifyMigrationInfo(&model, incomingModel.UserMapping)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to modify migration info: %w", err))
@@ -365,6 +367,11 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 	// if user mappings have been created.
 	err = j.Database.Transaction(func(db *db.Database) error {
 		for localUser, externalUser := range modelMigration.UserMapping {
+			if externalUser == "" {
+				// An empty external user indicates the user intentionally wants
+				// to skip mapping the local user to an external user.
+				continue
+			}
 			userMapping := &dbmodel.UserMapping{
 				ModelUUID:        modelMigration.ModelUUID,
 				LocalUser:        localUser,

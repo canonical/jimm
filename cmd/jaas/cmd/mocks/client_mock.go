@@ -155,3 +155,80 @@ func (c *MockJIMMClientBootstrapStopCall) DoAndReturn(f func(*params.BootstrapSt
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// Close mocks base method.
+func (m *MockJIMMClient) Close() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Close")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Close indicates an expected call of Close.
+func (mr *MockJIMMClientMockRecorder) Close() *MockJIMMClientCloseCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockJIMMClient)(nil).Close))
+	return &MockJIMMClientCloseCall{Call: call}
+}
+
+// MockJIMMClientCloseCall wrap *gomock.Call
+type MockJIMMClientCloseCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMClientCloseCall) Return(arg0 error) *MockJIMMClientCloseCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMClientCloseCall) Do(f func() error) *MockJIMMClientCloseCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMClientCloseCall) DoAndReturn(f func() error) *MockJIMMClientCloseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// PrepareModelMigration mocks base method.
+func (m *MockJIMMClient) PrepareModelMigration(req *params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrepareModelMigration", req)
+	ret0, _ := ret[0].(params.PrepareModelMigrationResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PrepareModelMigration indicates an expected call of PrepareModelMigration.
+func (mr *MockJIMMClientMockRecorder) PrepareModelMigration(req any) *MockJIMMClientPrepareModelMigrationCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareModelMigration", reflect.TypeOf((*MockJIMMClient)(nil).PrepareModelMigration), req)
+	return &MockJIMMClientPrepareModelMigrationCall{Call: call}
+}
+
+// MockJIMMClientPrepareModelMigrationCall wrap *gomock.Call
+type MockJIMMClientPrepareModelMigrationCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMClientPrepareModelMigrationCall) Return(arg0 params.PrepareModelMigrationResponse, arg1 error) *MockJIMMClientPrepareModelMigrationCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMClientPrepareModelMigrationCall) Do(f func(*params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error)) *MockJIMMClientPrepareModelMigrationCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMClientPrepareModelMigrationCall) DoAndReturn(f func(*params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error)) *MockJIMMClientPrepareModelMigrationCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}

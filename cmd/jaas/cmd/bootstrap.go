@@ -44,7 +44,7 @@ type bootstrapCommand struct {
 	out cmd.Output
 
 	store            jujuclient.ClientStore
-	bootstrapAPIFunc func() (JIMMClient, error)
+	bootstrapAPIFunc func() (JIMMAPI, error)
 
 	cloud          string
 	region         string
@@ -121,6 +121,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not create JIMM client: %v", err)
 	}
+	defer client.Close()
 
 	resp, err := client.Bootstrap(&req)
 	if err != nil {
@@ -146,7 +147,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	return poller.watchBootstrapLogs()
 }
 
-func (c *bootstrapCommand) newClient() (JIMMClient, error) {
+func (c *bootstrapCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
 		return nil, fmt.Errorf("could not determine controller: %v", err)

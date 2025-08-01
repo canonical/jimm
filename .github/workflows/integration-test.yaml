@@ -28,6 +28,11 @@ jobs:
           juju-channel: "3.6/edge" # Temporary change while 3.6.3 is on 3/stable and broken with JIMM.
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
+      # Build the JAAS plugin to test any changes made 
+      # to it instead of using the snap version.
+      - name: Build JAAS plugin
+        run: go build ./cmd/jaas/
+
       - name: Run integration tests
         run: ./tests/run-tests.sh
         env:
