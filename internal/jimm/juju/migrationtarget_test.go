@@ -224,6 +224,171 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
+func TestPreChecks_NoUsersWithAccess(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	api := &jimmtest.API{
+		Prechecks_: func(mi migration.ModelInfo) error {
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+	// Below is a simple model description with no users that have access.
+	descriptionArgs := description.ModelArgs{
+		AgentVersion: "3.2.1",
+		Owner:        names.NewUserTag("bob"),
+		Type:         description.IAAS,
+		Cloud:        "test",
+		Config: map[string]interface{}{
+			"uuid": migratingModelUUID,
+			"name": "test-model",
+		},
+		CloudRegion: "test-region",
+	}
+	modelDescription := description.NewModel(descriptionArgs)
+
+	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+		Owner: names.NewUserTag("bob"),
+		Name:  "test-cred",
+		Cloud: names.NewCloudTag("test"),
+	})
+	modelInfo := migration.ModelInfo{
+		UUID:                   migratingModelUUID,
+		Owner:                  names.NewUserTag("bob"),
+		Name:                   "test-model",
+		AgentVersion:           version.MustParse("3.2.1"),
+		ControllerAgentVersion: version.MustParse("3.2.1"),
+		ModelDescription:       modelDescription,
+	}
+	err := j.Prechecks(ctx, user, modelInfo)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestPreChecks_ValidatesUserMapping(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	err := j.Prechecks(ctx, user, modelInfoWithUnmappedUsers())
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jane\" who has admin access to the model$.*`)
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jack\" who has admin access to offer "test-offer"$.*`)
+}
+
+func modelInfoWithUnmappedUsers() migration.ModelInfo {
+	descriptionArgs := description.ModelArgs{
+		AgentVersion: "3.2.1",
+		Owner:        names.NewUserTag("bob"),
+		Type:         description.IAAS,
+		Cloud:        "test",
+		Config: map[string]interface{}{
+			"uuid": migratingModelUUID,
+			"name": "test-model",
+		},
+		CloudRegion: "test-region",
+	}
+	modelDescription := description.NewModel(descriptionArgs)
+
+	// Add a user with admin access that is not mapped.
+	userArgs := description.UserArgs{
+		Name:        names.NewUserTag("jane"),
+		DisplayName: "jane",
+		Access:      "admin",
+	}
+	modelDescription.AddUser(userArgs)
+	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+		Owner: names.NewUserTag("bob"),
+		Name:  "test-cred",
+		Cloud: names.NewCloudTag("test"),
+	})
+	appArgs := description.ApplicationArgs{}
+	app := modelDescription.AddApplication(appArgs)
+
+	// Add an offer with an ACL for a user that is not mapped.
+	offerArgs := description.ApplicationOfferArgs{
+		OfferName: "test-offer",
+		ACL:       map[string]string{"jack": "admin"},
+	}
+	app.AddOffer(offerArgs)
+	modelInfo := migration.ModelInfo{
+		UUID:                   migratingModelUUID,
+		Owner:                  names.NewUserTag("bob"),
+		Name:                   "test-model",
+		AgentVersion:           version.MustParse("3.2.1"),
+		ControllerAgentVersion: version.MustParse("3.2.1"),
+		ModelDescription:       modelDescription,
+	}
+	return modelInfo
+}
+
+func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	api := &jimmtest.API{
+		Prechecks_: func(mi migration.ModelInfo) error {
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
+	everyoneUserArgs := description.UserArgs{
+		Name:   names.NewUserTag("everyone@external"),
+		Access: "read",
+	}
+	model.ModelDescription.AddUser(everyoneUserArgs)
+
+	appArgs := description.ApplicationArgs{}
+	app := model.ModelDescription.AddApplication(appArgs)
+
+	// Add an offer with an ACL for the everyone@external user.
+	offerArgs := description.ApplicationOfferArgs{
+		OfferName: "test-offer",
+		ACL:       map[string]string{"everyone@external": "read"},
+	}
+	app.AddOffer(offerArgs)
+
+	err := j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.IsNil)
+}
+
 func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -406,7 +571,35 @@ func TestPrechecks_MissingUserMapping(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 	err := j.Prechecks(ctx, user, model)
-	c.Assert(err, qt.ErrorMatches, `.*no external user mapping found for local user "not-found-user"`)
+	c.Assert(err, qt.ErrorMatches, `(?s).*user mapping is missing the following users.*`)
+}
+
+func TestPrechecks_InvalidOwner(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	incomingModel := env.IncomingMigrations[0].DBObject(c, j.Database)
+	incomingModel.UserMapping["bob"] = ""
+	err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &incomingModel)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	model := newMigrationInfo(modelDescriptionArgs{
+		Owner:               "bob",
+		ModelName:           "test-model",
+		CloudName:           "test",
+		CloudCredentialName: "test-cred",
+		CloudRegionName:     "test-region",
+	})
+	err = j.Prechecks(ctx, user, model)
+	c.Assert(err, qt.ErrorMatches, `.*invalid external user mapping "" for local user "bob"`)
 }
 
 func TestPrechecks_NoIncomingModelMigration(t *testing.T) {

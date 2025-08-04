@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	goerr "errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/juju/description/v9"
@@ -25,6 +26,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 const TIMEOUT_PENDING_MIGRATION = 24 * time.Hour
@@ -165,7 +167,10 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 		return errors.E(op, fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
 	}
 
-	// TODO(Kian): Validate user mapping contains all local users in the model description.
+	err = j.validateUserMapping(model.ModelDescription, incomingModel.UserMapping)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to validate user mapping: %w", err))
+	}
 
 	err = j.modifyMigrationInfo(&model, incomingModel.UserMapping)
 	if err != nil {
@@ -197,6 +202,40 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 	err = api.Prechecks(model)
 	if err != nil {
 		return errors.E(op, fmt.Errorf("failed to run pre-checks for migration: %w", err))
+	}
+	return nil
+}
+
+// validateUserMapping checks that the provided user mapping contains all the users
+// that either have access to the model or have access to any application offers in the model.
+func (j *JujuManager) validateUserMapping(modelDescription description.Model, userMapping dbmodel.StringMap) error {
+	var missingUserMessages []string
+
+	modelUsers := modelDescription.Users()
+	for _, user := range modelUsers {
+		if user.Name().Id() == ofganames.EveryoneUser {
+			continue
+		}
+		if _, ok := userMapping[user.Name().Id()]; !ok {
+			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to the model", user.Name().Id(), user.Access()))
+		}
+	}
+
+	apps := modelDescription.Applications()
+	for _, app := range apps {
+		for _, offer := range app.Offers() {
+			for user, access := range offer.ACL() {
+				if user == ofganames.EveryoneUser {
+					continue
+				}
+				if _, ok := userMapping[user]; !ok {
+					missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to offer %q", user, access, offer.OfferName()))
+				}
+			}
+		}
+	}
+	if len(missingUserMessages) > 0 {
+		return fmt.Errorf("user mapping is missing the following users:\n%s\n", strings.Join(missingUserMessages, "\n"))
 	}
 	return nil
 }
@@ -250,6 +289,9 @@ func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMappin
 		// If the owner is not found in the user mappings, we return an error.
 		// This is to ensure that the migration does not proceed with an invalid owner.
 		return errors.E(fmt.Errorf("no external user mapping found for local user %q", model.Owner.Id()))
+	}
+	if !names.IsValidUser(newOwner) {
+		return errors.E(fmt.Errorf("invalid external user mapping %q for local user %q", newOwner, model.Owner.Id()))
 	}
 
 	newOwnerTag := names.NewUserTag(newOwner)

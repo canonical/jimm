@@ -555,6 +555,12 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 			return resp, errors.E(op, fmt.Sprintf("%s is not a valid local user name", local))
 		}
 
+		if external == "" {
+			// The external user can be empty meaning that we are
+			// intentionally skipping the mapping for this local user.
+			continue
+		}
+
 		if !names.IsValidUser(external) || !strings.Contains(external, "@") {
 			return resp, errors.E(op, fmt.Sprintf("%s is not a valid external user name", external))
 		}

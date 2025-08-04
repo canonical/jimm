@@ -72,6 +72,29 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidControllerName(c *g
 	c.Assert(err, gc.ErrorMatches, "invalid controller name")
 }
 
+func (s *jimmUnitTestSuite) TestPrepareModelMigration_EmptyExternalUser(c *gc.C) {
+	ctx := context.Background()
+
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				PrepareModelMigration_: func(ctx context.Context, user *openfga.User, modelUUID, targetControllerName string, userMapping map[string]string) (string, error) {
+					return "foo", nil
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
+		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
+		BackingControllerName: "test-controller",
+		UserMapping:           map[string]string{"alice": "alice@canonical.com", "skipped-local-user": ""},
+	})
+
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
 	ctx := context.Background()
 
