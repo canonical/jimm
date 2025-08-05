@@ -1,0 +1,220 @@
+// Copyright 2025 Canonical.
+
+package jobtracker
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/network"
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclistore"
+	"github.com/canonical/jimm/v3/internal/jujucommands"
+	"github.com/canonical/jimm/v3/internal/openfga"
+)
+
+type BootstrapJobStore interface {
+	LockBootstrap(ctx context.Context, ttl time.Duration) error
+	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
+	AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error)
+	UnlockBootstrap(ctx context.Context) error
+}
+
+type BootstrapJobJujuManager interface {
+	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
+}
+
+// TODO: Validate params?
+type BootstrapParams struct {
+	// Runner params.
+
+	JujuDataDir string
+
+	// CLI Download params.
+
+	CLIVersion string
+	CLIOs      string
+	CLIArch    string
+
+	// User defined command arguments
+
+	CloudNameAndRegion string
+	ControllerName     string
+	AgentVersion       string
+	BootstrapTimeout   int
+	CloudCred          jujucloud.CloudCredential
+	// PersonalCloud is the personally defined cloud. Only necessary if the cloud is not a public
+	// cloud.
+	PersonalCloud jujucloud.Cloud
+
+	// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
+
+	LoginTokenRefreshURL string
+}
+
+// BootstrapJob return a [JobFunc] [for use in the [Tracker]] responsible for
+// bootstrapping a controller and adding it to JIMM.
+func BootstrapJob(
+	ctx context.Context,
+	p BootstrapParams,
+	db BootstrapJobStore,
+	jujuManager BootstrapJobJujuManager,
+	user *openfga.User,
+) JobFunc {
+	const bootstrapLockTTL = 40 * time.Minute
+
+	return func(ctx context.Context) error {
+		jobId, ok := JobIdFromContext(ctx)
+		if !ok {
+			return fmt.Errorf("failed to get job ID from context")
+		}
+
+		zapctx.Debug(
+			ctx,
+			"starting bootstrap job",
+			zap.String("job-id", jobId.String()),
+			zap.String("controller-name", p.ControllerName),
+		)
+
+		if err := db.LockBootstrap(ctx, bootstrapLockTTL); err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to acquire bootstrap lock",
+				zap.String("job-id", jobId.String()),
+				zap.String("controller-name", p.ControllerName),
+				zap.Error(err),
+			)
+			return fmt.Errorf("failed to acquire bootstrap lock: %w", err)
+		}
+
+		err := db.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
+		if err == nil {
+			return fmt.Errorf("controller %q already exists", p.ControllerName)
+		}
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			return fmt.Errorf("failed to check if controller exists: %w", err)
+		}
+
+		store, err := jujuclistore.NewJujuCLIStore(jujuclistore.Config{})
+		if err != nil {
+			return fmt.Errorf("failed to create Juju CLI store: %w", err)
+		}
+
+		binary, err := store.Get(
+			ctx,
+			jujuclistore.JujuBinarySpec{
+				Version: p.CLIVersion,
+				Os:      p.CLIVersion,
+				Arch:    p.CLIArch,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get Juju binary: %w", err)
+		}
+		defer binary.Done()
+
+		runner := jujucommands.NewCommandRunner(binary.FullPath, p.JujuDataDir)
+
+		cmd := jujucommands.NewBootstrapCmd(runner)
+
+		outputCh, cliStore, cleanup, err := cmd.Run(
+			ctx,
+			jujucommands.BootstrapCmdParams{
+				CloudNameAndRegion:   p.CloudNameAndRegion,
+				ControllerName:       p.ControllerName,
+				AgentVersion:         p.AgentVersion,
+				BootstrapTimeout:     p.BootstrapTimeout,
+				LoginTokenRefreshURL: p.LoginTokenRefreshURL,
+				PersonalCloud:        p.PersonalCloud,
+				CloudCred:            p.CloudCred,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to run bootstrap command: %w", err)
+		}
+		defer cleanup()
+
+		for output := range outputCh {
+			if output.Err != nil {
+				return fmt.Errorf("bootstrap command failed: %w", output.Err)
+			}
+			if writeLogErr := db.AddBootstrapLog(
+				ctx,
+				jobId,
+				output.Line,
+			); writeLogErr != nil {
+				// If we fail to write the log, we log the error but continue.
+				// This is because the bootstrap process may still succeed, and we
+				// don't want to fail the entire job just because we couldn't log.
+				zapctx.Error(ctx, "failed to write bootstrap log", zap.Error(writeLogErr), zap.String("jobId", jobId.String()))
+			}
+		}
+
+		// We could use .CurrentController, but should bootstrap change their behaviour
+		// to not set the default controller, it would break. As such we're explicitly
+		// getting the controller by name.
+		ctrlDetails, err := cliStore.ControllerByName(p.ControllerName)
+		if err != nil {
+			return fmt.Errorf("failed to get controller details: %w", err)
+		}
+
+		hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
+		if err != nil {
+			return fmt.Errorf("failed to parse API endpoints for controller: %w", err)
+		}
+		for i := range hps {
+			// Mark all the unknown scopes public.
+			if hps[i].Scope == network.ScopeUnknown {
+				hps[i].Scope = network.ScopePublic
+			}
+		}
+
+		dbCtrl := dbmodel.Controller{
+			UUID:          ctrlDetails.ControllerUUID,
+			Name:          p.ControllerName,
+			PublicAddress: ctrlDetails.PublicDNSName,
+			CACertificate: ctrlDetails.CACert,
+			// TLSHostname: // Not needed.
+			Addresses: dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+		}
+
+		account, err := cliStore.AccountDetails(p.ControllerName)
+		if err != nil {
+			return fmt.Errorf("failed to get account details for controller %s: %w", p.ControllerName, err)
+		}
+		dbCtrlCreds := juju.ControllerCreds{
+			AdminIdentityName: account.User,
+			AdminPassword:     account.Password,
+		}
+		if err := jujuManager.AddController(
+			ctx,
+			user,
+			&dbCtrl,
+			dbCtrlCreds,
+		); err != nil {
+			return fmt.Errorf("failed to add controller to JIMM: %w", err)
+		}
+
+		if err := db.UnlockBootstrap(ctx); err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to unlock bootstrap lock",
+				zap.String("job-id", jobId.String()),
+				zap.String("controller-name", p.ControllerName),
+				zap.Error(err),
+			)
+			return fmt.Errorf("failed to unlock bootstrap lock: %w", err)
+		}
+
+		return nil
+	}
+}

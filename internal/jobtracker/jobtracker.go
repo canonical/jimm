@@ -23,6 +23,9 @@ const minimumRefreshIntervalseconds = 5
 // JobIdContextKey is a context key for storing job IDs.
 type JobIdContextKey struct{}
 
+// JobFunc represents a job being tracked by the job tracker.
+type JobFunc func(context.Context) error
+
 // Store defines the interface for tracking the lifecycle and status of jobs.
 // It provides methods to add a new job, update its status (running, successful, or failed),
 // and retrieve a stop signal for a specific job.
