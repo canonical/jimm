@@ -30,7 +30,7 @@ func (s *jobTrackerSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.db = db
-	tracker, err := jobtracker.NewJobTracker(db, 5*time.Second)
+	tracker, err := jobtracker.New(db, 5*time.Second)
 	// Set a short interval for testing purposes.
 	jobtracker.ChangeRefreshInterval(tracker, 10*time.Millisecond)
 	c.Assert(err, qt.IsNil)

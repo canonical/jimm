@@ -43,7 +43,7 @@ func (s *bootstrapManagerSuite) Init(c *qt.C) {
 
 	s.ofgaClient = ofgaClient
 
-	jobtracker, err := jobtracker.NewJobTracker(db, 1*time.Minute)
+	jobtracker, err := jobtracker.New(db, 1*time.Minute)
 	s.jobTracker = jobtracker
 	c.Assert(err, qt.IsNil)
 	s.manager, err = bootstrap.NewBootstrapManager(db, ofgaClient, jobtracker)

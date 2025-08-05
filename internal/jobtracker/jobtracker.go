@@ -46,10 +46,10 @@ type Tracker struct {
 	refreshInterval time.Duration
 }
 
-// NewJobTracker creates and returns a new Tracker instance using the provided JobTrackerStore and refreshInterval.
+// New creates and returns a new Tracker instance using the provided JobTrackerStore and refreshInterval.
 // refreshInterval is the interval between successive checks for job status.
 // It returns an error if the store is nil or if refreshInterval is not greater than zero.
-func NewJobTracker(store Store, refreshInterval time.Duration) (*Tracker, error) {
+func New(store Store, refreshInterval time.Duration) (*Tracker, error) {
 	if store == nil {
 		return nil, goerr.New("store cannot be nil")
 	}

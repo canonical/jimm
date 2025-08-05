@@ -513,7 +513,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.offerAuthorizer = offerAuthorizer
 
-	jobTracker, err := jobtracker.NewJobTracker(j.Database, 5*time.Second)
+	jobTracker, err := jobtracker.New(j.Database, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
