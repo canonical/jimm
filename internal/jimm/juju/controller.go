@@ -645,8 +645,7 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 		return errors.E(op, err)
 	}
 
-	model.Controller = targetController
-	model.ControllerID = targetController.ID
+	model.ProcessSuccessfulInternalMigration(targetController.ID)
 	err = j.Database.UpdateModel(ctx, &model)
 	if err != nil {
 		zapctx.Error(ctx, "failed to update model", zap.String("model", model.UUID.String), zaputil.Error(err))

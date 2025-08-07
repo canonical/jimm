@@ -9,7 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
+	jujurpc "github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -33,6 +33,10 @@ cloud-credentials:
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+- name: controller-2
+  uuid: 00000001-0000-0000-0000-000000000002
   cloud: test-cloud
   region: test-cloud-region
 models:
@@ -81,13 +85,14 @@ users:
   controller-access: superuser
 `
 
-type modelCleanupSuite struct {
+type modelPollerTest struct {
 	jujuManager *juju.JujuManager
 	jimmAdmin   *openfga.User
 	env         *jimmtest.Environment
 }
 
-func (s *modelCleanupSuite) Init(c *qt.C) {
+func setupModelPollerTest(c *qt.C) modelPollerTest {
+	var s modelPollerTest
 	s.jujuManager = newTestJujuManager(c, nil)
 
 	i, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -98,10 +103,12 @@ func (s *modelCleanupSuite) Init(c *qt.C) {
 
 	s.env = jimmtest.ParseEnvironment(c, modelPollerTestEnv)
 	s.env.PopulateDBAndPermissions(c, s.jujuManager.ResourceTag(), s.jujuManager.Database, s.jujuManager.OpenFGAClient)
-
+	return s
 }
 
-func (s *modelCleanupSuite) TestModelCleanup(c *qt.C) {
+func TestModelCleanup(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
 	ctx := context.Background()
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
@@ -125,8 +132,7 @@ func (s *modelCleanupSuite) TestModelCleanup(c *qt.C) {
 		},
 	}
 
-	// test
-	err := s.jujuManager.CleanupNotFoundModels(ctx)
+	err := s.jujuManager.PollModels(ctx)
 	c.Assert(err, qt.IsNil)
 
 	model := dbmodel.Model{
@@ -148,7 +154,93 @@ func (s *modelCleanupSuite) TestModelCleanup(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 }
 
-func (s *modelCleanupSuite) TestPollModelsDyingControllerErrors(c *qt.C) {
+func TestInternalMigrationSuccess(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
+	ctx := context.Background()
+
+	model := s.env.Models[0].DBObject(c, s.jujuManager.Database)
+	model.MigrationMode = dbmodel.MigrationModeMigrateInternal
+	err := s.jujuManager.Database.UpdateModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+
+	sourceController := s.env.Controllers[0].DBObject(c, s.jujuManager.Database)
+	targetController := s.env.Controllers[1].DBObject(c, s.jujuManager.Database)
+	c.Assert(model.ControllerID, qt.Equals, sourceController.ID)
+
+	s.jujuManager.Dialer = &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+				return &jujurpc.RequestError{
+					Message: "redirect",
+					Code:    jujuparams.CodeRedirect,
+					Info: jujuparams.RedirectErrorInfo{
+						ControllerTag: "controller-" + s.env.Controllers[1].UUID,
+					}.AsMap(),
+				}
+			},
+		},
+	}
+
+	err = s.jujuManager.PollModels(ctx)
+	c.Assert(err, qt.IsNil)
+
+	model = dbmodel.Model{
+		UUID: sql.NullString{
+			String: s.env.Models[0].UUID,
+			Valid:  true,
+		},
+	}
+	err = s.jujuManager.Database.GetModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+	c.Assert(model.ControllerID, qt.Equals, targetController.ID)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
+}
+
+func TestInternalMigrationFailure(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
+	ctx := context.Background()
+
+	model := s.env.Models[0].DBObject(c, s.jujuManager.Database)
+	model.MigrationMode = dbmodel.MigrationModeMigrateInternal
+	err := s.jujuManager.Database.UpdateModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+
+	sourceController := s.env.Controllers[0].DBObject(c, s.jujuManager.Database)
+	c.Assert(model.ControllerID, qt.Equals, sourceController.ID)
+
+	s.jujuManager.Dialer = &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+				mi.Migration = &jujuparams.ModelMigrationStatus{
+					Status: "migration failed",
+					Start:  &time.Time{},
+					End:    &time.Time{},
+				}
+				return nil
+			},
+		},
+	}
+
+	err = s.jujuManager.PollModels(ctx)
+	c.Assert(err, qt.IsNil)
+
+	model = dbmodel.Model{
+		UUID: sql.NullString{
+			String: s.env.Models[0].UUID,
+			Valid:  true,
+		},
+	}
+	err = s.jujuManager.Database.GetModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+	c.Assert(model.ControllerID, qt.Equals, sourceController.ID)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
+}
+
+func TestPollModelsDyingControllerErrors(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
 	ctx := context.Background()
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
@@ -162,8 +254,7 @@ func (s *modelCleanupSuite) TestPollModelsDyingControllerErrors(c *qt.C) {
 		},
 	}
 
-	// test
-	err := s.jujuManager.CleanupNotFoundModels(ctx)
+	err := s.jujuManager.PollModels(ctx)
 	c.Assert(err, qt.IsNil)
 
 	model := dbmodel.Model{
@@ -175,8 +266,4 @@ func (s *modelCleanupSuite) TestPollModelsDyingControllerErrors(c *qt.C) {
 	err = s.jujuManager.Database.GetModel(ctx, &model)
 	c.Assert(err, qt.IsNil)
 	c.Assert(model.Life, qt.Equals, state.Alive.String())
-}
-
-func TestDyingModelsCleanup(t *testing.T) {
-	qtsuite.Run(qt.New(t), &modelCleanupSuite{})
 }

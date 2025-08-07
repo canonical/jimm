@@ -61,8 +61,8 @@ type JujuManager struct {
 	RevokeOfferAccessOnController_     func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
 	PrepareModelMigration_             func(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
 	// These mocks can be removed soon once the jujuManager interface is updated.
-	UpdateMetrics_         func(ctx context.Context)
-	CleanupNotFoundModels_ func(ctx context.Context) error
+	UpdateMetrics_ func(ctx context.Context)
+	PollModels_    func(ctx context.Context) error
 }
 
 func (j *JujuManager) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
@@ -249,11 +249,11 @@ func (j *JujuManager) UpdateMetrics(ctx context.Context) {
 	}
 	j.UpdateMetrics_(ctx)
 }
-func (j *JujuManager) CleanupNotFoundModels(ctx context.Context) error {
-	if j.CleanupNotFoundModels_ == nil {
+func (j *JujuManager) PollModels(ctx context.Context) error {
+	if j.PollModels_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return j.CleanupNotFoundModels_(ctx)
+	return j.PollModels_(ctx)
 }
 
 func (j *JujuManager) GrantOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {

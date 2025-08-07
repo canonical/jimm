@@ -300,7 +300,7 @@ type JujuManager interface {
 
 	// These are methods on the Juju manager that don't need to be mocked and can be removed from this interface later.
 	UpdateMetrics(ctx context.Context)
-	CleanupNotFoundModels(ctx context.Context) error
+	PollModels(ctx context.Context) error
 }
 
 // BootstrapManager provides methods to manage bootstrap jobs.

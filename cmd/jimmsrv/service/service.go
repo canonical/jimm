@@ -279,7 +279,7 @@ func (s *Service) CleanupNotFoundModels(ctx context.Context, trigger <-chan time
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.JujuManager().CleanupNotFoundModels(ctx)
+			err := s.jimm.JujuManager().PollModels(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "dying models cleanup", zap.Error(err))
 				continue
