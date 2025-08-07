@@ -105,6 +105,18 @@ func BootstrapJob(
 			return fmt.Errorf("failed to acquire bootstrap lock: %w", err)
 		}
 
+		defer func() {
+			if err := store.UnlockBootstrap(ctx); err != nil {
+				zapctx.Error(
+					ctx,
+					"failed to unlock bootstrap lock",
+					zap.String("job-id", jobId.String()),
+					zap.String("controller-name", p.ControllerName),
+					zap.Error(err),
+				)
+			}
+		}()
+
 		err := store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
 		if err == nil {
 			return fmt.Errorf("controller %q already exists", p.ControllerName)
@@ -204,17 +216,6 @@ func BootstrapJob(
 			dbCtrlCreds,
 		); err != nil {
 			return fmt.Errorf("failed to add controller to JIMM: %w", err)
-		}
-
-		if err := store.UnlockBootstrap(ctx); err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to unlock bootstrap lock",
-				zap.String("job-id", jobId.String()),
-				zap.String("controller-name", p.ControllerName),
-				zap.Error(err),
-			)
-			return fmt.Errorf("failed to unlock bootstrap lock: %w", err)
 		}
 
 		return nil
