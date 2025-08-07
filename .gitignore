@@ -25,3 +25,4 @@ local/traefik/certs/ca.srl
 db_schemas
 
 *.test
+__debug_bin*
