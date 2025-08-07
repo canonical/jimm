@@ -561,6 +561,12 @@ type PrepareModelMigrationResponse struct {
 	Token string `json:"token" yaml:"token"`
 }
 
+// ListMigrationTargetsRequest holds the model to query controllers for
+type ListMigrationTargetsRequest struct {
+	// ModelTag holds the tag of the model that could be migrated
+	ModelTag string `json:"model-tag"`
+}
+
 // BootstrapStatusRequest holds the request to get the status of a bootstrap job.
 type BootstrapStatusRequest struct {
 	// JobID is the ID of the bootstrap job to get the status for.

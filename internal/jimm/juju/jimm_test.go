@@ -927,3 +927,100 @@ func TestPrepareMigration_MultipleCalls(t *testing.T) {
 	_, err = j.PrepareModelMigration(ctx, user, fakeModelUUID, targetController.Name, userMapping)
 	c.Assert(err, qt.IsNil)
 }
+
+const testMigrationTargetsEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region-a
+  - name: test-region-b
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-a
+  agent-version: 3.2.1
+- name: test2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test
+  region: test-region-b
+  agent-version: 3.2.0
+- name: test3
+  uuid: 00000001-0000-0000-0000-000000000003
+  cloud: test
+  region: test-region-b
+  agent-version: 3.10.0
+- name: test4
+  uuid: 00000001-0000-0000-0000-000000000004
+  cloud: test
+  region: test-region-b
+  agent-version: 2.1.0
+models:
+- name: test-migratable-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@canonical.com
+  cloud: test
+  region: test-region-b
+  cloud-credential: test-cred
+  controller: test2
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+- username: bob@canonical.com
+  controller-access: login
+- username: eve@canonical.com
+  controller-access: "no-access"
+`
+
+func TestListMigrationTargets(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testMigrationTargetsEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+	fakeModelTag := names.NewModelTag(env.Models[0].UUID)
+
+	tests := []struct {
+		about               string
+		user                dbmodel.Identity
+		jimmAdmin           bool
+		expectedControllers []dbmodel.Controller
+		expectedError       string
+	}{{
+		about:     "superuser can list migratable controllers",
+		user:      env.User("alice@canonical.com").DBObject(c, j.Database),
+		jimmAdmin: true,
+		expectedControllers: []dbmodel.Controller{
+			env.Controller("test3").DBObject(c, j.Database),
+		},
+	}, {
+		about:         "add-model user can not list controllers",
+		user:          env.User("bob@canonical.com").DBObject(c, j.Database),
+		expectedError: "unauthorized",
+	}, {
+		about:         "user withouth access rights cannot list controllers",
+		user:          env.User("eve@canonical.com").DBObject(c, j.Database),
+		expectedError: "unauthorized",
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			user := openfga.NewUser(&test.user, j.OpenFGAClient)
+			user.JimmAdmin = test.jimmAdmin
+			controllers, err := j.ListMigrationTargets(ctx, user, fakeModelTag)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.Equals, nil)
+				c.Assert(controllers, qt.CmpEquals(cmpopts.IgnoreTypes([]dbmodel.CloudRegionControllerPriority{})), test.expectedControllers)
+			}
+		})
+	}
+}

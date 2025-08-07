@@ -63,6 +63,7 @@ func init() {
 		migrateModel := rpc.Method(r.MigrateModel)
 		version := rpc.Method(r.Version)
 		prepareModelMigration := rpc.Method(r.PrepareModelMigration)
+		listMigrationTargetsMethod := rpc.Method(r.ListMigrationTargets)
 		bootstrapStatus := rpc.Method(r.BootstrapStatus)
 		bootstrapStart := rpc.Method(r.BootstrapStart)
 		bootstrapStop := rpc.Method(r.BootstrapStop)
@@ -104,6 +105,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "Version", version)
 		// JIMM Model Migrations
 		r.AddMethod("JIMM", 4, "PrepareModelMigration", prepareModelMigration)
+		r.AddMethod("JIMM", 4, "ListMigrationTargets", listMigrationTargetsMethod)
 		// JIMM Bootstrap
 		r.AddMethod("JIMM", 4, "BootstrapStatus", bootstrapStatus)
 		r.AddMethod("JIMM", 4, "BootstrapStart", bootstrapStart)
@@ -572,6 +574,29 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 	}
 
 	return resp, nil
+}
+
+// ListMigrationTargets returns the list of juju controllers that the given
+// model could be migrated to.
+func (r *controllerRoot) ListMigrationTargets(ctx context.Context, req apiparams.ListMigrationTargetsRequest) (apiparams.ListControllersResponse, error) {
+	const op = errors.Op("jujuapi.ListMigrationTargets")
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return apiparams.ListControllersResponse{}, errors.E(op, err, errors.CodeBadRequest)
+	}
+
+	dbControllers, err := r.jimm.JujuManager().ListMigrationTargets(ctx, r.user, mt)
+	controllersInfo := make([]apiparams.ControllerInfo, 0, len(dbControllers))
+	if err != nil {
+		return apiparams.ListControllersResponse{}, errors.E(op, err)
+	}
+	for _, ctl := range dbControllers {
+		controllersInfo = append(controllersInfo, ctl.ToAPIControllerInfo())
+	}
+	return apiparams.ListControllersResponse{
+		Controllers: controllersInfo,
+	}, nil
 }
 
 // BootstrapStatus retrieves the status of a bootstrap job, its logs and the watermark

@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/cloud"
+	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v5"
@@ -20,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -923,4 +925,63 @@ func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 	c.Assert(migrationToken, gc.Not(gc.Equals), "")
+}
+
+func (s *jimmSuite) TestListMigrationTargets(c *gc.C) {
+	// Add migration target controller
+	info := s.APIInfo(c)
+	ctl := &dbmodel.Controller{
+		UUID:          info.ControllerUUID,
+		Name:          "controller-2",
+		CACertificate: info.CACert,
+		Addresses:     nil,
+		CloudName:     jimmtest.TestCloudName,
+		CloudRegion:   jimmtest.TestCloudRegionName,
+	}
+	ctlCreds := juju.ControllerCreds{
+		AdminIdentityName: info.Tag.Id(),
+		AdminPassword:     info.Password,
+	}
+	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
+	for _, addr := range info.Addrs {
+		hp, err := network.ParseMachineHostPort(addr)
+		c.Assert(err, gc.Equals, nil)
+		ctl.Addresses = append(ctl.Addresses, []jujuparams.HostPort{{
+			Address: jujuparams.FromMachineAddress(hp.MachineAddress),
+			Port:    hp.Port(),
+		}})
+	}
+	err := s.JIMM.JujuManager().AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
+	c.Assert(err, gc.Equals, nil)
+
+	// Add model that could migrate to target
+	mt := s.AddModel(
+		c,
+		names.NewUserTag("charlie@canonical.com"),
+		"model-0",
+		names.NewCloudTag(jimmtest.TestCloudName),
+		jimmtest.TestCloudRegionName,
+		s.Model2.CloudCredential.ResourceTag(),
+	)
+
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	cis, err := client.ListMigrationTargets(&apiparams.ListMigrationTargetsRequest{
+		ModelTag: mt.String(),
+	})
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
+		Name:          "controller-2",
+		UUID:          s.Model.Controller.UUID,
+		APIAddresses:  s.APIInfo(c).Addrs,
+		CACertificate: s.APIInfo(c).CACert,
+		CloudTag:      names.NewCloudTag(jimmtest.TestCloudName).String(),
+		CloudRegion:   jimmtest.TestCloudRegionName,
+		AgentVersion:  s.Model.Controller.AgentVersion,
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	}})
 }

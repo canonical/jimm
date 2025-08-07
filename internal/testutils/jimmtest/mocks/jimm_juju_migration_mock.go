@@ -11,18 +11,20 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 type MigrationMocks struct {
-	Prechecks_      func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
-	AdoptResources_ func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
-	Activate_       func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
-	AbortMigration_ func(ctx context.Context, user *openfga.User, modelUUID string) error
-	CheckMachines_  func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
-	Import_         func(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error
-	LatestLogTime_  func(ctx context.Context, modelUUID string) (time.Time, error)
+	Prechecks_            func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
+	AdoptResources_       func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
+	Activate_             func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
+	AbortMigration_       func(ctx context.Context, user *openfga.User, modelUUID string) error
+	CheckMachines_        func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
+	Import_               func(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error
+	LatestLogTime_        func(ctx context.Context, modelUUID string) (time.Time, error)
+	ListMigrationTargets_ func(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
 }
 
 func (j *MigrationMocks) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
@@ -72,4 +74,11 @@ func (j *MigrationMocks) Import(ctx context.Context, user *openfga.User, seriali
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return j.Import_(ctx, user, serialized)
+}
+
+func (j *MigrationMocks) ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error) {
+	if j.ListMigrationTargets_ == nil {
+		return nil, errors.E(errors.CodeNotImplemented)
+	}
+	return j.ListMigrationTargets_(ctx, user, modelTag)
 }
