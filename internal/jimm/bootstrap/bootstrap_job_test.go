@@ -1,10 +1,11 @@
 // Copyright 2025 Canonical.
-package jobtracker_test
+package bootstrap_test
 
 import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/jujuclient"
@@ -13,22 +14,15 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jobtracker"
-	"github.com/canonical/jimm/v3/internal/jobtracker/mocks"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap/mocks"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/jujucommands"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// Test scenarios:)
-// 3. Cannot get controller
-// 4. Gets a controller that already exists
-// 5. Can't create store
-
-func (s *jobTrackerSuite) TestBootstrapJob(c *qt.C) {
-	testCtx := c.Context()
-
-	jobParams := jobtracker.BootstrapParams{
+var (
+	jobParams = bootstrap.BootstrapJobParams{
 		JujuDataDir:          "/path/to/a/juju/data/dir",
 		CLIVersion:           "3.6.9",
 		CLIOs:                "linux",
@@ -41,6 +35,30 @@ func (s *jobTrackerSuite) TestBootstrapJob(c *qt.C) {
 		PersonalCloud:        jujucloud.Cloud{},
 		LoginTokenRefreshURL: "jimm.com/.well-known/jwks.json",
 	}
+)
+
+func pollJob(c *qt.C, s *bootstrapManagerSuite, id uuid.UUID, expectedStatus dbmodel.JobStatus) {
+	var status dbmodel.JobStatus
+	var pollerr error
+	for i := 0; i < 20; i++ {
+		status, pollerr = s.db.GetJobStatus(c.Context(), id)
+		c.Assert(pollerr, qt.IsNil)
+		if status == expectedStatus {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	c.Assert(status, qt.Equals, expectedStatus)
+}
+
+// Test scenarios:)
+// 3. Cannot get controller
+// 4. Gets a controller that already exists
+// 5. Can't create store
+
+func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
+	testCtx := c.Context()
+
 	binaryPath := "/faketmp/juju"
 	testOutputLine := "test-line"
 
@@ -142,7 +160,7 @@ func (s *jobTrackerSuite) TestBootstrapJob(c *qt.C) {
 	).Return(nil).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := jobtracker.BootstrapJob(
+	job := bootstrap.BootstrapJob(
 		jobParams,
 		store,
 		jujuManager,
@@ -151,7 +169,7 @@ func (s *jobTrackerSuite) TestBootstrapJob(c *qt.C) {
 		user,
 	)
 
-	id, err := s.tracker.Run(
+	id, err := s.jobTracker.Run(
 		testCtx,
 		"test-job-type",
 		job,
@@ -159,35 +177,12 @@ func (s *jobTrackerSuite) TestBootstrapJob(c *qt.C) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	var status dbmodel.JobStatus
-	var pollerr error
-	for i := 0; i < 20; i++ {
-		status, pollerr = s.db.GetJobStatus(testCtx, id)
-		c.Assert(pollerr, qt.IsNil)
-		if status == dbmodel.StatusSuccessful {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	c.Assert(status, qt.Equals, dbmodel.StatusSuccessful)
+	pollJob(c, s, id, dbmodel.StatusSuccessful)
+
 }
 
-func (s *jobTrackerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
+func (s *bootstrapManagerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 	testCtx := c.Context()
-
-	jobParams := jobtracker.BootstrapParams{
-		JujuDataDir:          "/path/to/a/juju/data/dir",
-		CLIVersion:           "3.6.9",
-		CLIOs:                "linux",
-		CLIArch:              "aarch64",
-		CloudNameAndRegion:   "special-cloud",
-		ControllerName:       "a",
-		AgentVersion:         "3.6.3",
-		BootstrapTimeout:     0,
-		CloudCred:            jujucloud.CloudCredential{},
-		PersonalCloud:        jujucloud.Cloud{},
-		LoginTokenRefreshURL: "jimm.com/.well-known/jwks.json",
-	}
 
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
@@ -204,7 +199,7 @@ func (s *jobTrackerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 	// Mocked in order of execution:
 	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(errors.E("bootstrap lock is already held")).Times(1)
 
-	job := jobtracker.BootstrapJob(
+	job := bootstrap.BootstrapJob(
 		jobParams,
 		store,
 		jujuManager,
@@ -213,7 +208,7 @@ func (s *jobTrackerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 		user,
 	)
 
-	id, err := s.tracker.Run(
+	id, err := s.jobTracker.Run(
 		testCtx,
 		"test-job-type",
 		job,
@@ -221,17 +216,7 @@ func (s *jobTrackerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	var status dbmodel.JobStatus
-	var pollerr error
-	for i := 0; i < 20; i++ {
-		status, pollerr = s.db.GetJobStatus(testCtx, id)
-		c.Assert(pollerr, qt.IsNil)
-		if status == dbmodel.StatusFailed {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	c.Assert(status, qt.Equals, dbmodel.StatusFailed)
+	pollJob(c, s, id, dbmodel.StatusFailed)
 
 	entry := &dbmodel.JobTrackerEntry{JobID: id}
 	err = s.db.GetJob(testCtx, entry)

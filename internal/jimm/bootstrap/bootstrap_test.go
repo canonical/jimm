@@ -135,6 +135,11 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.
 	c.Assert(err, qt.ErrorMatches, "failed to get job status")
 }
 
+//go:generate mockgen -destination=./mocks/bootstrapjobstore.go -package=mocks . BootstrapJobStore
+//go:generate mockgen -destination=./mocks/bootstrapjobjujumanager.go -package=mocks . BootstrapJobJujuManager
+//go:generate mockgen -destination=./mocks/bootstrapjobclistore.go -package=mocks . BootstrapJobBinaryStore
+//go:generate mockgen -destination=./mocks/bootstrapexecutor.go -package=mocks . BootstrapExecutor
+//go:generate mockgen -destination=./mocks/juju_client_store.go -package=mocks github.com/juju/juju/jujuclient ClientStore
 func TestBootstrapManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &bootstrapManagerSuite{})
 }

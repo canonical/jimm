@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-package jobtracker
+package bootstrap
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/jujucommands"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -39,7 +40,7 @@ type BootstrapJobBinaryStore interface {
 }
 
 // TODO: Validate params?
-type BootstrapParams struct {
+type BootstrapJobParams struct {
 	// Runner params.
 
 	JujuDataDir string
@@ -71,17 +72,17 @@ type BootstrapParams struct {
 //
 //nolint:gocognit // The cognit is kinda inevitable here.
 func BootstrapJob(
-	p BootstrapParams,
+	p BootstrapJobParams,
 	store BootstrapJobStore,
 	jujuManager BootstrapJobJujuManager,
 	binaryStore BootstrapJobBinaryStore,
 	executor BootstrapExecutor,
 	user *openfga.User,
-) JobFunc {
+) jobtracker.JobFunc {
 	const bootstrapLockTTL = 40 * time.Minute
 
 	return func(ctx context.Context) error {
-		jobId, ok := JobIdFromContext(ctx)
+		jobId, ok := jobtracker.JobIdFromContext(ctx)
 		if !ok {
 			return fmt.Errorf("failed to get job ID from context")
 		}
