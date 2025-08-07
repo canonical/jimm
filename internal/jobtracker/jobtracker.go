@@ -64,7 +64,7 @@ func New(store Store, refreshInterval time.Duration) (*Tracker, error) {
 }
 
 // Run runs a new job and returns the job ID.
-func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.Context) error, maxDuration time.Duration) (uuid.UUID, error) {
+func (j *Tracker) Run(ctx context.Context, jobType string, job JobFunc, maxDuration time.Duration) (uuid.UUID, error) {
 	jobId, err := j.store.AddJob(ctx, jobType)
 	if err != nil {
 		return jobId, err
@@ -96,7 +96,7 @@ func (j *Tracker) handleJob(
 	j.monitorJob(id, jobErrCh, cancelJob)
 }
 
-func (j *Tracker) runJob(ctx context.Context, id uuid.UUID, jobErrCh chan error, job func(context.Context) error) {
+func (j *Tracker) runJob(ctx context.Context, id uuid.UUID, jobErrCh chan error, job JobFunc) {
 	if err := j.store.SetJobRunning(ctx, id); err != nil {
 		jobErrCh <- fmt.Errorf("failed to set job running, job not starting: %w", err)
 		return
