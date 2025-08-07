@@ -498,3 +498,326 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	assertJobError(c, s, id, "bootstrap command failed: command exited code 1")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
+
+func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetControllerDetails(c *qt.C) {
+	testCtx := c.Context()
+
+	binaryPath := "/faketmp/juju"
+	testOutputLine := "test-line"
+
+	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	defer ctrl.Finish()
+
+	// Mocked in order of execution:
+	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
+	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	store.EXPECT().GetController(
+		gomock.Any(),
+		&dbmodel.Controller{Name: jobParams.ControllerName},
+	).Return(
+		errors.E(errors.CodeNotFound, errors.E("test err")),
+	).Times(1)
+	// TODO: Figure a way to check done is indeed deferred?
+	binaryStore.EXPECT().Get(
+		gomock.Any(),
+		jujuclistore.JujuBinarySpec{
+			Version: jobParams.CLIVersion,
+			Os:      jobParams.CLIVersion,
+			Arch:    jobParams.CLIArch,
+		},
+	).Return(
+		&jujuclistore.Binary{FullPath: binaryPath},
+		nil,
+	).Times(1)
+	executor.EXPECT().RunWrapper(
+		gomock.Any(),
+		binaryPath,
+		jobParams.JujuDataDir,
+		jujucommands.BootstrapCmdParams{
+			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
+			ControllerName:       jobParams.ControllerName,
+			AgentVersion:         jobParams.AgentVersion,
+			BootstrapTimeout:     jobParams.BootstrapTimeout,
+			LoginTokenRefreshURL: jobParams.LoginTokenRefreshURL,
+			PersonalCloud:        jobParams.PersonalCloud,
+			CloudCred:            jobParams.CloudCred,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		clientStore,
+		func() {
+			cleanupCalled = true
+		},
+		nil,
+	).Times(1)
+	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
+	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
+	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	ctrlDetails := &jujuclient.ControllerDetails{
+		APIEndpoints: []string{
+			"10.0.0.1:17070",
+			"172.0.0.1:17070",
+			"192.0.0.1:17070",
+		},
+		ControllerUUID: "I am actually a uuid, I promise",
+		PublicDNSName:  "I am not a public DNS, I am a private DNS",
+		CACert:         "Very secure CA cert, promise",
+	}
+	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+		ctrlDetails,
+		nil,
+	).Times(1)
+	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+		nil,
+		errors.E("client store failed to get account details"),
+	)
+	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+
+	job := bootstrap.BootstrapJob(
+		jobParams,
+		store,
+		jujuManager,
+		binaryStore,
+		executor,
+		user,
+	)
+
+	id, err := s.jobTracker.Run(
+		testCtx,
+		"test-job-type",
+		job,
+		time.Second*1000,
+	)
+	c.Assert(err, qt.IsNil)
+
+	pollJob(c, s, id, dbmodel.StatusFailed)
+	assertJobError(c, s, id, "failed to get account details for controller a: client store failed to get account details")
+	c.Assert(cleanupCalled, qt.IsTrue)
+}
+
+func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDetails(c *qt.C) {
+	testCtx := c.Context()
+
+	binaryPath := "/faketmp/juju"
+	testOutputLine := "test-line"
+
+	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	defer ctrl.Finish()
+
+	// Mocked in order of execution:
+	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
+	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	store.EXPECT().GetController(
+		gomock.Any(),
+		&dbmodel.Controller{Name: jobParams.ControllerName},
+	).Return(
+		errors.E(errors.CodeNotFound, errors.E("test err")),
+	).Times(1)
+	// TODO: Figure a way to check done is indeed deferred?
+	binaryStore.EXPECT().Get(
+		gomock.Any(),
+		jujuclistore.JujuBinarySpec{
+			Version: jobParams.CLIVersion,
+			Os:      jobParams.CLIVersion,
+			Arch:    jobParams.CLIArch,
+		},
+	).Return(
+		&jujuclistore.Binary{FullPath: binaryPath},
+		nil,
+	).Times(1)
+	executor.EXPECT().RunWrapper(
+		gomock.Any(),
+		binaryPath,
+		jobParams.JujuDataDir,
+		jujucommands.BootstrapCmdParams{
+			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
+			ControllerName:       jobParams.ControllerName,
+			AgentVersion:         jobParams.AgentVersion,
+			BootstrapTimeout:     jobParams.BootstrapTimeout,
+			LoginTokenRefreshURL: jobParams.LoginTokenRefreshURL,
+			PersonalCloud:        jobParams.PersonalCloud,
+			CloudCred:            jobParams.CloudCred,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		clientStore,
+		func() {
+			cleanupCalled = true
+		},
+		nil,
+	).Times(1)
+	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
+	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
+	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	ctrlDetails := &jujuclient.ControllerDetails{
+		APIEndpoints: []string{
+			"10.0.0.1:17070",
+			"172.0.0.1:17070",
+			"192.0.0.1:17070",
+		},
+		ControllerUUID: "I am actually a uuid, I promise",
+		PublicDNSName:  "I am not a public DNS, I am a private DNS",
+		CACert:         "Very secure CA cert, promise",
+	}
+	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+		ctrlDetails,
+		nil,
+	).Times(1)
+	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+		nil,
+		errors.E("account details test error"),
+	)
+	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+
+	job := bootstrap.BootstrapJob(
+		jobParams,
+		store,
+		jujuManager,
+		binaryStore,
+		executor,
+		user,
+	)
+
+	id, err := s.jobTracker.Run(
+		testCtx,
+		"test-job-type",
+		job,
+		time.Second*1000,
+	)
+	c.Assert(err, qt.IsNil)
+
+	pollJob(c, s, id, dbmodel.StatusFailed)
+	assertJobError(c, s, id, "failed to get account details for controller a: account details test error")
+	c.Assert(cleanupCalled, qt.IsTrue)
+}
+
+func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController(c *qt.C) {
+	testCtx := c.Context()
+
+	binaryPath := "/faketmp/juju"
+	testOutputLine := "test-line"
+
+	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	defer ctrl.Finish()
+
+	// Mocked in order of execution:
+	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
+	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	store.EXPECT().GetController(
+		gomock.Any(),
+		&dbmodel.Controller{Name: jobParams.ControllerName},
+	).Return(
+		errors.E(errors.CodeNotFound, errors.E("test err")),
+	).Times(1)
+	// TODO: Figure a way to check done is indeed deferred?
+	binaryStore.EXPECT().Get(
+		gomock.Any(),
+		jujuclistore.JujuBinarySpec{
+			Version: jobParams.CLIVersion,
+			Os:      jobParams.CLIVersion,
+			Arch:    jobParams.CLIArch,
+		},
+	).Return(
+		&jujuclistore.Binary{FullPath: binaryPath},
+		nil,
+	).Times(1)
+	executor.EXPECT().RunWrapper(
+		gomock.Any(),
+		binaryPath,
+		jobParams.JujuDataDir,
+		jujucommands.BootstrapCmdParams{
+			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
+			ControllerName:       jobParams.ControllerName,
+			AgentVersion:         jobParams.AgentVersion,
+			BootstrapTimeout:     jobParams.BootstrapTimeout,
+			LoginTokenRefreshURL: jobParams.LoginTokenRefreshURL,
+			PersonalCloud:        jobParams.PersonalCloud,
+			CloudCred:            jobParams.CloudCred,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		clientStore,
+		func() {
+			cleanupCalled = true
+		},
+		nil,
+	).Times(1)
+	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
+	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
+	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	ctrlDetails := &jujuclient.ControllerDetails{
+		APIEndpoints: []string{
+			"10.0.0.1:17070",
+			"172.0.0.1:17070",
+			"192.0.0.1:17070",
+		},
+		ControllerUUID: "I am actually a uuid, I promise",
+		PublicDNSName:  "I am not a public DNS, I am a private DNS",
+		CACert:         "Very secure CA cert, promise",
+	}
+	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+		ctrlDetails,
+		nil,
+	).Times(1)
+	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+		&jujuclient.AccountDetails{
+			User:     "diglett",
+			Password: "diglett's password",
+		},
+		nil,
+	)
+	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
+	c.Assert(err, qt.IsNil)
+	jujuManager.EXPECT().AddController(
+		gomock.Any(),
+		user,
+		&dbmodel.Controller{
+			UUID:          ctrlDetails.ControllerUUID,
+			Name:          jobParams.ControllerName,
+			PublicAddress: ctrlDetails.PublicDNSName,
+			CACertificate: ctrlDetails.CACert,
+			// TLSHostname: // Not needed.
+			Addresses: dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+		},
+		gomock.Any(),
+	).Return(
+		errors.E("add controller test error"),
+	).Times(1)
+	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+
+	job := bootstrap.BootstrapJob(
+		jobParams,
+		store,
+		jujuManager,
+		binaryStore,
+		executor,
+		user,
+	)
+
+	id, err := s.jobTracker.Run(
+		testCtx,
+		"test-job-type",
+		job,
+		time.Second*1000,
+	)
+	c.Assert(err, qt.IsNil)
+
+	pollJob(c, s, id, dbmodel.StatusFailed)
+	assertJobError(c, s, id, "failed to add controller to JIMM: add controller test error")
+	c.Assert(cleanupCalled, qt.IsTrue)
+}
