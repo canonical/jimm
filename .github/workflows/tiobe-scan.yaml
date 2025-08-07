@@ -20,9 +20,8 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-        go install honnef.co/go/tools/cmd/staticcheck@v0.5.1
-        go install github.com/axw/gocov/gocov@v1.1.0
-        go install github.com/AlekSi/gocov-xml@v1.1.0
+        go install honnef.co/go/tools/cmd/staticcheck@v0.6.1
+        go install github.com/t-yuki/gocover-cobertura@latest
 
     - name: Install Docker
       run: |
@@ -50,9 +49,8 @@ jobs:
     - name: Test and generate coverage report
       run: |
         TEST_LOGGING_CONFIG=ERROR go test -mod readonly ./... -timeout 1h -coverprofile=coverage.out
-        gocov convert coverage.out > coverage.json
         mkdir -p .coverage
-        gocov-xml < coverage.json > .coverage/coverage.xml
+        gocover-cobertura < coverage.out > .coverage/coverage.xml
 
     - name: Run TICS analysis with github-action
       uses: tiobe/tics-github-action@v3
@@ -60,7 +58,7 @@ jobs:
         mode: qserver
         project: jimm
         branchdir: .
-        viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+        viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=GoProjects
         ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
         installTics: true
 
