@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/jujuclient"
@@ -24,23 +23,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-type BootstrapJobStore interface {
-	LockBootstrap(ctx context.Context, ttl time.Duration) error
-	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
-	AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error)
-	UnlockBootstrap(ctx context.Context) error
-}
-
-type BootstrapJobJujuManager interface {
-	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
-}
-
-type BootstrapJobBinaryStore interface {
-	Get(ctx context.Context, spec jujuclistore.JujuBinarySpec) (*jujuclistore.Binary, error)
-}
-
-// TODO: Validate params?
-type BootstrapJobParams struct {
+// JobParams holds the params to run a juju bootstrap job.
+type JobParams struct {
 	// Runner params.
 
 	JujuDataDir string
@@ -67,15 +51,10 @@ type BootstrapJobParams struct {
 	LoginTokenRefreshURL string
 }
 
-// BootstrapJob return a [JobFunc] [for use in the [Tracker]] responsible for
+// BootstrapJob returns a [jobtracker.JobFunc] [for use in the [jobtracker.Tracker]] responsible for
 // bootstrapping a controller and adding it to JIMM.
-//
-//nolint:gocognit // The cognit is kinda inevitable here.
-func BootstrapJob(
-	p BootstrapJobParams,
-	store BootstrapJobStore,
-	jujuManager BootstrapJobJujuManager,
-	binaryStore BootstrapJobBinaryStore,
+func (b *bootstrapManager) BootstrapJob(
+	p JobParams,
 	executor BootstrapExecutor,
 	user *openfga.User,
 ) jobtracker.JobFunc {
@@ -94,7 +73,7 @@ func BootstrapJob(
 			zap.String("controller-name", p.ControllerName),
 		)
 
-		if err := store.LockBootstrap(ctx, bootstrapLockTTL); err != nil {
+		if err := b.store.LockBootstrap(ctx, bootstrapLockTTL); err != nil {
 			zapctx.Error(
 				ctx,
 				"failed to acquire bootstrap lock",
@@ -106,7 +85,7 @@ func BootstrapJob(
 		}
 
 		defer func() {
-			if err := store.UnlockBootstrap(ctx); err != nil {
+			if err := b.store.UnlockBootstrap(ctx); err != nil {
 				zapctx.Error(
 					ctx,
 					"failed to unlock bootstrap lock",
@@ -117,7 +96,7 @@ func BootstrapJob(
 			}
 		}()
 
-		err := store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
+		err := b.store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
 		if err == nil {
 			return fmt.Errorf("controller %q already exists", p.ControllerName)
 		}
@@ -125,7 +104,7 @@ func BootstrapJob(
 			return fmt.Errorf("failed to check if controller exists: %w", err)
 		}
 
-		binary, err := binaryStore.Get(
+		binary, err := b.binaryStore.Get(
 			ctx,
 			jujuclistore.JujuBinarySpec{
 				Version: p.CLIVersion,
@@ -161,7 +140,7 @@ func BootstrapJob(
 			if output.Err != nil {
 				return fmt.Errorf("bootstrap command failed: %w", output.Err)
 			}
-			if writeLogErr := store.AddBootstrapLog(
+			if writeLogErr := b.store.AddBootstrapLog(
 				ctx,
 				jobId,
 				output.Line,
@@ -209,7 +188,7 @@ func BootstrapJob(
 			AdminIdentityName: account.User,
 			AdminPassword:     account.Password,
 		}
-		if err := jujuManager.AddController(
+		if err := b.jujuManager.AddController(
 			ctx,
 			user,
 			&dbCtrl,

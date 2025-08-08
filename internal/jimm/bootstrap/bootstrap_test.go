@@ -12,9 +12,12 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/google/uuid"
+	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap/mocks"
 	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -22,11 +25,34 @@ import (
 )
 
 type bootstrapManagerSuite struct {
-	manager    *bootstrap.BootstrapManager
 	jobTracker *jobtracker.Tracker
 	adminUser  *openfga.User
 	db         *db.Database
 	ofgaClient *openfga.OFGAClient
+}
+
+func setupMocks(c *qt.C) (
+	*gomock.Controller,
+	*mocks.MockStore,
+	*mocks.MockJujuManager,
+	*mocks.MockBinaryStore,
+	*mocks.MockBootstrapExecutor,
+	*mocks.MockClientStore,
+	*openfga.User,
+) {
+	ctrl := gomock.NewController(c)
+
+	store := mocks.NewMockStore(ctrl)
+	jujuManager := mocks.NewMockJujuManager(ctrl)
+	binaryStore := mocks.NewMockBinaryStore(ctrl)
+	executor := mocks.NewMockBootstrapExecutor(ctrl)
+	clientStore := mocks.NewMockClientStore(ctrl)
+
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	user := openfga.NewUser(i, nil)
+
+	return ctrl, store, jujuManager, binaryStore, executor, clientStore, user
 }
 
 func (s *bootstrapManagerSuite) Init(c *qt.C) {
@@ -46,8 +72,6 @@ func (s *bootstrapManagerSuite) Init(c *qt.C) {
 	jobtracker, err := jobtracker.New(db, 1*time.Minute)
 	s.jobTracker = jobtracker
 	c.Assert(err, qt.IsNil)
-	s.manager, err = bootstrap.NewBootstrapManager(db, ofgaClient, jobtracker)
-	c.Assert(err, qt.IsNil)
 }
 
 func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
@@ -56,6 +80,12 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	defer close(read)
 	write := make(chan struct{})
 	defer close(write)
+
+	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
+	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, s.db, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	numLogs := 101
 	batchSize := 10
@@ -86,7 +116,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	for batch := 0; batch < numLogs/batchSize+1; batch++ {
 		<-write // Wait for the batch of logs to be written.
 
-		response, err := s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
+		response, err := manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
 		c.Assert(err, qt.IsNil)
 		logs := []string{}
 		for j := 0; j < int(math.Min(float64(batchSize), float64(numLogs-batch*batchSize))); j++ {
@@ -99,7 +129,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	}
 
 	// check last batch is empty.
-	response, err := s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
+	response, err := manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
 	c.Assert(response.Status == params.StatusSuccessful || response.Status == params.StatusRunning, qt.IsTrue)
 	c.Assert(err, qt.IsNil)
 	c.Assert(response.Logs, qt.HasLen, 0)
@@ -107,6 +137,12 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 
 func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C) {
 	ctx := c.Context()
+	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
+	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, s.db, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
+
 	jobId, err := s.jobTracker.Run(ctx,
 		"bootstrap-job",
 		func(ctx context.Context) error {
@@ -117,7 +153,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C)
 	c.Assert(err, qt.IsNil)
 	var response params.BootstrapStatusResponse
 	for range 10 {
-		response, err = s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
+		response, err = manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
 		c.Assert(err, qt.IsNil)
 		if response.Status == params.StatusFailed {
 			break
@@ -131,15 +167,22 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C)
 func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.C) {
 	ctx := c.Context()
 	jobId := uuid.New()
-	_, err := s.manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
+
+	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
+	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, s.db, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
+
+	_, err = manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
 	c.Assert(err, qt.ErrorMatches, "failed to get job status")
 }
 
-//go:generate mockgen -destination=./mocks/bootstrapjobstore.go -package=mocks . BootstrapJobStore
-//go:generate mockgen -destination=./mocks/bootstrapjobjujumanager.go -package=mocks . BootstrapJobJujuManager
-//go:generate mockgen -destination=./mocks/bootstrapjobclistore.go -package=mocks . BootstrapJobBinaryStore
+//go:generate mockgen -destination=./mocks/store.go -package=mocks . Store
+//go:generate mockgen -destination=./mocks/jujumanager.go -package=mocks . JujuManager
+//go:generate mockgen -destination=./mocks/binarystore.go -package=mocks . BinaryStore
 //go:generate mockgen -destination=./mocks/bootstrapexecutor.go -package=mocks . BootstrapExecutor
-//go:generate mockgen -destination=./mocks/juju_client_store.go -package=mocks github.com/juju/juju/jujuclient ClientStore
+//go:generate mockgen -destination=./mocks/jujuclientstore.go -package=mocks github.com/juju/juju/jujuclient ClientStore
 func TestBootstrapManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &bootstrapManagerSuite{})
 }

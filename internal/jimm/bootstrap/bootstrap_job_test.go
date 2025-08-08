@@ -15,14 +15,12 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
-	"github.com/canonical/jimm/v3/internal/jimm/bootstrap/mocks"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/jujucommands"
-	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 var (
-	jobParams = bootstrap.BootstrapJobParams{
+	jobParams = bootstrap.JobParams{
 		JujuDataDir:          "/path/to/a/juju/data/dir",
 		CLIVersion:           "3.6.9",
 		CLIOs:                "linux",
@@ -58,30 +56,6 @@ func assertJobError(c *qt.C, s *bootstrapManagerSuite, id uuid.UUID, errStr stri
 	c.Assert(entry.Error, qt.Equals, errStr)
 }
 
-func setupMocks(c *qt.C) (
-	*gomock.Controller,
-	*mocks.MockBootstrapJobStore,
-	*mocks.MockBootstrapJobJujuManager,
-	*mocks.MockBootstrapJobBinaryStore,
-	*mocks.MockBootstrapExecutor,
-	*mocks.MockClientStore,
-	*openfga.User,
-) {
-	ctrl := gomock.NewController(c)
-
-	store := mocks.NewMockBootstrapJobStore(ctrl)
-	jujuManager := mocks.NewMockBootstrapJobJujuManager(ctrl)
-	binaryStore := mocks.NewMockBootstrapJobBinaryStore(ctrl)
-	executor := mocks.NewMockBootstrapExecutor(ctrl)
-	clientStore := mocks.NewMockClientStore(ctrl)
-
-	i, err := dbmodel.NewIdentity("bob@canonical.com")
-	c.Assert(err, qt.IsNil)
-	user := openfga.NewUser(i, nil)
-
-	return ctrl, store, jujuManager, binaryStore, executor, clientStore, user
-}
-
 func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	testCtx := c.Context()
 
@@ -90,6 +64,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
@@ -172,18 +149,14 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			Name:          jobParams.ControllerName,
 			PublicAddress: ctrlDetails.PublicDNSName,
 			CACertificate: ctrlDetails.CACert,
-			// TLSHostname: // Not needed.
-			Addresses: dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+			Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
 		},
 		gomock.Any(),
 	).Return(nil).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -206,14 +179,14 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
+
 	// Mocked in order of execution:
 	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(errors.E("bootstrap lock is already held")).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -236,6 +209,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerExists(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
+
 	// Mocked in order of execution:
 	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	store.EXPECT().GetController(
@@ -244,11 +220,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerExists(c *qt.C) {
 	).Return(nil).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -271,6 +244,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerRetrievalFails(c *qt.
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
+
 	// Mocked in order of execution:
 	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	store.EXPECT().GetController(
@@ -279,11 +255,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerRetrievalFails(c *qt.
 	).Return(errors.E("oh noes, we couldnt'se get the controller")).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -306,6 +279,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
+
 	// Mocked in order of execution:
 	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
 	store.EXPECT().GetController(
@@ -327,11 +303,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 	).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -355,6 +328,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
@@ -398,11 +374,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 	).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
+
 		executor,
 		user,
 	)
@@ -427,6 +401,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
@@ -477,11 +454,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -507,6 +481,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
@@ -578,11 +555,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -608,6 +582,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
@@ -679,11 +656,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
@@ -709,6 +683,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
@@ -791,8 +768,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 			Name:          jobParams.ControllerName,
 			PublicAddress: ctrlDetails.PublicDNSName,
 			CACertificate: ctrlDetails.CACert,
-			// TLSHostname: // Not needed.
-			Addresses: dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+			Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
 		},
 		gomock.Any(),
 	).Return(
@@ -800,11 +776,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
-	job := bootstrap.BootstrapJob(
+	job := manager.BootstrapJob(
 		jobParams,
-		store,
-		jujuManager,
-		binaryStore,
 		executor,
 		user,
 	)
