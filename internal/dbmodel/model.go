@@ -35,7 +35,7 @@ const (
 
 	// MigrationModeMovingInternal reflects a model that is being moved internally
 	// within JIMM, e.g. from one controller to another.
-	MigrationModeMigrateInternal = MigrationMode("migrate-internal")
+	MigrationModeMigrateInternal = MigrationMode("migrating-internally")
 )
 
 // A Model is a juju model.

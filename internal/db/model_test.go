@@ -802,7 +802,7 @@ func (s *dbSuite) TestSetModelMigrating(c *qt.C) {
 	model := env.Models[0].DBObject(c, s.Database)
 	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
 
-	modelWithMigration, err := s.Database.SetModelMigrating(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
+	modelWithMigration, err := s.Database.SetModelMigrationMode(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
 	c.Assert(err, qt.IsNil)
 
 	// Validate the returned struct has the correct migration mode.
@@ -815,6 +815,14 @@ func (s *dbSuite) TestSetModelMigrating(c *qt.C) {
 	c.Assert(migrationMode, qt.Equals, dbmodel.MigrationModeMigrateInternal)
 }
 
+func (s *dbSuite) TestSetModelMigrating_ModelDoesNotExist(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	_, err = s.Database.SetModelMigrationMode(context.Background(), "fake-uuid", dbmodel.MigrationModeMigrateInternal)
+	c.Assert(err, qt.ErrorMatches, `model with uuid "fake-uuid" does not exist`)
+}
+
 func (s *dbSuite) TestSetModelMigrating_PreventSetAgain(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
@@ -825,10 +833,10 @@ func (s *dbSuite) TestSetModelMigrating_PreventSetAgain(c *qt.C) {
 	model := env.Models[0].DBObject(c, s.Database)
 	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
 
-	_, err = s.Database.SetModelMigrating(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
+	_, err = s.Database.SetModelMigrationMode(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
 	c.Assert(err, qt.IsNil)
 
 	// Attempt to set the model to migrating again should return an error.
-	_, err = s.Database.SetModelMigrating(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
+	_, err = s.Database.SetModelMigrationMode(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
 	c.Assert(err, qt.ErrorMatches, `model is already migrating`)
 }

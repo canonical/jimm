@@ -705,7 +705,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 	if internalMigration {
 		migrationMode = dbmodel.MigrationModeMigrateInternal
 	}
-	model, err := j.Database.SetModelMigrating(ctx, mt.Id(), migrationMode)
+	model, err := j.Database.SetModelMigrationMode(ctx, mt.Id(), migrationMode)
 	if err != nil {
 		return result, errors.E(op, fmt.Errorf("failed to set model as migrating: %v", err))
 	}
