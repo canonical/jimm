@@ -24,6 +24,32 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+// BootstrapExecutor holds a wrapper to run a command. It is primarily for testing
+// and when running the bootstrap command the implemention to be used is [DefaultBootstrapExecutor].
+type BootstrapExecutor interface {
+	RunWrapper(
+		ctx context.Context,
+		binaryPath, jujuDataDir string,
+		params jujucommands.BootstrapCmdParams,
+	) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error)
+}
+
+// DefaultBootstrapExecutor defines the default, and expected bootstrap executor
+// to be used in a [bootstrapManager.BootstrapJob]
+type DefaultBootstrapExecutor struct{}
+
+// RunWrapper wraps the command runner and bootstrap command to be run, and then runs it for you.
+// This enables the running portion of the BootstrapJob to be mocked.
+func (h DefaultBootstrapExecutor) RunWrapper(
+	ctx context.Context,
+	binaryPath, jujuDataDir string,
+	params jujucommands.BootstrapCmdParams,
+) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error) {
+	r := jujucommands.NewCommandRunner(binaryPath, jujuDataDir)
+	command := jujucommands.NewBootstrapCmd(r)
+	return command.Run(ctx, params)
+}
+
 // JobParams holds the params to run a juju bootstrap job.
 type JobParams struct {
 	// Runner params.
@@ -216,28 +242,4 @@ func (b *bootstrapManager) runBootstrap(
 	}
 
 	return nil
-}
-
-// BootstrapExecutor holds a wrapper to run a command. It is primarily for testing
-// and when running the bootstrap command the implemention to be used is [DefaultBootstrapExecutor].
-type BootstrapExecutor interface {
-	RunWrapper(
-		ctx context.Context,
-		binaryPath, jujuDataDir string,
-		params jujucommands.BootstrapCmdParams,
-	) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error)
-}
-
-type DefaultBootstrapExecutor struct{}
-
-// RunWrapper wraps the command runner and bootstrap command to be run, and then runs it for you.
-// This enables the running portion of the BootstrapJob to be mocked.
-func (h DefaultBootstrapExecutor) RunWrapper(
-	ctx context.Context,
-	binaryPath, jujuDataDir string,
-	params jujucommands.BootstrapCmdParams,
-) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error) {
-	r := jujucommands.NewCommandRunner(binaryPath, jujuDataDir)
-	command := jujucommands.NewBootstrapCmd(r)
-	return command.Run(ctx, params)
 }
