@@ -141,7 +141,7 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 	defer p.lock.Unlock()
 	binary, ok := p.entries[url]
 	if ok {
-		binary.referenceCount.Add(1) // Increment reference count
+		binary.RefCount().Add(1) // Increment reference count
 		return binary, nil
 	}
 	err = p.freeEntry(ctx)
@@ -172,9 +172,14 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 	binary = &Binary{
 		FullPath: file.Name(),
 	}
-	binary.referenceCount.Store(1)
+	binary.RefCount().Store(1)
 	p.entries[url] = binary
 	return binary, nil
+}
+
+// RefCount returns the current reference count for this binary.
+func (b *Binary) RefCount() *atomic.Int32 {
+	return &b.referenceCount
 }
 
 // freeEntry checks if the entries map has reached the maximum number of entries.
@@ -186,7 +191,7 @@ func (p *jujuCLIStore) freeEntry(ctx context.Context) error {
 	}
 	entriesToDelete := []string{}
 	for key, binary := range p.entries {
-		if binary.referenceCount.Load() == 0 {
+		if binary.RefCount().Load() == 0 {
 			entriesToDelete = append(entriesToDelete, key)
 		}
 	}

@@ -62,6 +62,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	binaryPath := "/faketmp/juju"
 	testOutputLine := "test-line"
 
+	binary := &jujuclistore.Binary{FullPath: binaryPath}
+	binary.RefCount().Store(1) // Simulate the Get().
+
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
@@ -86,7 +89,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			Arch:    jobParams.CLIArch,
 		},
 	).Return(
-		&jujuclistore.Binary{FullPath: binaryPath},
+		binary,
 		nil,
 	).Times(1)
 	executor.EXPECT().RunWrapper(
@@ -171,6 +174,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 
 	pollJob(c, s, id, dbmodel.StatusSuccessful)
 	c.Assert(cleanupCalled, qt.IsTrue)
+	// Check binary is no longer referenced.
+	c.Assert(binary.RefCount().Load(), qt.Equals, int32(0))
 }
 
 func (s *bootstrapManagerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
