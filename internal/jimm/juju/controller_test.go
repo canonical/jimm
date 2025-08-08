@@ -1461,6 +1461,16 @@ func TestInitiateMigration(t *testing.T) {
 			} else {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
+			model := dbmodel.Model{
+				UUID: sql.NullString{String: mt1.Id(), Valid: true},
+			}
+			err = j.Database.GetModel(context.Background(), &model)
+			c.Assert(err, qt.IsNil)
+			if test.expectedError == "" {
+				c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeExporting)
+			} else {
+				c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
+			}
 		})
 	}
 }

@@ -789,7 +789,7 @@ func TestActivate_Success(t *testing.T) {
 	}
 	err = j.Database.GetModel(ctx, model)
 	c.Assert(err, qt.IsNil)
-	c.Assert(model.MigrationMode, qt.Equals, state.MigrationModeNone)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
 	c.Assert(model.Life, qt.Equals, state.Alive.String())
 }
 
@@ -1055,7 +1055,7 @@ func TestImport_Success(t *testing.T) {
 	}
 	err = j.Database.GetModel(ctx, m)
 	c.Assert(err, qt.IsNil)
-	c.Assert(m.MigrationMode, qt.Equals, state.MigrationModeImporting)
+	c.Assert(m.MigrationMode, qt.Equals, dbmodel.MigrationModeImporting)
 
 	// Check that the application is created in the database.
 	appOffer := &dbmodel.ApplicationOffer{
@@ -1255,7 +1255,7 @@ func TestImport_APIFailure(t *testing.T) {
 	}
 	err = j.Database.GetModel(ctx, m)
 	c.Assert(err, qt.IsNil)
-	c.Assert(m.MigrationMode, qt.Equals, state.MigrationModeImporting)
+	c.Assert(m.MigrationMode, qt.Equals, dbmodel.MigrationModeImporting)
 }
 
 // environment for testing cleanup of partial model migrations.
