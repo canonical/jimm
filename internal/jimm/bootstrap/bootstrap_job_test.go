@@ -394,7 +394,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "failed to run bootstrap command: executor test error")
+	assertJobError(c, s, id, "run bootstrap failed: failed to run bootstrap command: executor test error")
 }
 
 func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.C) {
@@ -472,7 +472,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "bootstrap command failed: command exited code 1")
+	assertJobError(c, s, id, "run bootstrap failed: bootstrap command failed: command exited code 1")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
@@ -572,7 +572,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "failed to get account details for controller a: client store failed to get account details")
+	assertJobError(c, s, id, "run bootstrap failed: failed to get account details for controller a: client store failed to get account details")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
@@ -672,7 +672,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "failed to get account details for controller a: account details test error")
+	assertJobError(c, s, id, "run bootstrap failed: failed to get account details for controller a: account details test error")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
@@ -791,6 +791,6 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "failed to add controller to JIMM: add controller test error")
+	assertJobError(c, s, id, "run bootstrap failed: failed to add controller to JIMM: add controller test error")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
