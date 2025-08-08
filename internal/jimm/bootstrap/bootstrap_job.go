@@ -99,7 +99,7 @@ func (b *bootstrapManager) BootstrapJob(
 
 		err := b.store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
 		if err == nil {
-			return fmt.Errorf("controller %q already exists", p.ControllerName)
+			return errors.E(errors.CodeAlreadyExists, fmt.Errorf("controller %q already exists", p.ControllerName))
 		}
 		if errors.ErrorCode(err) != errors.CodeNotFound {
 			return fmt.Errorf("failed to check if controller exists: %w", err)

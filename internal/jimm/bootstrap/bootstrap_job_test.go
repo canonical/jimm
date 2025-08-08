@@ -80,7 +80,6 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
 	).Times(1)
-	// TODO: Figure a way to check done is indeed deferred?
 	binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
@@ -419,7 +418,6 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
 	).Times(1)
-	// TODO: Figure a way to check done is indeed deferred?
 	binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
@@ -499,7 +497,6 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
 	).Times(1)
-	// TODO: Figure a way to check done is indeed deferred?
 	binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
@@ -600,7 +597,6 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
 	).Times(1)
-	// TODO: Figure a way to check done is indeed deferred?
 	binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
@@ -701,7 +697,6 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
 	).Times(1)
-	// TODO: Figure a way to check done is indeed deferred?
 	binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
