@@ -218,9 +218,10 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 	// Should we verify controller can access the cloud where the model is currently hosted?
 	apiControllerInfo := dbController.ToAPIControllerInfo()
 	targetInfo := jujuparams.MigrationTargetInfo{
-		ControllerTag: dbController.ResourceTag().String(),
-		Addrs:         apiControllerInfo.APIAddresses,
-		CACert:        dbController.CACertificate,
+		ControllerAlias: dbController.Name, // This value will be returned to us on successful migration.
+		ControllerTag:   dbController.ResourceTag().String(),
+		Addrs:           apiControllerInfo.APIAddresses,
+		CACert:          dbController.CACertificate,
 		// The target user must be the admin user as external users don't have username/password credentials.
 		AuthTag:  names.NewUserTag(adminUser).String(),
 		Password: adminPass,

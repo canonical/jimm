@@ -175,7 +175,7 @@ func TestInternalMigrationSuccess(t *testing.T) {
 					Message: "redirect",
 					Code:    jujuparams.CodeRedirect,
 					Info: jujuparams.RedirectErrorInfo{
-						ControllerTag: "controller-" + s.env.Controllers[1].UUID,
+						ControllerAlias: s.env.Controllers[1].Name,
 					}.AsMap(),
 				}
 			},

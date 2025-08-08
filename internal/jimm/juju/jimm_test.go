@@ -564,10 +564,11 @@ func TestFillMigrationTarget(t *testing.T) {
 		userTag:        "alice@canonical.com",
 		controllerName: "controller-1",
 		expectedInfo: jujuparams.MigrationTargetInfo{
-			ControllerTag: "controller-00000001-0000-0000-0000-000000000001",
-			Addrs:         nil,
-			AuthTag:       "user-admin",
-			Password:      "test-secret",
+			ControllerAlias: "controller-1",
+			ControllerTag:   "controller-00000001-0000-0000-0000-000000000001",
+			Addrs:           nil,
+			AuthTag:         "user-admin",
+			Password:        "test-secret",
 		},
 	}, {
 		about:          "controller doesn't exist",

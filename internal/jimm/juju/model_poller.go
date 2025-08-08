@@ -4,13 +4,9 @@ package juju
 
 import (
 	"context"
-	"fmt"
 
-	jujuerrors "github.com/juju/errors"
-	jujurpc "github.com/juju/juju/rpc"
 	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -96,29 +92,24 @@ func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, api API, m
 	}
 
 	// Parse the redirect error to get the new controller details.
-	rpcErr, ok := jujuerrors.Cause(err).(*jujurpc.RequestError)
-	if !ok {
-		zapctx.Error(ctx, "unexpected error type for model", zap.String("model", m.UUID.String), zap.String("error_type", fmt.Sprintf("%T", err)))
+	errInfo := errors.ErrorInfo(err)
+	if errInfo == nil {
+		zapctx.Error(ctx, "missing error info in redirect error", zap.String("model", m.UUID.String), zap.Error(err))
 		return
 	}
+
 	var redirectInfo params.RedirectErrorInfo
-	err = rpcErr.UnmarshalInfo(&redirectInfo)
+	err = params.Error{Info: errInfo}.UnmarshalInfo(&redirectInfo)
 	if err != nil {
 		zapctx.Error(ctx, "cannot unmarshal redirect info for model", zap.String("model", m.UUID.String), zap.Error(err))
 		return
 	}
 
 	// We expect this controller will be known to JIMM.
-	controllerTag, err := names.ParseControllerTag(redirectInfo.ControllerTag)
-	if err != nil {
-		zapctx.Error(ctx, "cannot parse controller tag for model", zap.String("tag", redirectInfo.ControllerTag), zap.String("model", m.UUID.String), zap.Error(err))
-		return
-	}
-
-	controller := dbmodel.Controller{UUID: controllerTag.Id()}
+	controller := dbmodel.Controller{Name: redirectInfo.ControllerAlias}
 	err = j.Database.GetController(ctx, &controller)
 	if err != nil {
-		zapctx.Error(ctx, "cannot get controller for model", zap.String("controller", controller.UUID), zap.String("controller_alias", redirectInfo.ControllerAlias), zap.String("model", m.UUID.String), zap.Error(err))
+		zapctx.Error(ctx, "cannot get controller for model", zap.String("controllerAlias", redirectInfo.ControllerAlias), zap.String("model", m.UUID.String), zap.Error(err))
 		return
 	}
 
