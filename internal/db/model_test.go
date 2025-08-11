@@ -767,7 +767,7 @@ func (s *dbSuite) TestCountModelsByController(c *qt.C) {
 	c.Assert(count, qt.Equals, 3)
 }
 
-const testSetModelMigratingEnv = `clouds:
+const testSetModelMigrationModeEnv = `clouds:
 - name: test
   type: test
   regions:
@@ -792,11 +792,11 @@ models:
   controller: test
 `
 
-func (s *dbSuite) TestSetModelMigrating(c *qt.C) {
+func (s *dbSuite) TestSetModelMigrationMode(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
-	env := jimmtest.ParseEnvironment(c, testSetModelMigratingEnv)
+	env := jimmtest.ParseEnvironment(c, testSetModelMigrationModeEnv)
 	env.PopulateDB(c, s.Database)
 
 	model := env.Models[0].DBObject(c, s.Database)
@@ -815,7 +815,7 @@ func (s *dbSuite) TestSetModelMigrating(c *qt.C) {
 	c.Assert(migrationMode, qt.Equals, dbmodel.MigrationModeMigrateInternal)
 }
 
-func (s *dbSuite) TestSetModelMigrating_ModelDoesNotExist(c *qt.C) {
+func (s *dbSuite) TestSetModelMigrationMode_ModelDoesNotExist(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
@@ -823,11 +823,11 @@ func (s *dbSuite) TestSetModelMigrating_ModelDoesNotExist(c *qt.C) {
 	c.Assert(err, qt.ErrorMatches, `model with uuid "fake-uuid" does not exist`)
 }
 
-func (s *dbSuite) TestSetModelMigrating_PreventSetAgain(c *qt.C) {
+func (s *dbSuite) TestSetModelMigrationMode_PreventSetAgain(c *qt.C) {
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
 
-	env := jimmtest.ParseEnvironment(c, testSetModelMigratingEnv)
+	env := jimmtest.ParseEnvironment(c, testSetModelMigrationModeEnv)
 	env.PopulateDB(c, s.Database)
 
 	model := env.Models[0].DBObject(c, s.Database)
