@@ -4,8 +4,11 @@ package db
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -73,6 +76,49 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 		return errors.E(op, dbError(err))
 	}
 	return nil
+}
+
+// SetModelMigrationMode updates the model's migration mode to the provided value.
+// This function will return an error if the model's migration mode is already
+// set to anything besides MigrationModeNone. Use `UpdateModel` to complete the
+// migration and reset the migration mode to MigrationModeNone.
+func (d *Database) SetModelMigrationMode(ctx context.Context, uuid string, migrationMode dbmodel.MigrationMode) (m *dbmodel.Model, err error) {
+	const op = errors.Op("db.SetModelMigrationMode")
+	if err := d.ready(); err != nil {
+		return nil, errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	db := d.DB.WithContext(ctx)
+	err = db.Transaction(func(tx *gorm.DB) error {
+		m = &dbmodel.Model{UUID: sql.NullString{String: uuid, Valid: true}}
+		if err := preloadModel("", tx).Clauses(clause.Locking{Strength: "UPDATE"}).First(m).Error; err != nil {
+			err = dbError(err)
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				return errors.E(op, fmt.Errorf("model with uuid %q does not exist", uuid))
+			}
+			return errors.E(op, err)
+		}
+
+		if m.MigrationMode != dbmodel.MigrationModeNone {
+			return errors.E(op, "model is already migrating", errors.CodeBadRequest)
+		}
+
+		m.MigrationMode = migrationMode
+		if err := tx.Save(m).Error; err != nil {
+			return errors.E(op, dbError(err))
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 // GetModelsUsingCredential returns all models that use the specified credentials.

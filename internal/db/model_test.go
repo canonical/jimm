@@ -766,3 +766,77 @@ func (s *dbSuite) TestCountModelsByController(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(count, qt.Equals, 3)
 }
+
+const testSetModelMigrationModeEnv = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: test
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region
+models:
+- name: test-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  owner: alice@canonical.com
+  cloud: test
+  region: test-region
+  cloud-credential: test-cred
+  controller: test
+`
+
+func (s *dbSuite) TestSetModelMigrationMode(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testSetModelMigrationModeEnv)
+	env.PopulateDB(c, s.Database)
+
+	model := env.Models[0].DBObject(c, s.Database)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
+
+	modelWithMigration, err := s.Database.SetModelMigrationMode(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
+	c.Assert(err, qt.IsNil)
+
+	// Validate the returned struct has the correct migration mode.
+	c.Assert(modelWithMigration.MigrationMode, qt.Equals, dbmodel.MigrationModeMigrateInternal)
+
+	// Validate the model in the database has the correct migration mode.
+	var migrationMode dbmodel.MigrationMode
+	err = s.Database.DB.Table("models").Select("migration_mode").Where("uuid = ?", model.UUID).Scan(&migrationMode).Error
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationMode, qt.Equals, dbmodel.MigrationModeMigrateInternal)
+}
+
+func (s *dbSuite) TestSetModelMigrationMode_ModelDoesNotExist(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	_, err = s.Database.SetModelMigrationMode(context.Background(), "fake-uuid", dbmodel.MigrationModeMigrateInternal)
+	c.Assert(err, qt.ErrorMatches, `model with uuid "fake-uuid" does not exist`)
+}
+
+func (s *dbSuite) TestSetModelMigrationMode_PreventSetAgain(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	env := jimmtest.ParseEnvironment(c, testSetModelMigrationModeEnv)
+	env.PopulateDB(c, s.Database)
+
+	model := env.Models[0].DBObject(c, s.Database)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
+
+	_, err = s.Database.SetModelMigrationMode(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
+	c.Assert(err, qt.IsNil)
+
+	// Attempt to set the model to migrating again should return an error.
+	_, err = s.Database.SetModelMigrationMode(context.Background(), model.UUID.String, dbmodel.MigrationModeMigrateInternal)
+	c.Assert(err, qt.ErrorMatches, `model is already migrating`)
+}

@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	NewControllerClient = &newControllerClient
-	FillMigrationTarget = fillMigrationTarget
-	InitiateMigration   = &initiateMigration
+	NewControllerClient       = &newControllerClient
+	FillMigrationTarget       = fillMigrationTarget
+	InitiateInternalMigration = &initiateInternalMigration
 )
 
 func NewWatcherWithControllerUnavailableChan(db *db.Database, dialer Dialer, pubsub Publisher, testChannel chan error) *Watcher {

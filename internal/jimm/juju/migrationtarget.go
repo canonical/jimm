@@ -434,7 +434,7 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 		if err != nil {
 			return errors.E(op, fmt.Errorf("failed to get model %q: %w", modelTag.Id(), err))
 		}
-		model.MigrationMode = state.MigrationModeNone
+		model.MigrationMode = dbmodel.MigrationModeNone
 		model.Life = state.Alive.String()
 
 		err = db.UpdateModel(ctx, &model)
@@ -583,7 +583,7 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 		ControllerID:      targetControllerID,
 		CloudCredentialID: cloudCredential.ID,
 		CloudRegionID:     region.ID,
-		MigrationMode:     state.MigrationModeImporting,
+		MigrationMode:     dbmodel.MigrationModeImporting,
 	}
 	err = tx.AddModel(ctx, &model)
 	if err != nil {

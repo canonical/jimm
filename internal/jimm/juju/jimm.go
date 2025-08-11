@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	initiateMigration = func(ctx context.Context, j *JujuManager, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
-		return j.InitiateMigration(ctx, user, spec)
+	initiateInternalMigration = func(ctx context.Context, j *JujuManager, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
+		internalMigration := true
+		return j.initiateMigration(ctx, user, spec, internalMigration)
 	}
 )
 
@@ -267,7 +268,7 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
 	}
 	spec := jujuparams.MigrationSpec{ModelTag: model.ResourceTag().String(), TargetInfo: migrationTarget}
-	result, err := initiateMigration(ctx, j, user, spec)
+	result, err := initiateInternalMigration(ctx, j, user, spec)
 	if err != nil {
 		return result, errors.E(op, err)
 	}

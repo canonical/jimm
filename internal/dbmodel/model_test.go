@@ -187,7 +187,7 @@ func TestModelSetMigrationModeEnumType(t *testing.T) {
 		UUID: m1.UUID,
 	}
 	c.Assert(db.First(&m).Error, qt.IsNil)
-	c.Check(m.MigrationMode, qt.Equals, state.MigrationModeNone)
+	c.Check(m.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
 
 	// Check that we can set the migration mode to a valid value.
 	m2 := dbmodel.Model{
@@ -201,7 +201,7 @@ func TestModelSetMigrationModeEnumType(t *testing.T) {
 		CloudRegion:     cl1.Regions[0],
 		CloudCredential: cred1,
 		Life:            state.Alive.String(),
-		MigrationMode:   state.MigrationModeNone,
+		MigrationMode:   dbmodel.MigrationModeNone,
 	}
 	c.Assert(db.Create(&m2).Error, qt.IsNil)
 

@@ -11,7 +11,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	"sigs.k8s.io/yaml"
 
@@ -478,7 +477,7 @@ type Model struct {
 	Type          string                   `json:"type"`
 	DefaultSeries string                   `json:"default-series"`
 	Life          string                   `json:"life"`
-	MigrationMode state.MigrationMode      `json:"migration-mode"`
+	MigrationMode dbmodel.MigrationMode    `json:"migration-mode"`
 	Status        jujuparams.EntityStatus  `json:"status"`
 	SLA           *jujuparams.ModelSLAInfo `json:"sla"`
 	AgentVersion  string                   `json:"agent-version"`

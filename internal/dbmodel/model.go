@@ -14,6 +14,30 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
+// MigrationMode specifies where the Model is with respect to migration.
+// The modes mirror Juju's state values with some JIMM-specific additions.
+// We use our own type to avoid introducing a dependency on Juju's state
+// package throughout JIMM's codebase.
+type MigrationMode string
+
+const (
+	// MigrationModeNone is the default mode for a model and reflects
+	// that it isn't involved with a model migration.
+	MigrationModeNone = MigrationMode(state.MigrationMode(""))
+
+	// MigrationModeExporting reflects a model that is in the process of being
+	// exported away from JIMM.
+	MigrationModeExporting = MigrationMode(state.MigrationMode("exporting"))
+
+	// MigrationModeImporting reflects a model that is being imported into a
+	// controller, but is not yet fully active.
+	MigrationModeImporting = MigrationMode(state.MigrationMode("importing"))
+
+	// MigrationModeMovingInternal reflects a model that is being moved internally
+	// within JIMM, e.g. from one controller to another.
+	MigrationModeMigrateInternal = MigrationMode("migrating-internally")
+)
+
 // A Model is a juju model.
 type Model struct {
 	// Note this cannot use the standard gorm.Model as the soft-delete does
@@ -51,10 +75,7 @@ type Model struct {
 	Offers []ApplicationOffer
 
 	// MigrationMode is the migration mode of the model.
-	// In JIMM it can have two values:
-	// - state.MigrationModeNone: the model is not being migrated.
-	// - state.MigrationModeImporting: the model is being migrated to JIMM.
-	MigrationMode state.MigrationMode `gorm:"default:''"`
+	MigrationMode MigrationMode `gorm:"default:''"`
 }
 
 // Tag returns a names.Tag for the model.

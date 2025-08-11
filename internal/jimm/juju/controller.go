@@ -656,12 +656,18 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 	return nil
 }
 
-// InitiateMigration triggers the migration of the specified model to a target controller.
-// externalMigration indicates whether this model is moving to a controller managed by
-// JIMM or not.
+// InitiateMigration triggers the migration of the specified model to a controller
+// that is not managed by JIMM.
 func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
-	const op = errors.Op("jimm.InitiateMigration")
+	internalMigration := false
+	return j.initiateMigration(ctx, user, spec, internalMigration)
+}
 
+// initiateMigration is the internal implementation for model migration.
+// It is used for both internal migrations (migrating a model to another
+// controller managed by JIMM) and migrations away from JIMM.
+func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec, internalMigration bool) (jujuparams.InitiateMigrationResult, error) {
+	const op = errors.Op("jimm.initiateMigration")
 	result := jujuparams.InitiateMigrationResult{
 		ModelTag: spec.ModelTag,
 	}
@@ -695,15 +701,27 @@ func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User,
 		}
 	}
 
-	model := dbmodel.Model{}
-	model.SetTag(mt)
-	err = j.Database.GetModel(ctx, &model)
+	migrationMode := dbmodel.MigrationModeExporting
+	if internalMigration {
+		migrationMode = dbmodel.MigrationModeMigrateInternal
+	}
+	model, err := j.Database.SetModelMigrationMode(ctx, mt.Id(), migrationMode)
 	if err != nil {
-		return result, errors.E(op, "failed to retrieve the model from the database", err)
+		return result, errors.E(op, fmt.Errorf("failed to set model as migrating: %v", err))
+	}
+
+	// Until we have better handling for partial failures we try to revert
+	// the model migration mode if we fail after this to avoid inconsistenties.
+	rollbackMigrationMode := func() {
+		model.MigrationMode = dbmodel.MigrationModeNone
+		if updateErr := j.Database.UpdateModel(ctx, model); updateErr != nil {
+			zapctx.Error(ctx, "failed to revert model migration mode after failure initiating migration", zap.Error(updateErr))
+		}
 	}
 
 	api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, nil)
 	if err != nil {
+		rollbackMigrationMode()
 		return result, errors.E(op, "failed to dial the controller", err)
 	}
 
@@ -721,8 +739,10 @@ func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User,
 		TargetMacaroons:       targetMacaroons,
 	})
 	if err != nil {
+		rollbackMigrationMode()
 		return result, errors.E(op, err)
 	}
+
 	return result, nil
 }
 
