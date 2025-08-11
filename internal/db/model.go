@@ -4,8 +4,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -48,6 +46,37 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
+	err = d.getModel(ctx, model, false)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+// GetModelForUpdate retrieves a model and locks the row for updates.
+// This method should be used within a transaction.
+func (d *Database) GetModelForUpdate(ctx context.Context, model *dbmodel.Model) (err error) {
+	const op = errors.Op("db.GetModelForUpdate")
+	if err := d.ready(); err != nil {
+		return errors.E(op, err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+
+	err = d.getModel(ctx, model, true)
+	if err != nil {
+		return errors.E(op, err)
+	}
+	return nil
+}
+
+func (d *Database) getModel(ctx context.Context, model *dbmodel.Model, forUpdate bool) (err error) {
+	if err := d.ready(); err != nil {
+		return errors.E(err)
+	}
+
 	db := d.DB.WithContext(ctx)
 	switch {
 	case model.UUID.Valid:
@@ -63,62 +92,22 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 		// TODO: fix ordering of where fields and handle error to represent what is *actually* required.
 		db = db.Where("controller_id = ?", model.ControllerID)
 	default:
-		return errors.E(op, "missing id or uuid", errors.CodeBadRequest)
+		return errors.E("missing id or uuid", errors.CodeBadRequest)
 	}
 
 	db = preloadModel("", db)
 
+	if forUpdate {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
 	if err := db.First(&model).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, err, "model not found")
+			return errors.E(err, "model not found")
 		}
-		return errors.E(op, dbError(err))
+		return errors.E(dbError(err))
 	}
 	return nil
-}
-
-// SetModelMigrationMode updates the model's migration mode to the provided value.
-// This function will return an error if the model's migration mode is already
-// set to anything besides MigrationModeNone. Use `UpdateModel` to complete the
-// migration and reset the migration mode to MigrationModeNone.
-func (d *Database) SetModelMigrationMode(ctx context.Context, uuid string, migrationMode dbmodel.MigrationMode) (m *dbmodel.Model, err error) {
-	const op = errors.Op("db.SetModelMigrationMode")
-	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
-
-	db := d.DB.WithContext(ctx)
-	err = db.Transaction(func(tx *gorm.DB) error {
-		m = &dbmodel.Model{UUID: sql.NullString{String: uuid, Valid: true}}
-		if err := preloadModel("", tx).Clauses(clause.Locking{Strength: "UPDATE"}).First(m).Error; err != nil {
-			err = dbError(err)
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				return errors.E(op, fmt.Errorf("model with uuid %q does not exist", uuid))
-			}
-			return errors.E(op, err)
-		}
-
-		if m.MigrationMode != dbmodel.MigrationModeNone {
-			return errors.E(op, "model is already migrating", errors.CodeBadRequest)
-		}
-
-		m.MigrationMode = migrationMode
-		if err := tx.Save(m).Error; err != nil {
-			return errors.E(op, dbError(err))
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
 }
 
 // GetModelsUsingCredential returns all models that use the specified credentials.

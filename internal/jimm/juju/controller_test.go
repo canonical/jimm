@@ -1475,6 +1475,41 @@ func TestInitiateMigration(t *testing.T) {
 	}
 }
 
+func TestInitiateMigration_InProgress(t *testing.T) {
+	c := qt.New(t)
+
+	j := newTestJujuManager(c, nil)
+
+	env := jimmtest.ParseEnvironment(c, testInitiateMigrationEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	c.Patch(juju.NewControllerClient, func(api base.APICallCloser) juju.ControllerClient {
+		return &testControllerClient{
+			initiateMigrationResults: []result{{
+				result: "migration-result-id",
+			}},
+		}
+	})
+
+	u, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	user := openfga.NewUser(u, j.OpenFGAClient)
+	user.JimmAdmin = true
+
+	migrationSpec := jujuparams.MigrationSpec{
+		ModelTag: names.NewModelTag("00000002-0000-0000-0000-000000000003").String(),
+		TargetInfo: jujuparams.MigrationTargetInfo{
+			ControllerTag: names.NewControllerTag(uuid.NewString()).String(),
+			AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
+		},
+	}
+	_, err = j.InitiateMigration(context.Background(), user, migrationSpec)
+	c.Assert(err, qt.IsNil)
+
+	_, err = j.InitiateMigration(context.Background(), user, migrationSpec)
+	c.Assert(err, qt.ErrorMatches, `failed to update the model's migration mode: model is already in migration mode "exporting"`)
+}
+
 type result struct {
 	err    error
 	result any

@@ -700,20 +700,35 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 		}
 	}
 
-	migrationMode := dbmodel.MigrationModeExporting
-	if internalMigration {
-		migrationMode = dbmodel.MigrationModeMigrateInternal
-	}
-	model, err := j.Database.SetModelMigrationMode(ctx, mt.Id(), migrationMode)
+	model := dbmodel.Model{}
+	model.SetTag(mt)
+	err = j.Database.Transaction(func(tx *db.Database) error {
+		err := tx.GetModelForUpdate(ctx, &model)
+		if err != nil {
+			return errors.E(op, err)
+		}
+
+		if model.MigrationMode != dbmodel.MigrationModeNone {
+			return errors.E(op, fmt.Errorf("model is already in migration mode %q", model.MigrationMode))
+		}
+
+		if internalMigration {
+			model.SetInternalMigration()
+		} else {
+			model.SetExternalMigration()
+		}
+
+		return tx.UpdateModel(ctx, &model)
+	})
 	if err != nil {
-		return result, errors.E(op, fmt.Errorf("failed to set model as migrating: %v", err))
+		return result, errors.E(op, fmt.Errorf("failed to update the model's migration mode: %v", err))
 	}
 
 	// Until we have better handling for partial failures we try to revert
 	// the model migration mode if we fail after this to avoid inconsistenties.
 	rollbackMigrationMode := func() {
-		model.MigrationMode = dbmodel.MigrationModeNone
-		if updateErr := j.Database.UpdateModel(ctx, model); updateErr != nil {
+		model.ProcessFailedMigration()
+		if updateErr := j.Database.UpdateModel(ctx, &model); updateErr != nil {
 			zapctx.Error(ctx, "failed to revert model migration mode after failure initiating migration", zap.Error(updateErr))
 		}
 	}
