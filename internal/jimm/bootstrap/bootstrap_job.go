@@ -93,19 +93,21 @@ func (b *bootstrapManager) BootstrapJob(
 			return fmt.Errorf("failed to get job ID from context")
 		}
 
-		zapctx.Debug(
+		logCtx := zapctx.WithFields(
 			ctx,
-			"starting bootstrap job",
 			zap.String("job-id", jobId.String()),
 			zap.String("controller-name", p.ControllerName),
 		)
 
+		zapctx.Debug(
+			logCtx,
+			"starting bootstrap job",
+		)
+
 		if err := b.store.LockBootstrap(ctx, bootstrapLockTTL); err != nil {
 			zapctx.Error(
-				ctx,
+				logCtx,
 				"failed to acquire bootstrap lock",
-				zap.String("job-id", jobId.String()),
-				zap.String("controller-name", p.ControllerName),
 				zap.Error(err),
 			)
 			return fmt.Errorf("failed to acquire bootstrap lock: %w", err)
@@ -114,10 +116,8 @@ func (b *bootstrapManager) BootstrapJob(
 		defer func() {
 			if err := b.store.UnlockBootstrap(ctx); err != nil {
 				zapctx.Error(
-					ctx,
+					logCtx,
 					"failed to unlock bootstrap lock",
-					zap.String("job-id", jobId.String()),
-					zap.String("controller-name", p.ControllerName),
 					zap.Error(err),
 				)
 			}
