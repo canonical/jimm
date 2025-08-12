@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -46,33 +45,6 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	err = d.getModel(ctx, model, false)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-// GetModelForUpdateTx retrieves a model and locks the row for updates.
-// This method should be used within a transaction.
-func (d *Database) GetModelForUpdateTx(ctx context.Context, model *dbmodel.Model) (err error) {
-	const op = errors.Op("db.GetModelForUpdate")
-	if err := d.ready(); err != nil {
-		return errors.E(op, err)
-	}
-
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
-
-	err = d.getModel(ctx, model, true)
-	if err != nil {
-		return errors.E(op, err)
-	}
-	return nil
-}
-
-func (d *Database) getModel(ctx context.Context, model *dbmodel.Model, forUpdate bool) (err error) {
 	if err := d.ready(); err != nil {
 		return errors.E(err)
 	}
@@ -97,15 +69,12 @@ func (d *Database) getModel(ctx context.Context, model *dbmodel.Model, forUpdate
 
 	db = preloadModel("", db)
 
-	if forUpdate {
-		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
-	}
 	if err := db.First(&model).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(err, "model not found")
+			return errors.E(op, err, "model not found")
 		}
-		return errors.E(dbError(err))
+		return errors.E(op, dbError(err))
 	}
 	return nil
 }

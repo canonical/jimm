@@ -736,7 +736,7 @@ func (s *dbSuite) TestGetModelForUpdate(c *qt.C) {
 		_ = s.Database.Transaction(func(tx *db.Database) error {
 			model := dbmodel.Model{}
 			model.SetTag(mt)
-			err = tx.GetModelForUpdateTx(ctx, &model)
+			err = tx.ForUpdate().GetModel(ctx, &model)
 			c.Check(err, qt.IsNil)
 
 			close(rowLocked)
@@ -752,7 +752,7 @@ func (s *dbSuite) TestGetModelForUpdate(c *qt.C) {
 	defer cancelF()
 	model := dbmodel.Model{}
 	model.SetTag(mt)
-	err = s.Database.GetModelForUpdateTx(ctxWithTimeout, &model)
+	err = s.Database.ForUpdate().GetModel(ctxWithTimeout, &model)
 	c.Check(err, qt.ErrorMatches, `timeout: context deadline exceeded`)
 }
 

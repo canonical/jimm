@@ -703,7 +703,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 	model := dbmodel.Model{}
 	model.SetTag(mt)
 	err = j.Database.Transaction(func(tx *db.Database) error {
-		err := tx.GetModelForUpdateTx(ctx, &model)
+		err := tx.ForUpdate().GetModel(ctx, &model)
 		if err != nil {
 			return errors.E(op, err)
 		}
