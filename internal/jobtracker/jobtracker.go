@@ -23,6 +23,9 @@ const minimumRefreshIntervalseconds = 5
 // JobIdContextKey is a context key for storing job IDs.
 type JobIdContextKey struct{}
 
+// JobFunc represents a job being tracked by the job tracker.
+type JobFunc func(context.Context) error
+
 // Store defines the interface for tracking the lifecycle and status of jobs.
 // It provides methods to add a new job, update its status (running, successful, or failed),
 // and retrieve a stop signal for a specific job.
@@ -43,10 +46,10 @@ type Tracker struct {
 	refreshInterval time.Duration
 }
 
-// NewJobTracker creates and returns a new Tracker instance using the provided JobTrackerStore and refreshInterval.
+// New creates and returns a new Tracker instance using the provided JobTrackerStore and refreshInterval.
 // refreshInterval is the interval between successive checks for job status.
 // It returns an error if the store is nil or if refreshInterval is not greater than zero.
-func NewJobTracker(store Store, refreshInterval time.Duration) (*Tracker, error) {
+func New(store Store, refreshInterval time.Duration) (*Tracker, error) {
 	if store == nil {
 		return nil, goerr.New("store cannot be nil")
 	}
@@ -61,7 +64,7 @@ func NewJobTracker(store Store, refreshInterval time.Duration) (*Tracker, error)
 }
 
 // Run runs a new job and returns the job ID.
-func (j *Tracker) Run(ctx context.Context, jobType string, job func(ctx context.Context) error, maxDuration time.Duration) (uuid.UUID, error) {
+func (j *Tracker) Run(ctx context.Context, jobType string, job JobFunc, maxDuration time.Duration) (uuid.UUID, error) {
 	jobId, err := j.store.AddJob(ctx, jobType)
 	if err != nil {
 		return jobId, err
@@ -93,7 +96,7 @@ func (j *Tracker) handleJob(
 	j.monitorJob(id, jobErrCh, cancelJob)
 }
 
-func (j *Tracker) runJob(ctx context.Context, id uuid.UUID, jobErrCh chan error, job func(context.Context) error) {
+func (j *Tracker) runJob(ctx context.Context, id uuid.UUID, jobErrCh chan error, job JobFunc) {
 	if err := j.store.SetJobRunning(ctx, id); err != nil {
 		jobErrCh <- fmt.Errorf("failed to set job running, job not starting: %w", err)
 		return

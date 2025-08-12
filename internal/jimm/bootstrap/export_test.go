@@ -3,3 +3,7 @@
 package bootstrap
 
 type BootstrapManager = bootstrapManager
+
+var (
+	BinaryDone = &binaryDone
+)

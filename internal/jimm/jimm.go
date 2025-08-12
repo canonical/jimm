@@ -42,6 +42,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jobtracker"
+	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
@@ -513,14 +514,26 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.offerAuthorizer = offerAuthorizer
 
-	jobTracker, err := jobtracker.NewJobTracker(j.Database, 5*time.Second)
+	jobTracker, err := jobtracker.New(j.Database, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
-	bootstrapManager, err := bootstrap.NewBootstrapManager(j.Database, j.OpenFGAClient, jobTracker)
+
+	binaryStore, err := jujuclistore.NewJujuCLIStore(jujuclistore.Config{})
 	if err != nil {
 		return nil, err
 	}
+	bootstrapManager, err := bootstrap.NewBootstrapManager(
+		j.OpenFGAClient,
+		j.Database,
+		jobTracker,
+		j.jujuManager,
+		binaryStore,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	j.bootstrapManager = bootstrapManager
 
 	return j, nil
