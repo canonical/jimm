@@ -54,9 +54,9 @@ func (j *JujuManager) PollModels(ctx context.Context) (err error) {
 		// - Do nothing if the model is in any other migration mode (MigrationModeImporting, MigrationModeExporting)
 		for _, m := range models {
 			ctx := zapctx.WithFields(ctx,
-				zap.String("modelOwner", m.OwnerIdentityName),
-				zap.String("modelName", m.Name),
-				zap.String("migrationMode", string(m.MigrationMode)),
+				zap.String("model-owner", m.OwnerIdentityName),
+				zap.String("model-name", m.Name),
+				zap.String("migration-mode", string(m.MigrationMode)),
 			)
 			var err error
 
