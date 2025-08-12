@@ -110,7 +110,7 @@ func (b *bootstrapManager) BootstrapJob(
 				"failed to acquire bootstrap lock",
 				zap.Error(err),
 			)
-			return fmt.Errorf("failed to acquire bootstrap lock: %w", err)
+			return errors.E(fmt.Errorf("failed to acquire bootstrap lock: %w", err))
 		}
 
 		defer func() {
@@ -128,7 +128,7 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(errors.CodeAlreadyExists, fmt.Errorf("controller %q already exists", p.ControllerName))
 		}
 		if errors.ErrorCode(err) != errors.CodeNotFound {
-			return fmt.Errorf("failed to check if controller exists: %w", err)
+			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
 		binary, err := b.binaryStore.Get(
@@ -140,12 +140,12 @@ func (b *bootstrapManager) BootstrapJob(
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("failed to get Juju binary: %w", err)
+			return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
 		}
 		defer binary.Done()
 
 		if err := b.runBootstrap(ctx, p, jobId, executor, binary, user); err != nil {
-			return fmt.Errorf("run bootstrap failed: %w", err)
+			return errors.E(fmt.Errorf("run bootstrap failed: %w", err))
 		}
 		return nil
 	}
@@ -177,13 +177,13 @@ func (b *bootstrapManager) runBootstrap(
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to run bootstrap command: %w", err)
+		return errors.E(fmt.Errorf("failed to run bootstrap command: %w", err))
 	}
 	defer cleanup()
 
 	for output := range outputCh {
 		if output.Err != nil {
-			return fmt.Errorf("bootstrap command failed: %w", output.Err)
+			return errors.E(fmt.Errorf("bootstrap command failed: %w", output.Err))
 		}
 		if writeLogErr := b.store.AddBootstrapLog(
 			ctx,
@@ -202,12 +202,12 @@ func (b *bootstrapManager) runBootstrap(
 	// getting the controller by name.
 	ctrlDetails, err := clientStore.ControllerByName(p.ControllerName)
 	if err != nil {
-		return fmt.Errorf("failed to get controller details: %w", err)
+		return errors.E(fmt.Errorf("failed to get controller details: %w", err))
 	}
 
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	if err != nil {
-		return fmt.Errorf("failed to parse API endpoints for controller: %w", err)
+		return errors.E(fmt.Errorf("failed to parse API endpoints for controller: %w", err))
 	}
 	for i := range hps {
 		// Mark all the unknown scopes public.
@@ -226,7 +226,7 @@ func (b *bootstrapManager) runBootstrap(
 
 	account, err := clientStore.AccountDetails(p.ControllerName)
 	if err != nil {
-		return fmt.Errorf("failed to get account details for controller %s: %w", p.ControllerName, err)
+		return errors.E(fmt.Errorf("failed to get account details for controller %s: %w", p.ControllerName, err))
 	}
 	dbCtrlCreds := juju.ControllerCreds{
 		AdminIdentityName: account.User,
@@ -238,7 +238,7 @@ func (b *bootstrapManager) runBootstrap(
 		&dbCtrl,
 		dbCtrlCreds,
 	); err != nil {
-		return fmt.Errorf("failed to add controller to JIMM: %w", err)
+		return errors.E(fmt.Errorf("failed to add controller to JIMM: %w", err))
 	}
 
 	return nil
