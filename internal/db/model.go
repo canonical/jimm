@@ -53,9 +53,9 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 	return nil
 }
 
-// GetModelForUpdate retrieves a model and locks the row for updates.
+// GetModelForUpdateTx retrieves a model and locks the row for updates.
 // This method should be used within a transaction.
-func (d *Database) GetModelForUpdate(ctx context.Context, model *dbmodel.Model) (err error) {
+func (d *Database) GetModelForUpdateTx(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = errors.Op("db.GetModelForUpdate")
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)

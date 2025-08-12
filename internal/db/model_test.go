@@ -719,9 +719,7 @@ func (s *dbSuite) TestGetModelsByController(c *qt.C) {
 }
 
 func (s *dbSuite) TestGetModelForUpdate(c *qt.C) {
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := c.Context()
 
 	err := s.Database.Migrate(context.Background())
 	c.Assert(err, qt.Equals, nil)
@@ -732,15 +730,17 @@ func (s *dbSuite) TestGetModelForUpdate(c *qt.C) {
 	mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
 
 	rowLocked := make(chan struct{})
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		_ = s.Database.Transaction(func(tx *db.Database) error {
 			model := dbmodel.Model{}
 			model.SetTag(mt)
-			err = tx.GetModelForUpdate(ctx, &model)
+			err = tx.GetModelForUpdateTx(ctx, &model)
 			c.Check(err, qt.IsNil)
 
 			close(rowLocked)
-			<-ctx.Done()
+			<-done
 			return nil
 		})
 	}()
@@ -748,11 +748,11 @@ func (s *dbSuite) TestGetModelForUpdate(c *qt.C) {
 	// Below we attempt to get the row while it is locked
 	// which should block until the first transaction is done.
 	<-rowLocked
-	ctxWithTimeout, cancel2 := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel2()
+	ctxWithTimeout, cancelF := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancelF()
 	model := dbmodel.Model{}
 	model.SetTag(mt)
-	err = s.Database.GetModelForUpdate(ctxWithTimeout, &model)
+	err = s.Database.GetModelForUpdateTx(ctxWithTimeout, &model)
 	c.Check(err, qt.ErrorMatches, `timeout: context deadline exceeded`)
 }
 

@@ -4,6 +4,7 @@ package juju
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -17,8 +18,10 @@ import (
 
 // PollModels loops over models, contacting the respective controller
 // and checking, based on the model's migration mode, if the model exists.
+// If the model exists in JIMM's database, but not on the controller,
+// it is deleted from JIMM's database.
 func (j *JujuManager) PollModels(ctx context.Context) (err error) {
-	const op = errors.Op("jimm.CleanupNotFoundModels")
+	const op = errors.Op("jimm.PollModels")
 	zapctx.Info(ctx, string(op))
 	durationObserver := servermon.DurationObserver(servermon.JimmMethodsDurationHistogram, string(op))
 	defer durationObserver()
@@ -50,11 +53,22 @@ func (j *JujuManager) PollModels(ctx context.Context) (err error) {
 		// - Check if the model has completed internal migration (MigrationModeMigrateInternal)
 		// - Do nothing if the model is in any other migration mode (MigrationModeImporting, MigrationModeExporting)
 		for _, m := range models {
+			ctx := zapctx.WithFields(ctx,
+				zap.String("modelOwner", m.OwnerIdentityName),
+				zap.String("modelName", m.Name),
+				zap.String("migrationMode", string(m.MigrationMode)),
+			)
+			var err error
+
 			switch m.MigrationMode {
 			case dbmodel.MigrationModeNone:
-				j.checkModelExists(ctx, api, m)
+				err = j.maybeCleanupModel(ctx, api, m)
 			case dbmodel.MigrationModeMigrateInternal:
-				j.checkModelMigratedInternal(ctx, api, m)
+				err = j.checkModelMigratedInternal(ctx, api, m)
+			}
+			if err != nil {
+				zapctx.Error(ctx, "error processing model", zap.Error(err))
+				continue
 			}
 		}
 	}
@@ -63,9 +77,8 @@ func (j *JujuManager) PollModels(ctx context.Context) (err error) {
 
 // checkModelMigratedInternal checks if the model has been migrated from
 // one controller managed by JIMM to another controller managed by JIMM.
-func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, api API, m *dbmodel.Model) {
-	const op = errors.Op("jimm.checkModelMoved")
-	zapctx.Info(ctx, string(op))
+func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, api API, m *dbmodel.Model) error {
+	const op = errors.Op("jimm.checkModelMigratedInternal")
 
 	// Check if the model has completed a migration.
 	// If modelInfo returns without an error, it definitely hasn't moved yet.
@@ -76,70 +89,70 @@ func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, api API, m
 		// failed to migrate otherwise we'd expect a redirect error.
 		if modelInfo.Migration.End != nil {
 			m.ProcessFailedMigration()
-			err = j.Database.UpdateModel(ctx, m)
-			if err != nil {
-				zapctx.Error(ctx, "failed to update model after failed migration", zap.String("model", m.UUID.String), zap.Error(err))
+			if err := j.Database.UpdateModel(ctx, m); err != nil {
+				return errors.E(fmt.Errorf("failed to update model after failed migration: %w", err))
 			}
 		}
-		return
+		return nil
 	}
 
 	// Expect a redirect error if the model successfully migrated.
+	// This is the error that Juju controllers return when a model has been migrated.
+
 	isRedirectErr := errors.ErrorCode(err) == params.CodeRedirect
 	if !isRedirectErr {
-		zapctx.Error(ctx, "failed to get model info", zap.String("model", m.UUID.String), zap.Error(err))
-		return
+		return errors.E(op, fmt.Errorf("failed to get model info: %w", err))
 	}
 
 	// Parse the redirect error to get the new controller details.
 	errInfo := errors.ErrorInfo(err)
 	if errInfo == nil {
-		zapctx.Error(ctx, "missing error info in redirect error", zap.String("model", m.UUID.String), zap.Error(err))
-		return
+		return errors.E(op, fmt.Errorf("missing error info in redirect error: %w", err))
 	}
 
 	var redirectInfo params.RedirectErrorInfo
 	err = params.Error{Info: errInfo}.UnmarshalInfo(&redirectInfo)
 	if err != nil {
-		zapctx.Error(ctx, "cannot unmarshal redirect info for model", zap.String("model", m.UUID.String), zap.Error(err))
-		return
+		return errors.E(op, fmt.Errorf("cannot unmarshal redirect error info: %w", err))
 	}
 
 	// We expect this controller will be known to JIMM.
 	controller := dbmodel.Controller{Name: redirectInfo.ControllerAlias}
 	err = j.Database.GetController(ctx, &controller)
 	if err != nil {
-		zapctx.Error(ctx, "cannot get controller for model", zap.String("controllerAlias", redirectInfo.ControllerAlias), zap.String("model", m.UUID.String), zap.Error(err))
-		return
+		return errors.E(op, fmt.Errorf("failed to get controller %q: %w", redirectInfo.ControllerAlias, err))
 	}
 
 	m.ProcessSuccessfulInternalMigration(controller.ID)
 
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {
-		zapctx.Error(ctx, "failed to update model after migration", zap.String("model", m.UUID.String), zap.Error(err))
-		return
+		return errors.E(op, fmt.Errorf("failed to update model after migration: %w", err))
 	}
 	zapctx.Info(ctx, "model successfully migrated to controller", zap.String("model", m.UUID.String), zap.String("controller_name", controller.Name))
+	return nil
 }
 
-// checkModelExists checks if the model exists on the controller.
+// maybeCleanupModel checks if the model exists on the controller.
 // This performs eventual cleanup of models that have been deleted through
 // the API (since the deletion of a model is not immediate) and handles
 // cases where the model was deleted directly on the underlying controller.
-func (j *JujuManager) checkModelExists(ctx context.Context, api API, m *dbmodel.Model) {
+func (j *JujuManager) maybeCleanupModel(ctx context.Context, api API, m *dbmodel.Model) error {
+	const op = errors.Op("jimm.maybeCleanupModel")
+
 	err := api.ModelInfo(ctx, &jujuparams.ModelInfo{UUID: m.UUID.String})
 	if err == nil {
 		// If the call succeeds, the model exists and we can return.
-		return
+		return nil
 	}
 	// Some versions of juju return unauthorized for models that cannot be found.
 	modelDeleted := (errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeUnauthorized)
 	if modelDeleted {
 		if err := j.deleteModel(ctx, m.ResourceTag()); err != nil {
-			zapctx.Error(ctx, "failed to delete model", zap.String("model", m.UUID.String), zap.Error(err))
+			return errors.E(op, fmt.Errorf("failed to delete model: %w", err))
 		}
 	} else {
-		zapctx.Error(ctx, "failed to get ModelInfo", zap.String("model", m.UUID.String), zap.Error(err))
+		return errors.E(op, fmt.Errorf("failed to get model info: %w", err))
 	}
+	return nil
 }
