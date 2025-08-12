@@ -3,6 +3,8 @@
 package jujuapi
 
 import (
+	"sync"
+
 	jujuparams "github.com/juju/juju/rpc/params"
 
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -30,8 +32,12 @@ func ModelAccessWatcherMatch(w *modelAccessWatcher, model string) bool {
 	return w.match(model)
 }
 
-func RunModelAccessWatcher(w *modelAccessWatcher) {
-	go w.loop()
+func RunModelAccessWatcher(w *modelAccessWatcher, wg *sync.WaitGroup) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		w.loop()
+	}()
 }
 
 type ControllerRoot = controllerRoot

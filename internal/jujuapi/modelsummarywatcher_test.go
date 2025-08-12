@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuapi_test
 
@@ -55,18 +55,20 @@ func (s *modelSummaryWatcherSuite) TestModelSummaryWatcher(c *gc.C) {
 func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 
 	modelGetter := &testModelGetter{
 		calledChan: make(chan bool, 1),
 	}
 
 	watcher := jujuapi.NewModelAccessWatcher(ctx, 100*time.Millisecond, modelGetter.getModels)
-	jujuapi.RunModelAccessWatcher(watcher)
+	wg := sync.WaitGroup{}
+	jujuapi.RunModelAccessWatcher(watcher, &wg)
 
 	select {
 	case <-modelGetter.calledChan:
 	case <-time.After(200 * time.Millisecond):
-		c.Fatalf("timed oud")
+		c.Fatalf("timed out")
 	}
 
 	match := jujuapi.ModelAccessWatcherMatch(watcher, "model1")
@@ -77,8 +79,14 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 	select {
 	case <-modelGetter.calledChan:
 	case <-time.After(200 * time.Millisecond):
-		c.Fatalf("timed oud")
+		c.Fatalf("timed out")
 	}
+
+	// Once the modelGetter has been called, the watcher should have the models.
+	// We then cancel the watcher and call Wait() as way of synchronising the test
+	// to ensure the watcher has processed the models.
+	cancelFunc()
+	wg.Wait()
 
 	match = jujuapi.ModelAccessWatcherMatch(watcher, "model1")
 	c.Assert(match, jc.IsTrue)
@@ -89,8 +97,8 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 	match = jujuapi.ModelAccessWatcherMatch(watcher, "model3")
 	c.Assert(match, jc.IsFalse)
 
-	cancelFunc()
-
+	// Now with the watcher stopped, we set new models and
+	// check that the previous models are still matched.
 	modelGetter.setModels([]string{"model1", "model3"})
 
 	<-time.After(200 * time.Millisecond)
