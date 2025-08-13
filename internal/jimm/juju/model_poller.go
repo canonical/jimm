@@ -88,7 +88,7 @@ func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, api API, m
 		// If the migration end time is set, it means the model has
 		// failed to migrate otherwise we'd expect a redirect error.
 		if modelInfo.Migration.End != nil {
-			m.ProcessFailedMigration()
+			m.MigrationFailed()
 			if err := j.Database.UpdateModel(ctx, m); err != nil {
 				return errors.E(fmt.Errorf("failed to update model after failed migration: %w", err))
 			}
@@ -123,7 +123,7 @@ func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, api API, m
 		return errors.E(op, fmt.Errorf("failed to get controller %q: %w", redirectInfo.ControllerAlias, err))
 	}
 
-	m.ProcessSuccessfulInternalMigration(controller.ID)
+	m.InternalMigrationSuccess(controller.ID)
 
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {

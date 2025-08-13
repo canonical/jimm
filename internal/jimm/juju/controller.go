@@ -645,7 +645,7 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 		return errors.E(op, err)
 	}
 
-	model.ProcessSuccessfulInternalMigration(targetController.ID)
+	model.InternalMigrationSuccess(targetController.ID)
 	err = j.Database.UpdateModel(ctx, &model)
 	if err != nil {
 		zapctx.Error(ctx, "failed to update model", zap.String("model", model.UUID.String), zaputil.Error(err))
@@ -727,7 +727,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 	// Until we have better handling for partial failures we try to revert
 	// the model migration mode if we fail after this to avoid inconsistenties.
 	rollbackMigrationMode := func() {
-		model.ProcessFailedMigration()
+		model.MigrationFailed()
 		if updateErr := j.Database.UpdateModel(ctx, &model); updateErr != nil {
 			zapctx.Error(ctx, "failed to revert model migration mode after failure initiating migration", zap.Error(updateErr))
 		}

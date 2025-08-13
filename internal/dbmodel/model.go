@@ -183,15 +183,15 @@ func (m Model) MergeModelSummaryFromController(modelSummaryFromController *jujup
 	return *modelSummaryFromController
 }
 
-// ProcessFailedMigration processes a failed migration by resetting the
+// MigrationFailed processes a failed migration by resetting the
 // MigrationMode to MigrationModeNone.
-func (m *Model) ProcessFailedMigration() {
+func (m *Model) MigrationFailed() {
 	m.MigrationMode = MigrationModeNone
 }
 
-// ProcessSuccessfulInternalMigration processes a successful internal migration
+// InternalMigrationSuccess processes a successful internal migration
 // by setting the MigrationMode to MigrationModeNone and updating the ControllerID.
-func (m *Model) ProcessSuccessfulInternalMigration(controllerID uint) {
+func (m *Model) InternalMigrationSuccess(controllerID uint) {
 	m.MigrationMode = MigrationModeNone
 	m.ControllerID = controllerID
 	m.Controller = Controller{} // Clear the association to force GORM to use the new ControllerID.
