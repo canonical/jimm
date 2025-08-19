@@ -7,6 +7,8 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"os"
+	"runtime"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,6 +35,11 @@ var (
 	}
 )
 
+const (
+	bootstrapJobType     = "bootstrap"
+	maxBootstrapDuration = 60 * time.Minute
+)
+
 // Store defines the store methods required by the manager.
 type Store interface {
 	QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error)
@@ -49,9 +56,10 @@ type Store interface {
 type JobTracker interface {
 	// GetJob retrieves a job entry by its ID.
 	GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrackerEntry, error)
-
 	// StopJob stops a job by its ID.
 	StopJob(ctx context.Context, jobId uuid.UUID) error
+	// Run runs a new job and returns the job ID.
+	Run(ctx context.Context, jobType string, job jobtracker.JobFunc, maxDuration time.Duration) (uuid.UUID, error)
 }
 
 // JujuManager defines the juju manager methods required by the job.
@@ -65,38 +73,42 @@ type BinaryStore interface {
 }
 
 type bootstrapManager struct {
-	authSvc *openfga.OFGAClient
-
-	store       Store
-	jobtracker  JobTracker
-	jujuManager JujuManager
-	binaryStore BinaryStore
+	store                     Store
+	tracker                   JobTracker
+	jujuManager               JujuManager
+	binaryStore               BinaryStore
+	jimmWellknownJWKSEndpoint string
 }
 
 // NewBootstrapManager creates a new BootstrapManager instance.
-// TODO(ale8k): Remove authSvc later, it isn't used.
 func NewBootstrapManager(
-	authSvc *openfga.OFGAClient,
 	store Store,
 	jobtracker JobTracker,
 	jujuManager JujuManager,
 	binaryStore BinaryStore,
+	jimmWellknownJWKSEndpoint string,
 ) (*bootstrapManager, error) {
 	if store == nil {
 		return nil, errors.E("store cannot be nil")
 	}
-	if authSvc == nil {
-		return nil, errors.E("authorisation service cannot be nil")
-	}
 	if jobtracker == nil {
 		return nil, errors.E("job tracker cannot be nil")
 	}
+	if jujuManager == nil {
+		return nil, errors.E("juju manager cannot be nil")
+	}
+	if binaryStore == nil {
+		return nil, errors.E("binary store cannot be nil")
+	}
+	if jimmWellknownJWKSEndpoint == "" {
+		return nil, errors.E("jimm well-known JWKs endpoint cannot be empty")
+	}
 	return &bootstrapManager{
-		store:       store,
-		authSvc:     authSvc,
-		jobtracker:  jobtracker,
-		jujuManager: jujuManager,
-		binaryStore: binaryStore,
+		store:                     store,
+		tracker:                   jobtracker,
+		jujuManager:               jujuManager,
+		binaryStore:               binaryStore,
+		jimmWellknownJWKSEndpoint: jimmWellknownJWKSEndpoint,
 	}, nil
 }
 
@@ -106,7 +118,7 @@ func NewBootstrapManager(
 func (b *bootstrapManager) GetBootstrapStatusAndLogs(ctx context.Context, _ *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error) {
 	const op = errors.Op("jimm.GetBootstrapStatusAndLogs")
 
-	job, err := b.jobtracker.GetJob(ctx, jobId)
+	job, err := b.tracker.GetJob(ctx, jobId)
 	if err != nil {
 		return params.BootstrapStatusResponse{}, errors.E(op, "failed to get job status", err)
 	}
@@ -123,18 +135,6 @@ func (b *bootstrapManager) GetBootstrapStatusAndLogs(ctx context.Context, _ *ope
 	}, nil
 }
 
-// StartBootstrap starts a bootstrap job with the provided parameters.
-func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.User, params BootstrapParams) (string, error) {
-	const op = errors.Op("jimm.StartBootstrap")
-
-	err := params.validate()
-	if err != nil {
-		return "", errors.E(op, fmt.Errorf("invalid bootstrap parameters: %v", err))
-	}
-
-	return "", errors.E(op, "not implemented")
-}
-
 // StopBootstrap stops a bootstrap job by its ID.
 func (b *bootstrapManager) StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
 	const op = errors.Op("jimm.StopBootstrap")
@@ -147,12 +147,56 @@ func (b *bootstrapManager) StopBootstrap(ctx context.Context, user *openfga.User
 		return errors.E(op, "job ID cannot be nil")
 	}
 
-	err := b.jobtracker.StopJob(ctx, jobId)
+	err := b.tracker.StopJob(ctx, jobId)
 	if err != nil {
 		return errors.E(op, "failed to stop job", err)
 	}
 
 	return nil
+}
+
+// StartBootstrap starts a bootstrap job with the provided parameters.
+func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.User, params BootstrapParams) (string, error) {
+	const op = errors.Op("jimm.StartBootstrap")
+
+	if err := params.validate(); err != nil {
+		return "", errors.E(op, fmt.Errorf("invalid bootstrap parameters: %v", err))
+	}
+
+	temp, err := os.MkdirTemp("", "juju-data-dir")
+	if err != nil {
+		return "", errors.E(op, fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
+	}
+
+	jobId, err := b.tracker.Run(
+		ctx,
+		bootstrapJobType,
+		b.BootstrapJob(
+			JobParams{
+				// Runner args.
+				JujuDataDir: temp,
+				// Binary args.
+				CLIVersion: params.CLIVersion,
+				// User defined command arguments
+				CloudNameAndRegion: params.CloudNameAndRegion,
+				ControllerName:     params.ControllerName,
+				AgentVersion:       params.AgentVersion,
+				BootstrapTimeout:   params.BootstrapTimeout,
+				CloudCred:          params.CloudCred,
+				PersonalCloud:      params.PersonalCloud,
+				// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
+				LoginTokenRefreshURL: b.jimmWellknownJWKSEndpoint, // TODO: Set the correct login token refresh URL
+			},
+			DefaultBootstrapExecutor{},
+			user,
+		),
+		maxBootstrapDuration,
+	)
+	if err != nil {
+		return "", errors.E(op, fmt.Errorf("failed to start bootstrap job: %w", err))
+	}
+
+	return jobId.String(), nil
 }
 
 // BootstrapExecutor holds a wrapper to run a command. It is primarily for testing
@@ -190,8 +234,6 @@ type JobParams struct {
 	// CLI Download params.
 
 	CLIVersion string
-	CLIOs      string
-	CLIArch    string
 
 	// User defined command arguments
 
@@ -265,18 +307,26 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
+		// TODO(ale8k): When downloading, it takes a while and the CLI has no output. Download progress would be a VERY nice to have here.
 		binary, err := b.binaryStore.Get(
 			ctx,
 			jujuclistore.JujuBinarySpec{
 				Version: p.CLIVersion,
-				Os:      p.CLIVersion,
-				Arch:    p.CLIArch,
+				// This is a best effort. The launchpad URL just so happens to have similar filenames to runtime.GOOS and runtime.GOARCH.
+				// If this ever changes, we should update the binary store to use the correct URL
+				// or we should detect the OS and arch here. We don't want to detect it in the binary store
+				// because the consumer may want to detect it in different ways.
+				Os:   runtime.GOOS,
+				Arch: runtime.GOARCH,
 			},
 		)
 		if err != nil {
 			return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
 		}
-
+		// TODO(ale8k): Is it possible to tell the client to only attempt to get status after binary is downloaded?
+		// Because as it stands, the client will be unncessarily polling (perhaps we could put download progress in the logs?).
+		// That way the status calls wouldn't be unncessary and serve a purpose.
+		zapctx.Debug(logCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 		defer binaryDone(binary)
 
 		if err := b.runBootstrap(ctx, p, jobId, executor, binary, user); err != nil {
@@ -318,6 +368,13 @@ func (b *bootstrapManager) runBootstrap(
 
 	for output := range outputCh {
 		if output.Err != nil {
+			if writeLogErr := b.store.AddBootstrapLog(
+				ctx,
+				jobId,
+				output.Err.Error(),
+			); writeLogErr != nil {
+				zapctx.Error(ctx, "failed to write bootstrap error", zap.Error(writeLogErr), zap.String("jobId", jobId.String()))
+			}
 			return errors.E(fmt.Errorf("bootstrap command failed: %w", output.Err))
 		}
 		if writeLogErr := b.store.AddBootstrapLog(
@@ -339,6 +396,12 @@ func (b *bootstrapManager) runBootstrap(
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to get controller details: %w", err))
 	}
+	// TODO(ale8k): At the moment, we can't reach added k8s controllers because the controller is not reachable.
+	// The CLI spins up a kube-proxy to reach it and we could do the same. The controller details of said controller
+	// may contain proxy details and those proxy details can be used to launch a proxy to contact the controller.
+	// Accessed like so: [ctrlDetails.Proxy.Proxier.Start].
+	//
+	// As such, AddController fails.
 
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	if err != nil {
@@ -367,6 +430,10 @@ func (b *bootstrapManager) runBootstrap(
 		AdminIdentityName: account.User,
 		AdminPassword:     account.Password,
 	}
+	// TODO(ale8k): Fix this...
+	// If the controller cannot be reached, we'll end up with dangling resources to a now no-longer accessible controller (from the clients perspective).
+	// So... Find a nice way to remove controllers if the add fail / clean up dangling ones later.
+	// Once fixed, this can be tested by just making the controller addr something that doesn't exist, and we can test the solution.
 	if err := b.jujuManager.AddController(
 		ctx,
 		user,

@@ -11,13 +11,16 @@ import (
 func TestValidateBootstrapParams_AllValid(t *testing.T) {
 	c := qt.New(t)
 	params := BootstrapParams{
-		ControllerName: "ctrl",
-		CloudName:      "cloud",
-		CloudRegion:    "region",
-		AgentVersion:   "1.2.3",
-		TimeoutSeconds: 60,
+		CLIVersion: "1.0.0",
+
+		CloudNameAndRegion: "cloud/region",
+		ControllerName:     "my-controller",
+		AgentVersion:       "1.2.3",
+		BootstrapTimeout:   60,
+		// CloudCred & PersonalCloud are not validated.
 	}
 	c.Assert(params.validate(), qt.IsNil)
+
 }
 
 func TestValidateBootstrapParams_EmptyFields(t *testing.T) {
@@ -25,52 +28,69 @@ func TestValidateBootstrapParams_EmptyFields(t *testing.T) {
 		name   string
 		params BootstrapParams
 		want   []string
-	}{
+	}{ // do agent and bs timeout
 		{
 			name:   "all empty",
 			params: BootstrapParams{},
 			want: []string{
+				"CLI version cannot be empty",
+				"cloud name and region cannot be empty",
 				"controller name cannot be empty",
-				"cloud name cannot be empty",
-				"cloud region cannot be empty",
-				"agent version cannot be empty",
 			},
 		},
 		{
-			name: "missing controller name",
+			name: "cli version empty",
 			params: BootstrapParams{
-				CloudName:    "cloud",
-				CloudRegion:  "region",
-				AgentVersion: "1.2.3",
+				CloudNameAndRegion: "cloud/region",
+				ControllerName:     "my-controller",
 			},
-			want: []string{"controller name cannot be empty"},
+			want: []string{
+				"CLI version cannot be empty",
+			},
 		},
 		{
-			name: "missing cloud name",
+			name: "cloud name and region empty",
 			params: BootstrapParams{
-				ControllerName: "ctrl",
-				CloudRegion:    "region",
-				AgentVersion:   "1.2.3",
+				CLIVersion:     "1.0.0",
+				ControllerName: "my-controller",
 			},
-			want: []string{"cloud name cannot be empty"},
+			want: []string{
+				"cloud name and region cannot be empty",
+			},
 		},
 		{
-			name: "missing cloud region",
+			name: "controller name empty",
 			params: BootstrapParams{
-				ControllerName: "ctrl",
-				CloudName:      "cloud",
-				AgentVersion:   "1.2.3",
+				CLIVersion:         "1.0.0",
+				CloudNameAndRegion: "cloud/region",
 			},
-			want: []string{"cloud region cannot be empty"},
+			want: []string{
+				"controller name cannot be empty",
+			},
 		},
 		{
-			name: "missing agent version",
+			name: "agent version invalid",
 			params: BootstrapParams{
-				ControllerName: "ctrl",
-				CloudName:      "cloud",
-				CloudRegion:    "region",
+				CLIVersion:         "1.0.0",
+				CloudNameAndRegion: "cloud/region",
+				ControllerName:     "my-controller",
+				AgentVersion:       "invalid-version",
 			},
-			want: []string{"agent version cannot be empty"},
+			want: []string{
+				"invalid-version",
+			},
+		},
+		{
+			name: "bootstrap timeout negative",
+			params: BootstrapParams{
+				CLIVersion:         "1.0.0",
+				CloudNameAndRegion: "cloud/region",
+				ControllerName:     "my-controller",
+				BootstrapTimeout:   -1,
+			},
+			want: []string{
+				"bootstrap timeout cannot be less than zero",
+			},
 		},
 	}
 

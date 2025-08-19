@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"testing"
 	"time"
 
@@ -35,23 +36,25 @@ type bootstrapManagerSuite struct {
 	jobTracker *jobtracker.Tracker
 	adminUser  *openfga.User
 	db         *db.Database
-	ofgaClient *openfga.OFGAClient
 }
 
 var (
 	jobParams = bootstrap.JobParams{
-		JujuDataDir:          "/path/to/a/juju/data/dir",
-		CLIVersion:           "3.6.9",
-		CLIOs:                "linux",
-		CLIArch:              "aarch64",
-		CloudNameAndRegion:   "special-cloud",
-		ControllerName:       "a",
-		AgentVersion:         "3.6.3",
-		BootstrapTimeout:     0,
-		CloudCred:            jujucloud.CloudCredential{},
-		PersonalCloud:        jujucloud.Cloud{},
-		LoginTokenRefreshURL: "jimm.com/.well-known/jwks.json",
+		JujuDataDir: "/path/to/a/juju/data/dir",
+
+		CLIVersion: "3.6.9",
+
+		CloudNameAndRegion: "special-cloud",
+		ControllerName:     "a",
+		AgentVersion:       "3.6.3",
+		BootstrapTimeout:   0,
+
+		CloudCred:     jujucloud.CloudCredential{},
+		PersonalCloud: jujucloud.Cloud{},
+
+		LoginTokenRefreshURL: loginTokenRefreshURLParam,
 	}
+	loginTokenRefreshURLParam = "jimm.com/.well-known/jwks.json"
 )
 
 func pollJob(c *qt.C, s *bootstrapManagerSuite, id uuid.UUID, expectedStatus dbmodel.JobStatus) {
@@ -108,11 +111,6 @@ func (s *bootstrapManagerSuite) Init(c *qt.C) {
 
 	s.db = db
 
-	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
-	c.Assert(err, qt.IsNil)
-
-	s.ofgaClient = ofgaClient
-
 	jobtracker, err := jobtracker.New(db, 1*time.Minute)
 	s.jobTracker = jobtracker
 	c.Assert(err, qt.IsNil)
@@ -128,7 +126,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, s.db, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	numLogs := 101
@@ -184,7 +182,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C)
 	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, s.db, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	jobId, err := s.jobTracker.Run(ctx,
@@ -215,11 +213,16 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.
 	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, s.db, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	_, err = manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
 	c.Assert(err, qt.ErrorMatches, "failed to get job status")
+}
+
+// TODO
+func (s *bootstrapManagerSuite) TestStartBootstrap(c *qt.C) {
+
 }
 
 func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
@@ -239,7 +242,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -255,8 +258,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		binary,
@@ -354,7 +357,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -384,7 +387,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerExists(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -419,7 +422,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerRetrievalFails(c *qt.
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -454,7 +457,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -469,8 +472,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		nil,
@@ -504,7 +507,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -519,8 +522,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
@@ -577,7 +580,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -593,8 +596,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
@@ -626,6 +629,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 		},
 		nil,
 	).Times(1)
+	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLineError).Return(nil).Times(1)
 	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
 
 	job := manager.BootstrapJob(
@@ -656,7 +660,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -672,8 +676,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
@@ -756,7 +760,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -772,8 +776,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
@@ -856,7 +860,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.ofgaClient, store, s.jobTracker, jujuManager, binaryStore)
+	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
@@ -872,8 +876,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
-			Os:      jobParams.CLIVersion,
-			Arch:    jobParams.CLIArch,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
 		},
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
