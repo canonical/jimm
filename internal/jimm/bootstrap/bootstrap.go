@@ -307,6 +307,7 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
+		// TODO(ale8k): When downloading, it takes a while and the CLI has no output. Download progress would be a VERY nice to have here.
 		binary, err := b.binaryStore.Get(
 			ctx,
 			jujuclistore.JujuBinarySpec{
@@ -322,7 +323,6 @@ func (b *bootstrapManager) BootstrapJob(
 		if err != nil {
 			return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
 		}
-
 		zapctx.Debug(logCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 		defer binaryDone(binary)
 
@@ -393,6 +393,12 @@ func (b *bootstrapManager) runBootstrap(
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to get controller details: %w", err))
 	}
+	// TODO(ale8k): At the moment, we can't reach added k8s controllers because the controller is not reachable.
+	// The CLI spins up a kube-proxy to reach it and we could do the same. The controller details of said controller
+	// may contain proxy details and those proxy details can be used to launch a proxy to contact the controller.
+	// Accessed like so: [ctrlDetails.Proxy.Proxier.Start].
+	//
+	// As such, AddController fails.
 
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	if err != nil {
@@ -421,7 +427,6 @@ func (b *bootstrapManager) runBootstrap(
 		AdminIdentityName: account.User,
 		AdminPassword:     account.Password,
 	}
-
 	if err := b.jujuManager.AddController(
 		ctx,
 		user,
