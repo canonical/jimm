@@ -350,6 +350,7 @@ require (
 	github.com/moby/patternmatcher v0.6.0 // indirect
 	github.com/moby/sys/sequential v0.6.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
+	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/zitadel/logging v0.6.1 // indirect
 	github.com/zitadel/oidc/v3 v3.35.0 // indirect
 	github.com/zitadel/schema v1.3.0 // indirect
