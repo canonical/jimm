@@ -3,6 +3,7 @@
 package jujuclistore
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +21,9 @@ import (
 	jujuerrors "github.com/juju/errors"
 	"github.com/juju/retry"
 	"github.com/juju/version/v2"
+	"github.com/juju/zaputil/zapctx"
+	"github.com/ulikunitz/xz"
+	"go.uber.org/zap"
 )
 
 const timeoutRequestDuration = 5 * time.Minute
@@ -29,7 +34,10 @@ const launchPadURL = "https://launchpad.net/juju"
 // launchPadTemplate is the template for constructing the download URL for Juju binaries.
 const launchPadTemplate = "{{.BaseURL}}/{{.VersionWithMinor}}/{{.VersionWithPatch}}/+download/juju-{{.VersionWithPatch}}-{{.Os}}-{{.Arch}}.tar.xz"
 
-var retryRequestError = jujuerrors.New("retry request error")
+var (
+	retryRequestError error = jujuerrors.New("retry request error")
+	maxExtractSize    int64 = 200 * 1024 * 1024
+)
 
 // Config holds the configuration for the Juju binary fetcher.
 type Config struct {
@@ -122,7 +130,6 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 	if err != nil {
 		return nil, jujuerrors.Annotatef(err, "invalid version %q", spec.Version)
 	}
-
 	err = p.template.Execute(&buf, map[string]string{
 		"BaseURL":          p.config.BaseURL,
 		"VersionWithMinor": fmt.Sprintf("%d.%d", v.Major, v.Minor),
@@ -134,6 +141,15 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 		return nil, err
 	}
 	url := buf.String()
+	zapctx.Debug(
+		ctx,
+		"getting Juju binary",
+		zap.String("version", spec.Version),
+		zap.String("os", spec.Os),
+		zap.String("arch", spec.Arch),
+		zap.String("url", url),
+	)
+
 	// worst case the lock will be help for the duration of the download
 	// of the binary. For now it is acceptable because we support bootstrapping
 	// one controller at a time.
@@ -144,11 +160,12 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 		binary.referenceCount.Add(1) // Increment reference count
 		return binary, nil
 	}
-	err = p.freeEntry(ctx)
+	err = p.freeEntry()
 	if err != nil {
 		return nil, err
 	}
 	var file *os.File
+
 	err = retry.Call(retry.CallArgs{
 		Func: func() error {
 			file, err = p.downloadFile(ctx, url)
@@ -169,6 +186,7 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 	if err != nil {
 		return nil, err
 	}
+
 	binary = &Binary{
 		FullPath: file.Name(),
 	}
@@ -180,7 +198,7 @@ func (p *jujuCLIStore) Get(ctx context.Context, spec JujuBinarySpec) (*Binary, e
 // freeEntry checks if the entries map has reached the maximum number of entries.
 // If it has, it deletes a random entry from the map.
 // It should be called when the entries map is locked to ensure thread safety.
-func (p *jujuCLIStore) freeEntry(ctx context.Context) error {
+func (p *jujuCLIStore) freeEntry() error {
 	if len(p.entries) < p.config.MaxEntries {
 		return nil
 	}
@@ -225,21 +243,72 @@ func (p *jujuCLIStore) downloadFile(ctx context.Context, downloadUrl string) (*o
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	if (resp.StatusCode >= 500 && resp.StatusCode < 600) || resp.StatusCode == http.StatusTooManyRequests {
 		return nil, retryRequestError
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, jujuerrors.Errorf("request failed with status %d", resp.StatusCode)
 	}
-	file, err := os.CreateTemp(p.config.Dir, "juju-*")
+
+	xzReader, err := xz.NewReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, jujuerrors.Annotatef(err, "failed to create xz reader for %s", downloadUrl)
 	}
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		file.Close()
-		os.Remove(file.Name())
-		return nil, err
+	tarReader := tar.NewReader(xzReader)
+	// 200mb - limit download size should malicious actor send large file
+	// and destroy jimm's memory with decompression bomb.
+
+	limitedReader := io.LimitReader(tarReader, maxExtractSize)
+
+	var binaryFile *os.File
+	for {
+		hdr, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		// Skip non-regular files and non-binary files
+		if hdr.Typeflag != tar.TypeReg {
+			continue
+		}
+
+		zapctx.Debug(ctx, "processing tar header", zap.String("name", hdr.Name))
+		if filepath.Base(hdr.Name) != "juju" {
+			continue
+		}
+
+		// Create a temp file for the binary
+		f, err := os.CreateTemp(p.config.Dir, "juju-*")
+		if err != nil {
+			return nil, err
+		}
+
+		if _, err := io.Copy(f, limitedReader); err != nil {
+			f.Close()
+			os.Remove(f.Name())
+			return nil, err
+		}
+
+		if err := f.Chmod(0755); err != nil {
+			f.Close()
+			os.Remove(f.Name())
+			return nil, jujuerrors.Annotatef(err, "failed to set permissions on binary file %s", f.Name())
+		}
+		binaryFile = f
+		break
 	}
-	return file, nil
+
+	if binaryFile == nil {
+		return nil, fmt.Errorf("juju binary not found in archive")
+	}
+
+	if err := binaryFile.Close(); err != nil {
+		return nil, jujuerrors.Annotatef(err, "failed to close binary file %s", binaryFile.Name())
+	}
+
+	return binaryFile, nil
 }
