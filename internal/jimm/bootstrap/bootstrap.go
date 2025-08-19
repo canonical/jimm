@@ -422,6 +422,10 @@ func (b *bootstrapManager) runBootstrap(
 		AdminIdentityName: account.User,
 		AdminPassword:     account.Password,
 	}
+	// TODO(ale8k): Fix this...
+	// If the controller cannot be reached, we'll end up with dangling resources to a now no-longer accessible controller (from the clients perspective).
+	// So... Find a nice way to remove controllers if the add fail / clean up dangling ones later.
+	// Once fixed, this can be tested by just making the controller addr something that doesn't exist, and we can test the solution.
 	if err := b.jujuManager.AddController(
 		ctx,
 		user,

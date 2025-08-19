@@ -27,7 +27,7 @@ func TestValidateBootstrapParams_EmptyFields(t *testing.T) {
 		name   string
 		params BootstrapParams
 		want   []string
-	}{
+	}{ // do agent and bs timeout
 		{
 			name:   "all empty",
 			params: BootstrapParams{},

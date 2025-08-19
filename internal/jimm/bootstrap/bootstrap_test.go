@@ -221,6 +221,11 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.
 	c.Assert(err, qt.ErrorMatches, "failed to get job status")
 }
 
+// TODO
+func (s *bootstrapManagerSuite) TestStartBootstrap(c *qt.C) {
+
+}
+
 func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	testCtx := c.Context()
 
