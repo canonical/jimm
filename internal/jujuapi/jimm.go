@@ -625,12 +625,22 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 		return apiparams.BootstrapStartResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
+	cloudNameAndRegion := req.CloudName
+
+	if req.RegionName != "" {
+		cloudNameAndRegion = fmt.Sprintf("%s/%s", req.CloudName, req.RegionName)
+	}
+
 	params := bootstrap.BootstrapParams{
-		ControllerName: req.ControllerName,
-		CloudName:      req.CloudName,
-		CloudRegion:    req.RegionName,
-		AgentVersion:   req.Flags.AgentVersion,
-		TimeoutSeconds: req.Flags.Timeout,
+		CLIVersion: "3.6.8",
+
+		CloudNameAndRegion: cloudNameAndRegion,
+		ControllerName:     req.ControllerName,
+		AgentVersion:       req.Flags.AgentVersion,
+		BootstrapTimeout:   req.Flags.Timeout,
+
+		PersonalCloud: cloudFromParams(req.CloudName, req.Cloud),
+		CloudCred:     req.Credential,
 	}
 
 	jobID, err := r.jimm.BootstrapManager().StartBootstrap(ctx, r.user, params)

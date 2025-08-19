@@ -6,6 +6,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	jujucloud "github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
 
@@ -201,6 +203,9 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 			AgentVersion: "1.0.0",
 			Timeout:      3600,
 		},
+		Cloud:      jujuparams.Cloud{},
+		Credential: jujucloud.CloudCredential{},
+		CLIVersion: "3.6.8",
 	}
 
 	response, err := root.BootstrapStart(ctx, params)
