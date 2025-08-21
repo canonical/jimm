@@ -8,9 +8,12 @@ import (
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
+	jujucloud "github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
+	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
 	jimmAPI "github.com/canonical/jimm/v3/pkg/api"
@@ -31,10 +34,14 @@ logs are streamed to stdout.
 
 Use the --detach flag to start the bootstrap job and return immediately,
 printing only the job ID, without waiting for the job to complete.
+
+The final argument, version, denotes the version of the Juju CLI
+to use for the bootstrap behind the scenes when bootstrapping via JIMM.
 `
 	bootstrapExamples = `
-	juju [jaas] bootstrap mycloud/region mycontroller
-	juju [jaas] bootstrap mycloud/region mycontroller --agent-version=3.6.8
+	juju [jaas] bootstrap <cloud[/region]> <controller name> <cli version>
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.9 --agent-version=3.6.8
 `
 )
 
@@ -49,6 +56,7 @@ type bootstrapCommand struct {
 	cloud          string
 	region         string
 	controllerName string
+	cliVersion     string
 	agentVersion   string
 	timeout        int
 	detach         bool
@@ -67,8 +75,8 @@ func NewBootstrapStartCommand() cmd.Command {
 
 // Init implements modelcmd.Command.
 func (c *bootstrapCommand) Init(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("expected at least 2 arguments, got %d", len(args))
+	if len(args) < 3 {
+		return fmt.Errorf("expected at least 3 arguments, got %d", len(args))
 	}
 	c.cloud = args[0]
 	if i := strings.IndexRune(c.cloud, '/'); i > 0 {
@@ -78,6 +86,7 @@ func (c *bootstrapCommand) Init(args []string) error {
 		return fmt.Errorf("cloud name %q not valid", c.cloud)
 	}
 	c.controllerName = args[1]
+	c.cliVersion = args[2]
 
 	return nil
 }
@@ -92,13 +101,15 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.agentVersion, "agent-version", "", "The version of the Juju agent to use for the bootstrap.")
 	f.IntVar(&c.timeout, "timeout", 0, "The timeout in seconds for the bootstrap operation.")
 	f.BoolVar(&c.detach, "detach", false, "If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete.")
+	// TODO(ale8k): Support passing cloud & cloudcredential files, for now we're looking up clouds and credentials added to the store.
+	// See cmd/juju/cloud/add.go L311 on a nice way to do this and credential will be somewhere in there too.
 }
 
 // Info implements modelcmd.Command.
 func (c *bootstrapCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "bootstrap",
-		Args:     "<cloud name>[/region] <controller name>",
+		Args:     "<cloud name>[/region] <controller name> <juju version>",
 		Purpose:  "Bootstrap a Juju controller via JIMM",
 		Doc:      bootstrapDoc,
 		Examples: bootstrapExamples,
@@ -107,10 +118,37 @@ func (c *bootstrapCommand) Info() *cmd.Info {
 
 // Run implements modelcmd.Command.
 func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
+
+	// Check built in clouds like localhost (lxd).
+	builtinClouds, err := common.BuiltInClouds()
+	if err != nil {
+		return err
+	}
+
+	if _, isABuiltinCloud := builtinClouds[c.cloud]; isABuiltinCloud {
+		return fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", c.cloud)
+	}
+
+	// We use [jujucloud.CloudByName] and not [common.CloudByName] as the JIMM bootstrap
+	// will NOT support builtin clouds (localhost, microk8s, docker-desktop, etc.).
+	bootstrapCloud, err := jujucloud.CloudByName(c.cloud)
+	if err != nil {
+		return fmt.Errorf("failed to get cloud %q: %w", c.cloud, err)
+	}
+
+	bootstrapCredential, err := c.store.CredentialForCloud(c.cloud)
+	if err != nil {
+		return fmt.Errorf("failed to get credential for cloud %q: %w", c.cloud, err)
+	}
+
 	req := apiparams.BootstrapStartParams{
 		CloudName:      c.cloud,
 		RegionName:     c.region,
 		ControllerName: c.controllerName,
+		CLIVersion:     c.cliVersion,
+		Cloud:          cloudToParams(*bootstrapCloud),
+		Credential:     *bootstrapCredential,
+
 		Flags: apiparams.BootstrapFlags{
 			AgentVersion: c.agentVersion,
 			Timeout:      c.timeout,
@@ -128,15 +166,34 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 
-	err = c.out.Write(ctxt, resp)
-	if err != nil {
-		return err
+	if c.detach {
+		fmt.Printf(`
+Bootstrap job started successfully.
+You can track the progress via bootstrap-status with the job ID:
+	juju [jaas] bootstrap-status %s
+
+	`,
+			resp.JobID,
+		)
+	} else {
+		fmt.Printf(`
+Starting bootstrap job.
+
+Should you cancel this process, you can track the progress via bootstrap-status with the job ID:
+	juju [jaas] bootstrap-status %s
+
+	`,
+			resp.JobID,
+		)
 	}
+
 	if c.detach {
 		return nil
 	}
+
 	// Don't use c.out for the logs since c.out
 	// attempts to format the output.
+
 	poller := logPoller{
 		client:              client,
 		jobId:               resp.JobID,
@@ -144,6 +201,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		out:                 ctxt.Stdout,
 		follow:              true,
 	}
+
 	return poller.watchBootstrapLogs()
 }
 
@@ -159,4 +217,43 @@ func (c *bootstrapCommand) newClient() (JIMMAPI, error) {
 	}
 
 	return jimmAPI.NewClient(apiCaller), nil
+}
+
+// CloudToParams converts a jujucloud.Cloud to a jujuparams.Cloud.
+// Copied from api/client/cloud/cloud.go.
+func cloudToParams(cloud jujucloud.Cloud) jujuparams.Cloud {
+	authTypes := make([]string, len(cloud.AuthTypes))
+	for i, authType := range cloud.AuthTypes {
+		authTypes[i] = string(authType)
+	}
+	regions := make([]jujuparams.CloudRegion, len(cloud.Regions))
+	for i, region := range cloud.Regions {
+		regions[i] = jujuparams.CloudRegion{
+			Name:             region.Name,
+			Endpoint:         region.Endpoint,
+			IdentityEndpoint: region.IdentityEndpoint,
+			StorageEndpoint:  region.StorageEndpoint,
+		}
+	}
+	var regionConfig map[string]map[string]interface{}
+	for r, attr := range cloud.RegionConfig {
+		if regionConfig == nil {
+			regionConfig = make(map[string]map[string]interface{})
+		}
+		regionConfig[r] = attr
+	}
+	return jujuparams.Cloud{
+		Type:              cloud.Type,
+		HostCloudRegion:   cloud.HostCloudRegion,
+		AuthTypes:         authTypes,
+		Endpoint:          cloud.Endpoint,
+		IdentityEndpoint:  cloud.IdentityEndpoint,
+		StorageEndpoint:   cloud.StorageEndpoint,
+		Regions:           regions,
+		CACertificates:    cloud.CACertificates,
+		SkipTLSVerify:     cloud.SkipTLSVerify,
+		Config:            cloud.Config,
+		RegionConfig:      regionConfig,
+		IsControllerCloud: cloud.IsControllerCloud,
+	}
 }
