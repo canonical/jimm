@@ -626,8 +626,8 @@ type BootstrapStartParams struct {
 	// Flags hold modifiers for the bootstrap job.
 	Flags BootstrapFlags `json:"flags"`
 
-	// CLIVersion is the version of the Juju CLI that is being used.
-	CLIVersion string `json:"cli-version"`
+	// ControllerVersion is the version of the controller to be bootstrapped.
+	ControllerVersion string `json:"controller-version"`
 }
 
 // BootstrapStartResponse holds the response for starting
