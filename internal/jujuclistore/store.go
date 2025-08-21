@@ -257,7 +257,7 @@ func (p *jujuCLIStore) downloadFile(ctx context.Context, downloadUrl string) (*o
 	}
 	tarReader := tar.NewReader(xzReader)
 	// 200mb - limit download size should malicious actor send large file
-	// and destroy jimm's memory with decompression bomb.
+	// and destroy jimm's disk with decompression bomb.
 
 	limitedReader := io.LimitReader(tarReader, maxExtractSize)
 
