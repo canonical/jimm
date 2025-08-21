@@ -367,6 +367,11 @@ type Parameters struct {
 
 	// CrossModelQueryTimeout is the timeout for cross model queries.
 	CrossModelQueryTimeout time.Duration
+
+	// BootstrapLoginTokenRefreshURL is the URL when bootstrapping a controller via JIMM.
+	// It should look something like:
+	// <scheme><ip/dns>[<port>]/.well-known/jwks.json"
+	BootstrapLoginTokenRefreshURL string
 }
 
 func (p *Parameters) Validate() error {
@@ -524,12 +529,13 @@ func New(p Parameters) (*JIMM, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	bootstrapManager, err := bootstrap.NewBootstrapManager(
 		j.Database,
 		jobTracker,
 		j.jujuManager,
 		binaryStore,
-		"fixed-later",
+		p.BootstrapLoginTokenRefreshURL,
 	)
 	if err != nil {
 		return nil, err

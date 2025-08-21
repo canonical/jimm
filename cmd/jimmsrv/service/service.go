@@ -205,6 +205,11 @@ type Params struct {
 
 	// CrossModelQueryTimeout is the timeout for cross model queries.
 	CrossModelQueryTimeout time.Duration
+
+	// BootstrapLoginTokenRefreshURL is the URL when bootstrapping a controller via JIMM.
+	// It should look something like:
+	// <scheme><ip/dns>[<port>]/.well-known/jwks.json"
+	BootstrapLoginTokenRefreshURL string
 }
 
 // A Service is the implementation of a JIMM server.
@@ -443,6 +448,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		return nil, errors.E(op, err, "failed to parse final redirect url for the dashboard")
 	}
 
+	// Scheme is not optional, so we aren't using ParseURLWithOptionalScheme here.
+	if _, err := url.Parse(p.BootstrapLoginTokenRefreshURL); err != nil {
+		return nil, errors.E(op, err, "failed to parse login token refresh URL")
+	}
+	jimmParameters.BootstrapLoginTokenRefreshURL = p.BootstrapLoginTokenRefreshURL
+
 	s.jimm, err = jimm.New(jimmParameters)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -482,8 +493,10 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			},
 		),
 	)
+
+	wellKnownPath := "/.well-known"
 	mountHandler(
-		"/.well-known",
+		wellKnownPath,
 		jimmhttp.NewWellKnownHandler(s.jimm.CredentialStore),
 	)
 

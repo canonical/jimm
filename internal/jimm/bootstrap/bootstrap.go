@@ -184,7 +184,7 @@ func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.Use
 				CloudCred:          params.CloudCred,
 				PersonalCloud:      params.PersonalCloud,
 				// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
-				LoginTokenRefreshURL: b.jimmWellknownJWKSEndpoint, // TODO: Set the correct login token refresh URL
+				LoginTokenRefreshURL: b.jimmWellknownJWKSEndpoint,
 			},
 			DefaultBootstrapExecutor{},
 			user,

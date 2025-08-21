@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
+
 package jimmhttp
 
 import (
@@ -14,6 +15,10 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
+)
+
+const (
+	JwksEndpoint = "/jwks.json"
 )
 
 // WellKnownHandler holds the grouped router to be mounted and
@@ -32,7 +37,7 @@ func NewWellKnownHandler(cs credentials.CredentialStore) *WellKnownHandler {
 // Routes returns the grouped routers routes with group specific middlewares.
 func (wkh *WellKnownHandler) Routes() chi.Router {
 	wkh.SetupMiddleware()
-	wkh.Router.Get("/jwks.json", wkh.JWKS)
+	wkh.Router.Get(JwksEndpoint, wkh.JWKS)
 	return wkh.Router
 }
 

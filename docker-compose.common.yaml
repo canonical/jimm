@@ -87,6 +87,8 @@ services:
         kZT1O7501gvSxsHDNB/X39/AyrRp9nzakhkna2FIPIGdBSsOA84EPCQong/+Kzq9OniZFN
         v8touvVeAGefsAAAAPZHV0dG9zQGR1dHRvc3BjAQIDBA==
         -----END OPENSSH PRIVATE KEY-----
+      # To Q/A this, use any reachable address for this compose JIMM. 
+      JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL: "http://10.0.0.0:17070/.well-known/jwks.json"
     healthcheck:
       test: [ "CMD", "curl", "http://jimm.localhost:80" ]
       interval: 5s

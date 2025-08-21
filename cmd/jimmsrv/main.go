@@ -234,7 +234,8 @@ func start(ctx context.Context, s *service.Service) error {
 			SSHPort:          sshPortInt,
 			SSHPublicHostKey: publicHostKey,
 		},
-		CrossModelQueryTimeout: crossModelQueryTimeout,
+		CrossModelQueryTimeout:        crossModelQueryTimeout,
+		BootstrapLoginTokenRefreshURL: os.Getenv("JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL"),
 	})
 	if err != nil {
 		return err
