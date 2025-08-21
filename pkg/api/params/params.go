@@ -619,8 +619,6 @@ type BootstrapStartParams struct {
 	Cloud jujuparams.Cloud `json:"cloud,omitempty"`
 	// Credential contains the cloud credential and its tag, this credential will be used against the
 	// the cloud provided to bootstrap the controller.
-	// We're using jujucloud.CloudCredential as there's an API client func using this type to add clouds.
-	// Seen here: (juju 3.6) https://github.com/juju/juju/blob/adbd5a2255e4efd0d0c10089813a0af981290da1/api/client/cloud/cloud.go#L271
 	Credential jujucloud.CloudCredential `json:"credential"`
 
 	// ControllerName specifies the name of the controller as recorded in JIMM.
