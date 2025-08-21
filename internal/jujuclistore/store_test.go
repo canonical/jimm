@@ -121,7 +121,7 @@ func TestStoreProtectsAgainstDecompressionBomb(t *testing.T) {
 	// Set an extract size 1 byte smaller than the content size
 	// to trigger the decompression bomb protection
 	c.Patch(&maxExtractSize, int64(9))
-	tenBytesContent := []byte("123456789therestofthiswillbemissing") // We'll expect the 0 to missing
+	tenBytesContent := []byte("123456789therestofthiswillbemissing") // We'll expect string to missing
 	archive := makeTarXz(t, "juju", tenBytesContent)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
