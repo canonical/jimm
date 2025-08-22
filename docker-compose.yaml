@@ -138,6 +138,20 @@ services:
       timeout: 10s
       retries: 30
 
+  juju-dashboard:
+    image: ghcr.io/canonical/juju-dashboard:0.14.0-beta.0
+    container_name: juju-dashboard
+    profiles: ["dev"]
+    labels:
+      traefik.enable: true
+      traefik.http.routers.juju-dashboard.rule: Host(`juju-dashboard.localhost`)
+      traefik.http.routers.juju-dashboard.entrypoints: websecure
+      traefik.http.routers.juju-dashboard.tls: true
+      traefik.http.services.juju-dashboard.loadbalancer.server.port: 8080
+    volumes:
+      - ./local/dashboard/config.js:/srv/configs/config.js
+      - ./local/dashboard/nginx.conf:/srv/configs/nginx.conf
+
 volumes:
   go-modules:
   go-cache:
