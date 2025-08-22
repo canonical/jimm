@@ -203,9 +203,9 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 			AgentVersion: "1.0.0",
 			Timeout:      3600,
 		},
-		Cloud:      jujuparams.Cloud{},
-		Credential: jujucloud.CloudCredential{},
-		CLIVersion: "3.6.8",
+		Cloud:             jujuparams.Cloud{},
+		Credential:        jujucloud.CloudCredential{},
+		ControllerVersion: "3.6.8",
 	}
 
 	response, err := root.BootstrapStart(ctx, params)

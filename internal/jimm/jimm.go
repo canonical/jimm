@@ -525,11 +525,11 @@ func New(p Parameters) (*JIMM, error) {
 		return nil, err
 	}
 	bootstrapManager, err := bootstrap.NewBootstrapManager(
-		j.OpenFGAClient,
 		j.Database,
 		jobTracker,
 		j.jujuManager,
 		binaryStore,
+		"fixed-later",
 	)
 	if err != nil {
 		return nil, err
