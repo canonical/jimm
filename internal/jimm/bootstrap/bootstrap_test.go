@@ -54,6 +54,7 @@ var (
 
 		LoginTokenRefreshURL: loginTokenRefreshURLParam,
 	}
+	//nolint:gosec
 	loginTokenRefreshURLParam = "jimm.com/.well-known/jwks.json"
 )
 
