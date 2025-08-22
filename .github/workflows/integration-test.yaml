@@ -25,7 +25,7 @@ jobs:
         id: jaas
         with:
           jimm-version: dev
-          juju-channel: "3.6/edge" # Temporary change while 3.6.3 is on 3/stable and broken with JIMM.
+          juju-channel: "3.6/stable"
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
       # Build the JAAS plugin to test any changes made 
