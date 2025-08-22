@@ -22,8 +22,7 @@ type BootstrapParams struct {
 	BootstrapTimeout   int
 
 	CloudCred jujucloud.CloudCredential
-	// PersonalCloud is the personally defined cloud. Only necessary if the cloud is not a public
-	// cloud.
+	// PersonalCloud is the cloud-definition for a non-public cloud.
 	PersonalCloud jujucloud.Cloud
 }
 

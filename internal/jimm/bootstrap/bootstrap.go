@@ -307,7 +307,6 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
-		// TODO(ale8k): When downloading, it takes a while and the CLI has no output. Download progress would be a VERY nice to have here.
 		binary, err := b.binaryStore.Get(
 			ctx,
 			jujuclistore.JujuBinarySpec{
@@ -323,9 +322,7 @@ func (b *bootstrapManager) BootstrapJob(
 		if err != nil {
 			return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
 		}
-		// TODO(ale8k): Is it possible to tell the client to only attempt to get status after binary is downloaded?
-		// Because as it stands, the client will be unncessarily polling (perhaps we could put download progress in the logs?).
-		// That way the status calls wouldn't be unncessary and serve a purpose.
+
 		zapctx.Debug(logCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 		defer binaryDone(binary)
 
@@ -396,12 +393,6 @@ func (b *bootstrapManager) runBootstrap(
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to get controller details: %w", err))
 	}
-	// TODO(ale8k): At the moment, we can't reach added k8s controllers because the controller is not reachable.
-	// The CLI spins up a kube-proxy to reach it and we could do the same. The controller details of said controller
-	// may contain proxy details and those proxy details can be used to launch a proxy to contact the controller.
-	// Accessed like so: [ctrlDetails.Proxy.Proxier.Start].
-	//
-	// As such, AddController fails.
 
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	if err != nil {
@@ -430,10 +421,7 @@ func (b *bootstrapManager) runBootstrap(
 		AdminIdentityName: account.User,
 		AdminPassword:     account.Password,
 	}
-	// TODO(ale8k): Fix this...
-	// If the controller cannot be reached, we'll end up with dangling resources to a now no-longer accessible controller (from the clients perspective).
-	// So... Find a nice way to remove controllers if the add fail / clean up dangling ones later.
-	// Once fixed, this can be tested by just making the controller addr something that doesn't exist, and we can test the solution.
+
 	if err := b.jujuManager.AddController(
 		ctx,
 		user,
