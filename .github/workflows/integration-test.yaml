@@ -17,6 +17,9 @@ jobs:
         with:
           detached: true
 
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
