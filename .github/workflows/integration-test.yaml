@@ -12,6 +12,11 @@ jobs:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
+
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
