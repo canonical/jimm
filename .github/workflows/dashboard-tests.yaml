@@ -1,0 +1,47 @@
+name: Juju dashboard integration test
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  startjimm:
+    name: Test JIMM with the Juju dashboard
+    runs-on: [self-hosted-linux-amd64-jammy-large]
+    steps:
+      - name: Checkout JIMM repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Go vendor to speed up docker build
+        run: go mod vendor
+
+      - name: Start JIMM
+        uses: ./.github/actions/test-server
+        id: jaas
+        with:
+          jimm-version: dev
+          juju-channel: "3.6/stable"
+          ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run integration tests
+        uses: canonical/juju-dashboard/.github/actions/run-playwright@f10fb23537cb3c652d664e92d5afa095e96fa433
+        with:
+          test-identifier: e2e-jimm-docker-keycloak
+        env:
+          JIMM_CONTROLLER_NAME: jimm
+          CONTROLLER_NAME: jimm
+          DASHBOARD_ADDRESS: https://juju-dashboard.localhost
+          AUTH_MODE: oidc
+          AUTH_VARIANT: keycloak
+          JUJU_ENV: jimm
+          PROVIDER: localhost
+          ADMIN_IDENTITY_USERNAME: jimm-test
+          ADMIN_IDENTITY_PASSWORD: password
