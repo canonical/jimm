@@ -35,6 +35,7 @@ services:
       OPENFGA_AUTH_MODEL: "01GP1EC038KHGB6JJ2XXXXCXKB"
       OPENFGA_TOKEN: "jimm"
       JIMM_IS_LEADER: true
+      JIMM_OAUTH_AUTH_STYLE: "in_params" # can be "auto", "in_params", or "in_header"
       JIMM_OAUTH_ISSUER_URL: "http://keycloak.localhost:8082/realms/jimm" # Scheme required
       JIMM_OAUTH_CLIENT_ID: "jimm-device"
       JIMM_OAUTH_CLIENT_SECRET: "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4"

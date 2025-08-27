@@ -220,6 +220,7 @@ func start(ctx context.Context, s *service.Service) error {
 			SessionCookieMaxAge:  sessionCookieMaxAgeInt,
 			JWTSessionKey:        sessionSecretKey,
 			SecureSessionCookies: secureSessionCookies,
+			AuthStyle:            os.Getenv("JIMM_OAUTH_AUTH_STYLE"),
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		CookieSessionKey:          []byte(sessionSecretKey),

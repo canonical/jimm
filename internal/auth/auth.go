@@ -49,6 +49,25 @@ const (
 	migrationTokenExpiry = 3 * time.Hour
 )
 
+// AuthStyle determines how the client credentials are sent to the token endpoint.
+//
+// This is relevant because some identity providers expect the client credentials
+// to be sent in the request body, while others expect them to be sent in the
+// request header. The x/oauth2 package defaults to auto-detect this by trying
+// one method and falling back to the other if it gets an error. This leads to
+// rate-limit errors from the provider and the device flow ends up taking much
+// longer than necessary to complete.
+type AuthStyle string
+
+const (
+	// OAuthStyleInParams indicates that the client credentials should be sent in the request body.
+	OAuthStyleInParams AuthStyle = "in_params"
+	// OAuthStyleInHeader indicates that the client credentials should be sent in the request header.
+	OAuthStyleInHeader AuthStyle = "in_header"
+	// oAuthStyleAuto indicates that the client should automatically detect how to send the client credentials.
+	OAuthStyleAuto AuthStyle = "auto"
+)
+
 type sessionIdentityContextKey struct{}
 
 // ContextWithSessionIdentity adds the session identity id to the provided context.
@@ -144,6 +163,9 @@ type AuthenticationServiceParams struct {
 
 	// SessionStore holds the store for creating, getting and saving gorrila sessions.
 	SessionStore sessions.Store
+
+	// AuthStyle configures how the client credentials should be sent to the token endpoint.
+	AuthStyle AuthStyle
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -157,7 +179,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
 	}
 
-	return &AuthenticationService{
+	authSvc := &AuthenticationService{
 		provider: provider,
 		oauthConfig: oauth2.Config{
 			ClientID:     params.ClientID,
@@ -173,7 +195,21 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		sessionStore:        params.SessionStore,
 		sessionCookieMaxAge: params.SessionCookieMaxAge,
 		secureCookies:       params.SecureCookies,
-	}, nil
+	}
+
+	// If the auth style is specifically defined, then use that to avoid
+	// the pit-falls of auto-detection (sending 2 requests each time).
+	// See the docstring for the AuthStyle type for more information.
+	switch params.AuthStyle {
+	case OAuthStyleInHeader:
+		authSvc.oauthConfig.Endpoint.AuthStyle = oauth2.AuthStyleInHeader
+	case OAuthStyleInParams:
+		authSvc.oauthConfig.Endpoint.AuthStyle = oauth2.AuthStyleInParams
+	default:
+		authSvc.oauthConfig.Endpoint.AuthStyle = oauth2.AuthStyleAutoDetect
+	}
+
+	return authSvc, nil
 }
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.

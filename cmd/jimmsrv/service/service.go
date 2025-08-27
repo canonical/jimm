@@ -96,6 +96,9 @@ type OAuthAuthenticatorParams struct {
 	// JWTSessionKey holds the secret key used for signing/verifying JWT tokens.
 	// See internal/auth/oauth2.go AuthenticationService.SessionSecretkey for more details.
 	JWTSessionKey string
+
+	// AuthStyle configures how the client credentials should be sent to the token endpoint.
+	AuthStyle string
 }
 
 // A Params structure contains the parameters required to initialise a new
@@ -408,6 +411,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
 			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,
 			SecureCookies:       p.OAuthAuthenticatorParams.SecureSessionCookies,
+			AuthStyle:           auth.AuthStyle(p.OAuthAuthenticatorParams.AuthStyle),
 			Store:               db,
 			SessionStore:        sessionStore,
 			RedirectURL:         redirectUrl,
