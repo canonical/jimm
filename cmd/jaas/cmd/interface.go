@@ -10,5 +10,6 @@ type JIMMAPI interface {
 	BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error)
 	Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error)
 	BootstrapStop(req *params.BootstrapStopRequest) error
+	ListMigrationTargets(req *params.ListMigrationTargetsRequest) ([]params.ControllerInfo, error)
 	PrepareModelMigration(req *params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error)
 }

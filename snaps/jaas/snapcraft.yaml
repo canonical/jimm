@@ -48,6 +48,7 @@ parts:
       ln -sf jaas bin/juju-list-audit-events
       ln -sf jaas bin/juju-list-controllers
       ln -sf jaas bin/juju-list-groups
+      ln -sf jaas bin/juju-list-migration-targets
       ln -sf jaas bin/juju-list-permissions
       ln -sf jaas bin/juju-list-roles
       ln -sf jaas bin/juju-list-service-account-credentials

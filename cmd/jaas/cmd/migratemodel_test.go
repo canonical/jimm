@@ -30,7 +30,7 @@ import (
 // our test suite doesn't support spinning up multiple controllers
 // so this behaviour is tested elsewhere instead.
 type migrateModelSuite struct {
-	jimmClient    *mocks.MockJIMMClient
+	jimmClient    *mocks.MockJIMMAPI
 	migrateClient *mocks.MockMigrateAPI
 	writer        *mocks.MockWriter
 	store         *mocks.MockClientStore
@@ -40,7 +40,7 @@ var _ = gc.Suite(&migrateModelSuite{})
 
 func (s *migrateModelSuite) SetupMocks(c *gc.C) *gomock.Controller {
 	ctrl := gomock.NewController(c)
-	s.jimmClient = mocks.NewMockJIMMClient(ctrl)
+	s.jimmClient = mocks.NewMockJIMMAPI(ctrl)
 	s.migrateClient = mocks.NewMockMigrateAPI(ctrl)
 	s.writer = mocks.NewMockWriter(ctrl)
 	s.store = mocks.NewMockClientStore(ctrl)

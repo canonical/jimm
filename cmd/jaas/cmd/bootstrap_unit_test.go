@@ -18,7 +18,7 @@ import (
 )
 
 type bootstrapCmdSuite struct {
-	client *mocks.MockJIMMClient
+	client *mocks.MockJIMMAPI
 	writer *mocks.MockWriter
 }
 
@@ -26,7 +26,7 @@ var _ = gc.Suite(&bootstrapCmdSuite{})
 
 func (s *bootstrapCmdSuite) SetupMocks(c *gc.C) *gomock.Controller {
 	ctrl := gomock.NewController(c)
-	s.client = mocks.NewMockJIMMClient(ctrl)
+	s.client = mocks.NewMockJIMMAPI(ctrl)
 	s.writer = mocks.NewMockWriter(ctrl)
 
 	return ctrl
