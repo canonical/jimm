@@ -57,6 +57,9 @@ else
     juju add-model "$MIGRATING_MODEL_NAME"
 fi
 
+# Sleep for 5 second to avoid error "machine 0 not running"
+sleep 5
+
 model_uuid=$(juju show-model "$MIGRATING_MODEL_NAME" --format json | jq -r ".[\"$MIGRATING_MODEL_NAME\"].\"model-uuid\"")
 
 # Source the `JAAS` variable for executing jaas commands.
