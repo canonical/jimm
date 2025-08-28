@@ -5,7 +5,7 @@
 #
 # This script creates a controller called internal-migration-controller and 
 # then creates a model called internal-migration-model, lists viable internal
-# migration targets, and then migrates the model internally to the other
+# migration targets, and then migrates the model internally to another
 # controller attached to JIMM before waiting for the migration to complete.
 #
 # Note that migrating a model back to a controller it was previously on
@@ -18,8 +18,9 @@ set -euo pipefail
 
 # Notes:
 # - This script is partially idempotent, meaning you can run it multiple times
-# without recreating the source-controller or models, but this only applies up
-# to the point of migration. If migration fails, the script is not idempotent.
+# without recreating the migration-controller, but this only applies up
+# to a certain point. Because the model is always recreated, all steps after
+# model creation are not idempotent.
 #
 # - The script uses || true in some places to avoid failing the script
 # if a command has non-zero exit code, used to check if certain resources
