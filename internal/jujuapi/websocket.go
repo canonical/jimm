@@ -231,6 +231,7 @@ func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTok
 			ControllerUUID: m.Controller.UUID,
 			ModelName:      fullModelName,
 			ModelUUID:      uuid,
+			MigrationMode:  m.MigrationMode,
 		}, nil
 	}
 }

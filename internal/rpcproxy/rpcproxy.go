@@ -34,6 +34,7 @@ import (
 
 const (
 	accessRequiredErrorCode = "access required"
+	unauthorizedErrorCode   = "unauthorized"
 )
 
 // ControllerDetails holds information about the controller
@@ -94,6 +95,7 @@ type WebsocketConnectionWithMetadata struct {
 	ControllerUUID string
 	ModelName      string
 	ModelUUID      string
+	MigrationMode  dbmodel.MigrationMode
 }
 
 // LoginService represents the LoginService interface used by the proxy.
@@ -297,6 +299,7 @@ type modelProxy struct {
 	loginService            LoginService
 	modelName               string
 	modelUUID               string
+	modelMigrationMode      dbmodel.MigrationMode
 	conversationId          string
 	authenticatedIdentityID string
 	redirectInfo            RedirectInfoGetter
@@ -475,6 +478,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		p.msgs.controllerUUID = connWithMetadata.ControllerUUID
 		p.modelName = connWithMetadata.ModelName
 		p.modelUUID = connWithMetadata.ModelUUID
+		p.modelMigrationMode = connWithMetadata.MigrationMode
 		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 		controllerToClient := controllerProxy{
 			modelProxy: modelProxy{
@@ -513,34 +517,17 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			}
 			return nil
 		}
-		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
-		if err != nil {
-			zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
-			p.handleError(msg, err)
+
+		returnMsgToClient := p.processControllerErrors(ctx, msg)
+		if !returnMsgToClient {
 			continue
 		}
-		if permissionsRequired != nil {
-			zapctx.Error(ctx, "Access Required error")
-			if err := p.redoLogin(ctx, permissionsRequired); err != nil {
-				zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
-				p.handleError(msg, err)
-				continue
-			}
-			// Write back to the controller.
-			msg := p.msgs.getMessage(msg.RequestID)
-			if msg != nil {
-				if err := p.src.writeJson(msg); err != nil {
-					zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
-				}
-			}
-			continue
-		} else {
-			if err := modifyControllerResponse(msg); err != nil {
-				zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
-				p.handleError(msg, err)
-				// An error when modifying the message is a show stopper.
-				return fmt.Errorf("error modifying controller response: %w", err)
-			}
+
+		if err := modifyControllerResponse(msg); err != nil {
+			zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
+			p.handleError(msg, err)
+			// An error when modifying the message is a show stopper.
+			return fmt.Errorf("error modifying controller response: %w", err)
 		}
 		p.msgs.removeMessage(msg.RequestID)
 		if err := p.auditLogMessage(msg, true); err != nil {
@@ -551,6 +538,54 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			return fmt.Errorf("error writing message to client: %w", err)
 		}
 	}
+}
+
+// processControllerErrors checks for errors in the message from the controller
+// and decides how to handle them. It returns true if the message should be
+// returned to the client, false if it should not.
+func (p *controllerProxy) processControllerErrors(ctx context.Context, msg *message) bool {
+
+	// Check if the model is migrating. When it has completed its migration, we will receive
+	// an unauthorized error from the controller and want to mask that error and inform
+	// client to try again as JIMM will eventually update the model's controller details
+	// in its database. See internal/jimm/juju/model_poller.go.
+	modelMigrating := p.modelMigrationMode == dbmodel.MigrationModeMigrateInternal || p.modelMigrationMode == dbmodel.MigrationModeExporting
+	if modelMigrating && msg.ErrorCode == unauthorizedErrorCode {
+		msg.ErrorCode = "model migrating"
+		msg.Error = "model is finishing migration, please retry later"
+		return true
+	}
+
+	// Next we check for permission required errors where the Juju controller is informing us
+	// that the user needs more permissions to perform the requested operation.
+	// If so, we attempt to redo the login with the required permissions (if the user has them)
+	// and then resend the original login request.
+	//
+	// It's ideally unlikely we'll hit this code path often because JIMM sets a broad scope
+	// of permissions on the initial login request.
+	permissionsRequired, err := checkPermissionsRequired(ctx, msg)
+	if err != nil {
+		zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
+		p.handleError(msg, err)
+		return false
+	}
+	if permissionsRequired != nil {
+		zapctx.Error(ctx, "Access Required error")
+		if err := p.redoLogin(ctx, permissionsRequired); err != nil {
+			zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
+			p.handleError(msg, err)
+			return false
+		}
+		// Write back to the controller.
+		msg := p.msgs.getMessage(msg.RequestID)
+		if msg != nil {
+			if err := p.src.writeJson(msg); err != nil {
+				zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
+			}
+		}
+		return false
+	}
+	return true
 }
 
 func (p *controllerProxy) handleError(msg *message, err error) {
