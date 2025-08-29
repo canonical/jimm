@@ -189,6 +189,7 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 		SSHKeyManager:           s.jimm.SSHKeyManager(),
 		RedirectInfo:            redirectInfo,
+		MigrationChecker:        migrationChecker{jimm: s.jimm},
 	}
 	if err := rpcproxy.ProxySockets(ctx, proxyHelpers); err != nil {
 		zapctx.Error(ctx, "failed to start jimm model proxy", zap.Error(err))
@@ -261,6 +262,33 @@ func (r redirectInfoAdapter) GetRedirectInfo(ctx context.Context) (rpcproxy.Cont
 		Addresses: model.Controller.Addresses,
 		CACert:    model.Controller.CACertificate,
 	}, nil
+}
+
+type migrationChecker struct {
+	jimm *jimm.JIMM
+}
+
+// CheckModelMigrated implements rpcproxy.MigrationChecker.
+func (m migrationChecker) CheckModelMigrated(ctx context.Context, apiErr error, modelUUID string) bool {
+	if errors.ErrorCode(apiErr) != errors.CodeRedirect {
+		return false
+	}
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: modelUUID,
+			Valid:  modelUUID != "",
+		},
+	}
+	if err := m.jimm.Database.GetModel(ctx, &model); err != nil {
+		zapctx.Error(ctx, "failed to find model for migration check", zap.String("uuid", modelUUID), zap.Error(err))
+		return false
+	}
+	ok, err := m.jimm.JujuManager().CheckInternalMigration(ctx, apiErr, &model)
+	if err != nil {
+		zapctx.Error(ctx, "error checking model migration", zap.Error(err))
+		return false
+	}
+	return ok
 }
 
 // Use a 64k frame size for the websockets while we need to deal
