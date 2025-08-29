@@ -482,13 +482,14 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 		controllerToClient := controllerProxy{
 			modelProxy: modelProxy{
-				src:            p.dst,
-				dst:            p.src,
-				msgs:           p.msgs,
-				auditLog:       p.auditLog,
-				tokenGen:       p.tokenGen,
-				modelName:      p.modelName,
-				conversationId: p.conversationId,
+				src:                p.dst,
+				dst:                p.src,
+				msgs:               p.msgs,
+				auditLog:           p.auditLog,
+				tokenGen:           p.tokenGen,
+				modelName:          p.modelName,
+				conversationId:     p.conversationId,
+				modelMigrationMode: p.modelMigrationMode,
 			},
 		}
 		p.wg.Add(1)
@@ -546,12 +547,12 @@ func (p *controllerProxy) start(ctx context.Context) error {
 func (p *controllerProxy) processControllerErrors(ctx context.Context, msg *message) bool {
 
 	// Check if the model is migrating. When it has completed its migration, we will receive
-	// an unauthorized error from the controller and want to mask that error and inform
-	// client to try again as JIMM will eventually update the model's controller details
-	// in its database. See internal/jimm/juju/model_poller.go.
+	// an unauthorized error from the controller and we want to mask that error and inform
+	// clients to try again as JIMM will eventually update the model's controller.
+	// See internal/jimm/juju/model_poller.go.
 	modelMigrating := p.modelMigrationMode == dbmodel.MigrationModeMigrateInternal || p.modelMigrationMode == dbmodel.MigrationModeExporting
-	if modelMigrating && msg.ErrorCode == unauthorizedErrorCode {
-		msg.ErrorCode = "model migrating"
+	if modelMigrating && msg.ErrorCode == string(errors.CodeUnauthorized) {
+		msg.ErrorCode = string(errors.CodeModelMigrating)
 		msg.Error = "model is finishing migration, please retry later"
 		return true
 	}

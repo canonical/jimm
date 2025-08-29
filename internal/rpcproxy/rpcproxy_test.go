@@ -16,6 +16,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpcproxy"
@@ -301,6 +302,135 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 	},
 	}
 	c.Assert(auditLogs, qt.DeepEquals, expectedEvents)
+}
+
+// TestProxySocketsModelMigration verifies that when a model is migrating
+// and we get back and unauthorized error from the controller, we modify
+// the error to indicate that the model is completing migration.
+func TestProxySocketsModelMigration(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	srvController := rpctest.NewServer(rpctest.Unauthorized)
+
+	errChan := make(chan error)
+	srvJIMM := rpctest.NewServer(func(connClient *websocket.Conn) error {
+		f := func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
+			connController := srvController.Dialer.DialWebsocket(c, srvController.URL)
+			return rpcproxy.WebsocketConnectionWithMetadata{
+				Conn:          connController,
+				ModelName:     "TestName",
+				MigrationMode: dbmodel.MigrationModeMigrateInternal,
+			}, nil
+		}
+
+		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
+			ConnClient:        connClient,
+			TokenGen:          &testTokenGenerator{},
+			ConnectController: f,
+			AuditLog:          func(ale *dbmodel.AuditLogEntry) {},
+			LoginService:      &mockLoginService{},
+			SSHKeyManager:     &mocks.SSHKeyManager{},
+		}
+		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.IsNil)
+		errChan <- err
+		return err
+	})
+
+	defer srvController.Close()
+	defer srvJIMM.Close()
+	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
+	defer ws.Close()
+
+	msg := rpcproxy.Message{RequestID: 1, Type: "TestType", Request: "TestReq"}
+	err := ws.WriteJSON(&msg)
+	c.Assert(err, qt.IsNil)
+
+	resp := rpcproxy.Message{}
+	receiveChan := make(chan error)
+	go func() {
+		receiveChan <- ws.ReadJSON(&resp)
+	}()
+	select {
+	case err := <-receiveChan:
+		c.Assert(err, qt.IsNil)
+	case <-time.After(5 * time.Second):
+		c.Logf("took too long to read response")
+		c.FailNow()
+	case err := <-errChan:
+		c.Fatal(err)
+	}
+
+	c.Assert(resp.Error, qt.Equals, "model is finishing migration, please retry later")
+	c.Assert(resp.ErrorCode, qt.Equals, string(errors.CodeModelMigrating))
+	ws.Close()
+	<-errChan // Ensure go routines are cleaned up
+}
+
+// TestProxySocketsUnauthorized complements TestProxySocketsModelMigration
+// by verifying that if the model is not migrating, we do not modify the
+// unauthorized error from the controller.
+func TestProxySocketsUnauthorized(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	srvController := rpctest.NewServer(rpctest.Unauthorized)
+
+	errChan := make(chan error)
+	srvJIMM := rpctest.NewServer(func(connClient *websocket.Conn) error {
+		f := func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
+			connController := srvController.Dialer.DialWebsocket(c, srvController.URL)
+			return rpcproxy.WebsocketConnectionWithMetadata{
+				Conn:      connController,
+				ModelName: "TestName",
+			}, nil
+		}
+
+		proxyHelpers := rpcproxy.ProxyHelpers{
+			RedirectInfo:      &mockRedirectInfo{},
+			ConnClient:        connClient,
+			TokenGen:          &testTokenGenerator{},
+			ConnectController: f,
+			AuditLog:          func(ale *dbmodel.AuditLogEntry) {},
+			LoginService:      &mockLoginService{},
+			SSHKeyManager:     &mocks.SSHKeyManager{},
+		}
+		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
+		c.Check(err, qt.IsNil)
+		errChan <- err
+		return err
+	})
+
+	defer srvController.Close()
+	defer srvJIMM.Close()
+	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
+	defer ws.Close()
+
+	msg := rpcproxy.Message{RequestID: 1, Type: "TestType", Request: "TestReq"}
+	err := ws.WriteJSON(&msg)
+	c.Assert(err, qt.IsNil)
+
+	resp := rpcproxy.Message{}
+	receiveChan := make(chan error)
+	go func() {
+		receiveChan <- ws.ReadJSON(&resp)
+	}()
+	select {
+	case err := <-receiveChan:
+		c.Assert(err, qt.IsNil)
+	case <-time.After(5 * time.Second):
+		c.Logf("took too long to read response")
+		c.FailNow()
+	case err := <-errChan:
+		c.Fatal(err)
+	}
+
+	c.Assert(resp.Error, qt.Equals, "unauthorized access error message from controller")
+	c.Assert(resp.ErrorCode, qt.Equals, string(errors.CodeUnauthorized))
+	ws.Close()
+	<-errChan // Ensure go routines are cleaned up
 }
 
 // TestProxySocketsSSHKeys verifies that the

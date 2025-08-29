@@ -136,6 +136,7 @@ const (
 	CodeForbidden                    Code = jujuparams.CodeForbidden
 	CodeIncompatibleClouds           Code = jujuparams.CodeIncompatibleClouds
 	CodeModelNotFound                Code = jujuparams.CodeModelNotFound
+	CodeModelMigrating               Code = "model migrating"
 	CodeNotFound                     Code = jujuparams.CodeNotFound
 	CodeNotImplemented               Code = jujuparams.CodeNotImplemented
 	CodeNotSupported                 Code = jujuparams.CodeNotSupported

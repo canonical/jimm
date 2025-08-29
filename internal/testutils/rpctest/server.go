@@ -13,6 +13,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 type testDialer struct {
@@ -89,6 +91,21 @@ func Echo(c *websocket.Conn) error {
 		delete(msg, "request")
 		msg["response"] = msg["params"]
 		delete(msg, "params")
+		if err := c.WriteJSON(msg); err != nil {
+			return err
+		}
+	}
+}
+
+func Unauthorized(c *websocket.Conn) error {
+	for {
+		msg := make(map[string]interface{})
+		if err := c.ReadJSON(&msg); err != nil {
+			return err
+		}
+		msg["error"] = "unauthorized access error message from controller"
+		msg["error-code"] = errors.CodeUnauthorized
+		msg["response"] = map[string]any{}
 		if err := c.WriteJSON(msg); err != nil {
 			return err
 		}
