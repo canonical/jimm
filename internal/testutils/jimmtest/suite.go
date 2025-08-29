@@ -157,13 +157,14 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 			ControllerCredentialsStore: credentialStore,
 			JWTService:                 jwtService,
 		},
-		CredentialStore:         credentialStore,
-		Pubsub:                  &pubsub.Hub{MaxConcurrency: 10},
-		OpenFGAClient:           s.OFGAClient,
-		OAuthAuthenticator:      authenticator,
-		MigrationTokenGenerator: mockMigrationTokenGenerator{},
-		JWTService:              jwtService,
-		CrossModelQueryTimeout:  time.Second * 5,
+		CredentialStore:               credentialStore,
+		Pubsub:                        &pubsub.Hub{MaxConcurrency: 10},
+		OpenFGAClient:                 s.OFGAClient,
+		OAuthAuthenticator:            authenticator,
+		MigrationTokenGenerator:       mockMigrationTokenGenerator{},
+		JWTService:                    jwtService,
+		CrossModelQueryTimeout:        time.Second * 5,
+		BootstrapLoginTokenRefreshURL: "https://jimm.localhost/.well-known/jwks.json",
 	})
 	c.Assert(err, gc.IsNil)
 
