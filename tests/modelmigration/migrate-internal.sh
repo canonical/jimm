@@ -63,6 +63,9 @@ else
     juju add-model "$MIGRATING_MODEL_NAME"
 fi
 
+echo "Sleeping to try and resolve error 'source prechecks failed: controller: machine 0 not running (pending)'"
+sleep 30
+
 model_info=$(juju show-model "$MIGRATING_MODEL_NAME" --format json)
 echo "Model info: $model_info"
 echo "Model Status: $(juju status)"
