@@ -125,13 +125,24 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		return fmt.Errorf("failed to get credential for cloud %q: %w", c.cloud, err)
 	}
 
+	var firstCredential jujucloud.Credential
+	for _, v := range bootstrapCredential.AuthCredentials {
+		firstCredential = v
+		break
+	}
+
+	cloudCred := jujuparams.CloudCredential{
+		AuthType:   string(firstCredential.AuthType()),
+		Attributes: firstCredential.Attributes(),
+	}
+
 	req := apiparams.BootstrapStartParams{
 		CloudName:         c.cloud,
 		RegionName:        c.region,
 		ControllerName:    c.controllerName,
 		ControllerVersion: c.controllerVersion,
 		Cloud:             cloudToParams(*bootstrapCloud),
-		Credential:        *bootstrapCredential,
+		Credential:        cloudCred,
 
 		Flags: apiparams.BootstrapFlags{
 			Timeout: c.timeout,

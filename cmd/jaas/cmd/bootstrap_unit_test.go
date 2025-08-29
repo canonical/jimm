@@ -95,7 +95,9 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 	cloudName := "aws"
 
 	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
-		DefaultCredential: "default-cred-value-for-test",
+		AuthCredentials: map[string]jujucloud.Credential{
+			"default": jujucloud.NewCredential("auth-type-for-test", nil),
+		},
 	}, nil)
 	s.client.EXPECT().Bootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapStartParams) (*params.BootstrapStartResponse, error) {
 		expected := &params.BootstrapStartParams{
@@ -103,8 +105,8 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 			CloudName:      cloudName,
 			RegionName:     "region",
 			Cloud:          jujuparams.Cloud{},
-			Credential: jujucloud.CloudCredential{
-				DefaultCredential: "default-cred-value-for-test",
+			Credential: jujuparams.CloudCredential{
+				AuthType: "auth-type-for-test",
 			},
 			Flags: params.BootstrapFlags{
 				Timeout: 60,
@@ -117,9 +119,9 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 		// AWS is dynamically populated, i.e., 32 regions.
 		// So we expect just ec2 and it should be ok.
 		c.Assert(bsp.Cloud.Type, gc.DeepEquals, "ec2")
-		c.Assert(bsp.Credential, gc.DeepEquals, expected.Credential)
 		c.Assert(bsp.Flags.Timeout, gc.Equals, expected.Flags.Timeout)
 		c.Assert(bsp.ControllerVersion, gc.Equals, expected.ControllerVersion)
+		c.Assert(bsp.Credential.AuthType, gc.Equals, "auth-type-for-test")
 
 		return &params.BootstrapStartResponse{
 			JobID: "test-job-id",

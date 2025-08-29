@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -643,6 +644,14 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 		cloudNameAndRegion = fmt.Sprintf("%s/%s", req.CloudName, req.RegionName)
 	}
 
+	in := cloud.NewCredential(
+		cloud.AuthType(req.Credential.AuthType),
+		req.Credential.Attributes,
+	)
+
+	cloudCred := cloud.NewEmptyCloudCredential()
+	cloudCred.AuthCredentials["default"] = in
+
 	params := bootstrap.BootstrapParams{
 		CLIVersion: "3.6.8",
 
@@ -651,7 +660,7 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 		BootstrapTimeout:   req.Flags.Timeout,
 
 		PersonalCloud: cloudFromParams(req.CloudName, req.Cloud),
-		CloudCred:     req.Credential,
+		CloudCred:     *cloudCred,
 	}
 
 	jobID, err := r.jimm.BootstrapManager().StartBootstrap(ctx, r.user, params)
