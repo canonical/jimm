@@ -82,8 +82,9 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 			SessionCookieMaxAge: 60,
 			JWTSessionKey:       jimmtest.JWTTestSecret,
 		},
-		DashboardFinalRedirectURL: "dashboard-url",
-		CrossModelQueryTimeout:    time.Second * 5,
+		DashboardFinalRedirectURL:     "dashboard-url",
+		CrossModelQueryTimeout:        time.Second * 5,
+		BootstrapLoginTokenRefreshURL: u.String() + "/.well-known/jwks.json",
 	}
 	dsn, err := url.Parse(s.Params.DSN)
 	c.Assert(err, gc.Equals, nil)
