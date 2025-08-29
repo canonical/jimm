@@ -35,13 +35,11 @@ logs are streamed to stdout.
 Use the --detach flag to start the bootstrap job and return immediately,
 printing only the job ID, without waiting for the job to complete.
 
-The final argument, version, denotes the version of the Juju CLI
-to use for the bootstrap behind the scenes when bootstrapping via JIMM.
+The final argument, version, denotes the Juju controller to be bootstrapped.
 `
 	bootstrapExamples = `
-	juju [jaas] bootstrap <cloud[/region]> <controller name> <cli version>
+	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
-	juju [jaas] bootstrap mycloud/region mycontroller 3.6.9 --agent-version=3.6.8
 `
 )
 
@@ -53,13 +51,12 @@ type bootstrapCommand struct {
 	store            jujuclient.ClientStore
 	bootstrapAPIFunc func() (JIMMAPI, error)
 
-	cloud          string
-	region         string
-	controllerName string
-	cliVersion     string
-	agentVersion   string
-	timeout        int
-	detach         bool
+	cloud             string
+	region            string
+	controllerName    string
+	controllerVersion string
+	timeout           int
+	detach            bool
 }
 
 // NewBootstrapStartCommand returns a command to start a job
@@ -86,7 +83,7 @@ func (c *bootstrapCommand) Init(args []string) error {
 		return fmt.Errorf("cloud name %q not valid", c.cloud)
 	}
 	c.controllerName = args[1]
-	c.cliVersion = args[2]
+	c.controllerVersion = args[2]
 
 	return nil
 }
@@ -98,7 +95,6 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
-	f.StringVar(&c.agentVersion, "agent-version", "", "The version of the Juju agent to use for the bootstrap.")
 	f.IntVar(&c.timeout, "timeout", 0, "The timeout in seconds for the bootstrap operation.")
 	f.BoolVar(&c.detach, "detach", false, "If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete.")
 	// TODO(ale8k): Support passing cloud & cloudcredential files, for now we're looking up clouds and credentials added to the store.
@@ -142,16 +138,15 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	}
 
 	req := apiparams.BootstrapStartParams{
-		CloudName:      c.cloud,
-		RegionName:     c.region,
-		ControllerName: c.controllerName,
-		CLIVersion:     c.cliVersion,
-		Cloud:          cloudToParams(*bootstrapCloud),
-		Credential:     *bootstrapCredential,
+		CloudName:         c.cloud,
+		RegionName:        c.region,
+		ControllerName:    c.controllerName,
+		ControllerVersion: c.controllerVersion,
+		Cloud:             cloudToParams(*bootstrapCloud),
+		Credential:        *bootstrapCredential,
 
 		Flags: apiparams.BootstrapFlags{
-			AgentVersion: c.agentVersion,
-			Timeout:      c.timeout,
+			Timeout: c.timeout,
 		},
 	}
 
@@ -168,7 +163,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 
 	if c.detach {
 		fmt.Printf(`
-Bootstrap job started successfully.
+Bootstrap job started.
 You can track the progress via bootstrap-status with the job ID:
 	juju [jaas] bootstrap-status %s
 

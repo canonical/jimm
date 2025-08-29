@@ -200,8 +200,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 		CloudName:      "cloud",
 		RegionName:     "region",
 		Flags: params.BootstrapFlags{
-			AgentVersion: "1.0.0",
-			Timeout:      3600,
+			Timeout: 3600,
 		},
 		Cloud:             jujuparams.Cloud{},
 		Credential:        jujucloud.CloudCredential{},

@@ -43,30 +43,29 @@ func (s *bootstrapCmdSuite) TestArgParsing(c *gc.C) {
 		errMatch   string
 	}{
 		{
-			args: []string{"test-cloud", "controller-name", "cli-version"},
+			args: []string{"test-cloud", "controller-name", "controller-version"},
 			checkFlags: func(c *gc.C, command *bootstrapCommand) {
 				c.Check(command.cloud, gc.Equals, "test-cloud")
 				c.Check(command.region, gc.Equals, "")
 				c.Check(command.controllerName, gc.Equals, "controller-name")
-				c.Check(command.cliVersion, gc.Equals, "cli-version")
+				c.Check(command.controllerVersion, gc.Equals, "controller-version")
 			},
 		},
 		{
-			args: []string{"test-cloud/region", "controller-name", "cli-version"},
+			args: []string{"test-cloud/region", "controller-name", "controller-version"},
 			checkFlags: func(c *gc.C, command *bootstrapCommand) {
 				c.Check(command.cloud, gc.Equals, "test-cloud")
 				c.Check(command.region, gc.Equals, "region")
 				c.Check(command.controllerName, gc.Equals, "controller-name")
-				c.Check(command.cliVersion, gc.Equals, "cli-version")
+				c.Check(command.controllerVersion, gc.Equals, "controller-version")
 			},
 		}, {
-			args: []string{"test-cloud/region", "controller-name", "cli-version", "--agent-version=3.6.8", "--timeout=60", "--detach"},
+			args: []string{"test-cloud/region", "controller-name", "controller-version", "--timeout=60", "--detach"},
 			checkFlags: func(c *gc.C, command *bootstrapCommand) {
 				c.Check(command.cloud, gc.Equals, "test-cloud")
 				c.Check(command.region, gc.Equals, "region")
 				c.Check(command.controllerName, gc.Equals, "controller-name")
-				c.Check(command.cliVersion, gc.Equals, "cli-version")
-				c.Check(command.agentVersion, gc.Equals, "3.6.8")
+				c.Check(command.controllerVersion, gc.Equals, "controller-version")
 				c.Check(command.timeout, gc.Equals, 60)
 				c.Check(command.detach, gc.Equals, true)
 			},
@@ -108,10 +107,9 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 				DefaultCredential: "default-cred-value-for-test",
 			},
 			Flags: params.BootstrapFlags{
-				AgentVersion: "3.6.8",
-				Timeout:      60,
+				Timeout: 60,
 			},
-			CLIVersion: "cli-version",
+			ControllerVersion: "controller-version",
 		}
 		c.Assert(bsp.ControllerName, gc.Equals, expected.ControllerName)
 		c.Assert(bsp.CloudName, gc.Equals, expected.CloudName)
@@ -120,9 +118,8 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 		// So we expect just ec2 and it should be ok.
 		c.Assert(bsp.Cloud.Type, gc.DeepEquals, "ec2")
 		c.Assert(bsp.Credential, gc.DeepEquals, expected.Credential)
-		c.Assert(bsp.Flags.AgentVersion, gc.Equals, expected.Flags.AgentVersion)
 		c.Assert(bsp.Flags.Timeout, gc.Equals, expected.Flags.Timeout)
-		c.Assert(bsp.CLIVersion, gc.Equals, expected.CLIVersion)
+		c.Assert(bsp.ControllerVersion, gc.Equals, expected.ControllerVersion)
 
 		return &params.BootstrapStartResponse{
 			JobID: "test-job-id",
@@ -142,8 +139,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 	command.controllerName = "controller-name"
 	command.cloud = cloudName
 	command.region = "region"
-	command.cliVersion = "cli-version"
-	command.agentVersion = "3.6.8"
+	command.controllerVersion = "controller-version"
 	command.timeout = 60
 	command.detach = true
 
@@ -216,7 +212,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRejectsBuiltinClouds(c *gc.C) {
 	command.controllerName = "controller-name"
 	command.cloud = "localhost" // A built-in cloud.
 	command.region = "region"
-	command.cliVersion = "cli-version"
+	command.controllerVersion = "controller-version"
 
 	ctx := &cmd.Context{
 		Context: context.Background(),
@@ -245,7 +241,7 @@ func (s *bootstrapCmdSuite) TestBootstrapFailsToGetCredential(c *gc.C) {
 	command.controllerName = "controller-name"
 	command.cloud = "aws" // Need a valid cloud to reach credential error.
 	command.region = "region"
-	command.cliVersion = "cli-version"
+	command.controllerVersion = "controller-version"
 
 	ctx := &cmd.Context{
 		Context: context.Background(),

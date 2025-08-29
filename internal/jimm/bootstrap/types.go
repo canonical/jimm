@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
-	semversion "github.com/juju/version"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 )
@@ -18,7 +17,6 @@ type BootstrapParams struct {
 
 	CloudNameAndRegion string
 	ControllerName     string
-	AgentVersion       string
 	BootstrapTimeout   int
 
 	CloudCred jujucloud.CloudCredential
@@ -37,11 +35,6 @@ func (p BootstrapParams) validate() error {
 	}
 	if p.ControllerName == "" {
 		msgs = append(msgs, "controller name cannot be empty")
-	}
-	if p.AgentVersion != "" {
-		if _, err := semversion.Parse(p.AgentVersion); err != nil {
-			msgs = append(msgs, fmt.Sprintf("invalid agent version: %v", err))
-		}
 	}
 	if p.BootstrapTimeout < 0 {
 		msgs = append(msgs, "bootstrap timeout cannot be less than zero")

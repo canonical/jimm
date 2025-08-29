@@ -602,8 +602,6 @@ type BootstrapStatusResponse struct {
 // BootstrapFlags holds the flags that can be used
 // when bootstrapping a new controller.
 type BootstrapFlags struct {
-	// The agent version to use for the bootstrap.
-	AgentVersion string `json:"agent-version,omitempty"`
 	// The timeout in seconds for the bootstrap.
 	Timeout int `json:"timeout,omitempty"`
 }

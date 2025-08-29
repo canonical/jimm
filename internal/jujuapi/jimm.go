@@ -636,7 +636,6 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 
 		CloudNameAndRegion: cloudNameAndRegion,
 		ControllerName:     req.ControllerName,
-		AgentVersion:       req.Flags.AgentVersion,
 		BootstrapTimeout:   req.Flags.Timeout,
 
 		PersonalCloud: cloudFromParams(req.CloudName, req.Cloud),

@@ -180,7 +180,6 @@ func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.Use
 				// User defined command arguments
 				CloudNameAndRegion: params.CloudNameAndRegion,
 				ControllerName:     params.ControllerName,
-				AgentVersion:       params.AgentVersion,
 				BootstrapTimeout:   params.BootstrapTimeout,
 				CloudCred:          params.CloudCred,
 				PersonalCloud:      params.PersonalCloud,
