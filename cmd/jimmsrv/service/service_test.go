@@ -55,8 +55,9 @@ func newTestServiceParameters(t jimmtest.Tester) jimmsvc.Params {
 			SessionCookieMaxAge: 60,
 			JWTSessionKey:       jimmtest.JWTTestSecret,
 		},
-		DashboardFinalRedirectURL: "dashboard-url",
-		CrossModelQueryTimeout:    time.Second * 5,
+		DashboardFinalRedirectURL:     "dashboard-url",
+		CrossModelQueryTimeout:        time.Second * 5,
+		BootstrapLoginTokenRefreshURL: "https://jimm.localhost/.well-known/jwks.json",
 	}
 }
 
