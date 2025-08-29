@@ -250,12 +250,8 @@ type JujuManager interface {
 	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
 
-	// Migration related methods - these relate to internal migrations i.e. migrating between two
-	// controllers managed by JIMM as well as migrating controllers to JIMM from non-JIMM controllers.
+	// Migration related methods
 
-	// CheckInternalMigration checks if the model has been migrated from
-	// one controller managed by JIMM to another controller managed by JIMM.
-	CheckInternalMigration(ctx context.Context, errFromAPI error, m *dbmodel.Model) (bool, error)
 	// ControllerDetailsForIncomingModel retrieves details about the
 	// target controller for a model that is being migrated.
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)

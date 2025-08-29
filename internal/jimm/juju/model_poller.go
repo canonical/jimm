@@ -67,23 +67,6 @@ func (j *JujuManager) PollModels(ctx context.Context) (err error) {
 	return nil
 }
 
-// CheckInternalMigration checks if the model has been migrated from
-// one controller managed by JIMM to another controller managed by JIMM.
-func (j *JujuManager) CheckInternalMigration(ctx context.Context, errFromAPI error, m *dbmodel.Model) (bool, error) {
-	const op = errors.Op("jimm.CheckInternalMigration")
-	switch m.MigrationMode {
-	case dbmodel.MigrationModeMigrateInternal:
-		err := j.checkModelMigratedInternal(ctx, errFromAPI, m)
-		if err != nil {
-			return false, errors.E(op, err)
-		}
-		return true, nil
-	default:
-		// No action needed for other migration modes.
-		return false, nil
-	}
-}
-
 // checkModelMigratedInternal checks if the model has been migrated from
 // one controller managed by JIMM to another controller managed by JIMM.
 func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, errFromAPI error, m *dbmodel.Model) error {

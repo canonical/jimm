@@ -106,12 +106,6 @@ type LoginService interface {
 	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
 }
 
-// ModelMigrationChecker provides a way to check if a model migration is in progress
-// and potentially complete the migration if it has finished.
-type ModelMigrationChecker interface {
-	CheckModelMigrated(ctx context.Context, apiErr error, modelUUID string) bool
-}
-
 // ProxyHelpers contains all the necessary helpers for proxying a Juju client
 // connection to a model.
 type ProxyHelpers struct {
@@ -121,7 +115,6 @@ type ProxyHelpers struct {
 	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
 	LoginService            LoginService
-	MigrationChecker        ModelMigrationChecker
 	AuthenticatedIdentityID string
 	RedirectInfo            RedirectInfoGetter
 }
@@ -151,10 +144,6 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		zapctx.Error(ctx, "Missing redirect info function")
 		return errors.E(op, "Missing redirect info function")
 	}
-	if helpers.MigrationChecker == nil {
-		zapctx.Error(ctx, "Missing model migration checker function")
-		return errors.E(op, "Missing model migration checker function")
-	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
 	client := writeLockConn{conn: helpers.ConnClient}
@@ -169,7 +158,6 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			conversationId:          utils.NewConversationID(),
 			sshKeyManager:           helpers.SSHKeyManager,
 			loginService:            helpers.LoginService,
-			migrationChecker:        helpers.MigrationChecker,
 			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
 			redirectInfo:            helpers.RedirectInfo,
 		},
@@ -307,7 +295,6 @@ type modelProxy struct {
 	tokenGen                TokenGenerator
 	sshKeyManager           SSHKeyManager
 	loginService            LoginService
-	migrationChecker        ModelMigrationChecker
 	modelName               string
 	modelUUID               string
 	conversationId          string
@@ -491,14 +478,13 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 		controllerToClient := controllerProxy{
 			modelProxy: modelProxy{
-				src:              p.dst,
-				dst:              p.src,
-				msgs:             p.msgs,
-				auditLog:         p.auditLog,
-				tokenGen:         p.tokenGen,
-				modelName:        p.modelName,
-				conversationId:   p.conversationId,
-				migrationChecker: p.migrationChecker,
+				src:            p.dst,
+				dst:            p.src,
+				msgs:           p.msgs,
+				auditLog:       p.auditLog,
+				tokenGen:       p.tokenGen,
+				modelName:      p.modelName,
+				conversationId: p.conversationId,
 			},
 		}
 		p.wg.Add(1)
@@ -527,71 +513,44 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			}
 			return nil
 		}
-
-		returnMsgToClient := p.processControllerErrors(ctx, msg)
-		if !returnMsgToClient {
+		permissionsRequired, err := checkPermissionsRequired(ctx, msg)
+		if err != nil {
+			zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
+			p.handleError(msg, err)
 			continue
 		}
-
-		if err := modifyControllerResponse(msg); err != nil {
-			zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
-			p.handleError(msg, err)
-			// An error when modifying the message is a show stopper.
-			return fmt.Errorf("error modifying controller response: %w", err)
+		if permissionsRequired != nil {
+			zapctx.Error(ctx, "Access Required error")
+			if err := p.redoLogin(ctx, permissionsRequired); err != nil {
+				zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
+				p.handleError(msg, err)
+				continue
+			}
+			// Write back to the controller.
+			msg := p.msgs.getMessage(msg.RequestID)
+			if msg != nil {
+				if err := p.src.writeJson(msg); err != nil {
+					zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
+				}
+			}
+			continue
+		} else {
+			if err := modifyControllerResponse(msg); err != nil {
+				zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
+				p.handleError(msg, err)
+				// An error when modifying the message is a show stopper.
+				return fmt.Errorf("error modifying controller response: %w", err)
+			}
 		}
-
 		p.msgs.removeMessage(msg.RequestID)
 		if err := p.auditLogMessage(msg, true); err != nil {
 			zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
 		}
-
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
 			return fmt.Errorf("error writing message to client: %w", err)
 		}
 	}
-}
-
-func (p *controllerProxy) processControllerErrors(ctx context.Context, msg *message) bool {
-	returnErrToClient := true
-
-	// We might get an error back from the controller indicating that the
-	// model has been migrated. We only need to update our DB with this information,
-	// return the error to the client (or modify it to "please retry" for clarity),
-	// and then have the client retry the request.
-	migrated := p.migrationChecker.CheckModelMigrated(ctx, errors.E(errors.Code(msg.ErrorCode), msg.ErrorInfo), p.modelUUID)
-	if migrated {
-		returnErrToClient = true
-		return returnErrToClient
-	}
-
-	permissionsRequired, err := checkPermissionsRequired(ctx, msg)
-	if err != nil {
-		zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
-		p.handleError(msg, err)
-		returnErrToClient = false
-		return returnErrToClient
-	}
-	if permissionsRequired != nil {
-		zapctx.Error(ctx, "Access Required error")
-		if err := p.redoLogin(ctx, permissionsRequired); err != nil {
-			zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
-			p.handleError(msg, err)
-			returnErrToClient = false
-			return returnErrToClient
-		}
-		// Write back to the controller.
-		msg := p.msgs.getMessage(msg.RequestID)
-		if msg != nil {
-			if err := p.src.writeJson(msg); err != nil {
-				zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
-			}
-		}
-		returnErrToClient = false
-		return returnErrToClient
-	}
-	returnErrToClient = true
-	return returnErrToClient
 }
 
 func (p *controllerProxy) handleError(msg *message, err error) {

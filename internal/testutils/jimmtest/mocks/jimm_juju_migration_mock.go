@@ -17,22 +17,14 @@ import (
 )
 
 type MigrationMocks struct {
-	CheckInternalMigration_ func(ctx context.Context, errFromAPI error, m *dbmodel.Model) (bool, error)
-	Prechecks_              func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
-	AdoptResources_         func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
-	Activate_               func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
-	AbortMigration_         func(ctx context.Context, user *openfga.User, modelUUID string) error
-	CheckMachines_          func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
-	Import_                 func(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error
-	LatestLogTime_          func(ctx context.Context, modelUUID string) (time.Time, error)
-	ListMigrationTargets_   func(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
-}
-
-func (j *MigrationMocks) CheckInternalMigration(ctx context.Context, errFromAPI error, m *dbmodel.Model) (bool, error) {
-	if j.CheckInternalMigration_ == nil {
-		return false, errors.E(errors.CodeNotImplemented)
-	}
-	return j.CheckInternalMigration_(ctx, errFromAPI, m)
+	Prechecks_            func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
+	AdoptResources_       func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
+	Activate_             func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
+	AbortMigration_       func(ctx context.Context, user *openfga.User, modelUUID string) error
+	CheckMachines_        func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
+	Import_               func(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error
+	LatestLogTime_        func(ctx context.Context, modelUUID string) (time.Time, error)
+	ListMigrationTargets_ func(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
 }
 
 func (j *MigrationMocks) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
