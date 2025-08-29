@@ -60,7 +60,10 @@ fi
 # Sleep for 5 second to avoid error "machine 0 not running"
 sleep 5
 
-model_uuid=$(juju show-model "$MIGRATING_MODEL_NAME" --format json | jq -r ".[\"$MIGRATING_MODEL_NAME\"].\"model-uuid\"")
+model_info=$(juju show-model "$MIGRATING_MODEL_NAME" --format json)
+echo "Model info: $model_info"
+echo "Model Status: $(juju status)"
+model_uuid=$(echo "$model_info" | jq -r ".[\"$MIGRATING_MODEL_NAME\"].\"model-uuid\"")
 
 # Source the `JAAS` variable for executing jaas commands.
 source "local/jimm/detect-jaas.sh"
