@@ -200,29 +200,6 @@ func (s *bootstrapCmdSuite) TestBootstrapWatchLogs(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *bootstrapCmdSuite) TestBootstrapRejectsBuiltinClouds(c *gc.C) {
-	command := &bootstrapCommand{
-		bootstrapAPIFunc: func() (JIMMAPI, error) {
-			return s.client, nil
-		},
-	}
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	f.SetOutput(s.writer)
-	command.SetFlags(f)
-	command.controllerName = "controller-name"
-	command.cloud = "localhost" // A built-in cloud.
-	command.region = "region"
-	command.controllerVersion = "controller-version"
-
-	ctx := &cmd.Context{
-		Context: context.Background(),
-		Stdout:  s.writer,
-	}
-
-	err := command.Run(ctx)
-	c.Assert(err, gc.ErrorMatches, `bootstrap via JIMM does not support built-in clouds like "localhost"`)
-}
-
 func (s *bootstrapCmdSuite) TestBootstrapFailsToGetCredential(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()

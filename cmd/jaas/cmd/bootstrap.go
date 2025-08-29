@@ -10,7 +10,6 @@ import (
 	"github.com/juju/gnuflag"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
-	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -114,17 +113,6 @@ func (c *bootstrapCommand) Info() *cmd.Info {
 
 // Run implements modelcmd.Command.
 func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
-
-	// Check built in clouds like localhost (lxd).
-	builtinClouds, err := common.BuiltInClouds()
-	if err != nil {
-		return err
-	}
-
-	if _, isABuiltinCloud := builtinClouds[c.cloud]; isABuiltinCloud {
-		return fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", c.cloud)
-	}
-
 	// We use [jujucloud.CloudByName] and not [common.CloudByName] as the JIMM bootstrap
 	// will NOT support builtin clouds (localhost, microk8s, docker-desktop, etc.).
 	bootstrapCloud, err := jujucloud.CloudByName(c.cloud)

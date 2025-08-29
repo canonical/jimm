@@ -177,6 +177,20 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }
 
+func (s *jimmUnitTestSuite) TestBootstrapStart_RejectsBuiltinClouds(c *gc.C) {
+	ctx := context.Background()
+
+	jimm := &jimmtest.JIMM{}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	params := params.BootstrapStartParams{
+		CloudName: "localhost",
+	}
+
+	_, err := root.BootstrapStart(ctx, params)
+	c.Assert(err, gc.ErrorMatches, `.*bootstrap via JIMM does not support built-in clouds like "localhost"`)
+}
+
 func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	ctx := context.Background()
 	var startBootstrapErr error

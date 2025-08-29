@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -623,6 +624,17 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 
 	if !r.user.JimmAdmin {
 		return apiparams.BootstrapStartResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	// Check built in clouds like localhost (lxd).
+	builtinClouds, err := common.BuiltInClouds()
+	if err != nil {
+		return apiparams.BootstrapStartResponse{}, errors.E(op, errors.CodeIncompatibleClouds, "unauthorized")
+	}
+
+	if _, isABuiltinCloud := builtinClouds[req.CloudName]; isABuiltinCloud {
+		return apiparams.BootstrapStartResponse{},
+			errors.E(op, errors.CodeIncompatibleClouds, fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", req.CloudName))
 	}
 
 	cloudNameAndRegion := req.CloudName
