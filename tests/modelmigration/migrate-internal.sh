@@ -63,8 +63,12 @@ else
     juju add-model "$MIGRATING_MODEL_NAME"
 fi
 
-echo "Sleeping to try and resolve error 'source prechecks failed: controller: machine 0 not running (pending)'"
-sleep 30
+# I'm unable to determine exactly why this sleep is necessary but without it
+# we always get the error 'source prechecks failed: controller: machine 0 not running (pending)'
+# when starting the model migration. Even switching to the new controller and
+# running `juju wait-for machine 0 --model controller` does not help. 
+echo "Sleeping after model creation"
+sleep 20
 
 model_info=$(juju show-model "$MIGRATING_MODEL_NAME" --format json)
 echo "Model info: $model_info"
