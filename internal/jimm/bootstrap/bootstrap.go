@@ -393,11 +393,7 @@ func (b *bootstrapManager) runBootstrap(
 		return errors.E(fmt.Errorf("failed to get controller details: %w", err))
 	}
 	// TODO(ale8k): At the moment, we can't reach added k8s controllers because the controller is not reachable.
-	// The CLI spins up a kube-proxy to reach it and we could do the same. The controller details of said controller
-	// may contain proxy details and those proxy details can be used to launch a proxy to contact the controller.
-	// Accessed like so: [ctrlDetails.Proxy.Proxier.Start].
-	//
-	// As such, AddController fails.
+	// Card: https://warthogs.atlassian.net/browse/JUJU-8436
 
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	if err != nil {
