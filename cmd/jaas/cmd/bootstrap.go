@@ -56,6 +56,7 @@ type bootstrapCommand struct {
 	controllerVersion string
 	timeout           int
 	detach            bool
+	credentialName    string
 }
 
 // NewBootstrapStartCommand returns a command to start a job
@@ -96,8 +97,7 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 	})
 	f.IntVar(&c.timeout, "timeout", 0, "The timeout in seconds for the bootstrap operation.")
 	f.BoolVar(&c.detach, "detach", false, "If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete.")
-	// TODO(ale8k): Support passing cloud & cloudcredential files, for now we're looking up clouds and credentials added to the store.
-	// See cmd/juju/cloud/add.go L311 on a nice way to do this and credential will be somewhere in there too.
+	f.StringVar(&c.credentialName, "credential", "", "The name of the cloud credential to use for bootstrapping.")
 }
 
 // Info implements modelcmd.Command.
@@ -125,15 +125,20 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		return fmt.Errorf("failed to get credential for cloud %q: %w", c.cloud, err)
 	}
 
-	var firstCredential jujucloud.Credential
-	for _, v := range bootstrapCredential.AuthCredentials {
-		firstCredential = v
-		break
+	var credToUse jujucloud.Credential
+	if c.credentialName != "" {
+		cred, ok := bootstrapCredential.AuthCredentials[c.credentialName]
+		if !ok {
+			return fmt.Errorf("credential %q not found for cloud %q", c.credentialName, c.cloud)
+		}
+		credToUse = cred
+	} else {
+		credToUse = bootstrapCredential.AuthCredentials[bootstrapCredential.DefaultCredential]
 	}
 
 	cloudCred := jujuparams.CloudCredential{
-		AuthType:   string(firstCredential.AuthType()),
-		Attributes: firstCredential.Attributes(),
+		AuthType:   string(credToUse.AuthType()),
+		Attributes: credToUse.Attributes(),
 	}
 
 	req := apiparams.BootstrapStartParams{

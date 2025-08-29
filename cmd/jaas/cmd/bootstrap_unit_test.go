@@ -60,7 +60,7 @@ func (s *bootstrapCmdSuite) TestArgParsing(c *gc.C) {
 				c.Check(command.controllerVersion, gc.Equals, "controller-version")
 			},
 		}, {
-			args: []string{"test-cloud/region", "controller-name", "controller-version", "--timeout=60", "--detach"},
+			args: []string{"test-cloud/region", "controller-name", "controller-version", "--timeout=60", "--detach", "--credential=mycredential"},
 			checkFlags: func(c *gc.C, command *bootstrapCommand) {
 				c.Check(command.cloud, gc.Equals, "test-cloud")
 				c.Check(command.region, gc.Equals, "region")
@@ -68,6 +68,7 @@ func (s *bootstrapCmdSuite) TestArgParsing(c *gc.C) {
 				c.Check(command.controllerVersion, gc.Equals, "controller-version")
 				c.Check(command.timeout, gc.Equals, 60)
 				c.Check(command.detach, gc.Equals, true)
+				c.Check(command.credentialName, gc.Equals, "mycredential")
 			},
 		}, {
 			args:     []string{"test-cloud/region"},
