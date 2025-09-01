@@ -44,12 +44,6 @@ else
     CONTROLLER_NAME="$INTERNAL_MIGRATION_CONTROLLER" local/jimm/add-controller.sh
 fi
 
-# If we migrate too quickly after creating the controller,
-# we can get an error "target prechecks failed: machine 0 not running (pending)".
-echo "Ensuring new controller is ready"
-juju switch "$INTERNAL_MIGRATION_CONTROLLER"
-juju wait-for machine 0 --model controller
-
 # Switch back to JIMM controller
 juju switch "$JIMM_CONTROLLER_NAME"
 
@@ -70,10 +64,10 @@ fi
 echo "Sleeping after model creation"
 sleep 20
 
+echo 
 model_info=$(juju show-model "$MIGRATING_MODEL_NAME" --format json)
-echo "Model info: $model_info"
-echo "Model Status: $(juju status)"
 model_uuid=$(echo "$model_info" | jq -r ".[\"$MIGRATING_MODEL_NAME\"].\"model-uuid\"")
+echo "Model UUID for $MIGRATING_MODEL_NAME is $model_uuid"
 
 # Source the `JAAS` variable for executing jaas commands.
 source "local/jimm/detect-jaas.sh"
