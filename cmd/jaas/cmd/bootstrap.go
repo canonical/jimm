@@ -43,13 +43,13 @@ service if it knows it is supported by the cluster. This is performed by
 interrogating the cluster for a well known managed deployment such as microk8s,
 GKE or EKS.
 
-When bootstrapping to a k8s cluster Juju does not recognise, there's no
+When bootstrapping to a Kubernetes cluster Juju does not recognise, there's no
 guarantee a load balancer is available, so Juju defaults to a controller
 service type of ClusterIP. In the case of bootstrapping via JIMM, this will 
 not work unless JIMM is deployed within the same cluster. There are three bootstrap
 options available to tell Juju how to set up the controller service. Part of
 the solution may require a load balancer for the cluster to be set up manually
-first, or perhaps an external k8s service via a FQDN will be used
+first, or perhaps an external Kubernetes service via a FQDN will be used
 (this is a cluster specific implementation decision which Juju needs to be
 informed about so it can set things up correctly). The three relevant bootstrap
 options are (see list of bootstrap config items below for a full explanation):
@@ -64,6 +64,7 @@ other controllers for cross-model (cross-controller, actually) relations to work
 	bootstrapExamples = `
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --controller-service-type=loadbalancer
 `
 )
 
