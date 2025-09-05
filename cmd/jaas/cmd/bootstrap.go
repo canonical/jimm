@@ -35,6 +35,31 @@ Use the --detach flag to start the bootstrap job and return immediately,
 printing only the job ID, without waiting for the job to complete.
 
 The final argument, version, denotes the Juju controller to be bootstrapped.
+
+Bootstrapping to a k8s cluster requires that the service set up to handle
+requests to the controller be accessible outside the cluster. Typically this
+means a service type of LoadBalancer is needed, and Juju does create such a
+service if it knows it is supported by the cluster. This is performed by
+interrogating the cluster for a well known managed deployment such as microk8s,
+GKE or EKS.
+
+When bootstrapping to a k8s cluster Juju does not recognise, there's no
+guarantee a load balancer is available, so Juju defaults to a controller
+service type of ClusterIP. In the case of bootstrapping via JIMM, this will 
+not work unless JIMM is deployed within the same cluster. There are three bootstrap
+options available to tell Juju how to set up the controller service. Part of
+the solution may require a load balancer for the cluster to be set up manually
+first, or perhaps an external k8s service via a FQDN will be used
+(this is a cluster specific implementation decision which Juju needs to be
+informed about so it can set things up correctly). The three relevant bootstrap
+options are (see list of bootstrap config items below for a full explanation):
+
+- controller-service-type
+- controller-external-name 
+- controller-external-ips
+
+Juju advertises those addresses to other controllers (including JIMM), so they must be resolveable from
+other controllers for cross-model (cross-controller, actually) relations to work.
 `
 	bootstrapExamples = `
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
