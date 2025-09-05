@@ -322,6 +322,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			PublicAddress: ctrlDetails.PublicDNSName,
 			CACertificate: ctrlDetails.CACert,
 			Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+			TLSHostname:   "juju-apiserver",
 		},
 		gomock.Any(),
 	).Return(nil).Times(1)
@@ -940,6 +941,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 			PublicAddress: ctrlDetails.PublicDNSName,
 			CACertificate: ctrlDetails.CACert,
 			Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+			TLSHostname:   "juju-apiserver",
 		},
 		gomock.Any(),
 	).Return(
