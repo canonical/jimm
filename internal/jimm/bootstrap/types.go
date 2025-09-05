@@ -22,6 +22,14 @@ type BootstrapParams struct {
 	CloudCred jujucloud.CloudCredential
 	// PersonalCloud is the cloud-definition for a non-public cloud.
 	PersonalCloud jujucloud.Cloud
+
+	// Controller public dns address (if any) and k8s service options to expose a k8s
+	// controller.
+
+	PublicDNSAddress       string
+	ControllerServiceType  string
+	ControllerExternalIPs  string
+	ControllerExternalName string
 }
 
 // Validate checks if the BootstrapParams are valid.

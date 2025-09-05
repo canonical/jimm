@@ -32,6 +32,14 @@ type BootstrapCmdParams struct {
 	PersonalCloud jujucloud.Cloud
 	// The credential to use for the cloud.
 	CloudCred jujucloud.CloudCredential
+
+	// Controller public dns address (if any) and k8s service options to expose a k8s
+	// controller.
+
+	PublicDNSAddress       string
+	ControllerServiceType  string
+	ControllerExternalIPs  string
+	ControllerExternalName string
 }
 
 // Validate validates the BootstrapCmdParams.
@@ -80,6 +88,28 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	if b.BootstrapTimeout > 0 {
 		args = append(args, "--config")
 		args = append(args, fmt.Sprintf("bootstrap-timeout=%d", b.BootstrapTimeout))
+	}
+
+	// Simply allow the user the pass the options through, Juju will validate the
+	// permutations of these options and respond accordingly.
+	if b.ControllerServiceType != "" {
+		args = append(args, "--config")
+		args = append(args, fmt.Sprintf("controller-service-type=%s", b.ControllerServiceType))
+	}
+
+	if b.ControllerExternalIPs != "" {
+		args = append(args, "--config")
+		args = append(args, fmt.Sprintf("controller-external-ips=%s", b.ControllerExternalIPs))
+	}
+
+	if b.ControllerExternalName != "" {
+		args = append(args, "--config")
+		args = append(args, fmt.Sprintf("controller-external-name=%s", b.ControllerExternalName))
+	}
+
+	if b.PublicDNSAddress != "" {
+		args = append(args, "--config")
+		args = append(args, fmt.Sprintf("public-dns-address=%s", b.PublicDNSAddress))
 	}
 
 	// Always add controller name & cloud at the end

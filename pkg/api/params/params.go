@@ -604,6 +604,13 @@ type BootstrapStatusResponse struct {
 type BootstrapFlags struct {
 	// The timeout in seconds for the bootstrap.
 	Timeout int `json:"timeout,omitempty"`
+	// Controller public dns address (if any) and k8s service options to expose a k8s
+	// controller.
+
+	PublicDNSAddress       string `json:"public-dns-address,omitempty"`
+	ControllerServiceType  string `json:"controller-service-type,omitempty"`
+	ControllerExternalIPs  string `json:"controller-external-ips,omitempty"`
+	ControllerExternalName string `json:"controller-external-name,omitempty"`
 }
 
 // BootstrapStartParams holds parameters for starting

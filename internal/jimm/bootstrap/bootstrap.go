@@ -185,6 +185,11 @@ func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.Use
 				PersonalCloud:      params.PersonalCloud,
 				// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
 				LoginTokenRefreshURL: b.jimmWellknownJWKSEndpoint,
+
+				PublicDNSAddress:       params.PublicDNSAddress,
+				ControllerServiceType:  params.ControllerServiceType,
+				ControllerExternalIPs:  params.ControllerExternalIPs,
+				ControllerExternalName: params.ControllerExternalName,
 			},
 			DefaultBootstrapExecutor{},
 			user,
@@ -248,6 +253,14 @@ type JobParams struct {
 	// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
 
 	LoginTokenRefreshURL string
+
+	// Controller public dns address (if any) and k8s service options to expose a k8s
+	// controller.
+
+	PublicDNSAddress       string
+	ControllerServiceType  string
+	ControllerExternalIPs  string
+	ControllerExternalName string
 }
 
 // BootstrapJob returns a [jobtracker.JobFunc] [for use in the [jobtracker.Tracker]] responsible for
@@ -348,13 +361,17 @@ func (b *bootstrapManager) runBootstrap(
 		binary.FullPath,
 		p.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
-			CloudNameAndRegion:   p.CloudNameAndRegion,
-			ControllerName:       p.ControllerName,
-			AgentVersion:         p.AgentVersion,
-			BootstrapTimeout:     p.BootstrapTimeout,
-			LoginTokenRefreshURL: p.LoginTokenRefreshURL,
-			PersonalCloud:        p.PersonalCloud,
-			CloudCred:            p.CloudCred,
+			CloudNameAndRegion:     p.CloudNameAndRegion,
+			ControllerName:         p.ControllerName,
+			AgentVersion:           p.AgentVersion,
+			BootstrapTimeout:       p.BootstrapTimeout,
+			LoginTokenRefreshURL:   p.LoginTokenRefreshURL,
+			PersonalCloud:          p.PersonalCloud,
+			CloudCred:              p.CloudCred,
+			PublicDNSAddress:       p.PublicDNSAddress,
+			ControllerServiceType:  p.ControllerServiceType,
+			ControllerExternalIPs:  p.ControllerExternalIPs,
+			ControllerExternalName: p.ControllerExternalName,
 		},
 	)
 	if err != nil {
@@ -412,6 +429,7 @@ func (b *bootstrapManager) runBootstrap(
 		PublicAddress: ctrlDetails.PublicDNSName,
 		CACertificate: ctrlDetails.CACert,
 		Addresses:     dbmodel.HostPorts{jujuparams.FromProviderHostPorts(hps)},
+		TLSHostname:   "juju-apiserver",
 	}
 
 	account, err := clientStore.AccountDetails(p.ControllerName)
