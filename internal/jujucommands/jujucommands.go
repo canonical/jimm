@@ -33,7 +33,7 @@ type CommandRunner struct {
 	jujuDataDir string
 }
 
-// NewCommandRunner creates a new CommandRunner with the specified command command.
+// NewCommandRunner creates a new CommandRunner with the specified command.
 //
 // dataDir is the JUJU_DATA directory where juju commands will store their data.
 // It must be an ABSOLUTE path.

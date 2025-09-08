@@ -23,7 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
-	"github.com/canonical/jimm/v3/internal/jimm/bootstrap/mocks"
+	bootstrapmocks "github.com/canonical/jimm/v3/internal/jimm/bootstrap/mocks"
 	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/jujucommands"
@@ -79,28 +79,36 @@ func assertJobError(c *qt.C, s *bootstrapManagerSuite, id uuid.UUID, errStr stri
 	c.Assert(entry.Error, qt.Equals, errStr)
 }
 
-func setupMocks(c *qt.C) (
+type bootstrapMocks struct {
+	store          *bootstrapmocks.MockStore
+	jujuManager    *bootstrapmocks.MockJujuManager
+	binaryStore    *bootstrapmocks.MockBinaryStore
+	commandFactory *bootstrapmocks.MockCommandFactory
+	clientStore    *bootstrapmocks.MockClientStore
+	executor       *bootstrapmocks.MockJujuCommands
+}
+
+func setupTest(c *qt.C) (
 	*gomock.Controller,
-	*mocks.MockStore,
-	*mocks.MockJujuManager,
-	*mocks.MockBinaryStore,
-	*mocks.MockBootstrapExecutor,
-	*mocks.MockClientStore,
+	bootstrapMocks,
 	*openfga.User,
 ) {
 	ctrl := gomock.NewController(c)
 
-	store := mocks.NewMockStore(ctrl)
-	jujuManager := mocks.NewMockJujuManager(ctrl)
-	binaryStore := mocks.NewMockBinaryStore(ctrl)
-	executor := mocks.NewMockBootstrapExecutor(ctrl)
-	clientStore := mocks.NewMockClientStore(ctrl)
+	m := bootstrapMocks{
+		store:          bootstrapmocks.NewMockStore(ctrl),
+		jujuManager:    bootstrapmocks.NewMockJujuManager(ctrl),
+		binaryStore:    bootstrapmocks.NewMockBinaryStore(ctrl),
+		commandFactory: bootstrapmocks.NewMockCommandFactory(ctrl),
+		clientStore:    bootstrapmocks.NewMockClientStore(ctrl),
+		executor:       bootstrapmocks.NewMockJujuCommands(ctrl),
+	}
 
 	i, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	user := openfga.NewUser(i, nil)
 
-	return ctrl, store, jujuManager, binaryStore, executor, clientStore, user
+	return ctrl, m, user
 }
 
 func (s *bootstrapManagerSuite) Init(c *qt.C) {
@@ -124,10 +132,10 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	write := make(chan struct{})
 	defer close(write)
 
-	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
+	ctrl, mocks, _ := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	numLogs := 101
@@ -180,10 +188,10 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 
 func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C) {
 	ctx := c.Context()
-	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
+	ctrl, mocks, _ := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	jobId, err := s.jobTracker.Run(ctx,
@@ -211,10 +219,10 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.
 	ctx := c.Context()
 	jobId := uuid.New()
 
-	ctrl, _, jujuManager, binaryStore, _, _, _ := setupMocks(c)
+	ctrl, mocks, _ := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	_, err = manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
@@ -235,22 +243,22 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 		binary.Done()
 	})
 
-	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -260,11 +268,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	).Return(
 		binary,
 		nil,
-	).Times(1)
-	executor.EXPECT().RunWrapper(
+	)
+	mocks.executor.EXPECT().Bootstrap(
 		gomock.Any(),
-		binaryPath,
-		jobParams.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
 			ControllerName:       jobParams.ControllerName,
@@ -281,15 +287,17 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			close(outputCh)
 			return outputCh
 		}(),
-		clientStore,
+		mocks.clientStore,
 		func() {
 			cleanupCalled = true
 		},
 		nil,
-	).Times(1)
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -300,11 +308,11 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 		PublicDNSName:  "I am not a public DNS, I am a private DNS",
 		CACert:         "Very secure CA cert, promise",
 	}
-	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+	mocks.clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
 		ctrlDetails,
 		nil,
-	).Times(1)
-	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+	)
+	mocks.clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
 		&jujuclient.AccountDetails{
 			User:     "diglett",
 			Password: "diglett's password",
@@ -313,7 +321,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 	)
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	c.Assert(err, qt.IsNil)
-	jujuManager.EXPECT().AddController(
+	mocks.jujuManager.EXPECT().AddController(
 		gomock.Any(),
 		user,
 		&dbmodel.Controller{
@@ -325,12 +333,12 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			TLSHostname:   "juju-apiserver",
 		},
 		gomock.Any(),
-	).Return(nil).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	).Return(nil)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -351,18 +359,18 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 func (s *bootstrapManagerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 	testCtx := c.Context()
 
-	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(errors.E("bootstrap lock is already held")).Times(1)
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(errors.E("bootstrap lock is already held"))
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -381,23 +389,23 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_FailsToLock(c *qt.C) {
 func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerExists(c *qt.C) {
 	testCtx := c.Context()
 
-	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
-	).Return(nil).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	).Return(nil)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -416,23 +424,23 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerExists(c *qt.C) {
 func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerRetrievalFails(c *qt.C) {
 	testCtx := c.Context()
 
-	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
-	).Return(errors.E("oh noes, we couldnt'se get the controller")).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	).Return(errors.E("oh noes, we couldnt'se get the controller"))
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -451,21 +459,22 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ControllerRetrievalFails(c *qt.
 func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 	testCtx := c.Context()
 
-	ctrl, store, jujuManager, binaryStore, executor, _, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -475,12 +484,12 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 	).Return(
 		nil,
 		errors.E("test error"),
-	).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -496,26 +505,27 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 	assertJobError(c, s, id, "failed to get Juju binary: test error")
 }
 
-func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C) {
+func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorFails(c *qt.C) {
 	testCtx := c.Context()
 
 	binaryPath := "/faketmp/juju"
 
-	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -525,11 +535,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
 		nil,
-	).Times(1)
-	executor.EXPECT().RunWrapper(
+	)
+	mocks.executor.EXPECT().Bootstrap(
 		gomock.Any(),
-		binaryPath,
-		jobParams.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
 			ControllerName:       jobParams.ControllerName,
@@ -543,16 +551,17 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorRunWrapperFails(c *qt.C
 		func() chan jujucommands.OutputLine {
 			return nil
 		}(),
-		clientStore,
+		mocks.clientStore,
 		func() {},
 		errors.E("executor test error"),
-	).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -574,22 +583,22 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	binaryPath := "/faketmp/juju"
 	testOutputLineError := "command exited code 1"
 
-	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -599,11 +608,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
 		nil,
-	).Times(1)
-	executor.EXPECT().RunWrapper(
+	)
+	mocks.executor.EXPECT().Bootstrap(
 		gomock.Any(),
-		binaryPath,
-		jobParams.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
 			ControllerName:       jobParams.ControllerName,
@@ -620,18 +627,20 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 			close(outputCh)
 			return outputCh
 		}(),
-		clientStore,
+		mocks.clientStore,
 		func() {
 			cleanupCalled = true
 		},
 		nil,
-	).Times(1)
-	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLineError).Return(nil).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -644,7 +653,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "run bootstrap failed: bootstrap command failed: command exited code 1")
+	assertJobError(c, s, id, "run bootstrap failed: command failed: command exited code 1")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
@@ -654,22 +663,22 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	binaryPath := "/faketmp/juju"
 	testOutputLine := "test-line"
 
-	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -679,11 +688,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
 		nil,
-	).Times(1)
-	executor.EXPECT().RunWrapper(
+	)
+	mocks.executor.EXPECT().Bootstrap(
 		gomock.Any(),
-		binaryPath,
-		jobParams.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
 			ControllerName:       jobParams.ControllerName,
@@ -700,15 +707,17 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 			close(outputCh)
 			return outputCh
 		}(),
-		clientStore,
+		mocks.clientStore,
 		func() {
 			cleanupCalled = true
 		},
 		nil,
-	).Times(1)
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -719,19 +728,33 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 		PublicDNSName:  "I am not a public DNS, I am a private DNS",
 		CACert:         "Very secure CA cert, promise",
 	}
-	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+	mocks.clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
 		ctrlDetails,
 		nil,
-	).Times(1)
-	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+	)
+	mocks.clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
 		nil,
 		errors.E("client store failed to get account details"),
 	)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	mocks.executor.EXPECT().DestroyController(
+		gomock.Any(),
+		jujucommands.DestroyControllerCmdParams{
+			ControllerName: jobParams.ControllerName,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		nil,
+	)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -744,7 +767,11 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "run bootstrap failed: failed to get account details for controller a: client store failed to get account details")
+	assertJobError(c,
+		s,
+		id,
+		"run bootstrap failed: error post-bootstrap: failed to get account details for controller a: client store failed to get account details\n"+
+			"the controller has been automatically destroyed")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
@@ -754,22 +781,22 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	binaryPath := "/faketmp/juju"
 	testOutputLine := "test-line"
 
-	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -779,11 +806,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
 		nil,
-	).Times(1)
-	executor.EXPECT().RunWrapper(
+	)
+	mocks.executor.EXPECT().Bootstrap(
 		gomock.Any(),
-		binaryPath,
-		jobParams.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
 			ControllerName:       jobParams.ControllerName,
@@ -800,15 +825,17 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 			close(outputCh)
 			return outputCh
 		}(),
-		clientStore,
+		mocks.clientStore,
 		func() {
 			cleanupCalled = true
 		},
 		nil,
-	).Times(1)
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -819,19 +846,33 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 		PublicDNSName:  "I am not a public DNS, I am a private DNS",
 		CACert:         "Very secure CA cert, promise",
 	}
-	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+	mocks.clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
 		ctrlDetails,
 		nil,
-	).Times(1)
-	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+	)
+	mocks.clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
 		nil,
 		errors.E("account details test error"),
 	)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	mocks.executor.EXPECT().DestroyController(
+		gomock.Any(),
+		jujucommands.DestroyControllerCmdParams{
+			ControllerName: jobParams.ControllerName,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		nil,
+	)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -844,7 +885,11 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "run bootstrap failed: failed to get account details for controller a: account details test error")
+	assertJobError(c,
+		s,
+		id,
+		"run bootstrap failed: error post-bootstrap: failed to get account details for controller a: account details test error\n"+
+			"the controller has been automatically destroyed")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
@@ -854,22 +899,22 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	binaryPath := "/faketmp/juju"
 	testOutputLine := "test-line"
 
-	ctrl, store, jujuManager, binaryStore, executor, clientStore, user := setupMocks(c)
+	ctrl, mocks, user := setupTest(c)
 	defer ctrl.Finish()
 
-	manager, err := bootstrap.NewBootstrapManager(store, s.jobTracker, jujuManager, binaryStore, loginTokenRefreshURLParam)
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
 	// Mocked in order of execution:
 	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
-	store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-	store.EXPECT().GetController(
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
 	).Return(
 		errors.E(errors.CodeNotFound, errors.E("test err")),
-	).Times(1)
-	binaryStore.EXPECT().Get(
+	)
+	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
 			Version: jobParams.CLIVersion,
@@ -879,11 +924,9 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	).Return(
 		&jujuclistore.Binary{FullPath: binaryPath},
 		nil,
-	).Times(1)
-	executor.EXPECT().RunWrapper(
+	)
+	mocks.executor.EXPECT().Bootstrap(
 		gomock.Any(),
-		binaryPath,
-		jobParams.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
 			ControllerName:       jobParams.ControllerName,
@@ -900,15 +943,17 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 			close(outputCh)
 			return outputCh
 		}(),
-		clientStore,
+		mocks.clientStore,
 		func() {
 			cleanupCalled = true
 		},
 		nil,
-	).Times(1)
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), testOutputLine).Return(nil).Times(1)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -919,11 +964,11 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 		PublicDNSName:  "I am not a public DNS, I am a private DNS",
 		CACert:         "Very secure CA cert, promise",
 	}
-	clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+	mocks.clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
 		ctrlDetails,
 		nil,
-	).Times(1)
-	clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+	)
+	mocks.clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
 		&jujuclient.AccountDetails{
 			User:     "diglett",
 			Password: "diglett's password",
@@ -932,7 +977,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	)
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	c.Assert(err, qt.IsNil)
-	jujuManager.EXPECT().AddController(
+	mocks.jujuManager.EXPECT().AddController(
 		gomock.Any(),
 		user,
 		&dbmodel.Controller{
@@ -946,12 +991,26 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 		gomock.Any(),
 	).Return(
 		errors.E("add controller test error"),
-	).Times(1)
-	store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil).Times(1)
+	)
+	mocks.executor.EXPECT().DestroyController(
+		gomock.Any(),
+		jujucommands.DestroyControllerCmdParams{
+			ControllerName: jobParams.ControllerName,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		nil,
+	)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
 		jobParams,
-		executor,
+		mocks.commandFactory,
 		user,
 	)
 
@@ -964,15 +1023,142 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 	c.Assert(err, qt.IsNil)
 
 	pollJob(c, s, id, dbmodel.StatusFailed)
-	assertJobError(c, s, id, "run bootstrap failed: failed to add controller to JIMM: add controller test error")
+	assertJobError(c,
+		s,
+		id,
+		"run bootstrap failed: error post-bootstrap: failed to add controller to JIMM: add controller test error\n"+
+			"the controller has been automatically destroyed")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
-//go:generate mockgen -destination=./mocks/store.go -package=mocks . Store
-//go:generate mockgen -destination=./mocks/jujumanager.go -package=mocks . JujuManager
-//go:generate mockgen -destination=./mocks/binarystore.go -package=mocks . BinaryStore
-//go:generate mockgen -destination=./mocks/bootstrapexecutor.go -package=mocks . BootstrapExecutor
-//go:generate mockgen -destination=./mocks/jujuclientstore.go -package=mocks github.com/juju/juju/jujuclient ClientStore
+func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.C) {
+	testCtx := c.Context()
+
+	binaryPath := "/faketmp/juju"
+	testOutputLine := "test-line"
+
+	ctrl, mocks, user := setupTest(c)
+	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
+	c.Assert(err, qt.IsNil)
+
+	// Mocked in order of execution:
+	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
+		gomock.Any(),
+		&dbmodel.Controller{Name: jobParams.ControllerName},
+	).Return(
+		errors.E(errors.CodeNotFound, errors.E("test err")),
+	)
+	mocks.binaryStore.EXPECT().Get(
+		gomock.Any(),
+		jujuclistore.JujuBinarySpec{
+			Version: jobParams.CLIVersion,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
+		},
+	).Return(
+		&jujuclistore.Binary{FullPath: binaryPath},
+		nil,
+	)
+	mocks.executor.EXPECT().Bootstrap(
+		gomock.Any(),
+		jujucommands.BootstrapCmdParams{
+			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
+			ControllerName:       jobParams.ControllerName,
+			AgentVersion:         jobParams.AgentVersion,
+			BootstrapTimeout:     jobParams.BootstrapTimeout,
+			LoginTokenRefreshURL: jobParams.LoginTokenRefreshURL,
+			PersonalCloud:        jobParams.PersonalCloud,
+			CloudCred:            jobParams.CloudCred,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		mocks.clientStore,
+		func() {
+			cleanupCalled = true
+		},
+		nil,
+	)
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	ctrlDetails := &jujuclient.ControllerDetails{
+		APIEndpoints: []string{
+			"10.0.0.1:17070",
+			"172.0.0.1:17070",
+			"192.0.0.1:17070",
+		},
+		ControllerUUID: "I am actually a uuid, I promise",
+		PublicDNSName:  "I am not a public DNS, I am a private DNS",
+		CACert:         "Very secure CA cert, promise",
+	}
+	mocks.clientStore.EXPECT().ControllerByName(jobParams.ControllerName).Return(
+		ctrlDetails,
+		nil,
+	)
+	mocks.clientStore.EXPECT().AccountDetails(jobParams.ControllerName).Return(
+		&jujuclient.AccountDetails{
+			User:     "diglett",
+			Password: "diglett's password",
+		},
+		nil,
+	)
+	mocks.jujuManager.EXPECT().AddController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		errors.E("add controller test error"),
+	)
+	mocks.executor.EXPECT().DestroyController(
+		gomock.Any(),
+		jujucommands.DestroyControllerCmdParams{
+			ControllerName: jobParams.ControllerName,
+		},
+	).Return(
+		func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
+			close(outputCh)
+			return outputCh
+		}(),
+		nil,
+	)
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
+
+	job := manager.BootstrapJob(
+		jobParams,
+		mocks.commandFactory,
+		user,
+	)
+
+	id, err := s.jobTracker.Run(
+		testCtx,
+		"test-job-type",
+		job,
+		time.Second*1000,
+	)
+	c.Assert(err, qt.IsNil)
+
+	pollJob(c, s, id, dbmodel.StatusFailed)
+	assertJobError(c,
+		s,
+		id,
+		"run bootstrap failed: error post-bootstrap: failed to add controller to JIMM: add controller test error\n"+
+			"the controller has been automatically destroyed")
+	c.Assert(cleanupCalled, qt.IsTrue)
+}
+
+//go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
+//go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
+//go:generate mockgen -typed -destination=./mocks/binarystore.go -package=mocks . BinaryStore
+//go:generate mockgen -typed -destination=./mocks/commandfactory.go -package=mocks . CommandFactory
+//go:generate mockgen -typed -destination=./mocks/jujucommands.go -package=mocks . JujuCommands
+//go:generate mockgen -typed -destination=./mocks/jujuclientstore.go -package=mocks github.com/juju/juju/jujuclient ClientStore
 func TestBootstrapManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &bootstrapManagerSuite{})
 }

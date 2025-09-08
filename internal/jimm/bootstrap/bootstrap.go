@@ -18,6 +18,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -70,6 +71,18 @@ type JujuManager interface {
 // BinaryStore defines the binary store methods required by the job.
 type BinaryStore interface {
 	Get(ctx context.Context, spec jujuclistore.JujuBinarySpec) (*jujuclistore.Binary, error)
+}
+
+// JujuCommands defines the Juju CLI methods that the bootstrap job requires.
+type JujuCommands interface {
+	Bootstrap(ctx context.Context, p jujucommands.BootstrapCmdParams) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error)
+	DestroyController(ctx context.Context, p jujucommands.DestroyControllerCmdParams) (<-chan jujucommands.OutputLine, error)
+}
+
+// CommandFactory is a wrapper for mocking Juju commands, with a concrete
+// implementation in [commandFactory].
+type CommandFactory interface {
+	New(binaryPath, jujuDataDir string) JujuCommands
 }
 
 type bootstrapManager struct {
@@ -191,7 +204,7 @@ func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.Use
 				ControllerExternalIPs:  params.ControllerExternalIPs,
 				ControllerExternalName: params.ControllerExternalName,
 			},
-			DefaultBootstrapExecutor{},
+			commandFactory{},
 			user,
 		),
 		maxBootstrapDuration,
@@ -203,23 +216,41 @@ func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.Use
 	return jobId.String(), nil
 }
 
-// BootstrapExecutor holds a wrapper to run a command. It is primarily for testing
-// and when running the bootstrap command the implemention to be used is [DefaultBootstrapExecutor].
-type BootstrapExecutor interface {
-	RunWrapper(
-		ctx context.Context,
-		binaryPath, jujuDataDir string,
-		params jujucommands.BootstrapCmdParams,
-	) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error)
+type command struct {
+	binaryPath  string
+	jujuDataDir string
 }
 
-// DefaultBootstrapExecutor defines the default, and expected bootstrap executor
+// Bootstrap implements the JujuCommands interface.
+func (c command) Bootstrap(ctx context.Context, p jujucommands.BootstrapCmdParams) (
+	<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error) {
+
+	r := jujucommands.NewCommandRunner(c.binaryPath, c.jujuDataDir)
+	return jujucommands.NewBootstrapCmd(r).Run(ctx, p)
+}
+
+// DestroyController implements the JujuCommands interface.
+func (c command) DestroyController(ctx context.Context, p jujucommands.DestroyControllerCmdParams) (
+	<-chan jujucommands.OutputLine, error) {
+
+	r := jujucommands.NewCommandRunner(c.binaryPath, c.jujuDataDir)
+	return jujucommands.NewDestroyControllerCmd(r).Run(ctx, p)
+}
+
+// commandFactory provides a concrete implementation of [CommandFactory]
 // to be used in a [bootstrapManager.BootstrapJob]
-type DefaultBootstrapExecutor struct{}
+type commandFactory struct{}
+
+func (h commandFactory) New(binaryPath, jujuDataDir string) JujuCommands {
+	return command{
+		binaryPath:  binaryPath,
+		jujuDataDir: jujuDataDir,
+	}
+}
 
 // RunWrapper wraps the command runner and bootstrap command to be run, and then runs it for you.
 // This enables the running portion of the BootstrapJob to be mocked.
-func (h DefaultBootstrapExecutor) RunWrapper(
+func (h commandFactory) RunWrapper(
 	ctx context.Context,
 	binaryPath, jujuDataDir string,
 	params jujucommands.BootstrapCmdParams,
@@ -267,7 +298,7 @@ type JobParams struct {
 // bootstrapping a controller and adding it to JIMM.
 func (b *bootstrapManager) BootstrapJob(
 	p JobParams,
-	executor BootstrapExecutor,
+	cmdFactory CommandFactory,
 	user *openfga.User,
 ) jobtracker.JobFunc {
 	return func(jobCtx context.Context) error {
@@ -276,14 +307,14 @@ func (b *bootstrapManager) BootstrapJob(
 			return fmt.Errorf("failed to get job ID from context")
 		}
 
-		logCtx := zapctx.WithFields(
+		jobCtx = zapctx.WithFields(
 			jobCtx,
 			zap.String("job-id", jobId.String()),
 			zap.String("controller-name", p.ControllerName),
 		)
 
 		zapctx.Debug(
-			logCtx,
+			jobCtx,
 			"starting bootstrap job",
 		)
 
@@ -291,7 +322,7 @@ func (b *bootstrapManager) BootstrapJob(
 		// before being killed.
 		if err := b.store.LockBootstrap(jobCtx, jujucommands.CommandKillDelay); err != nil {
 			zapctx.Error(
-				logCtx,
+				jobCtx,
 				"failed to acquire bootstrap lock",
 				zap.Error(err),
 			)
@@ -301,7 +332,7 @@ func (b *bootstrapManager) BootstrapJob(
 		defer func() {
 			if err := b.store.UnlockBootstrap(jobCtx); err != nil {
 				zapctx.Error(
-					logCtx,
+					jobCtx,
 					"failed to unlock bootstrap lock",
 					zap.Error(err),
 				)
@@ -319,7 +350,9 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
-		// TODO(ale8k): When downloading, it takes a while and the CLI has no output. Download progress would be a VERY nice to have here.
+		_ = b.store.AddBootstrapLog(jobCtx, jobId,
+			fmt.Sprintf("Downloading the Juju CLI, version %s for bootstrap. This may take a few minutes", p.CLIVersion))
+
 		binary, err := b.binaryStore.Get(
 			jobCtx,
 			jujuclistore.JujuBinarySpec{
@@ -335,10 +368,12 @@ func (b *bootstrapManager) BootstrapJob(
 		if err != nil {
 			return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
 		}
-		zapctx.Debug(logCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
+		zapctx.Debug(jobCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 		defer binaryDone(binary)
 
-		if err := b.runBootstrap(jobCtx, p, jobId, executor, binary, user); err != nil {
+		jujuCmds := cmdFactory.New(binary.FullPath, p.JujuDataDir)
+
+		if err := b.runBootstrap(jobCtx, p, jobId, jujuCmds, user); err != nil {
 			return errors.E(fmt.Errorf("run bootstrap failed: %w", err))
 		}
 		return nil
@@ -357,14 +392,12 @@ func (b *bootstrapManager) runBootstrap(
 	jobCtx context.Context,
 	p JobParams,
 	jobId uuid.UUID,
-	executor BootstrapExecutor,
-	binary *jujuclistore.Binary,
+	executor JujuCommands,
 	user *openfga.User,
 ) error {
-	outputCh, clientStore, cleanup, err := executor.RunWrapper(
+
+	outputCh, clientStore, cleanup, err := executor.Bootstrap(
 		jobCtx,
-		binary.FullPath,
-		p.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
 			CloudNameAndRegion:     p.CloudNameAndRegion,
 			ControllerName:         p.ControllerName,
@@ -384,39 +417,38 @@ func (b *bootstrapManager) runBootstrap(
 	}
 	defer cleanup()
 
-	// For the following code, we want it to keep running
-	// and logging failures even when the jobCtx is cancelled, i.e.,
-	// in the case of running bootstrap-stop.
-	// As such, we use an independent storeCtx
-	// for the erroneous logs.
-	storeCtx := context.Background()
+	// Create a new context that is not cancelled when the jobCtx is cancelled.
+	// This ensures that we still capture output from the bootstrap command
+	// and log it if the command is cancelled while keeping things like
+	// log info that was set on the context.
+	jobCtx = context.WithoutCancel(jobCtx)
 
-	for output := range outputCh {
-		if output.Err != nil {
-			if writeLogErr := b.store.AddBootstrapLog(
-				storeCtx,
-				jobId,
-				output.Err.Error(),
-			); writeLogErr != nil {
-				zapctx.Error(storeCtx, "failed to write bootstrap error", zap.Error(writeLogErr), zap.String("jobId", jobId.String()))
-			}
-			return errors.E(fmt.Errorf("bootstrap command failed: %w", output.Err))
+	err = b.consumeCommandOutput(jobCtx, outputCh, jobId)
+	if err != nil {
+		return err
+	}
+
+	// controllerCleanup is a helper function to cleanup the controller if we fail at any point
+	// after the bootstrap, avoiding orphaned controllers in the cloud.
+	controllerCleanup := func(err error, controllerDetails *jujuclient.ControllerDetails) error {
+		cleanupErr := b.tryCleanupController(jobCtx, executor, jobId, p.ControllerName)
+		if cleanupErr == nil {
+			return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
+				"the controller has been automatically destroyed", err))
 		}
-		if writeLogErr := b.store.AddBootstrapLog(
-			storeCtx,
-			jobId,
-			output.Line,
-		); writeLogErr != nil {
-			// If we fail to write the log, we log the error but continue.
-			// This is because the bootstrap process may still succeed, and we
-			// don't want to fail the entire job just because we couldn't log.
-			zapctx.Error(
-				storeCtx,
-				"failed to write bootstrap log",
-				zap.Error(writeLogErr),
-				zap.String("jobId", jobId.String()),
-			)
+		var controllerDetailsStr string
+		if controllerDetails != nil {
+			res, _ := yaml.Marshal(controllerDetails)
+			controllerDetailsStr = string(res)
 		}
+
+		zapctx.Error(jobCtx, "failed to cleanup controller after failing to add it to JIMM", zap.Error(err))
+
+		return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
+			"automatic cleanup of the controller also failed: %w\n"+
+			"WARNING: manual attach to JIMM or cleanup of the controller is required.\n"+
+			"Controller details:\n%s", err, cleanupErr, controllerDetailsStr))
+
 	}
 
 	// We could use .CurrentController, but should bootstrap change their behaviour
@@ -424,14 +456,12 @@ func (b *bootstrapManager) runBootstrap(
 	// getting the controller by name.
 	ctrlDetails, err := clientStore.ControllerByName(p.ControllerName)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to get controller details: %w", err))
+		return controllerCleanup(fmt.Errorf("failed to get controller details: %w", err), nil)
 	}
-	// TODO(ale8k): At the moment, we can't reach added k8s controllers because the controller is not reachable.
-	// Card: https://warthogs.atlassian.net/browse/JUJU-8436
 
 	hps, err := network.ParseProviderHostPorts(ctrlDetails.APIEndpoints...)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to parse API endpoints for controller: %w", err))
+		return controllerCleanup(fmt.Errorf("failed to parse API endpoints for controller: %w", err), ctrlDetails)
 	}
 	for i := range hps {
 		// Mark all the unknown scopes public.
@@ -451,29 +481,58 @@ func (b *bootstrapManager) runBootstrap(
 
 	account, err := clientStore.AccountDetails(p.ControllerName)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to get account details for controller %s: %w", p.ControllerName, err))
+		return controllerCleanup(fmt.Errorf("failed to get account details for controller %s: %w", p.ControllerName, err), ctrlDetails)
 	}
 	dbCtrlCreds := juju.ControllerCreds{
 		AdminIdentityName: account.User,
 		AdminPassword:     account.Password,
 	}
-	// TODO(ale8k): Fix this...
-	// If the controller cannot be reached, we'll end up with dangling resources to a now no-longer accessible controller (from the clients perspective).
-	// So... Find a nice way to remove controllers if the add fail / clean up dangling ones later.
-	// Once fixed, this can be tested by just making the controller addr something that doesn't exist, and we can test the solution.
-
-	// We use store context here as there's a small chance that somebody
-	// could cancel the context between the controller being successfully bootstrapped
-	// and adding the controller, in which case we'd be left with a bootstrapped
-	// controller that JIMM isn't aware of.
 	if err := b.jujuManager.AddController(
-		storeCtx,
+		jobCtx,
 		user,
 		&dbCtrl,
 		dbCtrlCreds,
 	); err != nil {
-		return errors.E(fmt.Errorf("failed to add controller to JIMM: %w", err))
+		return controllerCleanup(fmt.Errorf("failed to add controller to JIMM: %w", err), ctrlDetails)
 	}
 
 	return nil
+}
+
+func (b *bootstrapManager) tryCleanupController(ctx context.Context, jujuCmd JujuCommands, jobID uuid.UUID, controllerName string) error {
+	outputCh, err := jujuCmd.DestroyController(
+		ctx,
+		jujucommands.DestroyControllerCmdParams{
+			ControllerName: controllerName,
+		},
+	)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to run destroy-controller command: %w", err))
+	}
+
+	err = b.consumeCommandOutput(ctx, outputCh, jobID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-chan jujucommands.OutputLine, jobId uuid.UUID) error {
+	for output := range outputCh {
+		if output.Err != nil {
+			b.writeBootstrapLog(ctx, jobId, output.Err.Error())
+			return errors.E(fmt.Errorf("command failed: %w", output.Err))
+		}
+		b.writeBootstrapLog(ctx, jobId, output.Line)
+	}
+	return nil
+}
+
+// writeBootstrapLog writes logs to the store to eventually be displayed to users.
+// Errors are masked but logged to avoid failing the bootstrap process.
+func (b *bootstrapManager) writeBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) {
+	if err := b.store.AddBootstrapLog(ctx, jobId, logLine); err != nil {
+		zapctx.Error(ctx, "failed to write bootstrap log", zap.Error(err), zap.String("jobId", jobId.String()))
+	}
 }
