@@ -7,10 +7,18 @@ package jujucommands
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
+	"time"
 
+	"github.com/juju/zaputil/zapctx"
 	"github.com/mitchellh/go-linereader"
+	"go.uber.org/zap"
+)
+
+const (
+	CommandKillDelay = time.Minute * 40
 )
 
 // OutputLine represents a line of output from a juju command.
@@ -51,7 +59,19 @@ func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan O
 	// G204: Subprocess launched with a potential tainted input or cmd arguments (gosec)
 	// We manage the args via specific <command>.go files, so the args are not tainted.
 	cmd := exec.CommandContext(ctx, b.command, args...)
+
+	// If the terminate takes very long, the WaitDelay
+	// will kick in and kill the process. We set it to the same
+	// as our bootstrap lock.
+	cmd.WaitDelay = CommandKillDelay
 	cmd.Env = append(cmd.Env, "JUJU_DATA="+b.jujuDataDir)
+	cmd.Cancel = func() error {
+		err := cmd.Process.Signal(os.Interrupt)
+		if err != nil {
+			zapctx.Error(ctx, "failed to send interrupt signal to command", zap.Error(err))
+		}
+		return err
+	}
 
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
@@ -74,12 +94,9 @@ func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan O
 
 	readLines := func(r *linereader.Reader) {
 		defer wg.Done()
+
 		for line := range r.Ch {
-			select {
-			case outputCh <- OutputLine{Line: line}:
-			case <-ctx.Done():
-				return
-			}
+			outputCh <- OutputLine{Line: line}
 		}
 	}
 

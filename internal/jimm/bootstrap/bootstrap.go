@@ -270,16 +270,14 @@ func (b *bootstrapManager) BootstrapJob(
 	executor BootstrapExecutor,
 	user *openfga.User,
 ) jobtracker.JobFunc {
-	const bootstrapLockTTL = 40 * time.Minute
-
-	return func(ctx context.Context) error {
-		jobId, ok := jobtracker.JobIdFromContext(ctx)
+	return func(jobCtx context.Context) error {
+		jobId, ok := jobtracker.JobIdFromContext(jobCtx)
 		if !ok {
 			return fmt.Errorf("failed to get job ID from context")
 		}
 
 		logCtx := zapctx.WithFields(
-			ctx,
+			jobCtx,
 			zap.String("job-id", jobId.String()),
 			zap.String("controller-name", p.ControllerName),
 		)
@@ -289,7 +287,9 @@ func (b *bootstrapManager) BootstrapJob(
 			"starting bootstrap job",
 		)
 
-		if err := b.store.LockBootstrap(ctx, bootstrapLockTTL); err != nil {
+		// Lock the bootstrap for the same length the process is allowed to run for
+		// before being killed.
+		if err := b.store.LockBootstrap(jobCtx, jujucommands.CommandKillDelay); err != nil {
 			zapctx.Error(
 				logCtx,
 				"failed to acquire bootstrap lock",
@@ -299,7 +299,7 @@ func (b *bootstrapManager) BootstrapJob(
 		}
 
 		defer func() {
-			if err := b.store.UnlockBootstrap(ctx); err != nil {
+			if err := b.store.UnlockBootstrap(jobCtx); err != nil {
 				zapctx.Error(
 					logCtx,
 					"failed to unlock bootstrap lock",
@@ -311,7 +311,7 @@ func (b *bootstrapManager) BootstrapJob(
 		// TODO: If we remove the 1 bootstrap lock, in theory two API requests to bootstrap controllers
 		// could be made at the same time, and both would pass this check but only one could succeed.
 		// This needs to be fixed.
-		err := b.store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
+		err := b.store.GetController(jobCtx, &dbmodel.Controller{Name: p.ControllerName})
 		if err == nil {
 			return errors.E(errors.CodeAlreadyExists, fmt.Errorf("controller %q already exists", p.ControllerName))
 		}
@@ -321,7 +321,7 @@ func (b *bootstrapManager) BootstrapJob(
 
 		// TODO(ale8k): When downloading, it takes a while and the CLI has no output. Download progress would be a VERY nice to have here.
 		binary, err := b.binaryStore.Get(
-			ctx,
+			jobCtx,
 			jujuclistore.JujuBinarySpec{
 				Version: p.CLIVersion,
 				// This is a best effort. The launchpad URL just so happens to have similar filenames to runtime.GOOS and runtime.GOARCH.
@@ -338,7 +338,7 @@ func (b *bootstrapManager) BootstrapJob(
 		zapctx.Debug(logCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 		defer binaryDone(binary)
 
-		if err := b.runBootstrap(ctx, p, jobId, executor, binary, user); err != nil {
+		if err := b.runBootstrap(jobCtx, p, jobId, executor, binary, user); err != nil {
 			return errors.E(fmt.Errorf("run bootstrap failed: %w", err))
 		}
 		return nil
@@ -349,7 +349,7 @@ func (b *bootstrapManager) BootstrapJob(
 // a self-contained function. It is expected, and only expected to be run from within
 // the [bootstrapManager.BootstrapJob].
 func (b *bootstrapManager) runBootstrap(
-	ctx context.Context,
+	jobCtx context.Context,
 	p JobParams,
 	jobId uuid.UUID,
 	executor BootstrapExecutor,
@@ -357,7 +357,7 @@ func (b *bootstrapManager) runBootstrap(
 	user *openfga.User,
 ) error {
 	outputCh, clientStore, cleanup, err := executor.RunWrapper(
-		ctx,
+		jobCtx,
 		binary.FullPath,
 		p.JujuDataDir,
 		jujucommands.BootstrapCmdParams{
@@ -379,26 +379,38 @@ func (b *bootstrapManager) runBootstrap(
 	}
 	defer cleanup()
 
+	// For the following code, we want it to keep running
+	// and logging failures even when the jobCtx is cancelled, i.e.,
+	// in the case of running bootstrap-stop.
+	// As such, we use an independent storeCtx
+	// for the erroneous logs.
+	storeCtx := context.Background()
+
 	for output := range outputCh {
 		if output.Err != nil {
 			if writeLogErr := b.store.AddBootstrapLog(
-				ctx,
+				storeCtx,
 				jobId,
 				output.Err.Error(),
 			); writeLogErr != nil {
-				zapctx.Error(ctx, "failed to write bootstrap error", zap.Error(writeLogErr), zap.String("jobId", jobId.String()))
+				zapctx.Error(storeCtx, "failed to write bootstrap error", zap.Error(writeLogErr), zap.String("jobId", jobId.String()))
 			}
 			return errors.E(fmt.Errorf("bootstrap command failed: %w", output.Err))
 		}
 		if writeLogErr := b.store.AddBootstrapLog(
-			ctx,
+			storeCtx,
 			jobId,
 			output.Line,
 		); writeLogErr != nil {
 			// If we fail to write the log, we log the error but continue.
 			// This is because the bootstrap process may still succeed, and we
 			// don't want to fail the entire job just because we couldn't log.
-			zapctx.Error(ctx, "failed to write bootstrap log", zap.Error(writeLogErr), zap.String("jobId", jobId.String()))
+			zapctx.Error(
+				storeCtx,
+				"failed to write bootstrap log",
+				zap.Error(writeLogErr),
+				zap.String("jobId", jobId.String()),
+			)
 		}
 	}
 
@@ -444,8 +456,13 @@ func (b *bootstrapManager) runBootstrap(
 	// If the controller cannot be reached, we'll end up with dangling resources to a now no-longer accessible controller (from the clients perspective).
 	// So... Find a nice way to remove controllers if the add fail / clean up dangling ones later.
 	// Once fixed, this can be tested by just making the controller addr something that doesn't exist, and we can test the solution.
+
+	// We use store context here as there's a small chance that somebody
+	// could cancel the context between the controller being successfully bootstrapped
+	// and adding the controller, in which case we'd be left with a bootstrapped
+	// controller that JIMM isn't aware of.
 	if err := b.jujuManager.AddController(
-		ctx,
+		storeCtx,
 		user,
 		&dbCtrl,
 		dbCtrlCreds,
