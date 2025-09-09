@@ -73,3 +73,4 @@ parts:
       ln -sf jaas bin/juju-update-migrated-model
       ln -sf jaas bin/juju-update-service-account-credential
       ln -sf jaas bin/juju-bootstrap-status
+      ln -sf jaas bin/juju-bootstrap-stop
