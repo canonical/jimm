@@ -241,6 +241,7 @@ func (c command) DestroyController(ctx context.Context, p jujucommands.DestroyCo
 // to be used in a [bootstrapManager.BootstrapJob]
 type commandFactory struct{}
 
+// New create a new JujuCommands implementation.
 func (h commandFactory) New(binaryPath, jujuDataDir string) JujuCommands {
 	return command{
 		binaryPath:  binaryPath,
@@ -350,7 +351,7 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
-		_ = b.store.AddBootstrapLog(jobCtx, jobId,
+		b.writeBootstrapLog(jobCtx, jobId,
 			fmt.Sprintf("Downloading the Juju CLI, version %s for bootstrap. This may take a few minutes", p.CLIVersion))
 
 		binary, err := b.binaryStore.Get(
@@ -417,9 +418,9 @@ func (b *bootstrapManager) runBootstrap(
 	}
 	defer cleanup()
 
-	// Create a new context that is not cancelled when the jobCtx is cancelled.
+	// Update the context from this point to prevent it from being cancelled when the parent is cancelled.
 	// This ensures that we still capture output from the bootstrap command
-	// and log it if the command is cancelled while keeping things like
+	// and log it if that command is cancelled while keeping things like
 	// log info that was set on the context.
 	jobCtx = context.WithoutCancel(jobCtx)
 
@@ -442,7 +443,8 @@ func (b *bootstrapManager) runBootstrap(
 			controllerDetailsStr = string(res)
 		}
 
-		zapctx.Error(jobCtx, "failed to cleanup controller after failing to add it to JIMM", zap.Error(err))
+		zapctx.Error(jobCtx, "failed to cleanup controller after failing to add it to JIMM",
+			zap.NamedError("BootstrapError", err), zap.NamedError("CleanupError", cleanupErr))
 
 		return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
 			"automatic cleanup of the controller also failed: %w\n"+
