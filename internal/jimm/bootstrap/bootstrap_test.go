@@ -1120,13 +1120,8 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 			ControllerName: jobParams.ControllerName,
 		},
 	).Return(
-		func() chan jujucommands.OutputLine {
-			outputCh := make(chan jujucommands.OutputLine, 1)
-			outputCh <- jujucommands.OutputLine{Line: testOutputLine}
-			close(outputCh)
-			return outputCh
-		}(),
 		nil,
+		errors.E("cleanup controller test failure"),
 	)
 	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
@@ -1149,7 +1144,19 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 		s,
 		id,
 		"run bootstrap failed: error post-bootstrap: failed to add controller to JIMM: add controller test error\n"+
-			"the controller has been automatically destroyed")
+			"automatic cleanup of the controller also failed: failed to run destroy-controller command: cleanup controller test failure\n"+
+			"\n"+
+			"WARNING: resources associated with the controller may remain dangling in your environment.\n"+
+			"Manual intervention is required, either attach the controller to JIMM or destroy it.\n"+
+			"\n"+
+			"Controller details:\n"+
+			"uuid: I am actually a uuid, I promise\n"+
+			"api-endpoints: ['10.0.0.1:17070', '172.0.0.1:17070', '192.0.0.1:17070']\n"+
+			"public-hostname: I am not a public DNS, I am a private DNS\n"+
+			"ca-cert: Very secure CA cert, promise\n"+
+			"cloud: \"\"\n"+
+			"controller-machine-count: 0\n"+
+			"active-controller-machine-count: 0\n")
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 

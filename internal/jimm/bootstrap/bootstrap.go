@@ -446,7 +446,10 @@ func (b *bootstrapManager) runBootstrap(
 
 		return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
 			"automatic cleanup of the controller also failed: %w\n"+
-			"WARNING: manual attach to JIMM or cleanup of the controller is required.\n"+
+			"\n"+
+			"WARNING: resources associated with the controller may remain dangling in your environment.\n"+
+			"Manual intervention is required, either attach the controller to JIMM or destroy it.\n"+
+			"\n"+
 			"Controller details:\n%s", err, cleanupErr, controllerDetailsStr))
 
 	}
