@@ -348,6 +348,11 @@ func (b *bootstrapManager) BootstrapJob(
 // runBootstrap wraps the logic of running a controller bootstrap for JIMM into
 // a self-contained function. It is expected, and only expected to be run from within
 // the [bootstrapManager.BootstrapJob].
+//
+// The jobCtx is expected to be the context of the job, and as such will be cancelled
+// when the job is stopped or cancelled. The jobCtx is NOT expected to be used for
+// any store operations, or other operations that should continue even if the job
+// is cancelled.
 func (b *bootstrapManager) runBootstrap(
 	jobCtx context.Context,
 	p JobParams,
