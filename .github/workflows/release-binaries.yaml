@@ -1,9 +1,7 @@
 name: Release binaries
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
 
 # GitHub considers creating releases and uploading assets as writing contents.
 permissions:
@@ -12,7 +10,6 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-22.04
-    environment: Release Environment
     steps:
       - name: Checkout
         uses: actions/checkout@v4

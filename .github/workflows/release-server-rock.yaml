@@ -1,12 +1,8 @@
 name: Release Server ROCK
 
 on:
-  # Note that when running via workflow_dispatch, the github.ref_name
-  # variable will match the selected branch name used.
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
 
 jobs:
   publish:

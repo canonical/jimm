@@ -2,9 +2,7 @@ name: Release Snaps
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v3*'
+  workflow_call:
 
 jobs:
   build-and-release-jaas-plugin:

@@ -1,0 +1,45 @@
+# This workflow is triggered on git tag creation.
+#
+# It runs the various workflows we have for releasing artefacts 
+# and creating release notes. We have multiple release workflows
+# because they each have different requirements.
+#
+# Before the release, the workflow runs the dashboard tests to ensure
+# that the new version of JIMM works with the Juju dashboard.
+# Our main integration tests are run for every PR so they are not
+# needed here, while the dashboard tests are slower and only
+# run periodically and on releases.
+
+name: Release pre-checks
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# GITHUB_TOKEN permissions can only be the same or more restrictive in nested workflows.
+# See https://docs.github.com/en/actions/reference/workflows-and-actions/reusable-workflows
+permissions:
+  contents: write
+
+jobs:
+  dashboard-tests:
+    uses: ./.github/workflows/dashboard-tests.yaml
+    secrets: inherit
+
+  release-binaries:
+    needs: dashboard-tests
+    uses: ./.github/workflows/release-binaries.yaml
+    secrets: inherit
+    permissions:
+      contents: write
+
+  release-server-rock:
+    needs: dashboard-tests
+    uses: ./.github/workflows/release-server-rock.yaml
+    secrets: inherit
+
+  release-snaps:
+    needs: dashboard-tests
+    uses: ./.github/workflows/release-snaps.yaml
+    secrets: inherit
