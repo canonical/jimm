@@ -62,7 +62,7 @@ if [[ "$model_exists" -gt 0 ]]; then
 else
     echo "Creating $PROVIDER_MODEL_NAME"
     echo "Adding source model"
-    juju add-model "$PROVIDER_MODEL_NAME" --config cloudinit-userdata="$CLOUDINIT_CONFIG"
+    juju add-model "$PROVIDER_MODEL_NAME" --config cloudinit-userdata="$CLOUDINIT_CONFIG" localhost
     juju deploy juju-qa-dummy-source
     juju offer dummy-source:sink
 fi
@@ -73,7 +73,7 @@ if [[ "$model_exists" -gt 0 ]]; then
     echo "Model $CONSUMER_MODEL_NAME already exists, skipping creation and app deploy."
 else
     echo "Adding sink model"
-    juju add-model "$CONSUMER_MODEL_NAME" --config cloudinit-userdata="$CLOUDINIT_CONFIG"
+    juju add-model "$CONSUMER_MODEL_NAME" --config cloudinit-userdata="$CLOUDINIT_CONFIG" localhost
     juju deploy juju-qa-dummy-sink
 fi
 

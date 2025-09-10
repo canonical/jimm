@@ -54,7 +54,7 @@ if [[ "$model_exists" -gt 0 ]]; then
     echo "Model $MIGRATING_MODEL_NAME already exists, skipping creation and app deploy."
 else
     echo "Creating $MIGRATING_MODEL_NAME"
-    juju add-model "$MIGRATING_MODEL_NAME"
+    juju add-model "$MIGRATING_MODEL_NAME" localhost
 fi
 
 # I'm unable to determine exactly why this sleep is necessary but without it

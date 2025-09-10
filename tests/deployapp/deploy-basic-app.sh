@@ -6,7 +6,7 @@
 set -euo pipefail
 
 echo "Creating a new model and deploying haproxy"
-juju add-model foo
+juju add-model foo localhost
 juju deploy haproxy
 
 echo "Waiting 5 seconds and then running 'juju status'"
