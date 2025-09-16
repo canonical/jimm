@@ -6,7 +6,6 @@
 set -euo pipefail
 source "local/jimm/detect-jaas.sh"
 
-
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
 
 sudo microk8s config | juju add-k8s testk8s --cluster-name=microk8s-cluster --client
