@@ -12,7 +12,6 @@ sudo microk8s config | juju add-k8s testk8s --cluster-name=microk8s-cluster --cl
 
 $JAAS bootstrap testk8s test-controller 3.6.8 --controller-service-type=loadbalancer
 
-# Would be nice to check "jaas controller" output?
 CERT=$(sudo microk8s config | yq '.users[0].user."client-certificate-data"')
 KEY=$(sudo microk8s config | yq '.users[0].user."client-key-data"' )
 
