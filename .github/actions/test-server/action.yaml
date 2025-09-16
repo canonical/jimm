@@ -84,7 +84,9 @@ runs:
     # doesn't have a .git folder when checked out.
     - name: Start server based on released version
       if: ${{ inputs.jimm-version != 'dev' }}
-      run: make dev-env
+      run: |
+        cd local/traefik/certs; ./certs.sh; cd - && \
+        docker compose --profile test up -d --wait
       shell: bash
       working-directory: ${{ github.action_path }}/../../..
       env:
@@ -94,9 +96,7 @@ runs:
     - name: Start server based on development version
       if: ${{ inputs.jimm-version == 'dev' }}
       working-directory: ${{ github.action_path }}/../../..
-      run: |
-        cd local/traefik/certs; ./certs.sh; cd - && \
-        docker compose --profile dev up -d --wait
+      run: make dev-env
       shell: bash
       env: 
         JIMM_TARGET: smoke
