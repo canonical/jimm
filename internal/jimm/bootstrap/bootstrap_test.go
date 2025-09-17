@@ -1168,6 +1168,128 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
+func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
+	testCtx := c.Context()
+
+	binaryPath := "/faketmp/juju"
+	cancelledBootstrapLine := "bootstrap-cancelled"
+
+	ctrl, mocks, user := setupTest(c)
+	defer ctrl.Finish()
+
+	// create a new job tracker with a lower polling interval.
+	tracker, err := jobtracker.New(s.db, 1*time.Second)
+	c.Assert(err, qt.IsNil)
+	s.jobTracker = tracker
+
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
+	c.Assert(err, qt.IsNil)
+
+	// Mocked in order of execution:
+	cleanupCalled := false // To be asserted after job run - ensures cleanup was run.
+	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
+	mocks.store.EXPECT().GetController(
+		gomock.Any(),
+		&dbmodel.Controller{Name: jobParams.ControllerName},
+	).Return(
+		errors.E(errors.CodeNotFound, errors.E("test err")),
+	)
+	mocks.binaryStore.EXPECT().Get(
+		gomock.Any(),
+		jujuclistore.JujuBinarySpec{
+			Version: jobParams.CLIVersion,
+			Os:      runtime.GOOS,
+			Arch:    runtime.GOARCH,
+		},
+		gomock.Any(),
+	).Return(
+		&jujuclistore.Binary{FullPath: binaryPath},
+		nil,
+	)
+	mocks.executor.EXPECT().Bootstrap(
+		gomock.Any(),
+		jujucommands.BootstrapCmdParams{
+			CloudNameAndRegion:   jobParams.CloudNameAndRegion,
+			ControllerName:       jobParams.ControllerName,
+			AgentVersion:         jobParams.AgentVersion,
+			BootstrapTimeout:     jobParams.BootstrapTimeout,
+			LoginTokenRefreshURL: jobParams.LoginTokenRefreshURL,
+			PersonalCloud:        jobParams.PersonalCloud,
+			CloudCred:            jobParams.CloudCred,
+		},
+	).DoAndReturn(func(ctx context.Context, bcp jujucommands.BootstrapCmdParams) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error) {
+		// Cancel the job to simulate a user cancelling bootstrap.
+		jobId, ok := jobtracker.JobIdFromContext(ctx)
+		c.Check(ok, qt.IsTrue)
+		err := s.jobTracker.StopJob(ctx, jobId)
+		c.Check(err, qt.IsNil)
+
+		// Wait to ensure the context we've received gets cancelled.
+		// If the context passed to Bootstrap is not the job context, this will timeout and fail the test.
+		// The job tracker polls the DB to detect whether the job has stopped so we wait a bit longer than the poll interval.
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Second * 5):
+			c.Error("expected context to be cancelled")
+		}
+
+		output := func() chan jujucommands.OutputLine {
+			outputCh := make(chan jujucommands.OutputLine, 1)
+			outputCh <- jujucommands.OutputLine{Line: cancelledBootstrapLine, Err: errors.E("failed-bootstrap")}
+			close(outputCh)
+			return outputCh
+		}()
+		cleanup := func() {
+			cleanupCalled = true
+		}
+		return output, mocks.clientStore, cleanup, nil
+	})
+	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
+		Return(mocks.executor)
+	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, u uuid.UUID, s string) error {
+			if err := ctx.Err(); err != nil {
+				c.Errorf("expected valid context, got error: %v", err)
+				c.Log("This may indicate we are using an incorrect context.")
+			}
+			return nil
+		}).AnyTimes()
+
+	bootstrapDone := make(chan struct{})
+	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) error {
+			if err := ctx.Err(); err != nil {
+				c.Errorf("expected valid context, got error: %v", err)
+				c.Log("This may indicate we are using an incorrect context.")
+			}
+			close(bootstrapDone)
+			return nil
+		})
+
+	job := manager.BootstrapJob(
+		jobParams,
+		mocks.commandFactory,
+		user,
+	)
+
+	id, err := s.jobTracker.Run(
+		testCtx,
+		"test-job-type",
+		job,
+		time.Second*1000,
+	)
+	c.Assert(err, qt.IsNil)
+
+	select {
+	case <-bootstrapDone:
+	case <-time.After(time.Second * 10):
+		c.Fatal("timed out waiting for bootstrap to complete")
+	}
+	pollJob(c, s, id, dbmodel.StatusFailed)
+	assertJobError(c, s, id, "run bootstrap failed: command failed: failed-bootstrap")
+	c.Assert(cleanupCalled, qt.IsTrue)
+}
+
 //go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
 //go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
 //go:generate mockgen -typed -destination=./mocks/binarystore.go -package=mocks . BinaryStore

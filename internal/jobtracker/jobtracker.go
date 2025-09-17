@@ -18,7 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
-const minimumRefreshIntervalseconds = 5
+const minimumRefreshIntervalseconds = 1
 
 // JobIdContextKey is a context key for storing job IDs.
 type JobIdContextKey struct{}

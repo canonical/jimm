@@ -348,6 +348,11 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+	ok = names.IsValidUser(user)
+	if !ok {
+		zapctx.Error(c.ctx, "invalid controller credentials", zap.String("user", user))
+		return nil, errors.E(op, "invalid/missing controller credentials")
+	}
 	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
 
 	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader)

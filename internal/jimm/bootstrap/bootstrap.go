@@ -330,8 +330,10 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to acquire bootstrap lock: %w", err))
 		}
 
+		// Use a background context to unlock the bootstrap lock.
+		// This ensures that the lock is released even if the job context is cancelled.
 		defer func() {
-			if err := b.store.UnlockBootstrap(jobCtx); err != nil {
+			if err := b.store.UnlockBootstrap(context.Background()); err != nil {
 				zapctx.Error(
 					jobCtx,
 					"failed to unlock bootstrap lock",
