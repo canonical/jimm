@@ -83,6 +83,7 @@ type bootstrapCommand struct {
 
 	// Flags
 
+	credentialName         string
 	timeout                int
 	publicDNSAddress       string
 	controllerServiceType  string
@@ -127,6 +128,7 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 		"yaml": cmd.FormatYaml,
 		"json": cmd.FormatJson,
 	})
+	f.StringVar(&c.credentialName, "credential", "", "The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud.")
 	f.IntVar(&c.timeout, "timeout", 0, "The timeout in seconds for the bootstrap operation.")
 	f.StringVar(&c.publicDNSAddress, "public-dns-address", "", "Public DNS address (with port) of the controller")
 	f.StringVar(
@@ -162,9 +164,29 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		return fmt.Errorf("failed to get cloud %q: %w", c.cloud, err)
 	}
 
-	bootstrapCredential, err := c.store.CredentialForCloud(c.cloud)
+	cloudCreds, err := c.store.CredentialForCloud(c.cloud)
 	if err != nil {
 		return fmt.Errorf("failed to get credential for cloud %q: %w", c.cloud, err)
+	}
+
+	var bootstrapCred jujucloud.Credential
+	switch {
+	case len(cloudCreds.AuthCredentials) == 1 && c.credentialName == "":
+		// If there's only one credential and the user didn't specify a credential name, use it.
+		for _, cred := range cloudCreds.AuthCredentials {
+			bootstrapCred = cred
+			break
+		}
+	case c.credentialName != "":
+		// If a credential name is provided, use it.
+		var ok bool
+		bootstrapCred, ok = cloudCreds.AuthCredentials[c.credentialName]
+		if !ok {
+			return fmt.Errorf("no credential found with name %q", c.credentialName)
+		}
+	default:
+		// If there are multiple credentials and no name is provided, return an error.
+		return fmt.Errorf("multiple credentials found for cloud %q, please specify one using --credential", c.cloud)
 	}
 
 	req := apiparams.BootstrapStartParams{
@@ -173,7 +195,10 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		ControllerName:    c.controllerName,
 		ControllerVersion: c.controllerVersion,
 		Cloud:             cloudToParams(*bootstrapCloud),
-		Credential:        *bootstrapCredential,
+		Credential: jujuparams.CloudCredential{
+			Attributes: bootstrapCred.Attributes(),
+			AuthType:   string(bootstrapCred.AuthType()),
+		},
 
 		Flags: apiparams.BootstrapFlags{
 			Timeout:                c.timeout,

@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
@@ -217,7 +216,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 			Timeout: 3600,
 		},
 		Cloud:             jujuparams.Cloud{},
-		Credential:        jujucloud.CloudCredential{},
+		Credential:        jujuparams.CloudCredential{},
 		ControllerVersion: "3.6.8",
 	}
 

@@ -5,7 +5,6 @@ package params
 import (
 	"time"
 
-	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 )
 
@@ -624,7 +623,7 @@ type BootstrapStartParams struct {
 	Cloud jujuparams.Cloud `json:"cloud,omitempty"`
 	// Credential contains the cloud credential and its tag, this credential will be used against the
 	// the cloud provided to bootstrap the controller.
-	Credential jujucloud.CloudCredential `json:"credential"`
+	Credential jujuparams.CloudCredential `json:"credential"`
 
 	// ControllerName specifies the name of the controller as recorded in JIMM.
 	ControllerName string `json:"controller-name"`

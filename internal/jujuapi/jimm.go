@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -651,7 +652,12 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 		BootstrapTimeout:   req.Flags.Timeout,
 
 		PersonalCloud: cloudFromParams(req.CloudName, req.Cloud),
-		CloudCred:     req.Credential,
+		CloudCred: cloud.NewNamedCredential(
+			"bootstrap-credential",
+			cloud.AuthType(req.Credential.AuthType),
+			req.Credential.Attributes,
+			false,
+		),
 
 		PublicDNSAddress:       req.Flags.PublicDNSAddress,
 		ControllerServiceType:  req.Flags.ControllerServiceType,

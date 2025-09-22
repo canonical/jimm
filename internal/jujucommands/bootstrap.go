@@ -31,7 +31,7 @@ type BootstrapCmdParams struct {
 	// May be left unset, if set, a personal cloud will be created and used for bootstrap.
 	PersonalCloud jujucloud.Cloud
 	// The credential to use for the cloud.
-	CloudCred jujucloud.CloudCredential
+	CloudCred jujucloud.Credential
 
 	// Controller public dns address (if any) and k8s service options to expose a k8s
 	// controller.
@@ -176,7 +176,15 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 		}
 	}
 
-	if err := store.UpdateCredential(cloudName, p.CloudCred); err != nil {
+	// Create a cloudCredential at the last possible moment from the provided credential.
+	// A cloudCredential holds a map of credentials for the cloud with optional defaults.
+	// We only accept a single credential for bootstrapping.
+	cloudCred := jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			p.CloudCred.Label: p.CloudCred,
+		},
+	}
+	if err := store.UpdateCredential(cloudName, cloudCred); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
 	}
 

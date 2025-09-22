@@ -19,7 +19,7 @@ type BootstrapParams struct {
 	ControllerName     string
 	BootstrapTimeout   int
 
-	CloudCred jujucloud.CloudCredential
+	CloudCred jujucloud.Credential
 	// PersonalCloud is the cloud-definition for a non-public cloud.
 	PersonalCloud jujucloud.Cloud
 

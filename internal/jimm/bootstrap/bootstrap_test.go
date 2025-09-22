@@ -49,7 +49,7 @@ var (
 		AgentVersion:       "3.6.3",
 		BootstrapTimeout:   0,
 
-		CloudCred:     jujucloud.CloudCredential{},
+		CloudCred:     jujucloud.Credential{},
 		PersonalCloud: jujucloud.Cloud{},
 
 		LoginTokenRefreshURL: loginTokenRefreshURLParam,

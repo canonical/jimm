@@ -277,7 +277,7 @@ type JobParams struct {
 	ControllerName     string
 	AgentVersion       string
 	BootstrapTimeout   int
-	CloudCred          jujucloud.CloudCredential
+	CloudCred          jujucloud.Credential
 	// PersonalCloud is the personally defined cloud. Only necessary if the cloud is not a public
 	// cloud.
 	PersonalCloud jujucloud.Cloud

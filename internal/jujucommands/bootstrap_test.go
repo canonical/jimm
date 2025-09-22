@@ -127,12 +127,11 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 		return outputCh, nil
 	}).AnyTimes()
 
-	cloudCred := *jujucloud.NewEmptyCloudCredential()
-	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.CertificateAuthType, map[string]string{
+	cloudCred := jujucloud.NewNamedCredential("bootstrap-credential", jujucloud.CertificateAuthType, map[string]string{
 		"server-cert": "server-cert",
 		"client-cert": "client-cert",
 		"client-key":  "client-key",
-	})
+	}, false)
 
 	p := jujucommands.BootstrapCmdParams{
 		CloudNameAndRegion:   "testcloud/testregion",
@@ -172,12 +171,12 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 	personalCloudCred, err := store.CredentialForCloud("testcloud")
 	c.Assert(err, qt.IsNil)
 	// Check just attributes, if the populated in memory credential is set for the "testcloud",
-	// then we're sure the default credential to be used is the one we provided for our provided cloud.
+	// then we're sure the credential to be used is the one we provided for our provided cloud.
 	// (Given it also exists in the temp directory)
 	c.Assert(
-		personalCloudCred.AuthCredentials["default"].Attributes(),
+		personalCloudCred.AuthCredentials["bootstrap-credential"].Attributes(),
 		qt.DeepEquals,
-		cloudCred.AuthCredentials["default"].Attributes(),
+		cloudCred.Attributes(),
 	)
 
 	// This was set to a temp dir until cleanup runs. We can use it to check the file exists.
@@ -207,10 +206,9 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 		return outputCh, nil
 	}).AnyTimes()
 
-	cloudCred := *jujucloud.NewEmptyCloudCredential()
-	cloudCred.AuthCredentials["default"] = jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
+	cloudCred := jujucloud.NewNamedCredential("bootstrap-credential", jujucloud.AccessKeyAuthType, map[string]string{
 		"aws-secret": "my-secret",
-	})
+	}, false)
 	p := jujucommands.BootstrapCmdParams{
 		CloudNameAndRegion:   "aws/us-east-1",
 		ControllerName:       "my-controller",
@@ -237,9 +235,9 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 	personalCloudCred, err := store.CredentialForCloud("aws")
 	c.Assert(err, qt.IsNil)
 	c.Assert(
-		personalCloudCred.AuthCredentials["default"].Attributes(),
+		personalCloudCred.AuthCredentials["bootstrap-credential"].Attributes(),
 		qt.DeepEquals,
-		cloudCred.AuthCredentials["default"].Attributes(),
+		cloudCred.Attributes(),
 	)
 
 	// Make sure no personal cloud was written.

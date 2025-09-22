@@ -103,8 +103,9 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 			CloudName:      cloudName,
 			RegionName:     "region",
 			Cloud:          jujuparams.Cloud{},
-			Credential: jujucloud.CloudCredential{
-				DefaultCredential: "default-cred-value-for-test",
+			Credential: jujuparams.CloudCredential{
+				AuthType:   "",
+				Attributes: map[string]string{},
 			},
 			Flags: params.BootstrapFlags{
 				Timeout: 60,
@@ -227,4 +228,65 @@ func (s *bootstrapCmdSuite) TestBootstrapFailsToGetCredential(c *gc.C) {
 
 	err := command.Run(ctx)
 	c.Assert(err, gc.ErrorMatches, `failed to get credential for cloud "aws": credential not found`)
+}
+
+func (s *bootstrapCmdSuite) TestBootstrapMultipleCredentials(c *gc.C) {
+	ctrl := s.SetupMocks(c)
+	defer ctrl.Finish()
+
+	s.store.EXPECT().CredentialForCloud("aws").Return(&jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": {Label: "cred-1"},
+			"cred-2": {Label: "cred-2"},
+		},
+	}, nil).Times(2)
+
+	command := &bootstrapCommand{
+		store: s.store,
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
+	f.SetOutput(s.writer)
+	command.SetFlags(f)
+	command.controllerName = "controller-name"
+	command.cloud = "aws" // Need a valid cloud to reach credential error.
+	command.region = "region"
+	command.controllerVersion = "controller-version"
+
+	ctx := &cmd.Context{
+		Context: context.Background(),
+		Stdout:  s.writer,
+	}
+
+	err := command.Run(ctx)
+	c.Assert(err, gc.ErrorMatches, `multiple credentials found for cloud "aws", please specify one using --credential`)
+
+	// Now specify a credential and verify the command works.
+	command.credentialName = "cred-2"
+
+	s.client.EXPECT().Bootstrap(gomock.Any()).Return(&params.BootstrapStartResponse{
+		JobID: "test-job-id",
+	}, nil)
+	s.client.EXPECT().Close().Return(nil)
+
+	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
+		Status:    params.StatusSuccessful,
+		Logs:      []string{"log-line", "log-line"},
+		Watermark: 2,
+	}, nil)
+
+	s.writer.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		c.Check(string(b), gc.Equals, "log-line\n")
+		return len(b), nil
+	}).Times(2)
+
+	s.writer.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		c.Check(string(b), gc.Equals, "Bootstrap job completed successfully.\n")
+		return len(b), nil
+	})
+
+	err = command.Run(ctx)
+	c.Assert(err, gc.IsNil)
 }
