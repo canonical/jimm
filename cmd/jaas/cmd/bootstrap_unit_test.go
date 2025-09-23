@@ -95,7 +95,9 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 	cloudName := "aws"
 
 	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
-		DefaultCredential: "default-cred-value-for-test",
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
 	}, nil)
 	s.client.EXPECT().Bootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapStartParams) (*params.BootstrapStartResponse, error) {
 		expected := &params.BootstrapStartParams{
@@ -104,7 +106,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 			RegionName:     "region",
 			Cloud:          jujuparams.Cloud{},
 			Credential: jujuparams.CloudCredential{
-				AuthType:   "",
+				AuthType:   string(jujucloud.UserPassAuthType),
 				Attributes: map[string]string{},
 			},
 			Flags: params.BootstrapFlags{
@@ -158,7 +160,9 @@ func (s *bootstrapCmdSuite) TestBootstrapWatchLogs(c *gc.C) {
 	defer ctrl.Finish()
 
 	s.store.EXPECT().CredentialForCloud("aws").Return(&jujucloud.CloudCredential{
-		DefaultCredential: "default-cred-value-for-test",
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
 	}, nil)
 	s.client.EXPECT().Bootstrap(gomock.Any()).Return(&params.BootstrapStartResponse{
 		JobID: "test-job-id",
@@ -261,7 +265,7 @@ func (s *bootstrapCmdSuite) TestBootstrapMultipleCredentials(c *gc.C) {
 	}
 
 	err := command.Run(ctx)
-	c.Assert(err, gc.ErrorMatches, `multiple credentials found for cloud "aws", please specify one using --credential`)
+	c.Assert(err, gc.ErrorMatches, `multiple credentials found for cloud "aws", please set a default or specify one using --credential`)
 
 	// Now specify a credential and verify the command works.
 	command.credentialName = "cred-2"
@@ -289,4 +293,86 @@ func (s *bootstrapCmdSuite) TestBootstrapMultipleCredentials(c *gc.C) {
 
 	err = command.Run(ctx)
 	c.Assert(err, gc.IsNil)
+}
+
+func (s *bootstrapCmdSuite) TestBootstrapWithDefaultCredential(c *gc.C) {
+	ctrl := s.SetupMocks(c)
+	defer ctrl.Finish()
+
+	cloudName := "aws"
+
+	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
+		DefaultCredential: "cred-1",
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+			"cred-2": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
+	}, nil)
+
+	s.client.EXPECT().Bootstrap(gomock.Any()).Return(&params.BootstrapStartResponse{JobID: "test-job-id"}, nil)
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &bootstrapCommand{
+		store: s.store,
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
+	f.SetOutput(s.writer)
+	command.SetFlags(f)
+	command.controllerName = "controller-name"
+	command.cloud = cloudName
+	command.region = "region"
+	command.controllerVersion = "controller-version"
+	command.timeout = 60
+	command.detach = true
+
+	ctx := &cmd.Context{
+		Context: context.Background(),
+		Stdout:  s.writer,
+	}
+
+	err := command.Run(ctx)
+	c.Assert(err, gc.IsNil)
+}
+
+func (s *bootstrapCmdSuite) TestBootstrapSpecifiedCredentialWithDefault(c *gc.C) {
+	ctrl := s.SetupMocks(c)
+	defer ctrl.Finish()
+
+	cloudName := "aws"
+
+	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
+		DefaultCredential: "cred-1",
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+			"cred-2": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
+	}, nil)
+
+	command := &bootstrapCommand{
+		store: s.store,
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
+	f.SetOutput(s.writer)
+	command.SetFlags(f)
+	command.controllerName = "controller-name"
+	command.cloud = cloudName
+	command.region = "region"
+	command.controllerVersion = "controller-version"
+	command.timeout = 60
+	command.detach = true
+	command.credentialName = "cred-3" // Use a different credential than the default.
+
+	ctx := &cmd.Context{
+		Context: context.Background(),
+		Stdout:  s.writer,
+	}
+
+	err := command.Run(ctx)
+	c.Assert(err, gc.ErrorMatches, `no credential found with name "cred-3"`)
 }

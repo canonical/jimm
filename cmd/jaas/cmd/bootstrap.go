@@ -184,9 +184,16 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		if !ok {
 			return fmt.Errorf("no credential found with name %q", c.credentialName)
 		}
+	case cloudCreds.DefaultCredential != "" && c.credentialName == "":
+		// If there's a default credential and the user didn't specify a credential name, use it.
+		var ok bool
+		bootstrapCred, ok = cloudCreds.AuthCredentials[cloudCreds.DefaultCredential]
+		if !ok {
+			return fmt.Errorf("default credential %q not found for cloud %q", cloudCreds.DefaultCredential, c.cloud)
+		}
 	default:
 		// If there are multiple credentials and no name is provided, return an error.
-		return fmt.Errorf("multiple credentials found for cloud %q, please specify one using --credential", c.cloud)
+		return fmt.Errorf("multiple credentials found for cloud %q, please set a default or specify one using --credential", c.cloud)
 	}
 
 	req := apiparams.BootstrapStartParams{
