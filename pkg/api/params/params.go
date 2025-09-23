@@ -568,15 +568,7 @@ type ListMigrationTargetsRequest struct {
 	ModelTag string `json:"model-tag"`
 }
 
-// BootstrapStatusRequest holds the request to get the status of a bootstrap job.
-type BootstrapStatusRequest struct {
-	// JobID is the ID of the bootstrap job to get the status for.
-	JobID string `json:"job-id"`
-	// Watermark is the line number to start reading logs from.
-	Watermark int `json:"watermark"`
-}
-
-// JobStatus represents the status of a bootstrap job.
+// JobStatus represents the status of a job.
 type JobStatus string
 
 const (
@@ -586,21 +578,56 @@ const (
 	StatusFailed     JobStatus = "failed"
 )
 
-// BootstrapStatusResponse holds the response for a bootstrap job status.
-type BootstrapStatusResponse struct {
-	// Status is the status of the bootstrap job.
+// GetJobInfoRequest holds the request to get the status of a job.
+type GetJobInfoRequest struct {
+	// JobID is the ID of the job to get the status for.
+	JobID string `json:"job-id"`
+	// Watermark is the line number to start reading logs from.
+	Watermark int `json:"watermark"`
+}
+
+// GetJobInfoResponse holds the response for a job status.
+type GetJobInfoResponse struct {
+	// Status is the status of the job.
 	Status JobStatus `json:"status"`
-	// Logs are the logs for the bootstrap job.
+	// Logs are the logs for the job.
 	Logs []string `json:"logs"`
 	// Watermark is the line number to use for the next request.
 	Watermark int `json:"watermark"`
-	// Error is the error message if the bootstrap job failed.
+	// Error is the error message if the job failed.
 	Error string `json:"error,omitempty"`
 }
 
-// BootstrapStartParams holds parameters for starting
+// StopJobRequest holds the request to stop a job.
+type StopJobRequest struct {
+	// JobID is the ID of the job to stop.
+	JobID string `json:"job-id"`
+}
+
+// StartJobResponse holds the response for starting
+// a controller job.
+type StartJobResponse struct {
+	// JobID is the ID of the job that was started.
+	JobID string `json:"job-id"`
+}
+
+// BootstrapFlags holds the flags that can be used
+// when bootstrapping a new controller.
+type BootstrapFlags struct {
+	// The timeout in seconds for the bootstrap.
+	Timeout int `json:"timeout,omitempty"`
+	// Controller public dns address (if any) and k8s service options to expose a k8s
+	// controller.
+
+	PublicDNSAddress       string `json:"public-dns-address,omitempty"`
+	ControllerServiceType  string `json:"controller-service-type,omitempty"`
+	ControllerExternalIPs  string `json:"controller-external-ips,omitempty"`
+	ControllerExternalName string `json:"controller-external-name,omitempty"`
+}
+
+// BootstrapParams holds parameters for starting
 // a controller bootstrap job.
-type BootstrapStartParams struct {
+type BootstrapParams struct {
 	// CloudName specifies the target cloud for the controller.
 	CloudName string `json:"cloud-name"`
 	// RegionName specifies the target region for the controller.
@@ -618,17 +645,4 @@ type BootstrapStartParams struct {
 
 	// ControllerVersion is the version of the controller to be bootstrapped.
 	ControllerVersion string `json:"controller-version"`
-}
-
-// BootstrapStartResponse holds the response for starting
-// a controller bootstrap job.
-type BootstrapStartResponse struct {
-	// JobID is the ID of the bootstrap job that was started.
-	JobID string `json:"job-id"`
-}
-
-// BootstrapStopRequest holds the request to stop a bootstrap job.
-type BootstrapStopRequest struct {
-	// JobID is the ID of the bootstrap job to stop.
-	JobID string `json:"job-id"`
 }

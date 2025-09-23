@@ -66,9 +66,9 @@ func init() {
 		version := rpc.Method(r.Version)
 		prepareModelMigration := rpc.Method(r.PrepareModelMigration)
 		listMigrationTargetsMethod := rpc.Method(r.ListMigrationTargets)
-		bootstrapStatus := rpc.Method(r.BootstrapStatus)
-		bootstrapStart := rpc.Method(r.BootstrapStart)
-		bootstrapStop := rpc.Method(r.BootstrapStop)
+		getJobInfo := rpc.Method(r.GetJobInfo)
+		stopJob := rpc.Method(r.StopJob)
+		startBootstrapJob := rpc.Method(r.StartBootstrapJob)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -109,9 +109,9 @@ func init() {
 		r.AddMethod("JIMM", 4, "PrepareModelMigration", prepareModelMigration)
 		r.AddMethod("JIMM", 4, "ListMigrationTargets", listMigrationTargetsMethod)
 		// JIMM Bootstrap
-		r.AddMethod("JIMM", 4, "BootstrapStatus", bootstrapStatus)
-		r.AddMethod("JIMM", 4, "BootstrapStart", bootstrapStart)
-		r.AddMethod("JIMM", 4, "BootstrapStop", bootstrapStop)
+		r.AddMethod("JIMM", 4, "GetJobInfo", getJobInfo)
+		r.AddMethod("JIMM", 4, "StopJob", stopJob)
+		r.AddMethod("JIMM", 4, "StartBootstrapJob", startBootstrapJob)
 
 		return []int{4}
 	}
@@ -602,39 +602,59 @@ func (r *controllerRoot) ListMigrationTargets(ctx context.Context, req apiparams
 	}, nil
 }
 
-// BootstrapStatus retrieves the status of a bootstrap job, its logs and the watermark
+// GetJobInfo retrieves the status of a job, its logs and the watermark
 // for the logs.
-func (r *controllerRoot) BootstrapStatus(ctx context.Context, req apiparams.BootstrapStatusRequest) (apiparams.BootstrapStatusResponse, error) {
-	const op = errors.Op("jujuapi.BootstrapStatus")
+func (r *controllerRoot) GetJobInfo(ctx context.Context, req apiparams.GetJobInfoRequest) (apiparams.GetJobInfoResponse, error) {
+	const op = errors.Op("jujuapi.GetJobInfo")
 
 	if !r.user.JimmAdmin {
-		return apiparams.BootstrapStatusResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return apiparams.GetJobInfoResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	jobId, err := uuid.Parse(req.JobID)
 	if err != nil {
-		return apiparams.BootstrapStatusResponse{}, errors.E(op, errors.CodeBadRequest, "invalid job ID", err)
+		return apiparams.GetJobInfoResponse{}, errors.E(op, errors.CodeBadRequest, "invalid job ID", err)
 	}
 
-	return r.jimm.BootstrapManager().GetBootstrapStatusAndLogs(ctx, r.user, jobId, req.Watermark)
+	return r.jimm.BootstrapManager().GetJobInfo(ctx, r.user, jobId, req.Watermark)
 }
 
-// BootstrapStart starts a bootstrap job.
-func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.BootstrapStartParams) (apiparams.BootstrapStartResponse, error) {
-	const op = errors.Op("jujuapi.BootstrapStart")
+// StopJob stops a job.
+func (r *controllerRoot) StopJob(ctx context.Context, req apiparams.StopJobRequest) error {
+	const op = errors.Op("jujuapi.StopJob")
 
 	if !r.user.JimmAdmin {
-		return apiparams.BootstrapStartResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	jobID, err := uuid.Parse(req.JobID)
+	if err != nil {
+		return errors.E(op, errors.CodeBadRequest, "invalid job ID", err)
+	}
+
+	err = r.jimm.BootstrapManager().StopJob(ctx, r.user, jobID)
+	if err != nil {
+		return errors.E(op, fmt.Errorf("failed to stop job: %v", err))
+	}
+	return nil
+}
+
+// StartBootstrapJob starts a bootstrap job.
+func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.BootstrapParams) (apiparams.StartJobResponse, error) {
+	const op = errors.Op("jujuapi.StartBootstrapJob")
+
+	if !r.user.JimmAdmin {
+		return apiparams.StartJobResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Check built in clouds like localhost (lxd).
 	builtinClouds, err := common.BuiltInClouds()
 	if err != nil {
-		return apiparams.BootstrapStartResponse{}, errors.E(op, errors.CodeIncompatibleClouds, "unauthorized")
+		return apiparams.StartJobResponse{}, errors.E(op, errors.CodeIncompatibleClouds, "unauthorized")
 	}
 
 	if _, isABuiltinCloud := builtinClouds[req.CloudName]; isABuiltinCloud {
-		return apiparams.BootstrapStartResponse{},
+		return apiparams.StartJobResponse{},
 			errors.E(op, errors.CodeIncompatibleClouds, fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", req.CloudName))
 	}
 
@@ -661,31 +681,11 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 		UserConfig: req.Config,
 	}
 
-	jobID, err := r.jimm.BootstrapManager().StartBootstrap(ctx, r.user, params)
+	jobID, err := r.jimm.BootstrapManager().StartBootstrapJob(ctx, r.user, params)
 	if err != nil {
-		return apiparams.BootstrapStartResponse{}, errors.E(op, fmt.Errorf("failed to start bootstrap job: %v", err))
+		return apiparams.StartJobResponse{}, errors.E(op, fmt.Errorf("failed to start bootstrap job: %v", err))
 	}
-	return apiparams.BootstrapStartResponse{
+	return apiparams.StartJobResponse{
 		JobID: jobID,
 	}, nil
-}
-
-// BootstrapStop stops a bootstrap job.
-func (r *controllerRoot) BootstrapStop(ctx context.Context, req apiparams.BootstrapStopRequest) error {
-	const op = errors.Op("jujuapi.BootstrapStop")
-
-	if !r.user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
-	}
-
-	jobID, err := uuid.Parse(req.JobID)
-	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, "invalid job ID", err)
-	}
-
-	err = r.jimm.BootstrapManager().StopBootstrap(ctx, r.user, jobID)
-	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to stop bootstrap job: %v", err))
-	}
-	return nil
 }

@@ -14,12 +14,12 @@ import (
 
 var (
 	// Blocks most concurrent writes and schema changes but allows reads.
-	bootstrapLoglockQuery = "LOCK TABLE bootstrap_logs IN EXCLUSIVE MODE"
+	jobLoglockQuery = "LOCK TABLE job_logs IN EXCLUSIVE MODE"
 )
 
-// AddBootstrapLog adds a bootstrap log entry to the store.
-func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error) {
-	const op = errors.Op("db.AddBootstrapLog")
+// AddJobLog adds a job log entry to the store.
+func (d *Database) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error) {
+	const op = errors.Op("db.AddJobLog")
 
 	if err := d.ready(); err != nil {
 		return errors.E(op, err)
@@ -27,14 +27,14 @@ func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine
 
 	return d.Transaction(func(d *Database) error {
 		// Blocks all other operations, including reads, writes, and other locks.
-		if err := d.DB.Exec(bootstrapLoglockQuery).Error; err != nil {
-			return errors.E(op, "failed to lock bootstrap_logs table", err)
+		if err := d.DB.Exec(jobLoglockQuery).Error; err != nil {
+			return errors.E(op, "failed to lock job_logs table", err)
 		}
 
-		// Get the current line number for this bootstrap job.
+		// Get the current line number for this job.
 		var currentLineNumber int
 		err = d.DB.WithContext(ctx).
-			Model(&dbmodel.BootstrapLog{}).
+			Model(&dbmodel.JobLog{}).
 			Where("job_id = ?", jobId).
 			Select("COALESCE(MAX(line_number), 0)").
 			Scan(&currentLineNumber).Error
@@ -44,9 +44,9 @@ func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine
 
 		nextLineNumber := currentLineNumber + 1
 
-		log, err := dbmodel.NewBootstrapLog(jobId, nextLineNumber, logLine)
+		log, err := dbmodel.NewJobLog(jobId, nextLineNumber, logLine)
 		if err != nil {
-			return errors.E(op, "failed to construct bootstrap log", err)
+			return errors.E(op, "failed to construct job log", err)
 		}
 
 		if err := d.DB.WithContext(ctx).Create(log).Error; err != nil {
@@ -56,13 +56,13 @@ func (d *Database) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine
 	})
 }
 
-// QueryBootstrapLog queries for bootstrap logs based on the jobId and offset.
+// QueryJobLog queries for job logs based on the jobId and offset.
 //
 // It returns the next offset value to use, and this offset value may be the same
 // as the one initially presented / previously returned. This means no new logs have
 // come in, but they may later, and the client should query again for logs after some time.
-func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error) {
-	const op = errors.Op("db.QueryBootstrapLog")
+func (d *Database) QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error) {
+	const op = errors.Op("db.QueryJobLog")
 
 	if err := d.ready(); err != nil {
 		return loggies, nextOffsetValue, errors.E(op, err)
@@ -72,7 +72,7 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	var logs []dbmodel.BootstrapLog
+	var logs []dbmodel.JobLog
 	err = d.Transaction(func(d *Database) error {
 		// Make sure job exists, if it doesn't, there's no point running the query
 		if err := d.DB.WithContext(ctx).First(&dbmodel.JobTrackerEntry{JobID: jobId}, "job_id = ?", jobId).Error; err != nil {
@@ -80,7 +80,7 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 		}
 
 		query := d.DB.WithContext(ctx).
-			Model(&dbmodel.BootstrapLog{}).
+			Model(&dbmodel.JobLog{}).
 			Where("job_id = ?", jobId)
 
 		var count int64
@@ -100,7 +100,7 @@ func (d *Database) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offse
 		// Get the next line number
 		var currentLineNumber int
 		err = d.DB.WithContext(ctx).
-			Model(&dbmodel.BootstrapLog{}).
+			Model(&dbmodel.JobLog{}).
 			Where("job_id = ?", jobId).
 			Select("COALESCE(MAX(line_number), 0)").
 			Scan(&currentLineNumber).Error

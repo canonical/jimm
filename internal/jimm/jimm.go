@@ -306,12 +306,12 @@ type JujuManager interface {
 
 // BootstrapManager provides methods to manage bootstrap jobs.
 type BootstrapManager interface {
-	// GetBootstrapStatusAndLogs retrieves the status and logs of a bootstrap job.
-	GetBootstrapStatusAndLogs(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error)
-	// StartBootstrap starts a bootstrap job and returns the job ID.
-	StartBootstrap(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
-	// StopBootstrap stops a bootstrap job.
-	StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
+	// GetJobInfo retrieves the status and logs of a job.
+	GetJobInfo(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.GetJobInfoResponse, error)
+	// StopJob stops a job.
+	StopJob(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
+	// StartBootstrapJob starts a bootstrap job and returns the job ID.
+	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.

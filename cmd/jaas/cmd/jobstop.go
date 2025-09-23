@@ -17,47 +17,47 @@ import (
 )
 
 const (
-	bootstrapStopCommandDoc = `
-Stop a bootstrap job.
+	jobStopCommandDoc = `
+Stop a job.
 `
-	bootstrapStopCommandExample = `
-    juju bootstrap-stop 2cb433a6-04eb-4ec4-9567-90426d20a004 
+	jobStopCommandExample = `
+    juju job-stop 2cb433a6-04eb-4ec4-9567-90426d20a004 
 `
 )
 
-// NewBootstrapStopCommand returns a command to stop a bootstrap job.
-func NewBootstrapStopCommand() cmd.Command {
-	cmd := &bootstrapStopCommand{
+// NewJobStopCommand returns a command to stop a job.
+func NewJobStopCommand() cmd.Command {
+	cmd := &jobStopCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
-	cmd.bootstrapAPIFunc = cmd.newClient
+	cmd.jobAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// bootstrapStopCommand to stop a bootstrap job.
-type bootstrapStopCommand struct {
+// jobStopCommand to stop a job.
+type jobStopCommand struct {
 	modelcmd.ControllerCommandBase
 
-	store            jujuclient.ClientStore
-	dialOpts         *jujuapi.DialOpts
-	jobId            string
-	bootstrapAPIFunc func() (JIMMAPI, error)
+	store      jujuclient.ClientStore
+	dialOpts   *jujuapi.DialOpts
+	jobId      string
+	jobAPIFunc func() (JIMMAPI, error)
 }
 
 // Info implements cmd.Info interface.
-func (c *bootstrapStopCommand) Info() *cmd.Info {
+func (c *jobStopCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "bootstrap-stop",
+		Name:     "job-stop",
 		Args:     "<job uuid>",
-		Purpose:  "Stop a bootstrap job",
-		Doc:      bootstrapStopCommandDoc,
-		Examples: bootstrapStopCommandExample,
+		Purpose:  "Stop a job",
+		Doc:      jobStopCommandDoc,
+		Examples: jobStopCommandExample,
 	})
 }
 
 // Init implements the cmd.Command interface.
-func (c *bootstrapStopCommand) Init(args []string) error {
+func (c *jobStopCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.E("missing job id")
 	}
@@ -70,26 +70,26 @@ func (c *bootstrapStopCommand) Init(args []string) error {
 }
 
 // Run implements cmd.Command.Run interface.
-func (c *bootstrapStopCommand) Run(ctxt *cmd.Context) error {
-	client, err := c.bootstrapAPIFunc()
+func (c *jobStopCommand) Run(ctxt *cmd.Context) error {
+	client, err := c.jobAPIFunc()
 	if err != nil {
 		return fmt.Errorf("failed to create JIMM client: %v", err)
 	}
 
-	err = client.BootstrapStop(&params.BootstrapStopRequest{
+	err = client.StopJob(&params.StopJobRequest{
 		JobID: c.jobId,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to stop bootstrap job: %v", err)
+		return fmt.Errorf("failed to stop job: %v", err)
 	}
-	_, err = ctxt.Stdout.Write([]byte(fmt.Sprintf("Bootstrap job %s has been stopped.\n", c.jobId)))
+	_, err = ctxt.Stdout.Write([]byte(fmt.Sprintf("Job %s has been stopped.\n", c.jobId)))
 	if err != nil {
 		return fmt.Errorf("failed to write output: %v", err)
 	}
 	return nil
 }
 
-func (s *bootstrapStopCommand) newClient() (JIMMAPI, error) {
+func (s *jobStopCommand) newClient() (JIMMAPI, error) {
 	currentController, err := s.store.CurrentController()
 	if err != nil {
 		return nil, errors.E(err, "could not determine controller")

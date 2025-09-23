@@ -43,13 +43,13 @@ const (
 
 // Store defines the store methods required by the manager.
 type Store interface {
-	QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error)
+	QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error)
 
 	// BootstrapJob store methods:
 
 	LockBootstrap(ctx context.Context, ttl time.Duration) error
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
-	AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error)
+	AddJobLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error)
 	UnlockBootstrap(ctx context.Context) error
 }
 
@@ -73,7 +73,7 @@ type BinaryStore interface {
 	Get(ctx context.Context, spec jujuclistore.JujuBinarySpec, logFunction func(string)) (*jujuclistore.Binary, error)
 }
 
-// JujuCommands defines the Juju CLI methods that the bootstrap job requires.
+// JujuCommands defines the Juju CLI methods that the jobs require.
 type JujuCommands interface {
 	Bootstrap(ctx context.Context, p jujucommands.BootstrapCmdParams) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error)
 	DestroyController(ctx context.Context, p jujucommands.DestroyControllerCmdParams) (<-chan jujucommands.OutputLine, error)
@@ -125,22 +125,22 @@ func NewBootstrapManager(
 	}, nil
 }
 
-// GetBootstrapStatusAndLogs retrieves the status and logs of a bootstrap job.
+// GetJobInfo retrieves the status and logs of a bootstrap job.
 // It requires the user to be an admin and returns the status, error message, logs,
 // and a watermark for pagination.
-func (b *bootstrapManager) GetBootstrapStatusAndLogs(ctx context.Context, _ *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error) {
-	const op = errors.Op("jimm.GetBootstrapStatusAndLogs")
+func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobId uuid.UUID, offset int) (params.GetJobInfoResponse, error) {
+	const op = errors.Op("jimm.GetJobInfo")
 
 	job, err := b.tracker.GetJob(ctx, jobId)
 	if err != nil {
-		return params.BootstrapStatusResponse{}, errors.E(op, "failed to get job status", err)
+		return params.GetJobInfoResponse{}, errors.E(op, "failed to get job info", err)
 	}
 
-	loggies, newOffset, err := b.store.QueryBootstrapLog(ctx, jobId, offset)
+	loggies, newOffset, err := b.store.QueryJobLog(ctx, jobId, offset)
 	if err != nil {
-		return params.BootstrapStatusResponse{}, errors.E(op, "failed to query bootstrap logs", err)
+		return params.GetJobInfoResponse{}, errors.E(op, "failed to query job logs", err)
 	}
-	return params.BootstrapStatusResponse{
+	return params.GetJobInfoResponse{
 		Status:    params.JobStatus(job.Status),
 		Error:     job.Error,
 		Logs:      loggies,
@@ -148,9 +148,9 @@ func (b *bootstrapManager) GetBootstrapStatusAndLogs(ctx context.Context, _ *ope
 	}, nil
 }
 
-// StopBootstrap stops a bootstrap job by its ID.
-func (b *bootstrapManager) StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
-	const op = errors.Op("jimm.StopBootstrap")
+// StopJob stops a bootstrap job by its ID.
+func (b *bootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
+	const op = errors.Op("jimm.StopJob")
 
 	if user == nil {
 		return errors.E(op, "user cannot be nil")
@@ -169,8 +169,8 @@ func (b *bootstrapManager) StopBootstrap(ctx context.Context, user *openfga.User
 }
 
 // StartBootstrap starts a bootstrap job with the provided parameters.
-func (b *bootstrapManager) StartBootstrap(ctx context.Context, user *openfga.User, params BootstrapParams) (string, error) {
-	const op = errors.Op("jimm.StartBootstrap")
+func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params BootstrapParams) (string, error) {
+	const op = errors.Op("jimm.StartBootstrapJob")
 
 	if err := params.validate(); err != nil {
 		return "", errors.E(op, fmt.Errorf("invalid bootstrap parameters: %v", err))
@@ -343,7 +343,7 @@ func (b *bootstrapManager) BootstrapJob(
 			return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
 		}
 
-		b.writeBootstrapLog(jobCtx, jobId,
+		b.writeJobLog(jobCtx, jobId,
 			fmt.Sprintf("Downloading the Juju CLI, version %s for bootstrap. This may take a few minutes", p.CLIVersion))
 
 		binary, err := b.binaryStore.Get(
@@ -358,7 +358,7 @@ func (b *bootstrapManager) BootstrapJob(
 				Arch: runtime.GOARCH,
 			},
 			func(line string) {
-				b.writeBootstrapLog(jobCtx, jobId, line)
+				b.writeJobLog(jobCtx, jobId, line)
 			},
 		)
 		if err != nil {
@@ -517,18 +517,18 @@ func (b *bootstrapManager) tryCleanupController(ctx context.Context, jujuCmd Juj
 func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-chan jujucommands.OutputLine, jobId uuid.UUID) error {
 	for output := range outputCh {
 		if output.Err != nil {
-			b.writeBootstrapLog(ctx, jobId, output.Err.Error())
+			b.writeJobLog(ctx, jobId, output.Err.Error())
 			return errors.E(fmt.Errorf("command failed: %w", output.Err))
 		}
-		b.writeBootstrapLog(ctx, jobId, output.Line)
+		b.writeJobLog(ctx, jobId, output.Line)
 	}
 	return nil
 }
 
-// writeBootstrapLog writes logs to the store to eventually be displayed to users.
+// writeJobLog writes logs to the store to eventually be displayed to users.
 // Errors are masked but logged to avoid failing the bootstrap process.
-func (b *bootstrapManager) writeBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) {
-	if err := b.store.AddBootstrapLog(ctx, jobId, logLine); err != nil {
+func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId uuid.UUID, logLine string) {
+	if err := b.store.AddJobLog(ctx, jobId, logLine); err != nil {
 		zapctx.Error(ctx, "failed to write bootstrap log", zap.Error(err), zap.String("jobId", jobId.String()))
 	}
 }

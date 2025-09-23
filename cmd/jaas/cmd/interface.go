@@ -7,9 +7,9 @@ import "github.com/canonical/jimm/v3/pkg/api/params"
 // JIMMAPI is an interface that defines the methods required for JIMM client operations.
 type JIMMAPI interface {
 	Close() error
-	BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error)
-	Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error)
-	BootstrapStop(req *params.BootstrapStopRequest) error
+	GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error)
+	StopJob(req *params.StopJobRequest) error
+	StartBootstrapJob(req *params.BootstrapParams) (*params.StartJobResponse, error)
 	ListMigrationTargets(req *params.ListMigrationTargetsRequest) ([]params.ControllerInfo, error)
 	PrepareModelMigration(req *params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error)
 }

@@ -2,7 +2,7 @@
 //
 // Generated from:
 //   Juju Version:   3.6.9
-//   Module Version: v0.0.0-20250715080108-a48434d3928a
+//   Module Version: v0.0.0-20250811161541-735128dc9d23
 
 package cloudcred
 

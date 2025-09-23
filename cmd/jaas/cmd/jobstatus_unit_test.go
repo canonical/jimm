@@ -13,14 +13,14 @@ import (
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type bootstrapStatusSuite struct {
+type jobStatusSuite struct {
 	client *mocks.MockJIMMAPI
 	writer *mocks.MockWriter
 }
 
-var _ = gc.Suite(&bootstrapStatusSuite{})
+var _ = gc.Suite(&jobStatusSuite{})
 
-func (s *bootstrapStatusSuite) SetupMocks(c *gc.C) *gomock.Controller {
+func (s *jobStatusSuite) SetupMocks(c *gc.C) *gomock.Controller {
 	ctrl := gomock.NewController(c)
 	s.client = mocks.NewMockJIMMAPI(ctrl)
 	s.writer = mocks.NewMockWriter(ctrl)
@@ -28,18 +28,18 @@ func (s *bootstrapStatusSuite) SetupMocks(c *gc.C) *gomock.Controller {
 	return ctrl
 }
 
-func (s *bootstrapStatusSuite) TestBootstrapStatus(c *gc.C) {
+func (s *jobStatusSuite) TestJobStatus(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
+	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
 		Status: params.StatusSuccessful,
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
-	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
+	s.writer.EXPECT().Write([]byte("Job completed successfully.\n"))
 
-	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMAPI, error) {
+	command := &jobStatusCommand{
+		jobAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -54,19 +54,19 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *bootstrapStatusSuite) TestBootstrapStatus_Failed(c *gc.C) {
+func (s *jobStatusSuite) TestJobStatus_Failed(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
+	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
 		Status: params.StatusFailed,
-		Error:  "Bootstrap job failed",
+		Error:  "Job failed",
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
-	s.writer.EXPECT().Write([]byte("Bootstrap job failed: Bootstrap job failed\n"))
+	s.writer.EXPECT().Write([]byte("Job failed: Job failed\n"))
 
-	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMAPI, error) {
+	command := &jobStatusCommand{
+		jobAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -81,11 +81,11 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Failed(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
+func (s *jobStatusSuite) TestJobStatus_Running(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
+	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
 		Status:    params.StatusRunning,
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
@@ -95,11 +95,11 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
 	s.client.EXPECT().
-		BootstrapStatus(&params.BootstrapStatusRequest{
+		GetJobInfo(&params.GetJobInfoRequest{
 			JobID:     "test-job-id",
 			Watermark: 2,
 		}).
-		Return(params.BootstrapStatusResponse{
+		Return(params.GetJobInfoResponse{
 			Status:    params.StatusRunning,
 			Logs:      []string{"log3"},
 			Watermark: 3,
@@ -107,17 +107,17 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log3\n"))
 
 	s.client.EXPECT().
-		BootstrapStatus(&params.BootstrapStatusRequest{
+		GetJobInfo(&params.GetJobInfoRequest{
 			JobID:     "test-job-id",
 			Watermark: 3,
 		}).
-		Return(params.BootstrapStatusResponse{
+		Return(params.GetJobInfoResponse{
 			Status: params.StatusSuccessful,
 		}, nil)
-	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
+	s.writer.EXPECT().Write([]byte("Job completed successfully.\n"))
 
-	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMAPI, error) {
+	command := &jobStatusCommand{
+		jobAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -132,11 +132,11 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *bootstrapStatusSuite) TestBootstrapStatus_NoFollow(c *gc.C) {
+func (s *jobStatusSuite) TestJobStatus_NoFollow(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
+	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
 		Status:    params.StatusRunning,
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
@@ -145,8 +145,8 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_NoFollow(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log1\n"))
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
-	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMAPI, error) {
+	command := &jobStatusCommand{
+		jobAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",
@@ -163,11 +163,11 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_NoFollow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *bootstrapStatusSuite) TestBootstrapStatus_AfterCompletion(c *gc.C) {
+func (s *jobStatusSuite) TestJobStatus_AfterCompletion(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().BootstrapStatus(gomock.Any()).Return(params.BootstrapStatusResponse{
+	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
 		Status:    params.StatusSuccessful,
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
@@ -175,10 +175,10 @@ func (s *bootstrapStatusSuite) TestBootstrapStatus_AfterCompletion(c *gc.C) {
 	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("log1\n"))
 	s.writer.EXPECT().Write([]byte("log2\n"))
-	s.writer.EXPECT().Write([]byte("Bootstrap job completed successfully.\n"))
+	s.writer.EXPECT().Write([]byte("Job completed successfully.\n"))
 
-	command := &bootstrapStatusCommand{
-		bootstrapAPIFunc: func() (JIMMAPI, error) {
+	command := &jobStatusCommand{
+		jobAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 		jobId:               "test-job-id",

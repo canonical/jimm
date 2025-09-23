@@ -267,21 +267,21 @@ func (c *Client) ListMigrationTargets(req *params.ListMigrationTargetsRequest) (
 	return response.Controllers, err
 }
 
-// BootstrapStatus retrieves the status and logs of a bootstrap job.
-func (c *Client) BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error) {
-	var response params.BootstrapStatusResponse
-	err := c.caller.APICall("JIMM", 4, "", "BootstrapStatus", req, &response)
+// GetJobInfo retrieves the status and logs of a job.
+func (c *Client) GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error) {
+	var response params.GetJobInfoResponse
+	err := c.caller.APICall("JIMM", 4, "", "GetJobInfo", req, &response)
 	return response, err
 }
 
-// Bootstrap starts a bootstrap operation on the JIMM server.
-func (c *Client) Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error) {
-	var response params.BootstrapStartResponse
-	err := c.caller.APICall("JIMM", 4, "", "BootstrapStart", req, &response)
-	return &response, err
+// StopJob stops a job on the JIMM server.
+func (c *Client) StopJob(req *params.StopJobRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "StopJob", req, nil)
 }
 
-// BootstrapStop stops a bootstrap operation on the JIMM server.
-func (c *Client) BootstrapStop(req *params.BootstrapStopRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "BootstrapStop", req, nil)
+// StartBootstrapJob starts a bootstrap operation on the JIMM server.
+func (c *Client) StartBootstrapJob(req *params.BootstrapParams) (*params.StartJobResponse, error) {
+	var response params.StartJobResponse
+	err := c.caller.APICall("JIMM", 4, "", "StartBootstrapJob", req, &response)
+	return &response, err
 }

@@ -152,7 +152,7 @@ func (j *Tracker) GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrack
 	job := dbmodel.JobTrackerEntry{JobID: jobId}
 	err := j.store.GetJob(ctx, &job)
 	if err != nil {
-		return job, errors.E(op, "failed to get job status", err)
+		return job, errors.E(op, "failed to get job info", err)
 	}
 
 	return job, nil

@@ -124,7 +124,7 @@ func (s *bootstrapManagerSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 }
 
-func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
+func (s *bootstrapManagerSuite) TestGetJobInfo(c *qt.C) {
 	ctx := c.Context()
 	read := make(chan struct{})
 	defer close(read)
@@ -151,7 +151,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 					write <- struct{}{} // Signal that a batch of logs has been written.
 					<-read              // Wait for the read before writing the next batch.
 				}
-				err := s.db.AddBootstrapLog(ctx, jobId, "bootstrap logs "+fmt.Sprint(rune(i)))
+				err := s.db.AddJobLog(ctx, jobId, "bootstrap logs "+fmt.Sprint(rune(i)))
 				c.Check(err, qt.IsNil)
 			}
 			// We need to signal that we've written the last batch of logs.
@@ -166,7 +166,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	for batch := 0; batch < numLogs/batchSize+1; batch++ {
 		<-write // Wait for the batch of logs to be written.
 
-		response, err := manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
+		response, err := manager.GetJobInfo(ctx, s.adminUser, jobId, watermark)
 		c.Assert(err, qt.IsNil)
 		logs := []string{}
 		for j := 0; j < int(math.Min(float64(batchSize), float64(numLogs-batch*batchSize))); j++ {
@@ -179,13 +179,13 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs(c *qt.C) {
 	}
 
 	// check last batch is empty.
-	response, err := manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, watermark)
+	response, err := manager.GetJobInfo(ctx, s.adminUser, jobId, watermark)
 	c.Assert(response.Status == params.StatusSuccessful || response.Status == params.StatusRunning, qt.IsTrue)
 	c.Assert(err, qt.IsNil)
 	c.Assert(response.Logs, qt.HasLen, 0)
 }
 
-func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C) {
+func (s *bootstrapManagerSuite) TestGetJobInfo_JobFailed(c *qt.C) {
 	ctx := c.Context()
 	ctrl, mocks, _ := setupTest(c)
 	defer ctrl.Finish()
@@ -201,9 +201,9 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C)
 		1*time.Minute,
 	)
 	c.Assert(err, qt.IsNil)
-	var response params.BootstrapStatusResponse
+	var response params.GetJobInfoResponse
 	for range 10 {
-		response, err = manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
+		response, err = manager.GetJobInfo(ctx, s.adminUser, jobId, 0)
 		c.Assert(err, qt.IsNil)
 		if response.Status == params.StatusFailed {
 			break
@@ -214,7 +214,7 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobFailed(c *qt.C)
 	c.Assert(response.Error, qt.Equals, "I died really fast")
 }
 
-func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.C) {
+func (s *bootstrapManagerSuite) TestGetJobInfo_JobNotFound(c *qt.C) {
 	ctx := c.Context()
 	jobId := uuid.New()
 
@@ -224,8 +224,8 @@ func (s *bootstrapManagerSuite) TestGetBootstrapStatusAndLogs_JobNotFound(c *qt.
 	manager, err := bootstrap.NewBootstrapManager(s.db, s.jobTracker, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam)
 	c.Assert(err, qt.IsNil)
 
-	_, err = manager.GetBootstrapStatusAndLogs(ctx, s.adminUser, jobId, 0)
-	c.Assert(err, qt.ErrorMatches, "failed to get job status")
+	_, err = manager.GetJobInfo(ctx, s.adminUser, jobId, 0)
+	c.Assert(err, qt.ErrorMatches, "failed to get job info")
 }
 
 func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
@@ -296,7 +296,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -466,7 +466,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 
 	// Mocked in order of execution:
 	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
@@ -518,7 +518,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorFails(c *qt.C) {
 
 	// Mocked in order of execution:
 	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mocks.store.EXPECT().GetController(
 		gomock.Any(),
 		&dbmodel.Controller{Name: jobParams.ControllerName},
@@ -635,7 +635,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	)
 	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
 		Return(mocks.executor)
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	job := manager.BootstrapJob(
@@ -717,7 +717,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -835,7 +835,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -953,7 +953,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 		Return(mocks.executor)
 	// We don't know the jobid to expect it yet. I did test by moving this line below the call, and it does
 	// pass, but it'd be racey between the starting of the job routine and the EXPECT.
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -1089,7 +1089,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 	)
 	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
 		Return(mocks.executor)
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	ctrlDetails := &jujuclient.ControllerDetails{
 		APIEndpoints: []string{
 			"10.0.0.1:17070",
@@ -1237,7 +1237,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 	})
 	mocks.commandFactory.EXPECT().New(binaryPath, jobParams.JujuDataDir).
 		Return(mocks.executor)
-	mocks.store.EXPECT().AddBootstrapLog(gomock.Any(), gomock.Any(), gomock.Any()).
+	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, u uuid.UUID, s string) error {
 			if err := ctx.Err(); err != nil {
 				c.Errorf("expected valid context, got error: %v", err)

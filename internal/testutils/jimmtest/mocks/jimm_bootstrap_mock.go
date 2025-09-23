@@ -14,28 +14,28 @@ import (
 )
 
 type BootstapManager struct {
-	GetBootstrapStatusAndLogs_ func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error)
-	StartBootstrap_            func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
-	StopBootstrap_             func(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
+	GetJobInfo_        func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.GetJobInfoResponse, error)
+	StopJob_           func(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
+	StartBootstrapJob_ func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
 }
 
-func (b *BootstapManager) GetBootstrapStatusAndLogs(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.BootstrapStatusResponse, error) {
-	if b.GetBootstrapStatusAndLogs_ == nil {
-		return params.BootstrapStatusResponse{}, errors.E(errors.CodeNotImplemented)
+func (b *BootstapManager) GetJobInfo(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.GetJobInfoResponse, error) {
+	if b.GetJobInfo_ == nil {
+		return params.GetJobInfoResponse{}, errors.E(errors.CodeNotImplemented)
 	}
-	return b.GetBootstrapStatusAndLogs_(ctx, user, jobId, offset)
+	return b.GetJobInfo_(ctx, user, jobId, offset)
 }
 
-func (b *BootstapManager) StartBootstrap(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
-	if b.StartBootstrap_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
-	}
-	return b.StartBootstrap_(ctx, user, params)
-}
-
-func (b *BootstapManager) StopBootstrap(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
-	if b.StopBootstrap_ == nil {
+func (b *BootstapManager) StopJob(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
+	if b.StopJob_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return b.StopBootstrap_(ctx, user, jobId)
+	return b.StopJob_(ctx, user, jobId)
+}
+
+func (b *BootstapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
+	if b.StartBootstrapJob_ == nil {
+		return "", errors.E(errors.CodeNotImplemented)
+	}
+	return b.StartBootstrapJob_(ctx, user, params)
 }

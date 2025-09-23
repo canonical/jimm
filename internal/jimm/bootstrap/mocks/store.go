@@ -43,40 +43,40 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
-// AddBootstrapLog mocks base method.
-func (m *MockStore) AddBootstrapLog(ctx context.Context, jobId uuid.UUID, logLine string) error {
+// AddJobLog mocks base method.
+func (m *MockStore) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddBootstrapLog", ctx, jobId, logLine)
+	ret := m.ctrl.Call(m, "AddJobLog", ctx, jobId, logLine)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// AddBootstrapLog indicates an expected call of AddBootstrapLog.
-func (mr *MockStoreMockRecorder) AddBootstrapLog(ctx, jobId, logLine any) *MockStoreAddBootstrapLogCall {
+// AddJobLog indicates an expected call of AddJobLog.
+func (mr *MockStoreMockRecorder) AddJobLog(ctx, jobId, logLine any) *MockStoreAddJobLogCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddBootstrapLog", reflect.TypeOf((*MockStore)(nil).AddBootstrapLog), ctx, jobId, logLine)
-	return &MockStoreAddBootstrapLogCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddJobLog", reflect.TypeOf((*MockStore)(nil).AddJobLog), ctx, jobId, logLine)
+	return &MockStoreAddJobLogCall{Call: call}
 }
 
-// MockStoreAddBootstrapLogCall wrap *gomock.Call
-type MockStoreAddBootstrapLogCall struct {
+// MockStoreAddJobLogCall wrap *gomock.Call
+type MockStoreAddJobLogCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockStoreAddBootstrapLogCall) Return(err error) *MockStoreAddBootstrapLogCall {
+func (c *MockStoreAddJobLogCall) Return(err error) *MockStoreAddJobLogCall {
 	c.Call = c.Call.Return(err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockStoreAddBootstrapLogCall) Do(f func(context.Context, uuid.UUID, string) error) *MockStoreAddBootstrapLogCall {
+func (c *MockStoreAddJobLogCall) Do(f func(context.Context, uuid.UUID, string) error) *MockStoreAddJobLogCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreAddBootstrapLogCall) DoAndReturn(f func(context.Context, uuid.UUID, string) error) *MockStoreAddBootstrapLogCall {
+func (c *MockStoreAddJobLogCall) DoAndReturn(f func(context.Context, uuid.UUID, string) error) *MockStoreAddJobLogCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -157,42 +157,42 @@ func (c *MockStoreLockBootstrapCall) DoAndReturn(f func(context.Context, time.Du
 	return c
 }
 
-// QueryBootstrapLog mocks base method.
-func (m *MockStore) QueryBootstrapLog(ctx context.Context, jobId uuid.UUID, offset int) ([]string, int, error) {
+// QueryJobLog mocks base method.
+func (m *MockStore) QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int) ([]string, int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryBootstrapLog", ctx, jobId, offset)
+	ret := m.ctrl.Call(m, "QueryJobLog", ctx, jobId, offset)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(int)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// QueryBootstrapLog indicates an expected call of QueryBootstrapLog.
-func (mr *MockStoreMockRecorder) QueryBootstrapLog(ctx, jobId, offset any) *MockStoreQueryBootstrapLogCall {
+// QueryJobLog indicates an expected call of QueryJobLog.
+func (mr *MockStoreMockRecorder) QueryJobLog(ctx, jobId, offset any) *MockStoreQueryJobLogCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryBootstrapLog", reflect.TypeOf((*MockStore)(nil).QueryBootstrapLog), ctx, jobId, offset)
-	return &MockStoreQueryBootstrapLogCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryJobLog", reflect.TypeOf((*MockStore)(nil).QueryJobLog), ctx, jobId, offset)
+	return &MockStoreQueryJobLogCall{Call: call}
 }
 
-// MockStoreQueryBootstrapLogCall wrap *gomock.Call
-type MockStoreQueryBootstrapLogCall struct {
+// MockStoreQueryJobLogCall wrap *gomock.Call
+type MockStoreQueryJobLogCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockStoreQueryBootstrapLogCall) Return(loggies []string, nextOffsetValue int, err error) *MockStoreQueryBootstrapLogCall {
+func (c *MockStoreQueryJobLogCall) Return(loggies []string, nextOffsetValue int, err error) *MockStoreQueryJobLogCall {
 	c.Call = c.Call.Return(loggies, nextOffsetValue, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockStoreQueryBootstrapLogCall) Do(f func(context.Context, uuid.UUID, int) ([]string, int, error)) *MockStoreQueryBootstrapLogCall {
+func (c *MockStoreQueryJobLogCall) Do(f func(context.Context, uuid.UUID, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreQueryBootstrapLogCall) DoAndReturn(f func(context.Context, uuid.UUID, int) ([]string, int, error)) *MockStoreQueryBootstrapLogCall {
+func (c *MockStoreQueryJobLogCall) DoAndReturn(f func(context.Context, uuid.UUID, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

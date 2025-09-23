@@ -40,122 +40,6 @@ func (m *MockJIMMAPI) EXPECT() *MockJIMMAPIMockRecorder {
 	return m.recorder
 }
 
-// Bootstrap mocks base method.
-func (m *MockJIMMAPI) Bootstrap(req *params.BootstrapStartParams) (*params.BootstrapStartResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Bootstrap", req)
-	ret0, _ := ret[0].(*params.BootstrapStartResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Bootstrap indicates an expected call of Bootstrap.
-func (mr *MockJIMMAPIMockRecorder) Bootstrap(req any) *MockJIMMAPIBootstrapCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Bootstrap", reflect.TypeOf((*MockJIMMAPI)(nil).Bootstrap), req)
-	return &MockJIMMAPIBootstrapCall{Call: call}
-}
-
-// MockJIMMAPIBootstrapCall wrap *gomock.Call
-type MockJIMMAPIBootstrapCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJIMMAPIBootstrapCall) Return(arg0 *params.BootstrapStartResponse, arg1 error) *MockJIMMAPIBootstrapCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJIMMAPIBootstrapCall) Do(f func(*params.BootstrapStartParams) (*params.BootstrapStartResponse, error)) *MockJIMMAPIBootstrapCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJIMMAPIBootstrapCall) DoAndReturn(f func(*params.BootstrapStartParams) (*params.BootstrapStartResponse, error)) *MockJIMMAPIBootstrapCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// BootstrapStatus mocks base method.
-func (m *MockJIMMAPI) BootstrapStatus(req *params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BootstrapStatus", req)
-	ret0, _ := ret[0].(params.BootstrapStatusResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// BootstrapStatus indicates an expected call of BootstrapStatus.
-func (mr *MockJIMMAPIMockRecorder) BootstrapStatus(req any) *MockJIMMAPIBootstrapStatusCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BootstrapStatus", reflect.TypeOf((*MockJIMMAPI)(nil).BootstrapStatus), req)
-	return &MockJIMMAPIBootstrapStatusCall{Call: call}
-}
-
-// MockJIMMAPIBootstrapStatusCall wrap *gomock.Call
-type MockJIMMAPIBootstrapStatusCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJIMMAPIBootstrapStatusCall) Return(arg0 params.BootstrapStatusResponse, arg1 error) *MockJIMMAPIBootstrapStatusCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJIMMAPIBootstrapStatusCall) Do(f func(*params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error)) *MockJIMMAPIBootstrapStatusCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJIMMAPIBootstrapStatusCall) DoAndReturn(f func(*params.BootstrapStatusRequest) (params.BootstrapStatusResponse, error)) *MockJIMMAPIBootstrapStatusCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// BootstrapStop mocks base method.
-func (m *MockJIMMAPI) BootstrapStop(req *params.BootstrapStopRequest) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BootstrapStop", req)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BootstrapStop indicates an expected call of BootstrapStop.
-func (mr *MockJIMMAPIMockRecorder) BootstrapStop(req any) *MockJIMMAPIBootstrapStopCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BootstrapStop", reflect.TypeOf((*MockJIMMAPI)(nil).BootstrapStop), req)
-	return &MockJIMMAPIBootstrapStopCall{Call: call}
-}
-
-// MockJIMMAPIBootstrapStopCall wrap *gomock.Call
-type MockJIMMAPIBootstrapStopCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJIMMAPIBootstrapStopCall) Return(arg0 error) *MockJIMMAPIBootstrapStopCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJIMMAPIBootstrapStopCall) Do(f func(*params.BootstrapStopRequest) error) *MockJIMMAPIBootstrapStopCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJIMMAPIBootstrapStopCall) DoAndReturn(f func(*params.BootstrapStopRequest) error) *MockJIMMAPIBootstrapStopCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // Close mocks base method.
 func (m *MockJIMMAPI) Close() error {
 	m.ctrl.T.Helper()
@@ -190,6 +74,45 @@ func (c *MockJIMMAPICloseCall) Do(f func() error) *MockJIMMAPICloseCall {
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockJIMMAPICloseCall) DoAndReturn(f func() error) *MockJIMMAPICloseCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetJobInfo mocks base method.
+func (m *MockJIMMAPI) GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetJobInfo", req)
+	ret0, _ := ret[0].(params.GetJobInfoResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetJobInfo indicates an expected call of GetJobInfo.
+func (mr *MockJIMMAPIMockRecorder) GetJobInfo(req any) *MockJIMMAPIGetJobInfoCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetJobInfo", reflect.TypeOf((*MockJIMMAPI)(nil).GetJobInfo), req)
+	return &MockJIMMAPIGetJobInfoCall{Call: call}
+}
+
+// MockJIMMAPIGetJobInfoCall wrap *gomock.Call
+type MockJIMMAPIGetJobInfoCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIGetJobInfoCall) Return(arg0 params.GetJobInfoResponse, arg1 error) *MockJIMMAPIGetJobInfoCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIGetJobInfoCall) Do(f func(*params.GetJobInfoRequest) (params.GetJobInfoResponse, error)) *MockJIMMAPIGetJobInfoCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIGetJobInfoCall) DoAndReturn(f func(*params.GetJobInfoRequest) (params.GetJobInfoResponse, error)) *MockJIMMAPIGetJobInfoCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -268,6 +191,83 @@ func (c *MockJIMMAPIPrepareModelMigrationCall) Do(f func(*params.PrepareModelMig
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockJIMMAPIPrepareModelMigrationCall) DoAndReturn(f func(*params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error)) *MockJIMMAPIPrepareModelMigrationCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// StartBootstrapJob mocks base method.
+func (m *MockJIMMAPI) StartBootstrapJob(req *params.BootstrapParams) (*params.StartJobResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartBootstrapJob", req)
+	ret0, _ := ret[0].(*params.StartJobResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartBootstrapJob indicates an expected call of StartBootstrapJob.
+func (mr *MockJIMMAPIMockRecorder) StartBootstrapJob(req any) *MockJIMMAPIStartBootstrapJobCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartBootstrapJob", reflect.TypeOf((*MockJIMMAPI)(nil).StartBootstrapJob), req)
+	return &MockJIMMAPIStartBootstrapJobCall{Call: call}
+}
+
+// MockJIMMAPIStartBootstrapJobCall wrap *gomock.Call
+type MockJIMMAPIStartBootstrapJobCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIStartBootstrapJobCall) Return(arg0 *params.StartJobResponse, arg1 error) *MockJIMMAPIStartBootstrapJobCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIStartBootstrapJobCall) Do(f func(*params.BootstrapParams) (*params.StartJobResponse, error)) *MockJIMMAPIStartBootstrapJobCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIStartBootstrapJobCall) DoAndReturn(f func(*params.BootstrapParams) (*params.StartJobResponse, error)) *MockJIMMAPIStartBootstrapJobCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// StopJob mocks base method.
+func (m *MockJIMMAPI) StopJob(req *params.StopJobRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StopJob", req)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StopJob indicates an expected call of StopJob.
+func (mr *MockJIMMAPIMockRecorder) StopJob(req any) *MockJIMMAPIStopJobCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopJob", reflect.TypeOf((*MockJIMMAPI)(nil).StopJob), req)
+	return &MockJIMMAPIStopJobCall{Call: call}
+}
+
+// MockJIMMAPIStopJobCall wrap *gomock.Call
+type MockJIMMAPIStopJobCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIStopJobCall) Return(arg0 error) *MockJIMMAPIStopJobCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIStopJobCall) Do(f func(*params.StopJobRequest) error) *MockJIMMAPIStopJobCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIStopJobCall) DoAndReturn(f func(*params.StopJobRequest) error) *MockJIMMAPIStopJobCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

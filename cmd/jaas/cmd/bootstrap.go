@@ -202,7 +202,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		stringConfigValues[k] = strVal
 	}
 
-	req := apiparams.BootstrapStartParams{
+	req := apiparams.BootstrapParams{
 		CloudName:         c.cloud,
 		RegionName:        c.region,
 		ControllerName:    c.controllerName,
@@ -221,7 +221,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	}
 	defer client.Close()
 
-	resp, err := client.Bootstrap(&req)
+	resp, err := client.StartBootstrapJob(&req)
 	if err != nil {
 		return err
 	}
@@ -229,8 +229,8 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	if c.detach {
 		fmt.Printf(`
 Bootstrap job started.
-You can track the progress via bootstrap-status with the job ID:
-	juju [jaas] bootstrap-status %s
+You can track the progress via job-status with the job ID:
+	juju [jaas] job-status %s
 
 	`,
 			resp.JobID,
@@ -239,8 +239,8 @@ You can track the progress via bootstrap-status with the job ID:
 		fmt.Printf(`
 Starting bootstrap job.
 
-Should you cancel this process, you can track the progress via bootstrap-status with the job ID:
-	juju [jaas] bootstrap-status %s
+Should you cancel this process, you can track the progress via job-status with the job ID:
+	juju [jaas] job-status %s
 
 	`,
 			resp.JobID,
@@ -262,7 +262,7 @@ Should you cancel this process, you can track the progress via bootstrap-status 
 		follow:              true,
 	}
 
-	return poller.watchBootstrapLogs()
+	return poller.watchJobLogs()
 }
 
 func (c *bootstrapCommand) newClient() (JIMMAPI, error) {
