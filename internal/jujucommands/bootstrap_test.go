@@ -23,7 +23,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
 	c.Assert(p.Validate(), qt.ErrorMatches, ".*controller name name cannot be empty.*")
 
 	p.ControllerName = "my-controller"
-	c.Assert(p.Validate(), qt.ErrorMatches, ".*login-token-refresh-url cannot be empty.*")
+	c.Assert(p.Validate(), qt.ErrorMatches, "missing login token refresh URL, this value should be automatically set by JIMM")
 
 	p.LoginTokenRefreshURL = "myurl.com"
 	c.Assert(p.Validate(), qt.IsNil)
@@ -32,12 +32,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
 	c.Assert(p.Validate(), qt.ErrorMatches, "invalid version \"bad version\"")
 
 	p.AgentVersion = "1.1.1"
-	c.Assert(p.Validate(), qt.IsNil)
-
-	p.BootstrapTimeout = -1
-	c.Assert(p.Validate(), qt.ErrorMatches, "bootstrap timeout cannot be less than or equal to 0")
-
-	p.BootstrapTimeout = 1
 	c.Assert(p.Validate(), qt.IsNil)
 }
 
@@ -53,8 +47,10 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				CloudNameAndRegion:   "testregion/testcloud",
 				ControllerName:       "my-controller",
 				AgentVersion:         "1.1.1",
-				BootstrapTimeout:     1000,
 				LoginTokenRefreshURL: "myurl.com",
+				UserConfig: map[string]string{
+					"bootstrap-timeout": "1000",
+				},
 			},
 			expect: []string{
 				"bootstrap",
@@ -73,8 +69,10 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				CloudNameAndRegion:   "testregion/testcloud",
 				ControllerName:       "my-controller",
 				AgentVersion:         "",
-				BootstrapTimeout:     1000,
 				LoginTokenRefreshURL: "myurl.com",
+				UserConfig: map[string]string{
+					"bootstrap-timeout": "1000",
+				},
 			},
 			expect: []string{
 				"bootstrap",
@@ -92,7 +90,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				CloudNameAndRegion:   "testregion/testcloud",
 				ControllerName:       "my-controller",
 				AgentVersion:         "",
-				BootstrapTimeout:     0,
 				LoginTokenRefreshURL: "myurl.com",
 			},
 			expect: []string{
@@ -137,7 +134,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 		CloudNameAndRegion:   "testcloud/testregion",
 		ControllerName:       "my-controller",
 		AgentVersion:         "1.1.1",
-		BootstrapTimeout:     1000,
 		LoginTokenRefreshURL: "myurl.com",
 
 		PersonalCloud: jujucloud.Cloud{
@@ -213,7 +209,6 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 		CloudNameAndRegion:   "aws/us-east-1",
 		ControllerName:       "my-controller",
 		AgentVersion:         "1.1.1",
-		BootstrapTimeout:     1000,
 		LoginTokenRefreshURL: "myurl.com",
 
 		CloudCred: cloudCred,

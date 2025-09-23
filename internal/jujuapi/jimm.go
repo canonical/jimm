@@ -649,7 +649,6 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 
 		CloudNameAndRegion: cloudNameAndRegion,
 		ControllerName:     req.ControllerName,
-		BootstrapTimeout:   req.Flags.Timeout,
 
 		PersonalCloud: cloudFromParams(req.CloudName, req.Cloud),
 		CloudCred: cloud.NewNamedCredential(
@@ -659,10 +658,7 @@ func (r *controllerRoot) BootstrapStart(ctx context.Context, req apiparams.Boots
 			false,
 		),
 
-		PublicDNSAddress:       req.Flags.PublicDNSAddress,
-		ControllerServiceType:  req.Flags.ControllerServiceType,
-		ControllerExternalIPs:  req.Flags.ControllerExternalIPs,
-		ControllerExternalName: req.Flags.ControllerExternalName,
+		UserConfig: req.Config,
 	}
 
 	jobID, err := r.jimm.BootstrapManager().StartBootstrap(ctx, r.user, params)

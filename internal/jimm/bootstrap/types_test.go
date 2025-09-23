@@ -15,7 +15,6 @@ func TestValidateBootstrapParams_AllValid(t *testing.T) {
 
 		CloudNameAndRegion: "cloud/region",
 		ControllerName:     "my-controller",
-		BootstrapTimeout:   60,
 		// CloudCred & PersonalCloud are not validated.
 	}
 	c.Assert(params.validate(), qt.IsNil)
@@ -65,18 +64,6 @@ func TestValidateBootstrapParams_EmptyFields(t *testing.T) {
 			},
 			want: []string{
 				"controller name cannot be empty",
-			},
-		},
-		{
-			name: "bootstrap timeout negative",
-			params: BootstrapParams{
-				CLIVersion:         "1.0.0",
-				CloudNameAndRegion: "cloud/region",
-				ControllerName:     "my-controller",
-				BootstrapTimeout:   -1,
-			},
-			want: []string{
-				"bootstrap timeout cannot be less than zero",
 			},
 		},
 	}

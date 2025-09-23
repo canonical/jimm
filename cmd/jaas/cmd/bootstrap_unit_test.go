@@ -10,6 +10,7 @@ import (
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/gnuflag"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/jujuclient/jujuclienttesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"go.uber.org/mock/gomock"
@@ -60,13 +61,12 @@ func (s *bootstrapCmdSuite) TestArgParsing(c *gc.C) {
 				c.Check(command.controllerVersion, gc.Equals, "controller-version")
 			},
 		}, {
-			args: []string{"test-cloud/region", "controller-name", "controller-version", "--timeout=60", "--detach"},
+			args: []string{"test-cloud/region", "controller-name", "controller-version", "--detach"},
 			checkFlags: func(c *gc.C, command *bootstrapCommand) {
 				c.Check(command.cloud, gc.Equals, "test-cloud")
 				c.Check(command.region, gc.Equals, "region")
 				c.Check(command.controllerName, gc.Equals, "controller-name")
 				c.Check(command.controllerVersion, gc.Equals, "controller-version")
-				c.Check(command.timeout, gc.Equals, 60)
 				c.Check(command.detach, gc.Equals, true)
 			},
 		}, {
@@ -109,8 +109,9 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 				AuthType:   string(jujucloud.UserPassAuthType),
 				Attributes: map[string]string{},
 			},
-			Flags: params.BootstrapFlags{
-				Timeout: 60,
+			Config: map[string]string{
+				"bootstrap-timeout": "60",
+				"string-option":     "value",
 			},
 			ControllerVersion: "controller-version",
 		}
@@ -121,7 +122,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 		// So we expect just ec2 and it should be ok.
 		c.Assert(bsp.Cloud.Type, gc.DeepEquals, "ec2")
 		c.Assert(bsp.Credential, gc.DeepEquals, expected.Credential)
-		c.Assert(bsp.Flags.Timeout, gc.Equals, expected.Flags.Timeout)
+		c.Assert(bsp.Config, gc.DeepEquals, expected.Config)
 		c.Assert(bsp.ControllerVersion, gc.Equals, expected.ControllerVersion)
 
 		return &params.BootstrapStartResponse{
@@ -136,6 +137,13 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 			return s.client, nil
 		},
 	}
+
+	configOpts := common.ConfigFlag{}
+	err := configOpts.Set("bootstrap-timeout=60")
+	c.Assert(err, gc.IsNil)
+	err = configOpts.Set("string-option=value")
+	c.Assert(err, gc.IsNil)
+
 	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
 	f.SetOutput(s.writer)
 	command.SetFlags(f)
@@ -143,7 +151,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 	command.cloud = cloudName
 	command.region = "region"
 	command.controllerVersion = "controller-version"
-	command.timeout = 60
+	command.config = configOpts
 	command.detach = true
 
 	ctx := &cmd.Context{
@@ -151,7 +159,7 @@ func (s *bootstrapCmdSuite) TestBootstrapRunDetached(c *gc.C) {
 		Stdout:  s.writer,
 	}
 
-	err := command.Run(ctx)
+	err = command.Run(ctx)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -325,7 +333,6 @@ func (s *bootstrapCmdSuite) TestBootstrapWithDefaultCredential(c *gc.C) {
 	command.cloud = cloudName
 	command.region = "region"
 	command.controllerVersion = "controller-version"
-	command.timeout = 60
 	command.detach = true
 
 	ctx := &cmd.Context{
@@ -364,7 +371,6 @@ func (s *bootstrapCmdSuite) TestBootstrapSpecifiedCredentialWithDefault(c *gc.C)
 	command.cloud = cloudName
 	command.region = "region"
 	command.controllerVersion = "controller-version"
-	command.timeout = 60
 	command.detach = true
 	command.credentialName = "cred-3" // Use a different credential than the default.
 

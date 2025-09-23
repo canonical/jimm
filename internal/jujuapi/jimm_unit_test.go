@@ -209,12 +209,10 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	params := params.BootstrapStartParams{
-		ControllerName: "controller",
-		CloudName:      "cloud",
-		RegionName:     "region",
-		Flags: params.BootstrapFlags{
-			Timeout: 3600,
-		},
+		ControllerName:    "controller",
+		CloudName:         "cloud",
+		RegionName:        "region",
+		Config:            map[string]string{},
 		Cloud:             jujuparams.Cloud{},
 		Credential:        jujuparams.CloudCredential{},
 		ControllerVersion: "3.6.8",

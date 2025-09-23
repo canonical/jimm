@@ -17,13 +17,17 @@ import (
 	"github.com/juju/version/v2"
 )
 
+const (
+	//nolint:gosec // Thinks hardcoded credentials.
+	loginTokenRefreshURLKey = "login-token-refresh-url"
+)
+
 // BootstrapCmdParams holds the parameters to bootstrap a controller for JIMM.
 type BootstrapCmdParams struct {
 	// Arguments to be turned into an actual command str.
 	CloudNameAndRegion   string
 	ControllerName       string
 	AgentVersion         string
-	BootstrapTimeout     int
 	LoginTokenRefreshURL string
 
 	// Additional args required (like adding credential, cloud, etc.) but JIMM will handle.
@@ -33,13 +37,8 @@ type BootstrapCmdParams struct {
 	// The credential to use for the cloud.
 	CloudCred jujucloud.Credential
 
-	// Controller public dns address (if any) and k8s service options to expose a k8s
-	// controller.
-
-	PublicDNSAddress       string
-	ControllerServiceType  string
-	ControllerExternalIPs  string
-	ControllerExternalName string
+	// UserConfig holds user defined config for bootstrap.
+	UserConfig map[string]string
 }
 
 // Validate validates the BootstrapCmdParams.
@@ -60,12 +59,12 @@ func (b BootstrapCmdParams) Validate() error {
 		}
 	}
 
-	if b.BootstrapTimeout < 0 {
-		return errors.New("bootstrap timeout cannot be less than or equal to 0")
+	if _, ok := b.UserConfig[loginTokenRefreshURLKey]; ok {
+		return fmt.Errorf("%q is a reserved config key and cannot be set in user config", loginTokenRefreshURLKey)
 	}
 
 	if b.LoginTokenRefreshURL == "" {
-		return errors.New("login-token-refresh-url cannot be empty")
+		return errors.New("missing login token refresh URL, this value should be automatically set by JIMM")
 	}
 
 	return nil
@@ -84,32 +83,9 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 		args = append(args, fmt.Sprintf("--agent-version=%s", b.AgentVersion))
 	}
 
-	// Conditionally add bootstrap-timeout if set
-	if b.BootstrapTimeout > 0 {
+	for k, v := range b.UserConfig {
 		args = append(args, "--config")
-		args = append(args, fmt.Sprintf("bootstrap-timeout=%d", b.BootstrapTimeout))
-	}
-
-	// Simply allow the user the pass the options through, Juju will validate the
-	// permutations of these options and respond accordingly.
-	if b.ControllerServiceType != "" {
-		args = append(args, "--config")
-		args = append(args, fmt.Sprintf("controller-service-type=%s", b.ControllerServiceType))
-	}
-
-	if b.ControllerExternalIPs != "" {
-		args = append(args, "--config")
-		args = append(args, fmt.Sprintf("controller-external-ips=%s", b.ControllerExternalIPs))
-	}
-
-	if b.ControllerExternalName != "" {
-		args = append(args, "--config")
-		args = append(args, fmt.Sprintf("controller-external-name=%s", b.ControllerExternalName))
-	}
-
-	if b.PublicDNSAddress != "" {
-		args = append(args, "--config")
-		args = append(args, fmt.Sprintf("public-dns-address=%s", b.PublicDNSAddress))
+		args = append(args, fmt.Sprintf("%s=%s", k, fmt.Sprint(v)))
 	}
 
 	// Always add controller name & cloud at the end

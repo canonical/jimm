@@ -17,19 +17,12 @@ type BootstrapParams struct {
 
 	CloudNameAndRegion string
 	ControllerName     string
-	BootstrapTimeout   int
 
 	CloudCred jujucloud.Credential
 	// PersonalCloud is the cloud-definition for a non-public cloud.
 	PersonalCloud jujucloud.Cloud
 
-	// Controller public dns address (if any) and k8s service options to expose a k8s
-	// controller.
-
-	PublicDNSAddress       string
-	ControllerServiceType  string
-	ControllerExternalIPs  string
-	ControllerExternalName string
+	UserConfig map[string]string
 }
 
 // Validate checks if the BootstrapParams are valid.
@@ -43,9 +36,6 @@ func (p BootstrapParams) validate() error {
 	}
 	if p.ControllerName == "" {
 		msgs = append(msgs, "controller name cannot be empty")
-	}
-	if p.BootstrapTimeout < 0 {
-		msgs = append(msgs, "bootstrap timeout cannot be less than zero")
 	}
 
 	// Don't validate cloud or cloud cred. Juju knows better how to validate those.
