@@ -712,9 +712,6 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 	jobID, err := r.jimm.BootstrapManager().StartDestroyControllerJob(ctx, r.user, bootstrap.DestroyControllerParams{
 		ControllerName: req.ControllerName,
 		CLIVersion:     ctrl.AgentVersion,
-		// TODO from vault
-		User:     "",
-		Password: "",
 	})
 	if err != nil {
 		return apiparams.StartJobResponse{}, errors.E(op, fmt.Errorf("failed to start destroy-controller job: %v", err))

@@ -80,6 +80,11 @@ type JujuCommands interface {
 	DestroyController(ctx context.Context, p jujucommands.DestroyControllerCmdParams) (<-chan jujucommands.OutputLine, error)
 }
 
+// CredentialStore lets us fetch credentials from Vault
+type CredentialStore interface {
+	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
+}
+
 // CommandFactory is a wrapper for mocking Juju commands, with a concrete
 // implementation in [commandFactory].
 type CommandFactory interface {
@@ -92,6 +97,7 @@ type bootstrapManager struct {
 	jujuManager               JujuManager
 	binaryStore               BinaryStore
 	jimmWellknownJWKSEndpoint string
+	credentialStore           CredentialStore
 }
 
 // NewBootstrapManager creates a new BootstrapManager instance.
@@ -101,6 +107,7 @@ func NewBootstrapManager(
 	jujuManager JujuManager,
 	binaryStore BinaryStore,
 	jimmWellknownJWKSEndpoint string,
+	credentialStore CredentialStore,
 ) (*bootstrapManager, error) {
 	if store == nil {
 		return nil, errors.E("store cannot be nil")
@@ -123,6 +130,7 @@ func NewBootstrapManager(
 		jujuManager:               jujuManager,
 		binaryStore:               binaryStore,
 		jimmWellknownJWKSEndpoint: jimmWellknownJWKSEndpoint,
+		credentialStore:           credentialStore,
 	}, nil
 }
 
@@ -592,14 +600,17 @@ func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 			cmdFactory := commandFactory{}
 			jujuCmd := cmdFactory.New(binary.FullPath, jujuDataDir)
 
-			// TODO get credentials
+			username, pass, err := b.credentialStore.GetControllerCredentials(ctx, params.ControllerName)
+			if err != nil {
+				return errors.E(fmt.Errorf("failed to get controller credentials: %w", err))
+			}
 
 			outputCh, err := jujuCmd.DestroyController(
 				ctx,
 				jujucommands.DestroyControllerCmdParams{
 					ControllerName: params.ControllerName,
-					User:           params.User,
-					Password:       params.Password,
+					Username:       username,
+					Password:       pass,
 				},
 			)
 			if err != nil {

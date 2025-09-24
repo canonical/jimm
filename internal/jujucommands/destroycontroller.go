@@ -15,7 +15,7 @@ import (
 // DestroyControllerCmdParams holds the parameters to tear-down a controller.
 type DestroyControllerCmdParams struct {
 	ControllerName string
-	User           string
+	Username       string
 	Password       string
 }
 
@@ -58,10 +58,10 @@ func (c *destroyControllerCmd) Run(ctx context.Context, p DestroyControllerCmdPa
 	dataDir := c.runner.JujuDataDir()
 	osenv.SetJujuXDGDataHome(dataDir)
 
-	if p.User != "" {
+	if p.Username != "" {
 		store := jujuclient.NewFileClientStore()
 		err := store.UpdateAccount(p.ControllerName, jujuclient.AccountDetails{
-			User:     p.User,
+			User:     p.Username,
 			Password: p.Password,
 		})
 		if err != nil {
