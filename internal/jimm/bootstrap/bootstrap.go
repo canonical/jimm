@@ -37,8 +37,8 @@ var (
 )
 
 const (
-	bootstrapJobType     = "bootstrap"
-	maxBootstrapDuration = 60 * time.Minute
+	bootstrapJobType = "bootstrap"
+	maxJobDuration   = 60 * time.Minute
 )
 
 // Store defines the store methods required by the manager.
@@ -66,6 +66,7 @@ type JobTracker interface {
 // JujuManager defines the juju manager methods required by the job.
 type JujuManager interface {
 	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
+	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
 }
 
 // BinaryStore defines the binary store methods required by the job.
@@ -203,7 +204,7 @@ func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 			commandFactory{},
 			user,
 		),
-		maxBootstrapDuration,
+		maxJobDuration,
 	)
 	if err != nil {
 		return "", errors.E(op, fmt.Errorf("failed to start bootstrap job: %w", err))
@@ -531,4 +532,104 @@ func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId uuid.UUID, log
 	if err := b.store.AddJobLog(ctx, jobId, logLine); err != nil {
 		zapctx.Error(ctx, "failed to write bootstrap log", zap.Error(err), zap.String("jobId", jobId.String()))
 	}
+}
+
+// StartDestroyControllerJob starts a destroy-controller job
+func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *openfga.User, params DestroyControllerParams) (string, error) {
+	const op = errors.Op("jimm.StartDestroyControllerJob")
+
+	jujuDataDir, err := os.MkdirTemp("", "juju-data-dir")
+	if err != nil {
+		return "", errors.E(op, fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
+	}
+
+	jobId, err := b.tracker.Run(
+		ctx,
+		bootstrapJobType,
+		func(jobCtx context.Context) error {
+			jobId, ok := jobtracker.JobIdFromContext(jobCtx)
+			if !ok {
+				return fmt.Errorf("failed to get job ID from context")
+			}
+
+			jobCtx = zapctx.WithFields(
+				jobCtx,
+				zap.String("job-id", jobId.String()),
+				zap.String("controller-name", params.ControllerName),
+			)
+
+			zapctx.Debug(
+				jobCtx,
+				"starting destroy-controller job",
+			)
+
+			b.writeJobLog(jobCtx, jobId,
+				fmt.Sprintf("Downloading the Juju CLI, version %s for bootstrap. This may take a few minutes", params.CLIVersion))
+
+			binary, err := b.binaryStore.Get(
+				jobCtx,
+				jujuclistore.JujuBinarySpec{
+					Version: params.CLIVersion,
+					// This is a best effort. The launchpad URL just so happens to have similar filenames to runtime.GOOS and runtime.GOARCH.
+					// If this ever changes, we should update the binary store to use the correct URL
+					// or we should detect the OS and arch here. We don't want to detect it in the binary store
+					// because the consumer may want to detect it in different ways.
+					Os:   runtime.GOOS,
+					Arch: runtime.GOARCH,
+				},
+				func(line string) {
+					b.writeJobLog(jobCtx, jobId, line)
+				},
+			)
+			if err != nil {
+				return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
+			}
+			zapctx.Debug(jobCtx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
+			defer func() {
+				binary.Done()
+			}()
+
+			cmdFactory := commandFactory{}
+			jujuCmd := cmdFactory.New(binary.FullPath, jujuDataDir)
+
+			// TODO get credentials
+
+			outputCh, err := jujuCmd.DestroyController(
+				ctx,
+				jujucommands.DestroyControllerCmdParams{
+					ControllerName: params.ControllerName,
+					User:           params.User,
+					Password:       params.Password,
+				},
+			)
+			if err != nil {
+				return errors.E(fmt.Errorf("failed to run destroy-controller command: %w", err))
+			}
+
+			// Update the context from this point to prevent it from being cancelled when the parent is cancelled.
+			// This ensures that we still capture output from the destroy-controller command
+			// and log it if that command is cancelled while keeping things like
+			// log info that was set on the context.
+			jobCtx = context.WithoutCancel(jobCtx)
+
+			err = b.consumeCommandOutput(jobCtx, outputCh, jobId)
+			if err != nil {
+				return err
+			}
+
+			// Finally, remove controller if we have successfully destroyed it
+			err = b.jujuManager.RemoveController(jobCtx, user, params.ControllerName, false)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+		maxJobDuration,
+	)
+	if err != nil {
+		return "", errors.E(op, fmt.Errorf("failed to start bootstrap job: %w", err))
+	}
+
+	return jobId.String(), nil
 }

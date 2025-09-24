@@ -10,6 +10,7 @@ type JIMMAPI interface {
 	GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error)
 	StopJob(req *params.StopJobRequest) error
 	StartBootstrapJob(req *params.BootstrapParams) (*params.StartJobResponse, error)
+	StartDestroyControllerJob(req *params.DestroyControllerRequest) (*params.StartJobResponse, error)
 	ListMigrationTargets(req *params.ListMigrationTargetsRequest) ([]params.ControllerInfo, error)
 	PrepareModelMigration(req *params.PrepareModelMigrationRequest) (params.PrepareModelMigrationResponse, error)
 }

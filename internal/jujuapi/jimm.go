@@ -69,6 +69,7 @@ func init() {
 		getJobInfo := rpc.Method(r.GetJobInfo)
 		stopJob := rpc.Method(r.StopJob)
 		startBootstrapJob := rpc.Method(r.StartBootstrapJob)
+		startDestroyControllerJob := rpc.Method(r.StartDestroyControllerJob)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -112,6 +113,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "GetJobInfo", getJobInfo)
 		r.AddMethod("JIMM", 4, "StopJob", stopJob)
 		r.AddMethod("JIMM", 4, "StartBootstrapJob", startBootstrapJob)
+		r.AddMethod("JIMM", 4, "StartDestroyControllerJob", startDestroyControllerJob)
 
 		return []int{4}
 	}
@@ -685,6 +687,39 @@ func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.Bo
 	if err != nil {
 		return apiparams.StartJobResponse{}, errors.E(op, fmt.Errorf("failed to start bootstrap job: %v", err))
 	}
+	return apiparams.StartJobResponse{
+		JobID: jobID,
+	}, nil
+}
+
+// StartDestroyControllerJob starts a destroy-controller job
+func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apiparams.DestroyControllerRequest) (apiparams.StartJobResponse, error) {
+	const op = errors.Op("jujuapi.StartDestroyControllerJob")
+
+	if !r.user.JimmAdmin {
+		return apiparams.StartJobResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	}
+
+	ctrl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.ControllerName)
+	if err != nil {
+		return apiparams.StartJobResponse{}, errors.E(op, fmt.Errorf("failed to fetch controller info: %w", err))
+	}
+
+	if len(ctrl.Models) != 0 {
+		return apiparams.StartJobResponse{}, errors.E(op, errors.CodeBadRequest, "cannot destroy controller with models")
+	}
+
+	jobID, err := r.jimm.BootstrapManager().StartDestroyControllerJob(ctx, r.user, bootstrap.DestroyControllerParams{
+		ControllerName: req.ControllerName,
+		CLIVersion:     ctrl.AgentVersion,
+		// TODO from vault
+		User:     "",
+		Password: "",
+	})
+	if err != nil {
+		return apiparams.StartJobResponse{}, errors.E(op, fmt.Errorf("failed to start destroy-controller job: %v", err))
+	}
+
 	return apiparams.StartJobResponse{
 		JobID: jobID,
 	}, nil

@@ -234,6 +234,45 @@ func (c *MockJIMMAPIStartBootstrapJobCall) DoAndReturn(f func(*params.BootstrapP
 	return c
 }
 
+// StartDestroyControllerJob mocks base method.
+func (m *MockJIMMAPI) StartDestroyControllerJob(req *params.DestroyControllerRequest) (*params.StartJobResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StartDestroyControllerJob", req)
+	ret0, _ := ret[0].(*params.StartJobResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StartDestroyControllerJob indicates an expected call of StartDestroyControllerJob.
+func (mr *MockJIMMAPIMockRecorder) StartDestroyControllerJob(req any) *MockJIMMAPIStartDestroyControllerJobCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartDestroyControllerJob", reflect.TypeOf((*MockJIMMAPI)(nil).StartDestroyControllerJob), req)
+	return &MockJIMMAPIStartDestroyControllerJobCall{Call: call}
+}
+
+// MockJIMMAPIStartDestroyControllerJobCall wrap *gomock.Call
+type MockJIMMAPIStartDestroyControllerJobCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIStartDestroyControllerJobCall) Return(arg0 *params.StartJobResponse, arg1 error) *MockJIMMAPIStartDestroyControllerJobCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIStartDestroyControllerJobCall) Do(f func(*params.DestroyControllerRequest) (*params.StartJobResponse, error)) *MockJIMMAPIStartDestroyControllerJobCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIStartDestroyControllerJobCall) DoAndReturn(f func(*params.DestroyControllerRequest) (*params.StartJobResponse, error)) *MockJIMMAPIStartDestroyControllerJobCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // StopJob mocks base method.
 func (m *MockJIMMAPI) StopJob(req *params.StopJobRequest) error {
 	m.ctrl.T.Helper()

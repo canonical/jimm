@@ -285,3 +285,10 @@ func (c *Client) StartBootstrapJob(req *params.BootstrapParams) (*params.StartJo
 	err := c.caller.APICall("JIMM", 4, "", "StartBootstrapJob", req, &response)
 	return &response, err
 }
+
+// StartDestroyControllerJob starts a destroy-controller operation on the JIMM server.
+func (c *Client) StartDestroyControllerJob(req *params.DestroyControllerRequest) (*params.StartJobResponse, error) {
+	var response params.StartJobResponse
+	err := c.caller.APICall("JIMM", 4, "", "StartDestroyControllerJob", req, &response)
+	return &response, err
+}

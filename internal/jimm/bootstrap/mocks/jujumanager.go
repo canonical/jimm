@@ -80,3 +80,41 @@ func (c *MockJujuManagerAddControllerCall) DoAndReturn(f func(context.Context, *
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// RemoveController mocks base method.
+func (m *MockJujuManager) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveController", ctx, user, controllerName, force)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveController indicates an expected call of RemoveController.
+func (mr *MockJujuManagerMockRecorder) RemoveController(ctx, user, controllerName, force any) *MockJujuManagerRemoveControllerCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveController", reflect.TypeOf((*MockJujuManager)(nil).RemoveController), ctx, user, controllerName, force)
+	return &MockJujuManagerRemoveControllerCall{Call: call}
+}
+
+// MockJujuManagerRemoveControllerCall wrap *gomock.Call
+type MockJujuManagerRemoveControllerCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJujuManagerRemoveControllerCall) Return(arg0 error) *MockJujuManagerRemoveControllerCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJujuManagerRemoveControllerCall) Do(f func(context.Context, *openfga.User, string, bool) error) *MockJujuManagerRemoveControllerCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJujuManagerRemoveControllerCall) DoAndReturn(f func(context.Context, *openfga.User, string, bool) error) *MockJujuManagerRemoveControllerCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}

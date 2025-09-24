@@ -312,6 +312,8 @@ type BootstrapManager interface {
 	StopJob(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
 	// StartBootstrapJob starts a bootstrap job and returns the job ID.
 	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
+	// StartDestroyControllerJob starts a destroy-controller job and returns the job ID.
+	StartDestroyControllerJob(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (string, error)
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.

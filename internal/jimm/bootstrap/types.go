@@ -51,3 +51,11 @@ func (p BootstrapParams) validate() error {
 	}
 	return nil
 }
+
+// DestroyControllerParams
+type DestroyControllerParams struct {
+	ControllerName string
+	CLIVersion     string
+	User           string
+	Password       string
+}
