@@ -194,7 +194,6 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 		AuditLog:                auditLogger,
 		LoginService:            s.jimm.LoginManager(),
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
-		SSHKeyManager:           s.jimm.SSHKeyManager(),
 		RedirectInfo:            redirectInfo,
 	}
 	if err := rpcproxy.ProxySockets(ctx, proxyHelpers); err != nil {

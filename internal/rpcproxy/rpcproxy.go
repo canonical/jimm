@@ -22,10 +22,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
@@ -52,18 +50,6 @@ type ControllerDetails struct {
 // model migration when receiving requests from agents.
 type RedirectInfoGetter interface {
 	GetRedirectInfo(ctx context.Context) (ControllerDetails, error)
-}
-
-// SSHKeyManager is an interface for managing SSH keys.
-type SSHKeyManager interface {
-	// AddUserPublicKey saves a user's public key.
-	AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
-	// ListUserPublicKeys lists a user's public keys.
-	ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
-	// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error
-	// RemoveUserKeyByFingerprint removes a user's public key(s) by the key fingerprint.
-	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
 }
 
 // TokenGenerator authenticates a user and generates a JWT token.
@@ -113,7 +99,6 @@ type LoginService interface {
 // connection to a model.
 type ProxyHelpers struct {
 	ConnClient              WebsocketConnection
-	SSHKeyManager           SSHKeyManager
 	TokenGen                TokenGenerator
 	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
@@ -139,10 +124,6 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		zapctx.Error(ctx, "Missing login service function")
 		return errors.E(op, "Missing login service function")
 	}
-	if helpers.SSHKeyManager == nil {
-		zapctx.Error(ctx, "Missing ssh key manager function")
-		return errors.E(op, "Missing ssh key manager function")
-	}
 	if helpers.RedirectInfo == nil {
 		zapctx.Error(ctx, "Missing redirect info function")
 		return errors.E(op, "Missing redirect info function")
@@ -159,7 +140,6 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			tokenGen:                helpers.TokenGen,
 			auditLog:                helpers.AuditLog,
 			conversationId:          utils.NewConversationID(),
-			sshKeyManager:           helpers.SSHKeyManager,
 			loginService:            helpers.LoginService,
 			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
 			redirectInfo:            helpers.RedirectInfo,
@@ -296,7 +276,6 @@ type modelProxy struct {
 	anonymousLogin          bool // anonymousLogin is true if the client is not authenticated.
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
-	sshKeyManager           SSHKeyManager
 	loginService            LoginService
 	modelName               string
 	modelUUID               string
@@ -391,7 +370,6 @@ func unexpectedReadError(err error) bool {
 // clientProxy proxies messages from client->controller.
 type clientProxy struct {
 	modelProxy
-	user                 *openfga.User
 	wg                   sync.WaitGroup
 	errChan              chan error
 	createControllerConn func(context.Context) (WebsocketConnectionWithMetadata, error)
@@ -416,7 +394,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 		}
 		// TODO: In some scenarios we don't need to ever dial the controller.
 		// For example, if the client is only sending requests that are handled by JIMM
-		// itself, like SSH key management or scenarios where JIMM returns a redirect.
+		// itself, like login or scenarios where JIMM returns a redirect.
 		// But we currently need `makeControllerConnection` to set the model UUID and name
 		// so that we can generate JWTs when messages DO need to be forwarded.
 		// Refactor this to be avoid dialling the controller if we don't need to.
@@ -447,18 +425,6 @@ func (p *clientProxy) start(ctx context.Context) error {
 				msg = toController
 				p.msgs.addLoginMessage(toController)
 			}
-		}
-		// This is a special case for the KeyManager facade. We handle it here
-		// because it is a model level facade. In Juju 4 we want to move this
-		// to a controller level facade and place the logic in jujuapi.
-		if msg.Type == "KeyManager" {
-			toClient, err := p.handleKeyManagerFacade(ctx, msg)
-			if err != nil {
-				p.sendError(ctx, p.src, msg, err)
-				continue
-			}
-			p.src.sendMessage(nil, toClient)
-			continue
 		}
 		p.msgs.addMessage(msg)
 		if err := p.dst.writeJson(msg); err != nil {
@@ -736,8 +702,6 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		return nil, nil, err
 	}
 	controllerLoginMessageFnc := func(user *openfga.User) (*message, *message, error) {
-		// Store the logged in user for use with SSH key manager methods.
-		p.user = user
 		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
 		if err != nil {
 			return errorFnc(err)
@@ -882,65 +846,5 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 		return nil, errRedirect
 	default:
 		return nil, fmt.Errorf("unsupported login request for tag %s", tag)
-	}
-}
-
-// handleKeyManagerFacade processes the key manager facade call.
-func (p *clientProxy) handleKeyManagerFacade(ctx context.Context, msg *message) (clientResponse *message, err error) {
-	if p.user == nil {
-		return nil, errors.E("user not authenticated")
-	}
-	clientRespF := func(data any) (*message, error) {
-		resp, err := json.Marshal(data)
-		if err != nil {
-			return nil, err
-		}
-		msg.Response = resp
-		return msg, nil
-	}
-	keyManager := keyManagerFacade{keyManager: p.sshKeyManager, user: p.user, modelUUID: p.modelUUID}
-
-	switch msg.Request {
-	case "ListKeys":
-		var request params.ListSSHKeys
-		err := json.Unmarshal(msg.Params, &request)
-		if err != nil {
-			return nil, err
-		}
-		res, err := keyManager.ListKeys(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		return clientRespF(res)
-
-	case "AddKeys":
-		var request params.ModifyUserSSHKeys
-		err := json.Unmarshal(msg.Params, &request)
-		if err != nil {
-			return nil, err
-		}
-		res, err := keyManager.AddKeys(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		return clientRespF(res)
-
-	case "DeleteKeys":
-		var request params.ModifyUserSSHKeys
-		err := json.Unmarshal(msg.Params, &request)
-		if err != nil {
-			return nil, err
-		}
-		res, err := keyManager.DeleteKeys(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		return clientRespF(res)
-
-	case "ImportKeys":
-		return nil, errors.E("ImportKeys not implemented", errors.CodeNotImplemented)
-
-	default:
-		return nil, errors.E("unknown key manager request")
 	}
 }

@@ -641,12 +641,6 @@ func (j *JIMM) AuditLogManager() AuditLogManager {
 	return j.auditLogManager
 }
 
-// SSHKeyManager returns a manager that enables operations
-// related to ssh keys.
-func (j *JIMM) SSHKeyManager() SSHKeyManager {
-	return j.sshKeyManager
-}
-
 // SSHManager returns a manager that enables operations
 // related to ssh.
 func (j *JIMM) SSHManager() SSHManager {

@@ -10,17 +10,12 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/utils/v3/ssh"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpcproxy"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/testutils/rpctest"
 )
 
@@ -65,7 +60,6 @@ func TestProxySockets(t *testing.T) {
 			ConnectController: f,
 			AuditLog:          auditLogger,
 			LoginService:      &mockLoginService{},
-			SSHKeyManager:     &mocks.SSHKeyManager{},
 		}
 		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
 		c.Check(err, qt.IsNil)
@@ -128,7 +122,6 @@ func TestProxySocketsControllerConnectionFails(t *testing.T) {
 			ConnectController: f,
 			AuditLog:          auditLogger,
 			LoginService:      &mockLoginService{},
-			SSHKeyManager:     &mocks.SSHKeyManager{},
 		}
 		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
 		c.Check(err, qt.IsNil)
@@ -195,7 +188,6 @@ func TestCancelProxySockets(t *testing.T) {
 			ConnectController: f,
 			AuditLog:          auditLogger,
 			LoginService:      &mockLoginService{},
-			SSHKeyManager:     &mocks.SSHKeyManager{},
 		}
 		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
 		c.Check(err, qt.ErrorMatches, "Context cancelled")
@@ -242,7 +234,6 @@ func TestProxySocketsAuditLogs(t *testing.T) {
 			ConnectController: f,
 			AuditLog:          auditLogger,
 			LoginService:      &mockLoginService{},
-			SSHKeyManager:     &mocks.SSHKeyManager{},
 		}
 		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
 		c.Check(err, qt.IsNil)
@@ -331,7 +322,6 @@ func TestProxySocketsModelMigration(t *testing.T) {
 			ConnectController: f,
 			AuditLog:          func(ale *dbmodel.AuditLogEntry) {},
 			LoginService:      &mockLoginService{},
-			SSHKeyManager:     &mocks.SSHKeyManager{},
 		}
 		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
 		c.Check(err, qt.IsNil)
@@ -395,7 +385,6 @@ func TestProxySocketsUnauthorized(t *testing.T) {
 			ConnectController: f,
 			AuditLog:          func(ale *dbmodel.AuditLogEntry) {},
 			LoginService:      &mockLoginService{},
-			SSHKeyManager:     &mocks.SSHKeyManager{},
 		}
 		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
 		c.Check(err, qt.IsNil)
@@ -431,160 +420,4 @@ func TestProxySocketsUnauthorized(t *testing.T) {
 	c.Assert(resp.ErrorCode, qt.Equals, string(errors.CodeUnauthorized))
 	ws.Close()
 	<-errChan // Ensure go routines are cleaned up
-}
-
-// TestProxySocketsSSHKeys verifies that the
-// SSH KeyManager methods are wired up properly.
-// E.g. that a call with method name AddKeys calls
-// the KeyManager's AddKeys method.
-func TestProxySocketsSSHKeys(t *testing.T) {
-	c := qt.New(t)
-
-	ctx := context.Background()
-	sshFacadeChan := make(chan (string), 1)
-
-	srvController := rpctest.NewServer(rpctest.Echo)
-
-	errChan := make(chan error)
-	srvJIMM := rpctest.NewServer(func(connClient *websocket.Conn) error {
-		defer connClient.Close()
-		testTokenGen := testTokenGenerator{}
-		connectControllerF := func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
-			connController := srvController.Dialer.DialWebsocket(c, srvController.URL)
-			return rpcproxy.WebsocketConnectionWithMetadata{
-				Conn:      connController,
-				ModelName: "TestModelName",
-			}, nil
-		}
-		proxyHelpers := rpcproxy.ProxyHelpers{
-			RedirectInfo:      &mockRedirectInfo{},
-			ConnClient:        connClient,
-			TokenGen:          &testTokenGen,
-			ConnectController: connectControllerF,
-			AuditLog:          func(ale *dbmodel.AuditLogEntry) {},
-			LoginService: &mockLoginService{
-				email: "alice@canonical.com",
-			},
-			SSHKeyManager: &mocks.SSHKeyManager{
-				AddUserPublicKey_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error {
-					sshFacadeChan <- "add-keys"
-					return nil
-				},
-				ListUserPublicKeys_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error) {
-					sshFacadeChan <- "list-keys"
-					return nil, nil
-				},
-				RemoveUserKeyByComment_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
-					sshFacadeChan <- "remove-keys-comment"
-					return nil
-				},
-				RemoveUserKeyByFingerprint_: func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
-					sshFacadeChan <- "remove-keys-fingerprint"
-					return nil
-				},
-				VerifyPublicKey_: func(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
-					sshFacadeChan <- "verify-key"
-					return true, nil
-				},
-			},
-		}
-		err := rpcproxy.ProxySockets(ctx, proxyHelpers)
-		c.Check(err, qt.IsNil)
-		errChan <- err
-		return err
-	})
-
-	defer srvController.Close()
-	defer srvJIMM.Close()
-	ws := srvJIMM.Dialer.DialWebsocket(c, srvJIMM.URL)
-	defer ws.Close()
-
-	// Perform login
-	p := json.RawMessage(`{"Key":"TestVal"}`)
-	msg := rpcproxy.Message{RequestID: 1, Type: "Admin", Request: "LoginWithSessionToken", Params: p} // #nosec G115 accept integer conversion
-	err := ws.WriteJSON(&msg)
-	c.Assert(err, qt.IsNil)
-	resp := rpcproxy.Message{}
-	err = ws.ReadJSON(&resp)
-	c.Assert(err, qt.IsNil)
-	c.Assert(resp.Error, qt.Equals, "")
-
-	// Run sub-tests for all SSH Key methods
-	tests := []struct {
-		name               string
-		request            string
-		params             []byte
-		expectedChanResult string
-		expectedErr        string
-	}{
-		{
-			name:               "Add key method",
-			request:            "AddKeys",
-			expectedChanResult: "add-keys",
-			params:             mustMarshal(jujuparams.ModifyUserSSHKeys{Keys: []string{"type key comment"}}),
-		},
-		{
-			name:               "List keys method",
-			request:            "ListKeys",
-			expectedChanResult: "list-keys",
-			params:             mustMarshal(jujuparams.ListSSHKeys{Mode: ssh.Fingerprints}),
-		},
-		{
-			name:               "Delete keys by comment",
-			request:            "DeleteKeys",
-			expectedChanResult: "remove-keys-comment",
-			params:             mustMarshal(jujuparams.ModifyUserSSHKeys{Keys: []string{"comment"}}),
-		},
-		{
-			name:               "Delete keys by fingerprint",
-			request:            "DeleteKeys",
-			expectedChanResult: "remove-keys-fingerprint",
-			params:             mustMarshal(jujuparams.ModifyUserSSHKeys{Keys: []string{"79:fc:60:93:ec:ce:42:fe:15:61:f2:fb:d6:22:43:6e"}}),
-		},
-		{
-			name:        "Invalid method called",
-			request:     "InvalidMethod",
-			expectedErr: "unknown key manager request",
-			params:      []byte{},
-		},
-	}
-
-	for i, test := range tests {
-		c.Run(test.name, func(c *qt.C) {
-			msg := rpcproxy.Message{RequestID: uint64(i + 1), Type: "KeyManager", Request: test.request, Params: test.params} // #nosec G115 accept integer conversion
-			err := ws.WriteJSON(&msg)
-			c.Assert(err, qt.IsNil)
-
-			resp := rpcproxy.Message{}
-			err = ws.ReadJSON(&resp)
-			c.Assert(err, qt.IsNil)
-			if test.expectedErr != "" {
-				c.Assert(resp.Error, qt.Matches, test.expectedErr)
-				return
-			}
-
-			c.Assert(resp.Error, qt.Equals, "")
-			select {
-			case res := <-sshFacadeChan:
-				c.Assert(res, qt.Equals, test.expectedChanResult)
-			case <-time.After(100 * time.Millisecond):
-				c.Error("Expected SSH method was not called")
-			}
-
-		})
-	}
-	ws.Close()
-	select {
-	case <-time.After(5 * time.Second):
-		c.Fatalf("model proxy did not return in time")
-	case <-errChan: // Ensure go routines are cleaned up
-	}
-}
-
-func mustMarshal(data any) []byte {
-	out, err := json.Marshal(data)
-	if err != nil {
-		panic(err)
-	}
-	return out
 }

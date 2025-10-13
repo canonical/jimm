@@ -20,7 +20,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpcproxy"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
@@ -354,7 +353,6 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				AuditLog:                func(*dbmodel.AuditLogEntry) {},
 				LoginService:            loginSvc,
 				AuthenticatedIdentityID: test.authenticateEntityID,
-				SSHKeyManager:           &mocks.SSHKeyManager{},
 				RedirectInfo:            &mockRedirectInfo{},
 			}
 			var wg sync.WaitGroup
