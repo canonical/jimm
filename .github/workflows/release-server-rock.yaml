@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   workflow_call:
 
+permissions: # Based on https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images#publishing-images-to-github-packages
+    contents: read
+    packages: write
+    attestations: write
+    id-token: write
+
 jobs:
   publish:
     runs-on: ubuntu-22.04
