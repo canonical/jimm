@@ -122,9 +122,11 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	insecureSecretStorage := false
-	insecureSecretStorage, err = strconv.ParseBool(os.Getenv("INSECURE_SECRET_STORAGE"))
-	if err != nil {
-		return fmt.Errorf("failed to parse INSECURE_SECRET_STORAGE env var: %v", err)
+	if key, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok && key != "" {
+		insecureSecretStorage, err = strconv.ParseBool(key)
+		if err != nil {
+			return fmt.Errorf("failed to parse INSECURE_SECRET_STORAGE env var: %v", err)
+		}
 	}
 	if insecureSecretStorage {
 		zapctx.Warn(ctx, "insecure secret storage is enabled, this is not recommended for production use")
