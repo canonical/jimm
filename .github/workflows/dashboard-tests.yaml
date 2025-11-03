@@ -26,6 +26,24 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'test-dashboard')
 
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+      - name: Free additional space
+        shell: bash
+        run: |
+          # Remove tools/caches that aren't required for this run.
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"/CodeQL
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"/Ruby
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"/Java_Temurin-Hotspot_jdk
+          
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
 
