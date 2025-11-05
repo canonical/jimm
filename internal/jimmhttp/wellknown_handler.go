@@ -4,7 +4,6 @@ package jimmhttp
 
 import (
 	"fmt"
-	"math"
 	"net/http"
 	"time"
 
@@ -89,19 +88,22 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Calculate remaining max-age from now to expiry time
-	maxAge := expiry.Sub(time.Now().UTC())
-	// Format expiry into expires header valid string (RFC 1123)
-	expires := expiry.Format(time.RFC1123)
+	// Set cache headers to a maximum age of 10 minutes (600 seconds)
+	// to ensure clients do not cache for too long.
+	// If expiry is less than 10 minutes, use the actual expiry
+	const maxAgeSeconds = 600
+	now := time.Now().UTC()
+	actualMaxAge := int64(maxAgeSeconds)
+	expiresTime := now.Add(maxAgeSeconds * time.Second)
 
-	// The cache is shared and set to:
-	//	- must-revalidate (to indicate it is a long running cache)
-	//	- maximum age (which is likely months, in our case 3)
-	// 	- immutable (so the client of this JWKS knows it will not change until the rotation date)
-
-	w.Header().Add("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d, immutable", int64(math.Floor(maxAge.Seconds()))))
-	// We also use expires as I've noticed some JWK cache clients in golang specifically
-	// look at the expires header over max-age directive... No idea why.
-	w.Header().Add("Expires", expires)
+	if expiry.After(now) {
+		remaining := int64(expiry.Sub(now).Seconds())
+		if remaining < maxAgeSeconds {
+			actualMaxAge = remaining
+			expiresTime = expiry
+		}
+	}
+	w.Header().Set("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d, immutable", actualMaxAge))
+	w.Header().Set("Expires", expiresTime.Format(time.RFC1123))
 	render.JSON(w, r, ks)
 }
