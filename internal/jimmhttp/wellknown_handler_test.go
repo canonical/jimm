@@ -161,5 +161,22 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	remaining := int(expiryShort.Sub(now).Seconds())
 	regexMaxAge := fmt.Sprintf(("(%d|%d)"), remaining, remaining-1)
 	c.Assert(resp.Header.Get("Cache-Control"), qt.Matches, fmt.Sprintf("must-revalidate, max-age=%s, immutable", regexMaxAge))
-	c.Assert(resp.Header.Get("Expires"), qt.Equals, expiryShort.Format(time.RFC1123))
+	regexExpiry := fmt.Sprintf("(%s|%s)", expiryShort.Format(time.RFC1123), expiryShort.Add(-1*time.Second).Format(time.RFC1123))
+	c.Assert(resp.Header.Get("Expires"), qt.Matches, regexExpiry)
+
+	// Test with expiry in the past (should use max-age=10)
+	expiryPast := now.Add(-5 * time.Minute)
+	err = store.PutJWKSExpiry(ctx, expiryPast)
+	c.Assert(err, qt.IsNil)
+	rr = setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
+	resp = rr.Result()
+	defer resp.Body.Close()
+	code = rr.Code
+	b, err = io.ReadAll(resp.Body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(b, qt.JSONEquals, jwks)
+	c.Assert(code, qt.Equals, http.StatusOK)
+	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=10, immutable")
+	regexExpiryPast := fmt.Sprintf("(%s|%s)", now.Add(10*time.Second).Format(time.RFC1123), now.Add(9*time.Second).Format(time.RFC1123))
+	c.Assert(resp.Header.Get("Expires"), qt.Matches, regexExpiryPast)
 }
