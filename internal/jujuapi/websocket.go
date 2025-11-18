@@ -126,8 +126,10 @@ func (r *controllerRoot) mapError(ctx context.Context, err error) *jujuparams.Er
 	if err == nil {
 		return nil
 	}
-	zapctx.Debug(ctx, "rpc error", zaputil.Error(err))
-	if errors.ErrorCode(err) == errors.CodeUnauthorized {
+	// If the error is an unauthorized error, we log it specifically for auditing purposes.
+	// Else, we log it as a warning.
+	switch errors.ErrorCode(err) {
+	case errors.CodeUnauthorized:
 		// Here we log the unauthorized access attempt.
 		// We use the error as a best effort description of what went wrong.
 		username := "unknown"
@@ -139,6 +141,8 @@ func (r *controllerRoot) mapError(ctx context.Context, err error) *jujuparams.Er
 			username,
 			fmt.Sprintf("unauthorized access attempt, error: %v", err),
 		)
+	default:
+		zapctx.Warn(ctx, "rpc error", zaputil.Error(err))
 	}
 	return &jujuparams.Error{
 		Message: err.Error(),

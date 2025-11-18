@@ -175,8 +175,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		zapctx.Error(ctx, "failed to create oidc provider", zap.Error(err))
-		return nil, errors.E(op, errors.CodeServerConfiguration, err, "failed to create oidc provider")
+		return nil, errors.E(op, errors.CodeServerConfiguration, fmt.Errorf("failed to create oidc provider: %v", err))
 	}
 
 	authSvc := &AuthenticationService{
@@ -246,7 +245,7 @@ func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oa
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(op, err, "authorisation code exchange failed")
+		return nil, errors.E(op, fmt.Errorf("authorisation code exchange failed: %v", err))
 	}
 
 	return t, nil
@@ -274,8 +273,7 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		zapctx.Error(ctx, "device auth call failed", zap.Error(err))
-		return nil, errors.E(op, err, "device auth call failed")
+		return nil, errors.E(op, fmt.Errorf("device auth call failed: %v", err))
 	}
 
 	return resp, nil
@@ -294,7 +292,7 @@ func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oau
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(op, err, "device access token call failed")
+		return nil, errors.E(op, fmt.Errorf("device access token call failed: %v", err))
 	}
 
 	return t, nil
@@ -317,8 +315,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 	token, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		zapctx.Error(ctx, "failed to verify id token", zap.Error(err))
-		return nil, errors.E(op, err, "failed to verify id token")
+		return nil, errors.E(op, fmt.Errorf("failed to verify id token: %v", err))
 	}
 
 	return token, nil
@@ -337,7 +334,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 	}
 
 	if err := idToken.Claims(&claims); err != nil {
-		return "", errors.E(op, err, "failed to extract claims")
+		return "", errors.E(op, fmt.Errorf("failed to extract claims: %v", err))
 	}
 
 	return claims.Email, nil
@@ -353,13 +350,12 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
 		Build()
 	if err != nil {
-		return "", errors.E(op, err, "failed to build access token")
+		return "", errors.E(op, fmt.Errorf("failed to build access token: %v", err))
 	}
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
-		zapctx.Error(context.Background(), "failed to sign access token", zap.Error(err))
-		return "", errors.E(op, err, "failed to sign access token")
+		return "", errors.E(op, fmt.Errorf("failed to sign access token: %v", err))
 	}
 
 	return base64.StdEncoding.EncodeToString(freshToken), nil
@@ -380,13 +376,12 @@ func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username
 		Expiration(time.Now().Add(migrationTokenExpiry)).
 		Build()
 	if err != nil {
-		return "", errors.E(op, err, "failed to mint migration token")
+		return "", errors.E(op, fmt.Errorf("failed to mint migration token: %v", err))
 	}
 
 	migrationToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
-		zapctx.Error(context.Background(), "failed to sign migration token", zap.Error(err))
-		return "", errors.E(op, err, "failed to sign migration token")
+		return "", errors.E(op, fmt.Errorf("failed to sign migration token: %v", err))
 	}
 
 	return base64.StdEncoding.EncodeToString(migrationToken), nil
@@ -490,8 +485,7 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 
 	_, err = cfg.Token(ctx)
 	if err != nil {
-		zapctx.Error(ctx, "client credential verification failed", zap.Error(err))
-		return errors.E(errors.CodeUnauthorized, "invalid client credentials")
+		return errors.E(errors.CodeUnauthorized, fmt.Errorf("invalid client credentials: %v", err))
 	}
 	return nil
 }
@@ -548,7 +542,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		return ctx, errors.E(op, err, "failed to retrieve session")
+		return ctx, errors.E(op, fmt.Errorf("failed to retrieve session: %v", err))
 	}
 	session = sessionCrossOriginSafe(session, as.secureCookies)
 
@@ -561,8 +555,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	if err != nil {
 		// If the user's access token AND refresh token have expired
 		// then we will fail authentication here.
-		zapctx.Error(ctx, "failed to validate and update status token", zap.Error(err))
-		return ctx, errors.E(op, err)
+		return ctx, errors.E(op, fmt.Errorf("failed to validate and update status token: %v", err))
 	}
 
 	ctx = ContextWithSessionIdentity(ctx, identityId)
@@ -584,27 +577,21 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		zapctx.Error(ctx, "failed to retrieve session", zap.Error(err))
-		return errors.E(op, err, "failed to retrieve session")
+		return errors.E(op, fmt.Errorf("failed to retrieve session: %v", err))
 	}
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		err := errors.E(op, "session is missing identity key")
-		zapctx.Error(ctx, "session is missing identity key", zap.Error(err))
-		return err
+		return errors.E(op, "session is missing identity key")
 	}
 
 	identityIdStr, ok := identityId.(string)
 	if !ok {
-		err := errors.E(op, fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
-		zapctx.Error(ctx, "failed to parse session identity key", zap.Error(err))
-		return err
+		return errors.E(op, fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
 	}
 
 	if err := as.deleteSession(session, w, req); err != nil {
-		zapctx.Error(ctx, "failed to delete session", zap.Error(err))
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to delete session: %v", err))
 	}
 
 	if err := as.UpdateIdentity(ctx, identityIdStr, &oauth2.Token{
@@ -613,8 +600,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 		Expiry:       time.Now(),
 		TokenType:    "",
 	}); err != nil {
-		zapctx.Error(ctx, "failed to update identity", zap.Error(err))
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to update identity: %v", err))
 	}
 
 	return nil
