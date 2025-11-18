@@ -199,5 +199,5 @@ func TestCallbackFailsExchange(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - authorisation code exchange failed")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+` - authorisation code exchange failed: oauth2: "invalid_grant" "Code not valid"`)
 }

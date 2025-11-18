@@ -325,7 +325,7 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 		ClientID:     "invalid-client-id",
 		ClientSecret: "invalid-secret",
 	}, &loginResult)
-	c.Assert(err, gc.ErrorMatches, `invalid client credentials \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `invalid client credentials: oauth2: "invalid_client" "Invalid client or Invalid client credentials" \(unauthorized access\)`)
 }
 
 // getDialWebsocketWithCustomCookieJar is mostly the default dialer configuration exception

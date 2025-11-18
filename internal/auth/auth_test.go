@@ -265,7 +265,7 @@ func TestVerifyClientCredentials(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	err = authSvc.VerifyClientCredentials(ctx, "invalid-client-id", validClientSecret)
-	c.Assert(err, qt.ErrorMatches, "invalid client credentials")
+	c.Assert(err, qt.ErrorMatches, "invalid client credentials.*")
 }
 
 func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {
@@ -387,7 +387,7 @@ func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *t
 
 	// The underlying error is a failed base64 decode
 	_, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
-	c.Assert(err, qt.ErrorMatches, "failed to retrieve session")
+	c.Assert(err, qt.ErrorMatches, "failed to retrieve session.*")
 
 	// Failure case 2: Value isn't valid but is base64 decoded
 	req, err = http.NewRequest("GET", "", nil)
@@ -400,7 +400,7 @@ func TestAuthenticateBrowserSessionRejectsNoneDecryptableOrDecodableCookies(t *t
 	rec = httptest.NewRecorder()
 
 	_, err = authSvc.AuthenticateBrowserSession(ctx, rec, req)
-	c.Assert(err, qt.ErrorMatches, "failed to retrieve session")
+	c.Assert(err, qt.ErrorMatches, "failed to retrieve session.*")
 }
 
 func TestAuthenticateBrowserSessionHandlesExpiredAccessTokens(t *testing.T) {
