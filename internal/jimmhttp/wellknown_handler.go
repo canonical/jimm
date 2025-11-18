@@ -94,7 +94,6 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	const maxAgeSeconds = 600
 	now := time.Now().UTC()
 	actualMaxAge := int64(maxAgeSeconds)
-	expiresTime := now.Add(maxAgeSeconds * time.Second)
 
 	// If the expiry is sooner than now + maxAgeSeconds, use the expiry instead.
 	// If the expiry is in the past, set a low cache value of 30s.
@@ -102,13 +101,10 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 		remaining := int64(expiry.Sub(now).Seconds())
 		if remaining < maxAgeSeconds {
 			actualMaxAge = remaining
-			expiresTime = expiry
 		}
 	} else {
 		actualMaxAge = 10
-		expiresTime = now.Add(10 * time.Second)
 	}
-	w.Header().Set("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d, immutable", actualMaxAge))
-	w.Header().Set("Expires", expiresTime.Format(time.RFC1123))
+	w.Header().Set("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d", actualMaxAge))
 	render.JSON(w, r, ks)
 }

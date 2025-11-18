@@ -143,8 +143,7 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(b, qt.JSONEquals, jwks)
 	c.Assert(code, qt.Equals, http.StatusOK)
-	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=600, immutable")
-	c.Assert(resp.Header.Get("Expires"), qt.Matches, now.Add(10*time.Minute).Format(time.RFC1123))
+	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=600")
 
 	// Test with expiry < 5min (should use actual expiry)
 	expiryShort := now.Add(3 * time.Minute)
@@ -160,9 +159,7 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	c.Assert(code, qt.Equals, http.StatusOK)
 	remaining := int(expiryShort.Sub(now).Seconds())
 	regexMaxAge := fmt.Sprintf(("(%d|%d)"), remaining, remaining-1)
-	c.Assert(resp.Header.Get("Cache-Control"), qt.Matches, fmt.Sprintf("must-revalidate, max-age=%s, immutable", regexMaxAge))
-	regexExpiry := fmt.Sprintf("(%s|%s)", expiryShort.Format(time.RFC1123), expiryShort.Add(-1*time.Second).Format(time.RFC1123))
-	c.Assert(resp.Header.Get("Expires"), qt.Matches, regexExpiry)
+	c.Assert(resp.Header.Get("Cache-Control"), qt.Matches, fmt.Sprintf("must-revalidate, max-age=%s", regexMaxAge))
 
 	// Test with expiry in the past (should use max-age=10)
 	expiryPast := now.Add(-5 * time.Minute)
@@ -176,7 +173,5 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(b, qt.JSONEquals, jwks)
 	c.Assert(code, qt.Equals, http.StatusOK)
-	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=10, immutable")
-	regexExpiryPast := fmt.Sprintf("(%s|%s)", now.Add(10*time.Second).Format(time.RFC1123), now.Add(9*time.Second).Format(time.RFC1123))
-	c.Assert(resp.Header.Get("Expires"), qt.Matches, regexExpiryPast)
+	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=10")
 }
