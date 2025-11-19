@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -35,7 +34,6 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 
 	groupEntry, err := r.jimm.GroupManager().AddGroup(ctx, r.user, req.Name)
 	if err != nil {
-		zapctx.Error(ctx, "failed to add group", zaputil.Error(err))
 		return resp, errors.E(op, err)
 	}
 	resp = apiparams.AddGroupResponse{Group: apiparams.Group{
@@ -65,7 +63,6 @@ func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupReq
 		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "no UUID or Name provided")
 	}
 	if err != nil {
-		zapctx.Error(ctx, "failed to get group", zaputil.Error(err))
 		return apiparams.Group{}, errors.E(op, err)
 	}
 
@@ -86,7 +83,6 @@ func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGr
 	}
 
 	if err := r.jimm.GroupManager().RenameGroup(ctx, r.user, req.Name, req.NewName); err != nil {
-		zapctx.Error(ctx, "failed to rename group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil
@@ -97,7 +93,6 @@ func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGr
 	const op = errors.Op("jujuapi.RemoveGroup")
 
 	if err := r.jimm.GroupManager().RemoveGroup(ctx, r.user, req.Name); err != nil {
-		zapctx.Error(ctx, "failed to remove group", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil
@@ -131,7 +126,6 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 	const op = errors.Op("jujuapi.AddRelation")
 
 	if err := r.jimm.PermissionManager().AddRelation(ctx, r.user, req.Tuples); err != nil {
-		zapctx.Error(ctx, "failed to add relation", zaputil.Error(err))
 		return errors.E(op, err)
 	}
 	return nil
@@ -144,7 +138,6 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 
 	err := r.jimm.PermissionManager().RemoveRelation(ctx, r.user, req.Tuples)
 	if err != nil {
-		zapctx.Error(ctx, "failed to delete tuple(s)", zap.NamedError("remove-relation-error", err))
 		return errors.E(op, err)
 	}
 	return nil
@@ -159,7 +152,6 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 
 	allowed, err := r.jimm.PermissionManager().CheckRelation(ctx, r.user, req.Tuple, false)
 	if err != nil {
-		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		checkResp.Error = err.Error()
 		return checkResp, errors.E(op, err)
 	}
@@ -176,7 +168,6 @@ func (r *controllerRoot) CheckRelations(ctx context.Context, req apiparams.Check
 
 	results, err := r.jimm.PermissionManager().CheckRelations(ctx, r.user, req.Tuples)
 	if err != nil {
-		zapctx.Error(ctx, "failed to check relation", zap.NamedError("check-relation-error", err))
 		return checksResp, errors.E(op, err)
 	}
 	for _, result := range results {
