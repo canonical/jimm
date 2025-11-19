@@ -11,8 +11,6 @@ import (
 
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -231,11 +229,9 @@ func (j *JujuManager) updateCredential(ctx context.Context, credential *dbmodel.
 	const op = errors.Op("jimm.updateCredential")
 
 	if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
-		zapctx.Error(ctx, "failed to store credential id", zap.Error(err))
 		return errors.E(op, err)
 	}
 	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), attr); err != nil {
-		zapctx.Error(ctx, "failed to store credentials", zap.Error(err))
 		return errors.E(op, err)
 	}
 

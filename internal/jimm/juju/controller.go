@@ -277,7 +277,6 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 	}
 
 	if err := addControllerTx(ctx, j, dbClouds, ctl); err != nil {
-		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 			return errors.E(op, err, fmt.Sprintf("controller %q already exists", ctl.Name))
 		}
@@ -648,7 +647,6 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 	model.InternalMigrationSuccess(targetController.ID)
 	err = j.Database.UpdateModel(ctx, &model)
 	if err != nil {
-		zapctx.Error(ctx, "failed to update model", zap.String("model", model.UUID.String), zaputil.Error(err))
 		return errors.E(op, err)
 	}
 
