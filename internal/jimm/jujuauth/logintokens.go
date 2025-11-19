@@ -10,6 +10,7 @@ package jujuauth
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/juju/names/v5"
@@ -126,8 +127,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	ctl.SetTag(auth.ct)
 	err := auth.database.GetController(ctx, &ctl)
 	if err != nil {
-		zapctx.Error(ctx, "failed to fetch controller", zap.Error(err))
-		return nil, errors.E(op, "failed to fetch controller", err)
+		return nil, errors.E(op, fmt.Errorf("failed to fetch controller: %w", err))
 	}
 	clouds := make(map[names.CloudTag]bool)
 	for _, cloudRegion := range ctl.CloudRegions {
@@ -136,8 +136,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	for cloudTag := range clouds {
 		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
 		if err != nil {
-			zapctx.Error(ctx, "cloud access check failed", zap.Error(err))
-			return nil, errors.E(op, "failed to check user's cloud access", err)
+			return nil, errors.E(op, fmt.Errorf("failed to check user's cloud access: %w", err))
 		}
 		auth.accessMapCache[cloudTag.String()] = accessLevel
 	}
