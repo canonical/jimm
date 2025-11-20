@@ -225,7 +225,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		AdminPassword:     req.Password,
 	}
 	if err := r.jimm.JujuManager().AddController(ctx, r.user, &ctl, ctlCreds); err != nil {
-		return apiparams.ControllerInfo{}, errors.E(op, err)
+		return apiparams.ControllerInfo{}, errors.E(op, fmt.Errorf("failed to add controller: %w", err))
 	}
 	return ctl.ToAPIControllerInfo(), nil
 }

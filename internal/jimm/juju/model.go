@@ -288,6 +288,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, errFromAPI erro
 		err := j.maybeCleanupModel(ctx, errFromAPI, model)
 		if err != nil {
 			zapctx.Error(ctx, "error cleaning model", zap.Error(err))
+			return nil, errors.E("internal server error")
 		}
 		// propagate the error to the caller.
 		return nil, errFromAPI
@@ -295,6 +296,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, errFromAPI erro
 		err := j.checkModelMigratedInternal(ctx, errFromAPI, model)
 		if err != nil {
 			zapctx.Error(ctx, "error checking model migration", zap.Error(err))
+			return nil, errors.E("internal server error")
 		}
 		// If the model has been migrated internally, we call api.ModelInfo again
 		// to get the updated model information from the new controller.

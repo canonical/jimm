@@ -251,7 +251,7 @@ func (j *permissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 	// Check if the user is jimm administrator.
 	isAdmin, err := openfga.IsAdministrator(ctx, targetUserTag, j.jimmTag)
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(op, fmt.Errorf("failed to check access rights: %w", err))
 	}
 	if isAdmin {
 		return "superuser", nil

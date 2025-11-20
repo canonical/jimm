@@ -316,12 +316,12 @@ func (j *JujuManager) PrepareModelMigration(
 		return nil
 	})
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(op, fmt.Errorf("failed to add incoming model migration details: %w", err))
 	}
 
 	migrationToken, err := j.migrationTokenGenerator.NewMigrationToken(ctx, user.Name)
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(op, fmt.Errorf("failed to generate migration token: %w", err))
 	}
 
 	return migrationToken, nil

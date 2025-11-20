@@ -229,10 +229,10 @@ func (j *JujuManager) updateCredential(ctx context.Context, credential *dbmodel.
 	const op = errors.Op("jimm.updateCredential")
 
 	if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to store credential id: %w", err))
 	}
 	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), attr); err != nil {
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to store credentials: %w", err))
 	}
 
 	return nil

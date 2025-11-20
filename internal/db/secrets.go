@@ -128,7 +128,7 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, nil
 		}
-		return nil, errors.E(op, err)
+		return nil, errors.E(op, fmt.Errorf("failed to get secret data: %w", err))
 	}
 	var attr map[string]string
 	err = json.Unmarshal(secret.Data, &attr)
@@ -177,7 +177,7 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 		return "", "", nil
 	}
 	if err != nil {
-		return "", "", errors.E(op, err)
+		return "", "", errors.E(op, fmt.Errorf("failed to get secret data: %w", err))
 	}
 	var secretData map[string]string
 	err = json.Unmarshal(secret.Data, &secretData)
@@ -263,7 +263,7 @@ func (d *Database) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(op, fmt.Errorf("failed to get jwks data: %w", err))
 	}
 	ks, err := jwk.ParseString(string(secret.Data))
 	if err != nil {
@@ -287,7 +287,7 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) 
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(op, fmt.Errorf("failed to get jwks private key: %w", err))
 	}
 	var pem []byte
 	err = json.Unmarshal(secret.Data, &pem)
@@ -312,7 +312,7 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
-		return time.Time{}, errors.E(op, err)
+		return time.Time{}, errors.E(op, fmt.Errorf("failed to get jwks expiry: %w", err))
 	}
 	var expiryTime time.Time
 	err = json.Unmarshal(secret.Data, &expiryTime)

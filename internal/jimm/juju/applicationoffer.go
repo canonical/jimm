@@ -114,7 +114,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 	}
 	err = api.GetApplicationOffer(ctx, &offerDetails)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to fetch details of the created application offer: %w", err))
 	}
 
 	doc := dbmodel.ApplicationOffer{
@@ -130,7 +130,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to store the created application offer: %w", err))
 	}
 
 	if err := j.OpenFGAClient.AddModelApplicationOffer(
@@ -420,21 +420,21 @@ func (j *JujuManager) DestroyOffer(ctx context.Context, user *openfga.User, offe
 func (j *JujuManager) getUserOfferAccess(ctx context.Context, user *openfga.User, offerTag names.ApplicationOfferTag) (string, error) {
 	isOfferAdmin, err := openfga.IsAdministrator(ctx, user, offerTag)
 	if err != nil {
-		return "", errors.E(err)
+		return "", errors.E(fmt.Errorf("openfga check failed: %w", err))
 	}
 	if isOfferAdmin {
 		return string(jujuparams.OfferAdminAccess), nil
 	}
 	isOfferConsumer, err := user.IsApplicationOfferConsumer(ctx, offerTag)
 	if err != nil {
-		return "", errors.E(err)
+		return "", errors.E(fmt.Errorf("openfga check failed: %w", err))
 	}
 	if isOfferConsumer {
 		return string(jujuparams.OfferConsumeAccess), nil
 	}
 	isOfferReader, err := user.IsApplicationOfferReader(ctx, offerTag)
 	if err != nil {
-		return "", errors.E(err)
+		return "", errors.E(fmt.Errorf("openfga check failed: %w", err))
 	}
 	if isOfferReader {
 		return string(jujuparams.OfferReadAccess), nil
