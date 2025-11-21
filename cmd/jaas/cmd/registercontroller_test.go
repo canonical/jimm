@@ -279,7 +279,7 @@ func (s *registerControllerSuite) TestRegisterControllerNotAuthorised(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, bClient), "controller-1")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to add controller: unauthorized \(unauthorized access\)`)
 }
 
 func writeYAMLTempFile(c *gc.C, payload interface{}) (string, string) {

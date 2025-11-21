@@ -42,7 +42,7 @@ func (s *groupSuite) TestAddGroup(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to add group: unauthorized \(unauthorized access\)`)
 }
 
 func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
@@ -67,7 +67,7 @@ func (s *groupSuite) TestRenameGroup(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to rename group: unauthorized \(unauthorized access\)`)
 }
 
 func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
@@ -97,7 +97,7 @@ func (s *groupSuite) TestRemoveGroup(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to remove group: unauthorized \(unauthorized access\)`)
 }
 
 func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
@@ -145,5 +145,5 @@ func (s *groupSuite) TestListGroups(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to list groups: unauthorized \(unauthorized access\)`)
 }

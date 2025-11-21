@@ -768,7 +768,7 @@ func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
 		targetControllerName,
 		userMapping,
 	)
-	c.Assert(err, qt.ErrorMatches, "controller not found")
+	c.Assert(err, qt.ErrorMatches, "failed to add incoming model migration details: controller not found")
 }
 
 func TestPrepareModelMigration_Success(t *testing.T) {

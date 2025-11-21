@@ -113,20 +113,16 @@ type ProxyHelpers struct {
 func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 	const op = errors.Op("rpc.ProxySockets")
 	if helpers.ConnectController == nil {
-		zapctx.Error(ctx, "Missing controller connect function")
-		return errors.E(op, "Missing controller connect function")
+		return errors.E(op, "missing controller connect function")
 	}
 	if helpers.AuditLog == nil {
-		zapctx.Error(ctx, "Missing audit log function")
-		return errors.E(op, "Missing audit log function")
+		return errors.E(op, "missing audit log function")
 	}
 	if helpers.LoginService == nil {
-		zapctx.Error(ctx, "Missing login service function")
-		return errors.E(op, "Missing login service function")
+		return errors.E(op, "missing login service function")
 	}
 	if helpers.RedirectInfo == nil {
-		zapctx.Error(ctx, "Missing redirect info function")
-		return errors.E(op, "Missing redirect info function")
+		return errors.E(op, "missing redirect info function")
 	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
@@ -333,8 +329,7 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 		if msg.Response != nil {
 			err := json.Unmarshal(msg.Response, &allErrors)
 			if err != nil {
-				zapctx.Error(context.Background(), "failed to unmarshal message response", zap.Error(err), zap.Any("message", msg))
-				return errors.E(err, "failed to unmarshal message response")
+				return errors.E(fmt.Errorf("failed to unmarshal message response: %w", err))
 			}
 		}
 		singleError := params.ErrorResult{Error: &params.Error{Message: msg.Error, Code: msg.ErrorCode, Info: msg.ErrorInfo}}
@@ -651,7 +646,6 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 
 	jwt, err := tokenGen.MakeToken(ctx, permissions)
 	if err != nil {
-		zapctx.Error(ctx, "failed to make token", zap.Error(err))
 		return errors.E(op, err)
 	}
 

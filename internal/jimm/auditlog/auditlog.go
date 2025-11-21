@@ -5,6 +5,7 @@ package auditlog
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -106,8 +107,7 @@ func (j *auditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, bef
 	}
 	count, err := j.store.DeleteAuditLogsBefore(ctx, before)
 	if err != nil {
-		zapctx.Error(ctx, "failed to purge logs", zap.Error(err))
-		return 0, errors.E(op, "failed to purge logs", err)
+		return 0, errors.E(op, fmt.Errorf("failed to purge logs: %w", err))
 	}
 	return count, nil
 }

@@ -154,19 +154,33 @@ const (
 )
 
 // ErrorCode returns the error code from the given error.
+// It unwraps the error chain to find the first error that implements
+// the ErrorCode() string method that also has a non-empty code. If no
+// such error is found, an empty Code is returned.
 func ErrorCode(err error) Code {
-	var errCode interface{ ErrorCode() string }
-	if stderr.As(err, &errCode) {
-		return Code(errCode.ErrorCode())
+	for err != nil {
+		if v, ok := err.(interface{ ErrorCode() string }); ok {
+			if code := v.ErrorCode(); code != "" {
+				return Code(code)
+			}
+		}
+		err = stderr.Unwrap(err)
 	}
 	return ""
 }
 
 // ErrorInfo returns additional information about the error.
+// It unwraps the error chain to find the first error that implements
+// the ErrorInfo() map[string]any method that also has non-nil info.
+// If no such error is found, nil is returned.
 func ErrorInfo(err error) map[string]any {
-	var errInfo interface{ ErrorInfo() map[string]any }
-	if stderr.As(err, &errInfo) {
-		return errInfo.ErrorInfo()
+	for err != nil {
+		if v, ok := err.(interface{ ErrorInfo() map[string]any }); ok {
+			if info := v.ErrorInfo(); info != nil {
+				return info
+			}
+		}
+		err = stderr.Unwrap(err)
 	}
 	return nil
 }

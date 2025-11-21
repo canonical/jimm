@@ -4,7 +4,6 @@ package jimmtest
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,8 +12,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 )
@@ -56,24 +53,20 @@ func CreateRandomKeycloakUser() (*KeycloakUser, error) {
 
 	adminCLIToken, err := getAdminCLIAccessToken()
 	if err != nil {
-		zapctx.Error(context.Background(), "failed to authenticate admin CLI user", zap.Error(err))
-		return nil, errors.E(err, "failed to authenticate admin CLI user")
+		return nil, errors.E(fmt.Errorf("failed to authenticate admin CLI user: %w", err))
 	}
 
 	if err := addKeycloakUser(adminCLIToken, email, username); err != nil {
-		zapctx.Error(context.Background(), "failed to add keycloak user", zap.Error(err))
-		return nil, errors.E(err, fmt.Sprintf("failed to add keycloak user (%q, %q)", email, username))
+		return nil, errors.E(fmt.Errorf("failed to add keycloak user (%q, %q): %w", email, username, err))
 	}
 
 	id, err := getKeycloakUserId(adminCLIToken, username)
 	if err != nil {
-		zapctx.Error(context.Background(), "failed to get keycloak user ID", zap.Error(err))
-		return nil, errors.E(err, fmt.Sprintf("failed to retrieve ID for newly added keycloak user (%q, %q)", email, username))
+		return nil, errors.E(fmt.Errorf("failed to retrieve ID for newly added keycloak user (%q, %q): %w", email, username, err))
 	}
 
 	if err := setKeycloakUserPassword(adminCLIToken, id, password); err != nil {
-		zapctx.Error(context.Background(), "failed to set keycloak user password", zap.Error(err))
-		return nil, errors.E(err, fmt.Sprintf("failed to set password for newly added keycloak user (%q, %q, %q)", email, username, password))
+		return nil, errors.E(fmt.Errorf("failed to set password for newly added keycloak user (%q, %q, %q): %w", email, username, password, err))
 	}
 	return &KeycloakUser{
 		Id:       id,

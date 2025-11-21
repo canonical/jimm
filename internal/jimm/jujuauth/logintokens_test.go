@@ -181,7 +181,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 				ct.String(): "superuser",
 			},
 		},
-		expectedError: "failed to fetch controller",
+		expectedError: "failed to fetch controller: a test error",
 	}, {
 		about:    "cloud access check fails",
 		username: "eve@canonical.com",
@@ -205,7 +205,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 			},
 			cloudAccessCheckErr: errors.E("a test error"),
 		},
-		expectedError: "failed to check user's cloud access",
+		expectedError: "failed to check user's cloud access: a test error",
 	}, {
 		about:    "jwt service errors out",
 		username: "eve@canonical.com",

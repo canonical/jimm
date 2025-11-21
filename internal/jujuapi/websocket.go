@@ -214,8 +214,7 @@ func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTok
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
-			zapctx.Error(ctx, "error parsing path", zap.Error(err))
-			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(op, err)
+			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(op, fmt.Errorf("error parsing path: %w", err))
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{
@@ -224,8 +223,7 @@ func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTok
 			},
 		}
 		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
-			zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
-			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(err, errors.CodeNotFound)
+			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(fmt.Errorf("failed to find model: %w", err), errors.CodeNotFound)
 		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()

@@ -42,7 +42,7 @@ func (s *roleSuite) TestAddRole(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRoleCommandForTesting(s.ClientStore(), bClient), "test-role")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to add role: unauthorized \(unauthorized access\)`)
 }
 
 func (s *roleSuite) TestRenameRoleSuperuser(c *gc.C) {
@@ -67,7 +67,7 @@ func (s *roleSuite) TestRenameRole(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRenameRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "renamed-role")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to rename role: unauthorized \(unauthorized access\)`)
 }
 
 func (s *roleSuite) TestRemoveRoleSuperuser(c *gc.C) {
@@ -97,7 +97,7 @@ func (s *roleSuite) TestRemoveRole(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "-y")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to remove role: unauthorized \(unauthorized access\)`)
 }
 
 func (s *roleSuite) TestListRolesSuperuser(c *gc.C) {

@@ -870,7 +870,7 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		},
 		ResolveUUIDs: true,
 	})
-	c.Assert(err, gc.ErrorMatches, "failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
+	c.Assert(err, gc.ErrorMatches, "failed to list relations: failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
 }
 
 func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
@@ -1012,7 +1012,7 @@ func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
 	}
 	req := apiparams.CheckRelationRequest{Tuple: input}
 	_, err := client.CheckRelation(&req)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to check relation: unauthorized \(unauthorized access\)`)
 	// Verify Bob can check for his own permission.
 	input = apiparams.RelationshipTuple{
 		Object:       userBobKey,

@@ -424,8 +424,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	)
 	jimmParameters.OAuthAuthenticator = authSvc
 	if err != nil {
-		zapctx.Error(ctx, "failed to setup authentication service", zap.Error(err))
-		return nil, errors.E(op, err, "failed to setup authentication service")
+		return nil, errors.E(op, fmt.Errorf("failed to setup authentication service: %w", err))
 	}
 
 	if p.JWTExpiryDuration == 0 {
@@ -504,8 +503,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
 		})
 		if err != nil {
-			zapctx.Error(ctx, "failed to setup authentication handler", zap.Error(err))
-			return nil, errors.E(op, err, "failed to setup authentication handler")
+			return nil, errors.E(op, fmt.Errorf("failed to setup authentication handler: %w", err))
 		}
 		mountHandler(
 			jimmhttp.AuthResourceBasePath,
@@ -637,8 +635,7 @@ func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte, d
 
 	store, err := pgstore.NewPGStoreFromPool(sqlDb, sessionSecret)
 	if err != nil {
-		zapctx.Error(ctx, "failed to create session store", zap.Error(err))
-		return nil, errors.E(op, err, "failed to create session store")
+		return nil, errors.E(op, fmt.Errorf("failed to create session store: %w", err))
 	}
 
 	// Cleanup expired session every 30 minutes
@@ -682,8 +679,7 @@ func (s *Service) setupCredentialStore(ctx context.Context, p Params, db *db.Dat
 
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
-		zapctx.Error(ctx, "Vault Store error", zap.Error(err))
-		return nil, errors.E(op, err)
+		return nil, errors.E(op, fmt.Errorf("vault store error: %v", err))
 	}
 	if vs != nil {
 		return vs, nil

@@ -258,7 +258,7 @@ func (s *apiProxySuite) TestAgentLoginModelDoesNotExist(c *gc.C) {
 	}
 	_, err = api.Open(&info, dialOpts)
 	c.Assert(err, gc.NotNil)
-	c.Check(err.Error(), gc.Matches, `model not found.*`)
+	c.Check(err.Error(), gc.Matches, `failed to find model: model not found.*`)
 }
 
 type logger struct{}

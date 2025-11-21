@@ -94,19 +94,16 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	if parsedIssuerURL.Scheme == "" {
-		zapctx.Error(ctx, "oauth issuer url has no scheme")
 		return errors.E("oauth issuer url has no scheme")
 	}
 
 	clientID := os.Getenv("JIMM_OAUTH_CLIENT_ID")
 	if clientID == "" {
-		zapctx.Error(ctx, "no oauth client id")
 		return errors.E("no oauth client id")
 	}
 
 	clientSecret := os.Getenv("JIMM_OAUTH_CLIENT_SECRET")
 	if clientSecret == "" {
-		zapctx.Error(ctx, "no oauth client secret")
 		return errors.E("no oauth client secret")
 	}
 
@@ -117,7 +114,6 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 	zapctx.Info(ctx, "oauth scopes", zap.Any("scopes", scopesParsed))
 	if len(scopesParsed) == 0 {
-		zapctx.Error(ctx, "no oauth client scopes present")
 		return errors.E("no oauth client scopes present")
 	}
 

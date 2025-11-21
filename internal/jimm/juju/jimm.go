@@ -12,8 +12,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -318,14 +316,12 @@ func (j *JujuManager) PrepareModelMigration(
 		return nil
 	})
 	if err != nil {
-		zapctx.Error(ctx, "failed to add incoming model migration details", zap.Error(err))
-		return "", errors.E(op, err)
+		return "", errors.E(op, fmt.Errorf("failed to add incoming model migration details: %w", err))
 	}
 
 	migrationToken, err := j.migrationTokenGenerator.NewMigrationToken(ctx, user.Name)
 	if err != nil {
-		zapctx.Error(ctx, "failed to generate migration token", zap.Error(err))
-		return "", errors.E(op, err)
+		return "", errors.E(op, fmt.Errorf("failed to generate migration token: %w", err))
 	}
 
 	return migrationToken, nil

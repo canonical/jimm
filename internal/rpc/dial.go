@@ -46,8 +46,7 @@ func (d Dialer) DialWebsocket(ctx context.Context, url string, headers http.Head
 	}
 	conn, resp, err := dialer.DialContext(ctx, url, headers)
 	if err != nil {
-		zapctx.Error(ctx, "BasicDial failed", zap.Error(err))
-		return nil, errors.E(op, err)
+		return nil, errors.E(op, fmt.Errorf("basic dial failed: %w", err))
 	}
 	defer resp.Body.Close()
 	return conn, nil

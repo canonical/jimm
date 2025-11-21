@@ -4,10 +4,8 @@ package jujuapi
 
 import (
 	"context"
+	"fmt"
 	"time"
-
-	"github.com/juju/zaputil"
-	"github.com/juju/zaputil/zapctx"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -27,8 +25,7 @@ func (r *controllerRoot) AddRole(ctx context.Context, req apiparams.AddRoleReque
 
 	roleEntry, err := r.jimm.RoleManager().AddRole(ctx, r.user, req.Name)
 	if err != nil {
-		zapctx.Error(ctx, "failed to add role", zaputil.Error(err))
-		return resp, errors.E(op, err)
+		return resp, errors.E(op, fmt.Errorf("failed to add role: %w", err))
 	}
 	resp = apiparams.AddRoleResponse{Role: apiparams.Role{
 		Name:      roleEntry.Name,
@@ -59,8 +56,7 @@ func (r *controllerRoot) GetRole(ctx context.Context, req apiparams.GetRoleReque
 		return apiparams.Role{}, errors.E(op, errors.CodeBadRequest, "no UUID or Name provided")
 	}
 	if err != nil {
-		zapctx.Error(ctx, "failed to get role", zaputil.Error(err))
-		return apiparams.Role{}, errors.E(op, err)
+		return apiparams.Role{}, errors.E(op, fmt.Errorf("failed to get role: %w", err))
 	}
 
 	return apiparams.Role{
@@ -80,8 +76,7 @@ func (r *controllerRoot) RenameRole(ctx context.Context, req apiparams.RenameRol
 	}
 
 	if err := r.jimm.RoleManager().RenameRole(ctx, r.user, req.Name, req.NewName); err != nil {
-		zapctx.Error(ctx, "failed to rename role", zaputil.Error(err))
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to rename role: %w", err))
 	}
 	return nil
 }
@@ -95,8 +90,7 @@ func (r *controllerRoot) RemoveRole(ctx context.Context, req apiparams.RemoveRol
 	}
 
 	if err := r.jimm.RoleManager().RemoveRole(ctx, r.user, req.Name); err != nil {
-		zapctx.Error(ctx, "failed to remove role", zaputil.Error(err))
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("failed to remove role: %w", err))
 	}
 	return nil
 }

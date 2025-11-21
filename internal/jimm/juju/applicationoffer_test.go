@@ -1152,7 +1152,7 @@ func TestOffer(t *testing.T) {
 			offer := dbmodel.ApplicationOffer{}
 
 			return *u, offerParams, offer, func(c *qt.C, err error) {
-				c.Assert(err, qt.ErrorMatches, "a silly error")
+				c.Assert(err, qt.ErrorMatches, "failed to fetch details of the created application offer: a silly error")
 			}
 		},
 	}, {

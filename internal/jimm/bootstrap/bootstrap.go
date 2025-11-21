@@ -334,11 +334,6 @@ func (b *bootstrapManager) BootstrapJob(
 		// Lock the bootstrap for the same length the process is allowed to run for
 		// before being killed.
 		if err := b.store.LockBootstrap(jobCtx, jujucommands.CommandKillDelay); err != nil {
-			zapctx.Error(
-				jobCtx,
-				"failed to acquire bootstrap lock",
-				zap.Error(err),
-			)
 			return errors.E(fmt.Errorf("failed to acquire bootstrap lock: %w", err))
 		}
 
@@ -454,7 +449,6 @@ func (b *bootstrapManager) runBootstrap(
 
 		zapctx.Error(jobCtx, "failed to cleanup controller after failing to add it to JIMM",
 			zap.NamedError("BootstrapError", err), zap.NamedError("CleanupError", cleanupErr))
-
 		return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
 			"automatic cleanup of the controller also failed: %w\n"+
 			"\n"+
@@ -599,11 +593,6 @@ func (b *bootstrapManager) DestroyControllerJob(
 		// Lock the bootstrap for the same length the process is allowed to run for
 		// before being killed.
 		if err := b.store.LockBootstrap(jobCtx, jujucommands.CommandKillDelay); err != nil {
-			zapctx.Error(
-				jobCtx,
-				"failed to acquire bootstrap lock",
-				zap.Error(err),
-			)
 			return errors.E(fmt.Errorf("failed to acquire bootstrap lock: %w", err))
 		}
 

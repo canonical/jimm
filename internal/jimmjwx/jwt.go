@@ -122,7 +122,6 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 
 	pubKey, ok := jwkSet.Key(jwkSet.Len() - 1)
 	if !ok {
-		zapctx.Error(ctx, "no jwk found")
 		return nil, errors.E("no jwk found")
 	}
 	pkeyPem, err := j.Store.GetJWKSPrivateKey(ctx)

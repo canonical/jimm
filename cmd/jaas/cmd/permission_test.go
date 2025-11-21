@@ -151,7 +151,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to add relation: unauthorized \(unauthorized access\)`)
 }
 
 func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
@@ -250,7 +250,7 @@ func (s *relationSuite) TestRemoveRelation(c *gc.C) {
 	// bob is not superuser
 	bClient := s.SetupCLIAccess(c, "bob")
 	_, err := cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), "group-testGroup1#member", "member", "group-testGroup2")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to remove relation: unauthorized \(unauthorized access\)`)
 }
 
 type environment struct {
@@ -655,5 +655,5 @@ func (s *relationSuite) TestCheckRelation(c *gc.C) {
 		"reader",
 		"controller-jimm",
 	)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to check relation: unauthorized \(unauthorized access\)`)
 }

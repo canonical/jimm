@@ -15,8 +15,6 @@ import (
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil"
-	"github.com/juju/zaputil/zapctx"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -227,8 +225,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		AdminPassword:     req.Password,
 	}
 	if err := r.jimm.JujuManager().AddController(ctx, r.user, &ctl, ctlCreds); err != nil {
-		zapctx.Error(ctx, "failed to add controller", zaputil.Error(err))
-		return apiparams.ControllerInfo{}, errors.E(op, err)
+		return apiparams.ControllerInfo{}, errors.E(op, fmt.Errorf("failed to add controller: %w", err))
 	}
 	return ctl.ToAPIControllerInfo(), nil
 }

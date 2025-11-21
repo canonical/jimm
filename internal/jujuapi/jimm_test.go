@@ -171,7 +171,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	})
 
 	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `controller "controller-2" already exists \(already exists\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to add controller: controller "controller-2" already exists \(already exists\)`)
 	c.Assert(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
 
 	conn = s.open(c, nil, "bob")
@@ -179,7 +179,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	client = api.NewClient(conn)
 	acr.Name = "controller-2"
 	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to add controller: unauthorized \(unauthorized access\)`)
 	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
 
 	acr.Name = "jimm"
@@ -232,7 +232,7 @@ func (s *jimmSuite) TestAddControllerCustomTLSHostname(c *gc.C) {
 	}
 
 	_, err := client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, "failed to dial the controller.*")
+	c.Assert(err, gc.ErrorMatches, "failed to add controller: failed to dial the controller.*")
 	acr.TLSHostname = "juju-apiserver"
 	ci, err := client.AddController(&acr)
 	c.Assert(err, gc.IsNil)

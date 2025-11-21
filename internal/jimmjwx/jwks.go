@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -95,7 +96,7 @@ func rotateJWKS(ctx context.Context, credStore CredentialStore, initialExpiryTim
 			if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
 				zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
 			}
-			return errors.E(err)
+			return errors.E(fmt.Errorf("failed to put JWKS: %w", err))
 		}
 	} else {
 		// Check it has expired.
@@ -108,7 +109,7 @@ func rotateJWKS(ctx context.Context, credStore CredentialStore, initialExpiryTim
 				if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
 					zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
 				}
-				return errors.E(err)
+				return errors.E(fmt.Errorf("failed to put JWKS: %w", err))
 			}
 			zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
 		}
@@ -133,8 +134,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	credStore := jwks.credentialStore
 
 	if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
-		zapctx.Error(ctx, "Rotate JWKS error", zap.Error(err))
-		return errors.E(op, err)
+		return errors.E(op, fmt.Errorf("rotate jwks: %w", err))
 	}
 
 	// The rotation method is as follows, if an expiry is not present, we know

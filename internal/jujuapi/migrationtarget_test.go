@@ -29,7 +29,7 @@ func (s *migrationTargetSuite) TestAbort(c *gc.C) {
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	err := client.Abort(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
 }
 
 func (s *migrationTargetSuite) TestCheckMachines(c *gc.C) {
@@ -39,7 +39,7 @@ func (s *migrationTargetSuite) TestCheckMachines(c *gc.C) {
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	_, err := client.CheckMachines(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
 }
 
 func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
@@ -75,7 +75,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	}
 	client := migrationtarget.NewClient(conn)
 	err := client.Prechecks(model)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
 
 	prepareModelMigration := params.PrepareModelMigrationRequest{
 		ModelTag:              names.NewModelTag(modelUUID).String(),
@@ -108,7 +108,7 @@ func (s *migrationTargetSuite) TestAdoptResources(c *gc.C) {
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	err := client.AdoptResources(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model not found`)
+	c.Assert(err, gc.ErrorMatches, `.*model not found.*`)
 }
 
 func (s *migrationTargetSuite) TestActivate(c *gc.C) {
@@ -123,7 +123,7 @@ func (s *migrationTargetSuite) TestActivate(c *gc.C) {
 
 	client := migrationtarget.NewClient(conn)
 	err := client.Activate(modelUUID, sourceInfo, relatedModels)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found`)
+	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
 }
 
 func (s *migrationTargetSuite) TestLatestLogTime(c *gc.C) {
