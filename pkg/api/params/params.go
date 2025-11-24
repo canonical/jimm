@@ -653,3 +653,15 @@ type DestroyControllerRequest struct {
 	// ControllerName of the controller to destroy
 	ControllerName string `json:"controller-name"`
 }
+
+// UpgradeToRequest holds the parameters for phase 1 for automated upgrades.
+type UpgradeToRequest struct {
+	ModelTag                string `json:"model-tag"`
+	TargetControllerVersion string `json:"target-controller-version"`
+}
+
+// UpgradeToResponse holds the response for phase 1 of an automated upgrade.
+type UpgradeToResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
