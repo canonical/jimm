@@ -34,9 +34,19 @@ type User struct {
 	JimmAdmin bool
 }
 
-// IsAllowedAddModed returns true if the user is allowed to add a model on the
+// IsAllowedAddModelToController returns true if the user is allowed to add a model on the
+// specified controller.
+func (u *User) IsAllowedAddModelToController(ctx context.Context, resource names.ControllerTag) (bool, error) {
+	allowed, err := checkRelation(ctx, u, resource, ofganames.CanAddModelRelation)
+	if err != nil {
+		return false, errors.E(err)
+	}
+	return allowed, nil
+}
+
+// IsAllowedAddModelToCloud returns true if the user is allowed to add a model on the
 // specified cloud.
-func (u *User) IsAllowedAddModel(ctx context.Context, resource names.CloudTag) (bool, error) {
+func (u *User) IsAllowedAddModelToCloud(ctx context.Context, resource names.CloudTag) (bool, error) {
 	allowed, err := checkRelation(ctx, u, resource, ofganames.CanAddModelRelation)
 	if err != nil {
 		return false, errors.E(err)
@@ -108,7 +118,7 @@ func (u *User) GetCloudAccess(ctx context.Context, resource names.CloudTag) Rela
 	if isCloudAdmin {
 		return ofganames.AdministratorRelation
 	}
-	userAccess, err := u.IsAllowedAddModel(ctx, resource)
+	userAccess, err := u.IsAllowedAddModelToCloud(ctx, resource)
 	if err != nil {
 		zapctx.Error(ctx, "openfga check failed", zap.Error(err))
 		return ofganames.NoRelation

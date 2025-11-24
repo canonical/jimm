@@ -632,7 +632,7 @@ func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.Use
 		return err
 	}
 
-	allowedAddModel, err := user.IsAllowedAddModel(ctx, region.Cloud.ResourceTag())
+	allowedAddModel, err := user.IsAllowedAddModelToCloud(ctx, region.Cloud.ResourceTag())
 	if err != nil {
 		return err
 	}

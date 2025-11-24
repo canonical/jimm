@@ -150,7 +150,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 
 	// at this point we know which cloud will host the model and
 	// we must check the user has add-model permission on the cloud
-	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModel(ctx, builder.cloud.ResourceTag())
+	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModelToCloud(ctx, builder.cloud.ResourceTag())
 	if err != nil {
 		return nil, errors.E(op, "permission check failed")
 	}

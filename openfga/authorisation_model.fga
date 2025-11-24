@@ -16,6 +16,7 @@ type controller
     define controller: [controller]
     define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
     define audit_log_viewer: [user, user:*, group#member, role#assignee] or administrator
+    define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
 
 type model
   relations

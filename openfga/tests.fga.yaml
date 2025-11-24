@@ -102,6 +102,15 @@ tuples:
     - user: group:co-group-2#member
       relation: audit_log_viewer
       object: controller:co-controller-2
+    - user: user:co-user-5
+      relation: can_addmodel
+      object: controller:co-controller-1
+    - user: user:co-user-6
+      relation: member
+      object: group:co-group-3
+    - user: group:co-group-3#member
+      relation: can_addmodel
+      object: controller:co-controller-2
 
     # Model (mo)
     - user: user:mo-user-1
@@ -294,7 +303,7 @@ tests:
     # Checks whether:
     # - all or invididual users, or group members can become administators and audit_log_viewers of a controller
     # - controllers can be related to each other with correct inheritance of administrators
-    # - proper hierarchy of relations is upheld: administrator > audit_log_viewer
+    # - proper hierarchy of relations is upheld: administrator > audit_log_viewer, administrator > can_addmodel
     - name: Controller
       list_objects:
          - user: user:co-user-1
@@ -306,12 +315,17 @@ tests:
              audit_log_viewer:
                - controller:co-controller-1
                - controller:co-controller-2
+             can_addmodel:
+               - controller:co-controller-1
+               - controller:co-controller-2
          - user: group:co-group-1#member
            type: controller
            assertions:
              administrator:
                - controller:co-controller-2
              audit_log_viewer:
+               - controller:co-controller-2
+             can_addmodel:
                - controller:co-controller-2
          - user: user:co-user-3
            type: controller
@@ -323,6 +337,22 @@ tests:
            assertions:
              audit_log_viewer:
                - controller:co-controller-2
+         - user: user:co-user-5
+           type: controller
+           assertions:
+             can_addmodel:
+               - controller:co-controller-1
+               - controller:co-controller-2
+         - user: group:co-group-3#member
+           type: controller
+           assertions:
+             can_addmodel:
+               - controller:co-controller-2
+         - user: user:co-user-6
+           type: controller
+           assertions:
+             can_addmodel:
+               - controller:co-controller-2
 
       check:
         - user: user:co-user-2
@@ -330,6 +360,7 @@ tests:
           assertions:
             audit_log_viewer: true
             administrator: false
+            can_addmodel: false
 
     # Ensures:
     # - all or individual users, as well as group members can take part in appropriate relations

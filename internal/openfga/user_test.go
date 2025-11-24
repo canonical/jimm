@@ -347,6 +347,45 @@ func (s *userTestSuite) TestControllerAccess(c *gc.C) {
 	c.Assert(relation, gc.DeepEquals, ofganames.NoRelation)
 }
 
+func (s *userTestSuite) TestCanAddModelToController(c *gc.C) {
+	ctx := context.Background()
+
+	controllerUUID, err := uuid.NewRandom()
+	c.Assert(err, gc.IsNil)
+	controller := names.NewControllerTag(controllerUUID.String())
+
+	eve := names.NewUserTag("eve")
+	alice := names.NewUserTag("alice")
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(eve),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(controller),
+	}, {
+		Object:   ofganames.ConvertTag(alice),
+		Relation: ofganames.AuditLogViewerRelation,
+		Target:   ofganames.ConvertTag(controller),
+	}}
+	err = s.ofgaClient.AddRelation(ctx, tuples...)
+	c.Assert(err, gc.IsNil)
+
+	eveIdentity, err := dbmodel.NewIdentity(eve.Id())
+	c.Assert(err, gc.IsNil)
+	aliceIdentity, err := dbmodel.NewIdentity(alice.Id())
+	c.Assert(err, gc.IsNil)
+
+	eveUser := openfga.NewUser(eveIdentity, s.ofgaClient)
+	aliceUser := openfga.NewUser(aliceIdentity, s.ofgaClient)
+
+	canAddModel, err := eveUser.IsAllowedAddModelToController(ctx, controller)
+	c.Assert(err, gc.IsNil)
+	c.Assert(canAddModel, gc.Equals, true)
+
+	canAddModel, err = aliceUser.IsAllowedAddModelToController(ctx, controller)
+	c.Assert(err, gc.IsNil)
+	c.Assert(canAddModel, gc.Equals, false)
+}
+
 func (s *userTestSuite) TestSetControllerAccess(c *gc.C) {
 	ctx := context.Background()
 	controllerUUID, err := uuid.NewRandom()
