@@ -103,7 +103,6 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 		},
 			nil,
 		)
-
 	s.dialer.EXPECT().
 		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
@@ -211,6 +210,61 @@ func (s *upgradeManagerSuite) TestCloneController_WaitForJobCompletionError(c *q
 
 	err = upgradeMgr.CloneController(c.Context(), &openfga.User{}, upgrade.CloneControllerParams{})
 	c.Assert(err, qt.ErrorMatches, ".*bootstrap job failed.*job failed.*")
+}
+
+func (s *upgradeManagerSuite) TestMigrateAndUpgradeModel_Success(c *qt.C) {
+	ctrl := s.setupTest(c)
+	defer ctrl.Finish()
+
+	ctx := c.Context()
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	c.Assert(err, qt.IsNil)
+
+	mt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetController := "4.0controller"
+	targetModelVersion, err := version.Parse("4.1.0")
+	c.Assert(err, qt.IsNil)
+
+	s.jujuManager.EXPECT().
+		InitiateInternalMigration(ctx, gomock.Any(), mt.Id(), targetController).
+		Return(
+			jujuparams.InitiateMigrationResult{
+				ModelTag:    mt.String(),
+				MigrationId: "1",
+			},
+			nil,
+		)
+
+	s.jujuManager.EXPECT().
+		ModelInfo(
+			gomock.Any(),
+			gomock.Any(),
+			mt,
+		).
+		Return(&jujuparams.ModelInfo{
+			UUID: mt.Id(),
+		}, nil)
+
+	s.store.EXPECT().
+		GetController(ctx, gomock.Any()).
+		DoAndReturn(func(ctx context.Context, ctrl *dbmodel.Controller) error {
+			*ctrl = dbmodel.Controller{
+				Name:         targetController,
+				AgentVersion: "4.1.0",
+			}
+			return nil
+		})
+
+	s.dialer.EXPECT().Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(s.api, nil)
+
+	s.api.EXPECT().
+		UpgradeModel(mt.Id(), targetModelVersion, "", false, true).
+		Return(targetModelVersion, nil)
+
+	controllerChosenVersion, err := upgradeMgr.MigrateAndUpgradeModel(ctx, &openfga.User{}, mt.Id(), targetController, targetModelVersion)
+	c.Assert(err, qt.IsNil)
+	c.Assert(controllerChosenVersion, qt.Equals, targetModelVersion)
 }
 
 //go:generate mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager

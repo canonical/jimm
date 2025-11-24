@@ -176,6 +176,7 @@ type API struct {
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
 	ListModels_                        func(ctx context.Context) ([]base.UserModel, error)
 	CredentialContents_                func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
+	UpgradeModel_                      func(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error)
 }
 
 func (a *API) Activate(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error {
@@ -525,6 +526,13 @@ func (a *API) CredentialContents(cloud string, credential string, withSecrets bo
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.CredentialContents(cloud, credential, withSecrets)
+}
+
+func (a *API) UpgradeModel(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error) {
+	if a.UpgradeModel_ == nil {
+		return version.Number{}, errors.E(errors.CodeNotImplemented)
+	}
+	return a.UpgradeModel_(modelUUID, targetVersion, stream, ignoreAgentVersions, dryRun)
 }
 
 var _ juju.API = &API{}

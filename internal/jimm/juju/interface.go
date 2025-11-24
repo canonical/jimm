@@ -207,6 +207,18 @@ type API interface {
 	// CredentialContents returns contents of the credential values for the specified
 	// cloud and credential name. Secrets will be included if requested.
 	CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
+
+	// UpgradeModel upgrades the model to the provided agent version.
+	// The provided target version could be version.Zero, in which case the
+	// best version is selected by the controller and returned as ChosenVersion
+	// in the result.
+	UpgradeModel(
+		modelUUID string,
+		targetVersion version.Number,
+		stream string,
+		ignoreAgentVersions bool,
+		dryRun bool,
+	) (version.Number, error)
 }
 
 // PermissionManager provides a way to manage permissions within JIMM.

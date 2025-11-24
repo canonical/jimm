@@ -2241,6 +2241,45 @@ func (c *MockAPIUpdateCredentialCall) DoAndReturn(f func(context.Context, params
 	return c
 }
 
+// UpgradeModel mocks base method.
+func (m *MockAPI) UpgradeModel(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions, dryRun bool) (version.Number, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpgradeModel", modelUUID, targetVersion, stream, ignoreAgentVersions, dryRun)
+	ret0, _ := ret[0].(version.Number)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpgradeModel indicates an expected call of UpgradeModel.
+func (mr *MockAPIMockRecorder) UpgradeModel(modelUUID, targetVersion, stream, ignoreAgentVersions, dryRun any) *MockAPIUpgradeModelCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpgradeModel", reflect.TypeOf((*MockAPI)(nil).UpgradeModel), modelUUID, targetVersion, stream, ignoreAgentVersions, dryRun)
+	return &MockAPIUpgradeModelCall{Call: call}
+}
+
+// MockAPIUpgradeModelCall wrap *gomock.Call
+type MockAPIUpgradeModelCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPIUpgradeModelCall) Return(arg0 version.Number, arg1 error) *MockAPIUpgradeModelCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPIUpgradeModelCall) Do(f func(string, version.Number, string, bool, bool) (version.Number, error)) *MockAPIUpgradeModelCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPIUpgradeModelCall) DoAndReturn(f func(string, version.Number, string, bool, bool) (version.Number, error)) *MockAPIUpgradeModelCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ValidateModelUpgrade mocks base method.
 func (m *MockAPI) ValidateModelUpgrade(arg0 context.Context, arg1 names.ModelTag, arg2 bool) error {
 	m.ctrl.T.Helper()
