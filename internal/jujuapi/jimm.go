@@ -15,6 +15,7 @@ import (
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	jujuversion "github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -111,6 +112,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "StopJob", stopJob)
 		r.AddMethod("JIMM", 4, "StartBootstrapJob", startBootstrapJob)
 		r.AddMethod("JIMM", 4, "StartDestroyControllerJob", startDestroyControllerJob)
+		// JIMM Automated Upgrades
+		r.AddMethod("JIMM", 4, "UpgradeTo", rpc.Method(r.UpgradeTo))
 
 		return []int{4}
 	}
@@ -701,4 +704,31 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 	return apiparams.StartJobResponse{
 		JobID: jobID,
 	}, nil
+}
+
+func (r *controllerRoot) UpgradeTo(ctx context.Context, req apiparams.UpgradeToRequest) (apiparams.UpgradeToResponse, error) {
+	const op = errors.Op("jujuapi.UpgradeTo")
+
+	// TODO: Deal with permissions later Alex
+	// if !r.user.JimmAdmin {
+	// 	return apiparams.UpgradeToResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+	// }
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return apiparams.UpgradeToResponse{}, errors.E(op, err, errors.CodeBadRequest, "invalid model tag")
+	}
+
+	targetVersion, err := jujuversion.Parse(req.TargetControllerVersion)
+	if err != nil {
+		return apiparams.UpgradeToResponse{}, errors.E(op, err, errors.CodeBadRequest, "invalid target upgrade version")
+	}
+
+	_, _ = mt, targetVersion
+
+	// cloud, cred, err := PrepareUpgradeTo(ctx, mt.Id(), targetVersion)
+	// BootstrapCall
+	// err = MigrateAndUpgradeModel(ctx, user, mt.Id(), controllerName, targetVersion)
+
+	return apiparams.UpgradeToResponse{}, nil
 }
