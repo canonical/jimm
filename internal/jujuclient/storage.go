@@ -15,7 +15,6 @@ import (
 // ListFilesystems lists filesystems for desired machines.
 // If no machines provided, a list of all filesystems is returned.
 func (c Connection) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
-	const op = errors.Op("jujuclient.ListFilesystems")
 
 	filters := make([]jujuparams.FilesystemFilter, len(machines))
 	for i, machine := range machines {
@@ -31,12 +30,11 @@ func (c Connection) ListFilesystems(ctx context.Context, machines []string) ([]j
 	var results jujuparams.FilesystemDetailsListResults
 
 	if err := c.CallHighestFacadeVersion(ctx, "Storage", []int{6}, "", "ListFilesystems", &args, &results); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
+		return nil, errors.E(jujuerrors.Cause(err))
 	}
 
 	if len(results.Results) != len(filters) {
 		return nil, errors.E(
-			op,
 			jujuerrors.Errorf(
 				"expected %d result(s), got %d",
 				len(filters), len(results.Results),
@@ -50,7 +48,6 @@ func (c Connection) ListFilesystems(ctx context.Context, machines []string) ([]j
 // ListVolumes lists volumes for desired machines.
 // If no machines provided, a list of all volumes is returned.
 func (c Connection) ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
-	const op = errors.Op("jujuclient.ListVolumes")
 
 	filters := make([]jujuparams.VolumeFilter, len(machines))
 	for i, machine := range machines {
@@ -63,12 +60,11 @@ func (c Connection) ListVolumes(ctx context.Context, machines []string) ([]jujup
 	var results jujuparams.VolumeDetailsListResults
 
 	if err := c.CallHighestFacadeVersion(ctx, "Storage", []int{6}, "", "ListVolumes", &args, &results); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
+		return nil, errors.E(jujuerrors.Cause(err))
 	}
 
 	if len(results.Results) != len(filters) {
 		return nil, errors.E(
-			op,
 			jujuerrors.Errorf(
 				"expected %d result(s), got %d",
 				len(filters), len(results.Results),
@@ -81,7 +77,6 @@ func (c Connection) ListVolumes(ctx context.Context, machines []string) ([]jujup
 
 // ListStorageDetails lists all storage.
 func (c Connection) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error) {
-	const op = errors.Op("jujuclient.ListStorageDetails")
 
 	args := jujuparams.StorageFilters{
 		Filters: []jujuparams.StorageFilter{{}}, // one empty filter
@@ -89,12 +84,11 @@ func (c Connection) ListStorageDetails(ctx context.Context) ([]jujuparams.Storag
 	var results jujuparams.StorageDetailsListResults
 
 	if err := c.CallHighestFacadeVersion(ctx, "Storage", []int{6}, "", "ListStorageDetails", &args, &results); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
+		return nil, errors.E(jujuerrors.Cause(err))
 	}
 
 	if len(results.Results) != 1 {
 		return nil, errors.E(
-			op,
 			jujuerrors.Errorf(
 				"expected 1 result, got %d",
 				len(results.Results),
@@ -103,7 +97,6 @@ func (c Connection) ListStorageDetails(ctx context.Context) ([]jujuparams.Storag
 	}
 	if results.Results[0].Error != nil {
 		return nil, errors.E(
-			op,
 			jujuerrors.Trace(results.Results[0].Error),
 		)
 	}

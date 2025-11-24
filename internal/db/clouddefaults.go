@@ -15,10 +15,10 @@ import (
 
 // SetCloudDefaults sets default model setting values for the specified cloud/region.
 func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) (err error) {
-	const op = errors.Op("db.SetCloudDefaults")
+	const op = "db.SetCloudDefaults"
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -42,11 +42,11 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 			if errors.ErrorCode(err) == errors.CodeNotFound {
 				// if defaults do not exist, we create them
 				if err := db.Create(&defaults).Error; err != nil {
-					return errors.E(op, dbError(err))
+					return errors.E(dbError(err))
 				}
 				return nil
 			}
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 
 		// update defaults
@@ -61,22 +61,22 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {
-			return errors.E(op, dbError(err))
+			return errors.E(dbError(err))
 		}
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // UnsetCloudDefaults unsets default model setting values for the specified cloud/region.
 func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults, keys []string) (err error) {
-	const op = errors.Op("db.UpsertCloudDefaults")
+	const op = "db.UpsertCloudDefaults"
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -97,7 +97,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		// try to fetch cloud defaults from the db
 		err := d.CloudDefaults(ctx, &dbDefaults)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 
 		// update defaults
@@ -112,22 +112,22 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {
-			return errors.E(op, dbError(err))
+			return errors.E(dbError(err))
 		}
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // CloudDefaults fetches cloud defaults based on user, cloud name or id and region name.
 func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDefaults) (err error) {
-	const op = errors.Op("db.CloudDefaults")
+	const op = "db.CloudDefaults"
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -149,19 +149,19 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 	if result.Error != nil {
 		err := dbError(result.Error)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, errors.CodeNotFound, "cloudregiondefaults not found", err)
+			return errors.E(errors.CodeNotFound, "cloudregiondefaults not found", err)
 		}
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
 func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloud names.CloudTag) (_ []dbmodel.CloudDefaults, err error) {
-	const op = errors.Op("db.ModelDefaultsForCloud")
+	const op = "db.ModelDefaultsForCloud"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -177,7 +177,7 @@ func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Iden
 	var defaults []dbmodel.CloudDefaults
 	result := db.Preload("Identity").Preload("Cloud").Find(&defaults)
 	if result.Error != nil {
-		return nil, errors.E(op, dbError(result.Error))
+		return nil, errors.E(dbError(result.Error))
 	}
 	return defaults, nil
 }

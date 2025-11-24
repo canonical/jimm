@@ -114,14 +114,13 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 
 // Dial implements jimm.Dialer.
 func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (juju.API, error) {
-	const op = errors.Op("jujuclient.Dial")
 
 	conn, err := rpc.Dial(ctx, ctl, modelTag, "", nil)
 	if err != nil {
 		return nil, err
 	}
 	if conn == nil {
-		return nil, errors.E(op, errors.CodeConnectionFailed, err)
+		return nil, errors.E(errors.CodeConnectionFailed, err)
 	}
 	client := rpc.NewClient(conn)
 
@@ -133,20 +132,20 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	if user.Name == adminUser {
 		loginRequest, err = d.createAdminLoginRequest(ctx, ctl, modelTag, withPermissions)
 		if err != nil {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 
 	} else {
 		loginRequest, err = d.createLoginRequest(ctx, ctl, modelTag, user, withPermissions)
 		if err != nil {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 	}
 
 	var res jujuparams.LoginResult
 	if err := client.Call(ctx, "Admin", 3, "", "Login", loginRequest, &res); err != nil {
 		client.Close()
-		return nil, errors.E(op, errors.CodeConnectionFailed, err)
+		return nil, errors.E(errors.CodeConnectionFailed, err)
 	}
 
 	ct, err := names.ParseControllerTag(res.ControllerTag)
@@ -338,25 +337,25 @@ func (c *Connection) Context() context.Context {
 // The given parameters are used as URL query values
 // when making the initial HTTP request.
 func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, error) {
-	const op = errors.Op("jujuclient.ConnectStream")
+
 	modelTag, ok := c.ModelTag()
 	if !ok {
-		return nil, errors.E(op, "no model found")
+		return nil, errors.E("no model found")
 	}
 
 	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	ok = names.IsValidUser(user)
 	if !ok {
-		return nil, errors.E(op, "invalid/missing controller credentials")
+		return nil, errors.E("invalid/missing controller credentials")
 	}
 	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
 
 	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return conn, nil
 }
@@ -367,11 +366,10 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 // HTTP request. Headers passed in will be added to the HTTP
 // request.
 func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extraHeaders http.Header) (base.Stream, error) {
-	const op = errors.Op("jujuclient.ConnectControllerStream")
 
 	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	header := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
@@ -383,7 +381,7 @@ func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extr
 
 	conn, err := rpc.Dial(c.ctx, c.ctl, names.ModelTag{}, path, header)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return conn, nil

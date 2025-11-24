@@ -24,14 +24,14 @@ import (
 //
 // GetIdentity returns an error with CodeNotFound if the identity name is invalid.
 func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
-	const op = errors.Op("db.GetIdentity")
+	const op = "db.GetIdentity"
 
 	if u.Name == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
+		return errors.E(errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -42,7 +42,7 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 		DoNothing: true,
 	}).Create(&u)
 	if result.Error != nil {
-		return errors.E(op, result.Error)
+		return errors.E(result.Error)
 	}
 
 	// Check if a new identity was created.
@@ -53,7 +53,7 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 
 	// If we didn't create it, it must exist (or we raced and lost). Fetch it.
 	if err = d.DB.WithContext(ctx).Where("name = ?", u.Name).First(&u).Error; err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
@@ -64,14 +64,14 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 //
 // FetchIdentity returns an error with CodeNotFound if the identity name is invalid.
 func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
-	const op = errors.Op("db.FetchIdentity")
+	const op = "db.FetchIdentity"
 
 	if u.Name == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
+		return errors.E(errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -80,7 +80,7 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err 
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Where("name = ?", u.Name).First(&u).Error; err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -92,9 +92,9 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err 
 // UpdateIdentity returns an error with CodeNotFound if the identity name is
 // invalid.
 func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
-	const op = errors.Op("db.UpdateIdentity")
+	const op = "db.UpdateIdentity"
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -102,27 +102,27 @@ func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	if u.Name == "" {
-		return errors.E(op, errors.CodeNotFound, `invalid identity name ""`)
+		return errors.E(errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("ApplicationOffers").Omit("Clouds").Omit("CloudCredentials").Omit("Models")
 	if err := db.Save(u).Error; err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // GetIdentityCloudCredentials fetches identity's cloud credentials for the specified cloud.
 func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.Identity, cloud string) (_ []dbmodel.CloudCredential, err error) {
-	const op = errors.Op("db.GetIdentityCloudCredentials")
+	const op = "db.GetIdentityCloudCredentials"
 
 	if u.Name == "" || cloud == "" {
-		return nil, errors.E(op, errors.CodeNotFound, `cloudcredential not found`)
+		return nil, errors.E(errors.CodeNotFound, `cloudcredential not found`)
 	}
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -132,7 +132,7 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	var credentials []dbmodel.CloudCredential
 	db := d.DB.WithContext(ctx)
 	if err := db.Model(u).Where("cloud_name = ?", cloud).Association("CloudCredentials").Find(&credentials); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return credentials, nil
 }
@@ -140,9 +140,9 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 // ListIdentities returns a paginated list of identities defined by limit and offset.
 // match is used to fuzzy find based on entries' name using the LIKE operator (ex. LIKE %<match>%).
 func (d *Database) ListIdentities(ctx context.Context, limit, offset int, match string) (_ []dbmodel.Identity, err error) {
-	const op = errors.Op("db.ListIdentities")
+	const op = "db.ListIdentities"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -162,17 +162,17 @@ func (d *Database) ListIdentities(ctx context.Context, limit, offset int, match 
 	}
 	var identities []dbmodel.Identity
 	if err := db.Find(&identities).Error; err != nil {
-		return nil, errors.E(op, dbError(err))
+		return nil, errors.E(dbError(err))
 	}
 	return identities, nil
 }
 
 // CountIdentities counts the number of identities.
 func (d *Database) CountIdentities(ctx context.Context) (_ int, err error) {
-	const op = errors.Op("db.CountIdentities")
+	const op = "db.CountIdentities"
 
 	if err := d.ready(); err != nil {
-		return 0, errors.E(op, err)
+		return 0, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -182,7 +182,7 @@ func (d *Database) CountIdentities(ctx context.Context) (_ int, err error) {
 	db := d.DB.WithContext(ctx)
 	var count int64
 	if err := db.Model(&dbmodel.Identity{}).Count(&count).Error; err != nil {
-		return 0, errors.E(op, err)
+		return 0, errors.E(err)
 	}
 	return int(count), nil
 }

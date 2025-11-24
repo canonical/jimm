@@ -153,14 +153,13 @@ func (c *Client) handleResponse(msg *message) {
 // the server and waits for the response to be returned or the context to
 // be canceled.
 func (c *Client) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) error {
-	const op = errors.Op("rpc.Client.Call")
 
 	var argsb []byte
 	if args != nil {
 		var err error
 		argsb, err = json.Marshal(args)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 	}
 	req := &message{
@@ -186,7 +185,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 	req.RequestID = c.reqID
 	if err := c.conn.WriteJSON(req); err != nil {
 		c.broken = true
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	ch := make(chan struct{})
 	//nolint:staticcheck // Not sure why Martin made this a **. Ignore for now.
@@ -212,7 +211,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 		}
 		if resp != nil {
 			if err := json.Unmarshal([]byte((*respMsg).Response), &resp); err != nil {
-				return errors.E(op, err)
+				return errors.E(err)
 			}
 		}
 		return nil
@@ -221,7 +220,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 		defer c.mu.Unlock()
 		return c.err
 	case <-ctx.Done():
-		return errors.E(op, ctx.Err())
+		return errors.E(ctx.Err())
 	}
 }
 
@@ -230,7 +229,6 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 // complete before gracefully shutting down. If for any reason sending the
 // close message fails Close will abruptly close the undelying connection.
 func (c *Client) Close() error {
-	const op = errors.Op("rpc.Client.Close")
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -244,7 +242,7 @@ func (c *Client) Close() error {
 	c.closing = true
 	cm := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 	if err := c.conn.WriteControl(websocket.CloseMessage, cm, time.Time{}); err != nil {
-		c.err = errors.E(op, "error closing connection", err)
+		c.err = errors.E("error closing connection", err)
 		// If sending the close message failed then tear down the
 		// connection. Note that we don't need to clear up any
 		// outstanding messages here as the receiver will error and

@@ -36,7 +36,6 @@ const TIMEOUT_PENDING_MIGRATION = 24 * time.Hour
 // It also deletes the migration record from the database, but does not return an error
 // if the deletion fails, as the migration has already been aborted on the target controller.
 func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error {
-	const op = errors.Op("jimm.Abort")
 
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -46,18 +45,18 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 	}
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to get model migration %q: %w", modelUUID, err))
+		return errors.E(fmt.Errorf("failed to get model migration %q: %w", modelUUID, err))
 	}
 
 	api, err := j.dialController(ctx, &incomingModel.TargetController)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	err = api.Abort(modelUUID)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to abort migration: %w", err))
+		return errors.E(fmt.Errorf("failed to abort migration: %w", err))
 	}
 
 	err = j.Database.DeleteIncomingModelMigration(ctx, &incomingModel)
@@ -90,7 +89,6 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 // and compares them with the ones reported by the provider.
 // It calls the CheckMachines method on the target Juju controller.
 func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error) {
-	const op = errors.Op("jimm.CheckMachines")
 
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -100,18 +98,18 @@ func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, mod
 	}
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("failed to get model migration %q: %w", modelUUID, err))
+		return nil, errors.E(fmt.Errorf("failed to get model migration %q: %w", modelUUID, err))
 	}
 
 	api, err := j.dialController(ctx, &incomingModel.TargetController)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return nil, errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	machineErrors, err := api.CheckMachines(modelUUID)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("failed to check machines: %w", err))
+		return nil, errors.E(fmt.Errorf("failed to check machines: %w", err))
 	}
 	return machineErrors, nil
 }
@@ -119,7 +117,6 @@ func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, mod
 // ControllerDetailsForIncomingModel retrieves the target controller details for a model that is being migrated.
 // It returns the controller information, username, and password for the target controller.
 func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (ControllerConnectionDetails, error) {
-	const op = errors.Op("jimm.ControllerDetailsForIncomingModel")
 
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -131,9 +128,9 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
+			return ControllerConnectionDetails{}, errors.E(errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
 		}
-		return ControllerConnectionDetails{}, errors.E(op, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
+		return ControllerConnectionDetails{}, errors.E(fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err))
 	}
 
 	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, incomingModel.TargetController.Name)
@@ -142,7 +139,7 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 	}
 
 	if username == "" || password == "" {
-		return ControllerConnectionDetails{}, errors.E(op, errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
+		return ControllerConnectionDetails{}, errors.E(errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
 	}
 
 	return toControllerConnectionDetails(incomingModel.TargetController, username, password), nil
@@ -154,7 +151,6 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 // As part of all model migrations passing through JIMM, it modifies the model description
 // to replace any local user references with their external mapping.
 func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
-	const op = errors.Op("jimm.Prechecks")
 
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -164,22 +160,22 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 	}
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
+		return errors.E(fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
 	}
 
 	err = j.validateUserMapping(model.ModelDescription, incomingModel.UserMapping)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to validate user mapping: %w", err))
+		return errors.E(fmt.Errorf("failed to validate user mapping: %w", err))
 	}
 
 	err = j.modifyMigrationInfo(&model, incomingModel.UserMapping)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to modify migration info: %w", err))
+		return errors.E(fmt.Errorf("failed to modify migration info: %w", err))
 	}
 
 	_, err = j.Database.FindRegionByCloudName(ctx, model.ModelDescription.CloudCredential().Cloud(), model.ModelDescription.CloudRegion())
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to find region for cloud %q: %w", model.ModelDescription.CloudCredential().Cloud(), err))
+		return errors.E(fmt.Errorf("failed to find region for cloud %q: %w", model.ModelDescription.CloudCredential().Cloud(), err))
 	}
 
 	cloudCredential := &dbmodel.CloudCredential{
@@ -190,18 +186,18 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model m
 
 	err = j.Database.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	api, err := j.dialController(ctx, &incomingModel.TargetController)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	err = api.Prechecks(model)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to run pre-checks for migration: %w", err))
+		return errors.E(fmt.Errorf("failed to run pre-checks for migration: %w", err))
 	}
 	return nil
 }
@@ -248,7 +244,6 @@ func (j *JujuManager) validateUserMapping(modelDescription description.Model, us
 // Adopt resources is called after the model has been activated so the
 // incoming model migration does not exist and the model is used instead.
 func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error {
-	const op = errors.Op("jimm.AdoptResources")
 
 	model := dbmodel.Model{
 		UUID: sql.NullString{
@@ -258,18 +253,18 @@ func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, mo
 	}
 	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to get model migration for model %q: %w", modelUUID, err))
+		return errors.E(fmt.Errorf("failed to get model migration for model %q: %w", modelUUID, err))
 	}
 
 	api, err := j.dialController(ctx, &model.Controller)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	err = api.AdoptResources(modelUUID, sourceControllerVersion)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to adopt resources: %w", err))
+		return errors.E(fmt.Errorf("failed to adopt resources: %w", err))
 	}
 	return nil
 }
@@ -353,7 +348,6 @@ func modifyModelDescription(modelDescription description.Model, userMapping dbmo
 // LatestLogTime asks the target controller for the time of the latest
 // log record it has seen.
 func (j *JujuManager) LatestLogTime(ctx context.Context, modelUUID string) (time.Time, error) {
-	const op = errors.Op("jimm.LatestLogTime")
 
 	model := dbmodel.Model{
 		UUID: sql.NullString{
@@ -363,18 +357,18 @@ func (j *JujuManager) LatestLogTime(ctx context.Context, modelUUID string) (time
 	}
 	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return time.Time{}, errors.E(op, fmt.Errorf("failed to get model %q: %w", modelUUID, err))
+		return time.Time{}, errors.E(fmt.Errorf("failed to get model %q: %w", modelUUID, err))
 	}
 
 	api, err := j.dialController(ctx, &model.Controller)
 	if err != nil {
-		return time.Time{}, errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return time.Time{}, errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	t, err := api.LatestLogTime(modelUUID)
 	if err != nil {
-		return time.Time{}, errors.E(op, fmt.Errorf("failed to get latest log time for model %q: %w", modelUUID, err))
+		return time.Time{}, errors.E(fmt.Errorf("failed to get latest log time for model %q: %w", modelUUID, err))
 	}
 	return t, nil
 }
@@ -382,7 +376,6 @@ func (j *JujuManager) LatestLogTime(ctx context.Context, modelUUID string) (time
 // Activate gets the model migration, proxies the Activate call to the target controller,
 // and then deletes the model migration from the database.
 func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error {
-	const op = errors.Op("jimm.Activate")
 
 	modelMigration := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -392,17 +385,17 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 	}
 	err := j.Database.GetIncomingModelMigration(ctx, &modelMigration)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to get model migration for model %q: %w", modelTag.Id(), err))
+		return errors.E(fmt.Errorf("failed to get model migration for model %q: %w", modelTag.Id(), err))
 	}
 	api, err := j.dialController(ctx, &modelMigration.TargetController)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	err = api.Activate(modelTag.Id(), migrationInfo, relatedModels)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to activate model %q: %w", modelTag.Id(), err))
+		return errors.E(fmt.Errorf("failed to activate model %q: %w", modelTag.Id(), err))
 	}
 
 	// This is done in a transaction to ensure that the model migration is only deleted
@@ -421,7 +414,7 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 			}
 			err = db.AddUserMapping(ctx, userMapping)
 			if err != nil {
-				return errors.E(op, fmt.Errorf("failed to add user mapping for model %q: %w", modelTag.Id(), err))
+				return errors.E(fmt.Errorf("failed to add user mapping for model %q: %w", modelTag.Id(), err))
 			}
 		}
 		model := dbmodel.Model{
@@ -432,24 +425,24 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 		}
 		err = db.GetModel(ctx, &model)
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to get model %q: %w", modelTag.Id(), err))
+			return errors.E(fmt.Errorf("failed to get model %q: %w", modelTag.Id(), err))
 		}
 		model.MigrationMode = dbmodel.MigrationModeNone
 		model.Life = state.Alive.String()
 
 		err = db.UpdateModel(ctx, &model)
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to update model %q: %w", modelTag.Id(), err))
+			return errors.E(fmt.Errorf("failed to update model %q: %w", modelTag.Id(), err))
 		}
 
 		err = db.DeleteIncomingModelMigration(ctx, &modelMigration)
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to delete model migration for model %q: %w", modelTag.Id(), err))
+			return errors.E(fmt.Errorf("failed to delete model migration for model %q: %w", modelTag.Id(), err))
 		}
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to activate model %q: %w", modelTag.Id(), err))
+		return errors.E(fmt.Errorf("failed to activate model %q: %w", modelTag.Id(), err))
 	}
 	return nil
 }
@@ -462,11 +455,10 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 //   - Adds permissions for the model and application offers.
 //   - Calls the import method on the target Juju controller to import the model.
 func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error {
-	const op = errors.Op("jimm.Import")
 
 	modelDescription, err := description.Deserialize(serialized.Bytes)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to deserialize model description: %w", err))
+		return errors.E(fmt.Errorf("failed to deserialize model description: %w", err))
 	}
 
 	var (
@@ -488,17 +480,17 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 		noWait := false
 		err = d.GetIncomingModelMigrationWithLock(ctx, incomingMigration, noWait)
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to get incoming model migration: %w", err))
+			return errors.E(fmt.Errorf("failed to get incoming model migration: %w", err))
 		}
 
 		err = modifyModelDescription(modelDescription, incomingMigration.UserMapping)
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to modify model description: %w", err))
+			return errors.E(fmt.Errorf("failed to modify model description: %w", err))
 		}
 
 		model, offers, err = importFromDescription(ctx, d, incomingMigration.TargetController.ID, modelDescription)
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to import model from description: %w", err))
+			return errors.E(fmt.Errorf("failed to import model from description: %w", err))
 		}
 		return nil
 	})
@@ -511,24 +503,24 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 	controllerTag := incomingMigration.TargetController.ResourceTag()
 	err = j.addModelAndOfferPermissions(ctx, user, model, offers, controllerTag)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to add resource permissions: %w", err))
+		return errors.E(fmt.Errorf("failed to add resource permissions: %w", err))
 	}
 
 	// Call the import method on the target controller to import the model.
 	api, err := j.dialController(ctx, &incomingMigration.TargetController)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to dial controller: %w", err))
+		return errors.E(fmt.Errorf("failed to dial controller: %w", err))
 	}
 	defer api.Close()
 
 	serializedDescrition, err := description.Serialize(modelDescription)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to serialize model description: %w", err))
+		return errors.E(fmt.Errorf("failed to serialize model description: %w", err))
 	}
 	err = api.Import(serializedDescrition)
 	if err != nil {
 		// TODO: handle migration failure in a cleanup routine.
-		return errors.E(op, fmt.Errorf("failed to import model: %w", err))
+		return errors.E(fmt.Errorf("failed to import model: %w", err))
 	}
 
 	return nil
@@ -540,20 +532,18 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 // Application offers are created for any offers in the model description.
 // It also ensures that the cloud credential and region are present in the database.
 func importFromDescription(ctx context.Context, tx *db.Database, targetControllerID uint, description description.Model) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
-	op := errors.Op("jimm.importFromDescription")
-
 	modelNameStr, ok := description.Config()[config.NameKey].(string)
 	if !ok {
-		return nil, nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.NameKey))
+		return nil, nil, errors.E(fmt.Errorf("model config must contain a string value for key %q", config.NameKey))
 	}
 
 	modelUUIDStr, ok := description.Config()[config.UUIDKey].(string)
 	if !ok {
-		return nil, nil, errors.E(op, fmt.Errorf("model config must contain a string value for key %q", config.UUIDKey))
+		return nil, nil, errors.E(fmt.Errorf("model config must contain a string value for key %q", config.UUIDKey))
 	}
 
 	if description.CloudCredential() == nil {
-		return nil, nil, errors.E(op, fmt.Errorf("model description must contain a cloud credential"))
+		return nil, nil, errors.E(fmt.Errorf("model description must contain a cloud credential"))
 	}
 	cloudCredential := &dbmodel.CloudCredential{
 		CloudName:         description.CloudCredential().Cloud(),
@@ -563,11 +553,11 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 
 	err := tx.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 	region, err := tx.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	var importedModel *dbmodel.Model
@@ -587,7 +577,7 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 	}
 	err = tx.AddModel(ctx, &model)
 	if err != nil {
-		return nil, nil, errors.E(op, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
+		return nil, nil, errors.E(fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err))
 	}
 	importedModel = &model
 
@@ -606,7 +596,7 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
 					return nil, nil, fmt.Errorf("offer with URL %s already exists", dbOffer.URL)
 				}
-				return nil, nil, errors.E(op, fmt.Errorf("failed to add application offer %q: %w", dbOffer.Name, err))
+				return nil, nil, errors.E(fmt.Errorf("failed to add application offer %q: %w", dbOffer.Name, err))
 			}
 
 			importedOffers = append(importedOffers, &dbOffer)
@@ -619,17 +609,16 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 // addModelAndOfferPermissions grants the user access to the model
 // and adds the necesary relations between the model and app offers.
 func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *openfga.User, model *dbmodel.Model, offers []*dbmodel.ApplicationOffer, ct names.ControllerTag) error {
-	const op = errors.Op("jimm.addResourcePermissions")
 
 	modelTag := model.ResourceTag()
 	if err := j.addModelPermissions(ctx, user, modelTag, ct); err != nil {
-		return errors.E(op, fmt.Errorf("failed to add model permissions: %w", err))
+		return errors.E(fmt.Errorf("failed to add model permissions: %w", err))
 	}
 
 	for _, offer := range offers {
 		err := j.OpenFGAClient.AddModelApplicationOffer(ctx, modelTag, offer.ResourceTag())
 		if err != nil {
-			return errors.E(op, fmt.Errorf("failed to add application offer permissions: %w", err))
+			return errors.E(fmt.Errorf("failed to add application offer permissions: %w", err))
 		}
 	}
 	return nil
@@ -639,12 +628,11 @@ func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *ope
 // It deletes the incoming model migration record, deletes the user mappings for the model,
 // and deletes the model record from JIMM's state.
 func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
-	const op = errors.Op("jimm.CleanupPartialModelMigrations")
 
 	// Get all incoming model migrations that have exceeded the timeout.
 	migrations, err := j.Database.GetIncomingModelMigrationsCreatedBefore(ctx, time.Now().Add(-TIMEOUT_PENDING_MIGRATION))
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to get incoming model migrations: %w", err))
+		return errors.E(fmt.Errorf("failed to get incoming model migrations: %w", err))
 	}
 	var errs []error
 	for _, migration := range migrations {
@@ -659,19 +647,18 @@ func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
 // cleanupPartialModelMigration cleans up a partial model migration by deleting the incoming model migration record,
 // deleting the user mappings for the model, and deleting the model record from JIMM's state.
 func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migration dbmodel.IncomingModelMigration) error {
-	const op = errors.Op("jimm.cleanupPartialModelMigration")
 
 	return j.Database.Transaction(func(db *db.Database) error {
 		// Delete the incoming model migration record.
 		err := j.Database.DeleteIncomingModelMigration(ctx, &migration)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 
 		// Delete user mappings for the model.
 		err = j.Database.DeleteUserMappingsByModelUUID(ctx, migration.ModelUUID.String)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 
 		// Delete the model record from JIMM's state.
@@ -683,7 +670,7 @@ func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migratio
 		}
 		err = j.Database.DeleteModel(ctx, &model)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		return nil
 	})

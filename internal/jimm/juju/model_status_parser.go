@@ -29,7 +29,6 @@ import (
 // Errors will contain a map from model UUID -> []error. Otherwise, the Results field
 // will contain model UUID -> []Jq result.
 func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jqQuery string) (params.CrossModelQueryResponse, error) {
-	op := errors.Op("QueryModels")
 	results := params.CrossModelQueryResponse{
 		Results: make(map[string][]any),
 		Errors:  make(map[string][]string),
@@ -37,7 +36,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 
 	query, err := gojq.Parse(jqQuery)
 	if err != nil {
-		return results, errors.E(op, "failed to parse jq query", err)
+		return results, errors.E("failed to parse jq query", err)
 	}
 
 	// Set up a formatterParamsRetriever to handle the heavy lifting
@@ -46,7 +45,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 
 	models, err := j.Database.GetModelsByUUID(ctx, modelUUIDs)
 	if err != nil {
-		return results, errors.E(op, "failed to get models for user")
+		return results, errors.E("failed to get models for user")
 	}
 
 	for _, model := range models {
@@ -79,7 +78,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 		}
 		tempMap := make(map[string]any)
 		if err := json.Unmarshal(fb, &tempMap); err != nil {
-			return results, errors.E(op, err)
+			return results, errors.E(err)
 		}
 
 		queryCtx, cancel := context.WithTimeout(ctx, j.crossModelQueryTimeout)
@@ -97,7 +96,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
 				if stderrors.Is(err, context.DeadlineExceeded) {
-					return results, errors.E(op, fmt.Sprintf("jq query timed out after %.2f seconds", j.crossModelQueryTimeout.Seconds()), err)
+					return results, errors.E(fmt.Sprintf("jq query timed out after %.2f seconds", j.crossModelQueryTimeout.Seconds()), err)
 				}
 				results.Errors[modelUUID] = append(results.Errors[modelUUID], "jq error: "+err.Error())
 				continue
@@ -164,7 +163,7 @@ func (f *formatterParamsRetriever) GetParams(ctx context.Context, model dbmodel.
 func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
 	modelTag, ok := f.model.Tag().(names.ModelTag)
 	if !ok {
-		return errors.E(errors.Op("failed to parse model tag"))
+		return errors.E("failed to parse model tag")
 	}
 	api, err := f.jujuManager.dial(ctx, &f.model.Controller, modelTag, nil)
 	if err != nil {

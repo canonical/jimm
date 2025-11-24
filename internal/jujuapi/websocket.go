@@ -209,12 +209,12 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 // connect to a controller when a client makes a request.
 func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTokenGenerator) func(context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
 	return func(ctx context.Context) (rpcproxy.WebsocketConnectionWithMetadata, error) {
-		const op = errors.Op("proxy.controllerConnectionFunc")
+
 		path := jimmhttp.PathElementFromContext(ctx)
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
-			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(op, fmt.Errorf("error parsing path: %w", err))
+			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(fmt.Errorf("error parsing path: %w", err))
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{

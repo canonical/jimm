@@ -46,7 +46,6 @@ type Watcher struct {
 // until either the given context is closed, or there is an error querying
 // the database.
 func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Duration) error {
-	const op = errors.Op("jimm.WatchAllModelSummaries")
 
 	r := newRunner()
 	// Ensure that all started goroutines are completed before we return.
@@ -72,7 +71,7 @@ func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Dura
 		if err != nil {
 			// Ignore temporary database errors.
 			if errors.ErrorCode(err) != errors.CodeDatabaseLocked {
-				return errors.E(op, err)
+				return errors.E(err)
 			}
 			zapctx.Warn(ctx, "temporary error polling for controllers", zap.Error(err))
 		}
@@ -86,7 +85,6 @@ func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Dura
 }
 
 func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (api API, err error) {
-	const op = errors.Op("jimm.dialController")
 
 	updateController := false
 	defer func() {
@@ -111,7 +109,7 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 		ctl.UnavailableSince = db.Now()
 		updateController = true
 
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	if ctl.UnavailableSince.Valid {
 		ctl.UnavailableSince = sql.NullTime{}
@@ -123,23 +121,22 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 // watchAllModelSummaries connects to the given controller and watches the
 // summary updates.
 func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Controller) error {
-	const op = errors.Op("jimm.watchAllModelSummaries")
 
 	// connect to the controller
 	api, err := w.dialController(ctx, ctl)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	defer api.Close()
 
 	if !api.SupportsModelSummaryWatcher() {
-		return errors.E(op, errors.CodeNotSupported)
+		return errors.E(errors.CodeNotSupported)
 	}
 
 	// start the model summary watcher
 	id, err := api.WatchAllModelSummaries(ctx)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	defer func() {
 		if err := api.ModelSummaryWatcherStop(ctx, id); err != nil {
@@ -150,13 +147,13 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	for {
 		select {
 		case <-ctx.Done():
-			return errors.E(op, ctx.Err(), "context cancelled")
+			return errors.E(ctx.Err(), "context cancelled")
 		default:
 		}
 		// wait for updates from the all model summary watcher.
 		modelSummaries, err := api.ModelSummaryWatcherNext(ctx, id)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		// Sanitize the model abstracts.
 		for _, summary := range modelSummaries {

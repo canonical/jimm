@@ -32,11 +32,10 @@ func NewIdentityManager(store *db.Database, authSvc *openfga.OFGAClient) (*ident
 // FetchIdentity fetches the user specified by the username and returns the user if it is found.
 // Or error "record not found".
 func (j *identityManager) FetchIdentity(ctx context.Context, id string) (*openfga.User, error) {
-	const op = errors.Op("jimm.FetchIdentity")
 
 	identity, err := dbmodel.NewIdentity(id)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	if err := j.store.FetchIdentity(ctx, identity); err != nil {
@@ -49,10 +48,9 @@ func (j *identityManager) FetchIdentity(ctx context.Context, id string) (*openfg
 // ListIdentities lists a page of users in our database and parse them into openfga entities.
 // `match` will filter the list for fuzzy find on identity name.
 func (j *identityManager) ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
-	const op = errors.Op("jimm.ListIdentities")
 
 	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	identities, err := j.store.ListIdentities(ctx, pagination.Limit(), pagination.Offset(), match)
 	var users []openfga.User
@@ -61,22 +59,21 @@ func (j *identityManager) ListIdentities(ctx context.Context, user *openfga.User
 		users = append(users, *openfga.NewUser(&id, j.authSvc))
 	}
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return users, nil
 }
 
 // CountIdentities returns the count of all the identities in our database.
 func (j *identityManager) CountIdentities(ctx context.Context, user *openfga.User) (int, error) {
-	const op = errors.Op("jimm.CountIdentities")
 
 	if !user.JimmAdmin {
-		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return 0, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	count, err := j.store.CountIdentities(ctx)
 	if err != nil {
-		return 0, errors.E(op, err)
+		return 0, errors.E(err)
 	}
 	return count, nil
 }

@@ -13,13 +13,13 @@ import (
 
 // ControllerConfig retrieves the controller configuration.
 func (c Connection) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
-	const op = errors.Op("jujuclient.ControllerConfig")
+
 	results := jujuparams.ControllerConfigResult{}
 	if err := c.CallHighestFacadeVersion(ctx, "Controller", []int{12}, "", "ControllerConfig", nil, &results); err != nil {
-		return jujuparams.ControllerConfigResult{}, errors.E(op, jujuerrors.Cause(err))
+		return jujuparams.ControllerConfigResult{}, errors.E(jujuerrors.Cause(err))
 	}
 	if results.Config == nil {
-		return jujuparams.ControllerConfigResult{}, errors.E(op, errors.CodeNotFound, "controller config not found")
+		return jujuparams.ControllerConfigResult{}, errors.E(errors.CodeNotFound, "controller config not found")
 	}
 	return results, nil
 }

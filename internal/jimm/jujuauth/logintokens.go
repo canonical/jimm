@@ -88,13 +88,12 @@ func (auth *LoginTokenGenerator) GetUser() names.UserTag {
 // a JWT containing claims about user's access to the controller, model (if applicable)
 // and all clouds that the controller knows about.
 func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
-	const op = errors.Op("jimm.MakeLoginToken")
 
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 
 	if user == nil {
-		return nil, errors.E(op, "user not specified")
+		return nil, errors.E("user not specified")
 	}
 	auth.user = user
 
@@ -104,7 +103,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 
 	var modelAccess string
 	if auth.mt.Id() == "" {
-		return nil, errors.E(op, "model not set")
+		return nil, errors.E("model not set")
 	}
 	modelAccess, authErr = auth.accessChecker.GetUserModelAccess(ctx, auth.user, auth.mt)
 	if authErr != nil {
@@ -114,7 +113,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	auth.accessMapCache[auth.mt.String()] = modelAccess
 
 	if auth.ct.Id() == "" {
-		return nil, errors.E(op, "controller not set")
+		return nil, errors.E("controller not set")
 	}
 	var controllerAccess string
 	controllerAccess, authErr = auth.accessChecker.GetUserControllerAccess(ctx, auth.user, auth.ct)
@@ -127,7 +126,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	ctl.SetTag(auth.ct)
 	err := auth.database.GetController(ctx, &ctl)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("failed to fetch controller: %w", err))
+		return nil, errors.E(fmt.Errorf("failed to fetch controller: %w", err))
 	}
 	clouds := make(map[names.CloudTag]bool)
 	for _, cloudRegion := range ctl.CloudRegions {
@@ -136,7 +135,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	for cloudTag := range clouds {
 		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
 		if err != nil {
-			return nil, errors.E(op, fmt.Errorf("failed to check user's cloud access: %w", err))
+			return nil, errors.E(fmt.Errorf("failed to check user's cloud access: %w", err))
 		}
 		auth.accessMapCache[cloudTag.String()] = accessLevel
 	}
@@ -152,17 +151,16 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 // specified in the permissionMap. If the logged in user has all those permissions
 // a JWT will be returned with assertions confirming all those permissions.
 func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
-	const op = errors.Op("jimm.MakeToken")
 
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 
 	if auth.callCount >= 10 {
-		return nil, errors.E(op, "Permission check limit exceeded")
+		return nil, errors.E("Permission check limit exceeded")
 	}
 	auth.callCount++
 	if auth.user == nil {
-		return nil, errors.E(op, "User authorization missing.")
+		return nil, errors.E("User authorization missing.")
 	}
 	if permissionMap != nil {
 		var err error

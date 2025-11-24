@@ -78,11 +78,10 @@ func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 
 // FindAuditEvents returns audit events matching the given filter.
 func (j *auditLogManager) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
-	const op = errors.Op("jimm.FindAuditEvents")
 
 	access := user.GetAuditLogViewerAccess(ctx, j.jimmTag)
 	if access != ofganames.AuditLogViewerRelation {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var entries []dbmodel.AuditLogEntry
@@ -91,7 +90,7 @@ func (j *auditLogManager) FindAuditEvents(ctx context.Context, user *openfga.Use
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return entries, nil
@@ -101,13 +100,12 @@ func (j *auditLogManager) FindAuditEvents(ctx context.Context, user *openfga.Use
 // administrators can perform this operation. The number of logs purged is
 // returned.
 func (j *auditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
-	op := errors.Op("jimm.PurgeLogs")
 	if !user.JimmAdmin {
-		return 0, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return 0, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	count, err := j.store.DeleteAuditLogsBefore(ctx, before)
 	if err != nil {
-		return 0, errors.E(op, fmt.Errorf("failed to purge logs: %w", err))
+		return 0, errors.E(fmt.Errorf("failed to purge logs: %w", err))
 	}
 	return count, nil
 }

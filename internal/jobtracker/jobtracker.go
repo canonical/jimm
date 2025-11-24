@@ -147,12 +147,11 @@ func (j *Tracker) monitorJob(id uuid.UUID, jobErrCh chan error, cancelJob contex
 
 // GetJob retrieves a Job via its jobId.
 func (j *Tracker) GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrackerEntry, error) {
-	const op = errors.Op("jimm.GetJobStatus")
 
 	job := dbmodel.JobTrackerEntry{JobID: jobId}
 	err := j.store.GetJob(ctx, &job)
 	if err != nil {
-		return job, errors.E(op, "failed to get job info", err)
+		return job, errors.E("failed to get job info", err)
 	}
 
 	return job, nil
@@ -160,10 +159,9 @@ func (j *Tracker) GetJob(ctx context.Context, jobId uuid.UUID) (dbmodel.JobTrack
 
 // StopJob stops a job by its ID.
 func (j *Tracker) StopJob(ctx context.Context, jobId uuid.UUID) error {
-	const op = errors.Op("jimm.StopJob")
 
 	if err := j.store.StopJob(ctx, jobId); err != nil {
-		return errors.E(op, "failed to stop job", err)
+		return errors.E("failed to stop job", err)
 	}
 
 	return nil

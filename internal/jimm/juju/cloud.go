@@ -28,23 +28,22 @@ import (
 // add-model access to the cloud then the returned Users field will only
 // contain the authentcated user.
 func (j *JujuManager) GetCloud(ctx context.Context, user *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error) {
-	const op = errors.Op("jimm.GetCloud")
 
 	var cl dbmodel.Cloud
 	cl.SetTag(tag)
 
 	if err := j.Database.GetCloud(ctx, &cl); err != nil {
-		return cl, errors.E(op, err)
+		return cl, errors.E(err)
 	}
 
 	accessLevel, err := j.permissionManager.GetUserCloudAccess(ctx, user, tag)
 	if err != nil {
-		return dbmodel.Cloud{}, errors.E(op, err)
+		return dbmodel.Cloud{}, errors.E(err)
 	}
 
 	switch accessLevel {
 	case "":
-		return dbmodel.Cloud{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return dbmodel.Cloud{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	case "admin":
 		return cl, nil
 	default:
@@ -61,11 +60,10 @@ func (j *JujuManager) GetCloud(ctx context.Context, user *openfga.User, tag name
 // an error then iteration will stop immediately and the error will be
 // returned unchanged. The given function should not update the database.
 func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
-	const op = errors.Op("jimm.ForEachUserCloud")
 
 	clouds, err := j.Database.GetClouds(ctx)
 	if err != nil {
-		return errors.E(op, err, "cannot load clouds")
+		return errors.E(err, "cannot load clouds")
 	}
 	for _, cloud := range clouds {
 		userAccess := permissions.ToCloudAccessString(user.GetCloudAccess(ctx, cloud.ResourceTag()))
@@ -88,15 +86,14 @@ func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, 
 // superuser then an error with the code CodeUnauthorized is returned. The
 // given function should not update the database.
 func (j *JujuManager) ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
-	const op = errors.Op("jimm.ForEachCloud")
 
 	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	clds, err := j.Database.GetClouds(ctx)
 	if err != nil {
-		return errors.E(op, "cannot load clouds", err)
+		return errors.E("cannot load clouds", err)
 	}
 
 	for i := range clds {
@@ -140,34 +137,33 @@ var DefaultReservedCloudNames = []string{
 // will be returned. If there is an error returned by the controller when
 // creating the cloud then that error code will be preserved.
 func (j *JujuManager) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
-	const op = errors.Op("jimm.AddCloudToController")
 
 	controller, err := j.getControllerByName(ctx, controllerName)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	if err := j.checkControllerAdminAccess(ctx, user, controller); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	if err := checkReservedCloudNames(tag, j.ReservedCloudNames); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	if err := validateCloudRegion(ctx, j.Database, user, cloud, controllerName); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	dbCloud, err := j.addCloudToDatabase(ctx, controller, user, tag, cloud, force)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	// TODO(ale8k): We've added the cloud to the db, but the access failed.
 	// This call needs to be idempotent.
 	if err := j.addCloudControllerRelation(ctx, dbCloud, *controller); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -236,7 +232,6 @@ func (j *JujuManager) determineHostCloudRegion(ctx context.Context, hostCloudReg
 //   - If there is an error returned by the controller when creating the cloud
 //     then that error code will be preserved.
 func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
-	const op = errors.Op("jimm.AddHostedCloud")
 
 	// NOTE (alesstimec) The default JIMM access right for every user is
 	// "login". Previously the code checked:
@@ -250,27 +245,27 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 	}
 	for _, n := range reservedNames {
 		if tag.Id() == n {
-			return errors.E(op, errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
+			return errors.E(errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
 		}
 	}
 
 	// Validate that the requested cloud is valid.
 	if cloud.Type != "kubernetes" {
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type))
+		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type))
 	}
 	if cloud.HostCloudRegion == "" {
-		return errors.E(op, errors.CodeCloudRegionRequired, "cloud host region not specified")
+		return errors.E(errors.CodeCloudRegionRequired, "cloud host region not specified")
 	}
 
 	region, err := j.determineHostCloudRegion(ctx, cloud.HostCloudRegion)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	if region.Cloud.HostCloudRegion != "" {
 		// Do not support creating a new cloud on an already hosted
 		// cloud.
-		return errors.E(op, errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
+		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
 	}
 
 	// Create the cloud locally, to reserve the name.
@@ -278,7 +273,7 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 	dbCloud.FromJujuCloud(cloud)
 	dbCloud.Name = tag.Id()
 	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	// Create the cloud on a host.
@@ -288,7 +283,7 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 	ccloud, err := j.addControllerCloud(ctx, &controller, user.ResourceTag(), tag, cloud, force)
 	if err != nil {
 		// TODO(mhilton) remove the added cloud if adding it to the controller failed.
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	// Update the cloud in the database.
 	dbCloud.FromJujuCloud(*ccloud)
@@ -305,7 +300,7 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 		// At this point the cloud has been created on the
 		// controller and we know something about it. Trying to
 		// undo that will probably make things worse.
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	err = j.OpenFGAClient.AddCloudController(ctx, dbCloud.ResourceTag(), controller.ResourceTag())
@@ -338,21 +333,20 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 // the controller. No error will be returned if the cloud already exists on
 // the controller or the user already has access to the cloud.
 func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, ut names.UserTag, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (*jujucloud.Cloud, error) {
-	const op = errors.Op("jimm.addControllerCloud")
 
 	api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	defer api.Close()
 	if err := api.AddCloud(tag, cloud, force); err != nil {
 		if !jujuparams.IsCodeAlreadyExists(err) {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 	}
 	var result jujucloud.Cloud
 	if err := api.Cloud(tag, &result); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return &result, nil
@@ -371,23 +365,22 @@ func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Contr
 // returned from the dial operation. If the given function returns an error
 // that error will be returned with the code unmasked.
 func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct names.CloudTag, f func(*dbmodel.Cloud, API) error) error {
-	const op = errors.Op("jimm.doCloudAdmin")
 
 	var c dbmodel.Cloud
 	c.SetTag(ct)
 
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, c.ResourceTag())
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	// Ensure we always have at least 1 region for the cloud with at least 1 controller
 	// managing that region.
@@ -396,15 +389,15 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 		if len(c.Regions) > 0 {
 			zapctx.Error(ctx, "number of controllers available for cloud/region", zap.Int("controllers", len(c.Regions[0].Controllers)))
 		}
-		return errors.E(op, fmt.Sprintf("cloud administration not available for %s", ct.Id()))
+		return errors.E(fmt.Sprintf("cloud administration not available for %s", ct.Id()))
 	}
 	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{}, nil)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	defer api.Close()
 	if err := f(&c, api); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -415,7 +408,6 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 // with the code CodeUnauthorized is returned. If the RemoveClouds API call
 // returns an error the error code is not masked.
 func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct names.CloudTag) error {
-	const op = errors.Op("jimm.RemoveCloud")
 
 	err := j.doCloudAdmin(ctx, user, ct, func(c *dbmodel.Cloud, api API) error {
 		// Note: JIMM doesn't attempt to determine if the cloud is
@@ -427,7 +419,7 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 		}
 
 		if err := j.Database.DeleteCloud(ctx, c); err != nil {
-			return errors.E(op, err, "cannot update database after updating controller")
+			return errors.E(err, "cannot update database after updating controller")
 		}
 
 		if err := j.OpenFGAClient.RemoveCloud(ctx, ct); err != nil {
@@ -436,7 +428,7 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -447,22 +439,21 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 // CodeUnauthorized. If the cloud with the given name cannot be found then
 // an error with the code CodeNotFound is returned.
 func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct names.CloudTag, cloud jujucloud.Cloud) error {
-	const op = errors.Op("jimm.UpdateCloud")
 
 	var c dbmodel.Cloud
 	c.SetTag(ct)
 
 	if err := j.Database.GetCloud(ctx, &c); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	cloudAccess, err := j.permissionManager.GetUserCloudAccess(ctx, user, c.ResourceTag())
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	if cloudAccess != "admin" {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var controllers []dbmodel.Controller
@@ -481,7 +472,7 @@ func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct na
 		return api.UpdateCloud(ct, cloud)
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -509,7 +500,7 @@ func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct na
 	})
 
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -520,23 +511,22 @@ func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct na
 // access to the cloud then an error with the code CodeUnauthorized is returned.
 // If the RemoveClouds API call returns an error the error code is not masked.
 func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openfga.User, controllerName string, ct names.CloudTag) error {
-	const op = errors.Op("jimm.RemoveCloudFromController")
 
 	var cloud dbmodel.Cloud
 	cloud.SetTag(ct)
 
 	if err := j.Database.GetCloud(ctx, &cloud); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	isAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
 	if err != nil {
-		return errors.E(op, err, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(err, errors.CodeUnauthorized, "unauthorized")
 	}
 	if !isAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	controllers := make(map[string]dbmodel.Controller)
@@ -548,12 +538,12 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 
 	controller, ok := controllers[controllerName]
 	if !ok {
-		return errors.E(op, "cloud not hosted by controller", errors.CodeNotFound)
+		return errors.E("cloud not hosted by controller", errors.CodeNotFound)
 	}
 
 	api, err := j.dial(ctx, &controller, names.ModelTag{}, nil)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	defer api.Close()
 
@@ -562,7 +552,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	// relies on the controller failing the RemoveClouds API
 	// request if the cloud is in use.
 	if err := api.RemoveCloud(ct); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	delete(controllers, controllerName)
@@ -570,7 +560,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	// if this was the only cloud controller, we delete the cloud
 	if len(controllers) == 0 {
 		if err := j.Database.DeleteCloud(ctx, &cloud); err != nil {
-			return errors.E(op, err, "failed to delete cloud after updating controller")
+			return errors.E(err, "failed to delete cloud after updating controller")
 		}
 		return nil
 	}
@@ -581,7 +571,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 		for _, crp := range cr.Controllers {
 			crp := crp
 			if err := j.Database.DeleteCloudRegionControllerPriority(ctx, &crp); err != nil {
-				return errors.E(op, err, "cannot update database after updating controller")
+				return errors.E(err, "cannot update database after updating controller")
 			}
 		}
 	}
@@ -670,7 +660,6 @@ func checkReservedCloudNames(tag names.CloudTag, reservedCloudNames []string) er
 // addCloudToDatabase adds the cloud to the database for this controller.
 // Additionally, it sets the cloud to controller access relation.
 func (j *JujuManager) addCloudToDatabase(ctx context.Context, controller *dbmodel.Controller, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (dbmodel.Cloud, error) {
-	const op = errors.Op("jimm.addCloudToDatabase")
 
 	var dbCloud dbmodel.Cloud
 	dbCloud.FromJujuCloud(cloud)
@@ -678,7 +667,7 @@ func (j *JujuManager) addCloudToDatabase(ctx context.Context, controller *dbmode
 
 	ccloud, err := j.addControllerCloud(ctx, controller, user.ResourceTag(), tag, cloud, force)
 	if err != nil {
-		return dbCloud, errors.E(op, err)
+		return dbCloud, errors.E(err)
 	}
 
 	dbCloud.FromJujuCloud(*ccloud)
@@ -689,7 +678,7 @@ func (j *JujuManager) addCloudToDatabase(ctx context.Context, controller *dbmode
 		}}
 	}
 	if err := j.Database.AddCloud(ctx, &dbCloud); err != nil {
-		return dbCloud, errors.E(op, err)
+		return dbCloud, errors.E(err)
 	}
 
 	return dbCloud, nil

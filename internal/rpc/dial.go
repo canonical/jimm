@@ -39,14 +39,13 @@ func (d Dialer) Dial(ctx context.Context, url string, headers http.Header) (*Cli
 
 // DialWebsocket dials a url and returns a websocket.
 func (d Dialer) DialWebsocket(ctx context.Context, url string, headers http.Header) (*websocket.Conn, error) {
-	const op = errors.Op("rpc.BasicDial")
 
 	dialer := websocket.Dialer{
 		TLSClientConfig: d.TLSConfig,
 	}
 	conn, resp, err := dialer.DialContext(ctx, url, headers)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("basic dial failed: %w", err))
+		return nil, errors.E(fmt.Errorf("basic dial failed: %w", err))
 	}
 	defer resp.Body.Close()
 	return conn, nil

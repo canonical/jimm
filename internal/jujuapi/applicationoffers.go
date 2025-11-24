@@ -52,15 +52,14 @@ func (r *controllerRoot) Offer(ctx context.Context, args jujuparams.AddApplicati
 }
 
 func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicationOffer) error {
-	const op = errors.Op("jujuapi.Offer")
 
 	mt, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, err)
+		return errors.E(errors.CodeBadRequest, err)
 	}
 	offerOwnerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return errors.E(op, errors.CodeBadRequest, err)
+		return errors.E(errors.CodeBadRequest, err)
 	}
 	err = r.jimm.JujuManager().Offer(ctx, r.user, juju.AddApplicationOfferParams{
 		ModelTag:               mt,
@@ -71,7 +70,7 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 		Endpoints:              args.Endpoints,
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -101,11 +100,10 @@ func (r *controllerRoot) GetConsumeDetails(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.User, v bakery.Version, offerURL string) (jujuparams.ConsumeOfferDetails, error) {
-	const op = errors.Op("jujuapi.GetConsumeDetails")
 
 	ourl, err := crossmodel.ParseOfferURL(offerURL)
 	if err != nil {
-		return jujuparams.ConsumeOfferDetails{}, errors.E(op, "cannot parse offer URL", errors.CodeBadRequest, err)
+		return jujuparams.ConsumeOfferDetails{}, errors.E("cannot parse offer URL", errors.CodeBadRequest, err)
 	}
 
 	// Ensure the path is normalised.
@@ -120,19 +118,19 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 		},
 	}
 	if err := r.jimm.JujuManager().GetApplicationOfferConsumeDetails(ctx, user, &details, v); err != nil {
-		return jujuparams.ConsumeOfferDetails{}, errors.E(op, err)
+		return jujuparams.ConsumeOfferDetails{}, errors.E(err)
 	}
 	return details, nil
 }
 
 // ListApplicationOffers returns all offers matching the specified filters.
 func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
-	const op = errors.Op("jujuapi.ListApplicationOffers")
+
 	results := jujuparams.QueryApplicationOffersResultsV5{}
 
 	offers, err := r.jimm.JujuManager().ListApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
-		return results, errors.E(op, err)
+		return results, errors.E(err)
 	}
 	results.Results = offers
 
@@ -143,12 +141,12 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 // as long as the user has read access to each offer. It also omits details
 // on users and connections.
 func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
-	const op = errors.Op("jujuapi.FindApplicationOffers")
+
 	results := jujuparams.QueryApplicationOffersResultsV5{}
 
 	offers, err := r.jimm.JujuManager().FindApplicationOffers(ctx, r.user, args.Filters...)
 	if err != nil {
-		return results, errors.E(op, err)
+		return results, errors.E(err)
 	}
 	results.Results = offers
 
@@ -168,11 +166,10 @@ func (r *controllerRoot) ModifyOfferAccess(ctx context.Context, args jujuparams.
 }
 
 func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparams.ModifyOfferAccess) error {
-	const op = errors.Op("jujuapi.ModifyOfferAccess")
 
 	ut, err := parseUserTag(change.UserTag)
 	if err != nil {
-		return errors.E(op, err, errors.CodeBadRequest)
+		return errors.E(err, errors.CodeBadRequest)
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
@@ -181,23 +178,23 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 		// releases of Juju.
 		if err := r.jimm.JujuManager().GrantOfferAccessOnController(ctx, r.user, ut, change.OfferURL, change.Access); err != nil {
 			if !strings.Contains(err.Error(), "user already has") {
-				return errors.E(op, err)
+				return errors.E(err)
 			}
 		}
 		if err := r.jimm.PermissionManager().GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		return nil
 	case jujuparams.RevokeOfferAccess:
 		if err := r.jimm.PermissionManager().RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		if err := r.jimm.JujuManager().RevokeOfferAccessOnController(ctx, r.user, ut, change.OfferURL, change.Access); err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		return nil
 	default:
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("unknown action %q", change.Action))
+		return errors.E(errors.CodeBadRequest, fmt.Sprintf("unknown action %q", change.Action))
 	}
 }
 

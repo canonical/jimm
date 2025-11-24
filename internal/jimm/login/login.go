@@ -105,10 +105,10 @@ func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthe
 
 // LoginDevice starts the device login flow.
 func (j *loginManager) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
-	const op = errors.Op("jimm.LoginDevice")
+
 	resp, err := j.oAuthAuthenticator.Device(ctx)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return resp, nil
 }
@@ -120,30 +120,29 @@ func (j *loginManager) AuthenticateBrowserSession(ctx context.Context, w http.Re
 
 // GetDeviceSessionToken polls an OIDC server while a user logs in and returns a session token scoped to the user's identity.
 func (j *loginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error) {
-	const op = errors.Op("jimm.GetDeviceSessionToken")
 
 	token, err := j.oAuthAuthenticator.DeviceAccessToken(ctx, deviceOAuthResponse)
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(err)
 	}
 
 	idToken, err := j.oAuthAuthenticator.ExtractAndVerifyIDToken(ctx, token)
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(err)
 	}
 
 	email, err := j.oAuthAuthenticator.Email(idToken)
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(err)
 	}
 
 	if err := j.oAuthAuthenticator.UpdateIdentity(ctx, email, token); err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(err)
 	}
 
 	encToken, err := j.oAuthAuthenticator.MintSessionToken(email)
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(err)
 	}
 
 	return string(encToken), nil
@@ -151,24 +150,24 @@ func (j *loginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthRes
 
 // LoginClientCredentials verifies a user's client ID and secret before the user is logged in.
 func (j *loginManager) LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error) {
-	const op = errors.Op("jimm.LoginClientCredentials")
+
 	// We expect the client to send the service account ID "as-is" and because we know that this is a clientCredentials login,
 	// we can append the @serviceaccount domain to the clientID (if not already present).
 	// TODO(Kian): Consider inlining the function below and removing the dependency on jimmnames.
 	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	err = j.oAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
 	if err != nil {
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	user, err := j.UserLogin(ctx, clientIdWithDomain)
 	if err != nil {
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	logger.LogSuccessfulLogin(ctx, clientIdWithDomain)
 	return user, nil
@@ -176,18 +175,18 @@ func (j *loginManager) LoginClientCredentials(ctx context.Context, clientID stri
 
 // LoginWithSessionToken verifies a user's session token before the user is logged in.
 func (j *loginManager) LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error) {
-	const op = errors.Op("jimm.LoginWithSessionToken")
+
 	jwtToken, err := j.oAuthAuthenticator.VerifySessionToken(sessionToken)
 	if err != nil {
 		logger.LogFailedLogin(ctx, "unknown session token")
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	email := jwtToken.Subject()
 	user, err := j.UserLogin(ctx, email)
 	if err != nil {
 		logger.LogFailedLogin(ctx, email)
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	logger.LogSuccessfulLogin(ctx, email)
 	return user, nil
@@ -200,14 +199,14 @@ func (j *loginManager) LoginWithSessionToken(ctx context.Context, sessionToken s
 // and passed to this function with the assumption that the cookie contained a valid session. This function is far from
 // the session cookie logic due to the separation between the HTTP layer and Juju's RPC mechanism.
 func (j *loginManager) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
-	const op = errors.Op("jimm.LoginWithSessionCookie")
+
 	if identityID == "" {
-		return nil, errors.E(op, "missing cookie identity")
+		return nil, errors.E("missing cookie identity")
 	}
 	user, err := j.UserLogin(ctx, identityID)
 	if err != nil {
 		logger.LogFailedLogin(ctx, identityID)
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	logger.LogSuccessfulLogin(ctx, identityID)
 	return user, nil
@@ -218,24 +217,23 @@ func (j *loginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 // It will create a new identity if one does not exist.
 // The identity's last login time is updated.
 func (j *loginManager) UserLogin(ctx context.Context, identifier string) (*openfga.User, error) {
-	const op = errors.Op("jimm.UpdateLastLogin")
+
 	ofgaUser, err := j.getOrCreateIdentity(ctx, identifier)
 	if err != nil {
-		return nil, errors.E(op, err, errors.CodeUnauthorized)
+		return nil, errors.E(err, errors.CodeUnauthorized)
 	}
 	err = j.updateLastLogin(ctx, ofgaUser.Identity)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return ofgaUser, nil
 }
 
 func (j *loginManager) getOrCreateIdentity(ctx context.Context, identifier string) (*openfga.User, error) {
-	const op = errors.Op("jimm.getOrCreateIdentity")
 
 	identity, err := dbmodel.NewIdentity(identifier)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	if err := j.store.GetIdentity(ctx, identity); err != nil {
@@ -245,7 +243,7 @@ func (j *loginManager) getOrCreateIdentity(ctx context.Context, identifier strin
 
 	isJimmAdmin, err := openfga.IsAdministrator(ctx, ofgaUser, j.jimmTag)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	ofgaUser.JimmAdmin = isJimmAdmin
 

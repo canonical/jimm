@@ -19,7 +19,6 @@ const (
 
 // SetModelDefaults writes new default model setting values for the specified cloud/region.
 func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
-	const op = errors.Op("jimm.SetModelDefaults")
 
 	var keys strings.Builder
 	var needComma bool
@@ -33,7 +32,7 @@ func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identi
 
 	for k := range configs {
 		if k == agentVersionKey {
-			return errors.E(op, errors.CodeBadRequest, `agent-version cannot have a default value`)
+			return errors.E(errors.CodeBadRequest, `agent-version cannot have a default value`)
 		}
 	}
 
@@ -42,7 +41,7 @@ func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identi
 	}
 	err := j.Database.GetCloud(ctx, &cloud)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	if region != "" {
 		found := false
@@ -52,7 +51,7 @@ func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identi
 			}
 		}
 		if !found {
-			return errors.E(op, errors.CodeNotFound, "region not found")
+			return errors.E(errors.CodeNotFound, "region not found")
 		}
 	}
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
@@ -62,14 +61,13 @@ func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identi
 		Defaults:     configs,
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // UnsetModelDefaults resets  default model setting values for the specified cloud/region.
 func (j *JujuManager) UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error {
-	const op = errors.Op("jimm.UnsetModelDefaults")
 
 	defaults := dbmodel.CloudDefaults{
 		IdentityName: user.Name,
@@ -80,14 +78,14 @@ func (j *JujuManager) UnsetModelDefaults(ctx context.Context, user *dbmodel.Iden
 	}
 	err := j.Database.UnsetCloudDefaults(ctx, &defaults, keys)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // ModelDefaultsForCloud returns the default config values for the specified cloud.
 func (j *JujuManager) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error) {
-	const op = errors.Op("jimm.ModelDefaultsForCloud")
+
 	result := jujuparams.ModelDefaultsResult{
 		Config: make(map[string]jujuparams.ModelDefaults),
 	}
@@ -97,7 +95,7 @@ func (j *JujuManager) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.I
 			Message: err.Error(),
 			Code:    string(errors.ErrorCode(err)),
 		}
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 
 	for _, cloudDefaults := range defaults {

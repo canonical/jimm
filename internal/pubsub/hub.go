@@ -94,15 +94,15 @@ func (h *Hub) Subscribe(model string, handler HandlerFunc) (func(), error) {
 // while the modelMatcher function is called. Any DB lookups or other
 // long operations for the matcher should be done out-of-band.
 func (h *Hub) SubscribeMatch(modelMatcher func(string) bool, handler HandlerFunc) (func(), error) {
-	const op = errors.Op("pubsub.SubscribeMatch")
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if handler == nil {
-		return func() {}, errors.E(op, "handler not specified")
+		return func() {}, errors.E("handler not specified")
 	}
 	if modelMatcher == nil {
-		return func() {}, errors.E(op, "model matcher not specified")
+		return func() {}, errors.E("model matcher not specified")
 	}
 	idx := h.idx
 	h.idx++

@@ -29,11 +29,11 @@ func TestE(t *testing.T) {
 	c := qt.New(t)
 
 	code := errors.Code("test code")
-	err := errors.E(errors.Op("test.op"), code, "an error happened")
+	err := errors.E(code, "an error happened")
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 
-	err = errors.E(errors.Op("test.op2"), err)
+	err = errors.E(err)
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 }
@@ -43,7 +43,7 @@ func TestEWithInfo(t *testing.T) {
 
 	code := errors.Code("test code")
 	info := map[string]any{"key": "value"}
-	err := errors.E(errors.Op("test.op"), code, "an error happened", info)
+	err := errors.E(code, "an error happened", info)
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 	c.Check(err.(*errors.Error).Info, qt.DeepEquals, info)

@@ -77,14 +77,13 @@ func (r *controllerRoot) UserInfo(ctx context.Context, req jujuparams.UserInfoRe
 }
 
 func (r *controllerRoot) userInfo(entity string) (*jujuparams.UserInfo, error) {
-	const op = errors.Op("jujuapi.UserInfo")
 
 	user, err := parseUserTag(entity)
 	if err != nil {
-		return nil, errors.E(op, err, errors.CodeBadRequest)
+		return nil, errors.E(err, errors.CodeBadRequest)
 	}
 	if r.user.Name != user.Id() {
-		return nil, errors.E(op, errors.CodeUnauthorized)
+		return nil, errors.E(errors.CodeUnauthorized)
 	}
 	ui := r.user.ToJujuUserInfo()
 	return &ui, nil

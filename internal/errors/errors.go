@@ -16,9 +16,6 @@ import (
 
 // An Error is an error in the JIMM system.
 type Error struct {
-	// Op is the operation that errored.
-	Op Op
-
 	// Code is a code attached to the error.
 	Code Code
 
@@ -82,8 +79,6 @@ func E(args ...interface{}) error {
 	var e Error
 	for _, arg := range args {
 		switch v := arg.(type) {
-		case Op:
-			e.Op = v
 		case Code:
 			setCode = true
 			e.Code = v
@@ -119,9 +114,6 @@ func E(args ...interface{}) error {
 	}
 	return &e
 }
-
-// An Op describes the operation being performed that caused the error.
-type Op string
 
 // A Code is a code which describes the class of error. Where possible
 // these codes are identical to the codes returned in the juju API.

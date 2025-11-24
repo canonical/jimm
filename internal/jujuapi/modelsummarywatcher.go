@@ -35,11 +35,10 @@ func init() {
 // ModelSummaryWatcher facade. It returns the next set of model summaries
 // when they are available.
 func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID string) (jujuparams.SummaryWatcherNextResults, error) {
-	const op = errors.Op("jujuapi.ModelSummaryWatcherNext")
 
 	w, err := r.watchers.get(objID)
 	if err != nil {
-		return jujuparams.SummaryWatcherNextResults{}, errors.E(op, err)
+		return jujuparams.SummaryWatcherNextResults{}, errors.E(err)
 	}
 	return w.Next()
 }
@@ -47,11 +46,10 @@ func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID stri
 // ModelSummaryWatcherStop implements the Stop method on the
 // ModelSummaryWatcher facade.
 func (r *controllerRoot) ModelSummaryWatcherStop(ctx context.Context, objID string) error {
-	const op = errors.Op("jujuapi.ModelSummaryWatcherStop")
 
 	w, err := r.watchers.get(objID)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return w.Stop()
@@ -101,7 +99,6 @@ func (r *watcherRegistry) get(id string) (*modelSummaryWatcher, error) {
 }
 
 func newModelSummaryWatcher(ctx context.Context, id string, pubsub *pubsub.Hub, modelGetterFunc func(context.Context) ([]string, error)) (*modelSummaryWatcher, error) {
-	const op = errors.Op("jujuapi.newModelSummaryWatcher")
 
 	ctx, cancelContext := context.WithCancel(ctx)
 
@@ -125,7 +122,7 @@ func newModelSummaryWatcher(ctx context.Context, id string, pubsub *pubsub.Hub, 
 	cleanupFunction, err := pubsub.SubscribeMatch(accessWatcher.match, watcher.pubsubHandler)
 	if err != nil {
 		cancelContext()
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	watcher.cleanup = func() {
 		cancelContext()

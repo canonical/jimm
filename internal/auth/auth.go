@@ -171,11 +171,10 @@ type AuthenticationServiceParams struct {
 // NewAuthenticationService returns a new authentication service for handling
 // authentication within JIMM.
 func NewAuthenticationService(ctx context.Context, params AuthenticationServiceParams) (*AuthenticationService, error) {
-	const op = errors.Op("auth.NewAuthenticationService")
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, errors.E(op, errors.CodeServerConfiguration, fmt.Errorf("failed to create oidc provider: %v", err))
+		return nil, errors.E(errors.CodeServerConfiguration, fmt.Errorf("failed to create oidc provider: %v", err))
 	}
 
 	authSvc := &AuthenticationService{
@@ -220,11 +219,11 @@ func (as *AuthenticationService) AuthCodeURL() (string, string, error) {
 	// A good reference is https://spring.io/blog/2011/11/30/cross-site-request-forgery-and-oauth2
 	// Because Hydra only accepts return addresses that have been pre-registered
 	// the risk of csrf attacks is largely eliminated, but this may not be the case with other IdPs.
-	const op = errors.Op("AuthenticationService.AuthCodeURL")
+
 	b := make([]byte, 8)
 	_, err := rand.Read(b)
 	if err != nil {
-		return "", "", errors.E(op, fmt.Sprintf("failed to generate state secret: %s", err.Error()))
+		return "", "", errors.E(fmt.Sprintf("failed to generate state secret: %s", err.Error()))
 	}
 	state := base64.RawURLEncoding.EncodeToString(b)
 	return as.oauthConfig.AuthCodeURL(state), state, nil
@@ -237,7 +236,6 @@ func (as *AuthenticationService) AuthCodeURL() (string, string, error) {
 // just testing the library. The handler test essentially covers this so perhaps
 // its ok to leave it as is?
 func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oauth2.Token, error) {
-	const op = errors.Op("auth.AuthenticationService.Exchange")
 
 	t, err := as.oauthConfig.Exchange(
 		ctx,
@@ -245,7 +243,7 @@ func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oa
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("authorisation code exchange failed: %v", err))
+		return nil, errors.E(fmt.Errorf("authorisation code exchange failed: %v", err))
 	}
 
 	return t, nil
@@ -266,14 +264,13 @@ func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oa
 //
 // The interval, expiry and device code and used to poll the token endpoint for completion.
 func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
-	const op = errors.Op("auth.AuthenticationService.Device")
 
 	resp, err := as.oauthConfig.DeviceAuth(
 		ctx,
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("device auth call failed: %v", err))
+		return nil, errors.E(fmt.Errorf("device auth call failed: %v", err))
 	}
 
 	return resp, nil
@@ -284,7 +281,6 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 //
 // See Device(...) godoc for more info pertaining to the flow.
 func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
-	const op = errors.Op("auth.AuthenticationService.DeviceAccessToken")
 
 	t, err := as.oauthConfig.DeviceAccessToken(
 		ctx,
@@ -292,7 +288,7 @@ func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oau
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("device access token call failed: %v", err))
+		return nil, errors.E(fmt.Errorf("device access token call failed: %v", err))
 	}
 
 	return t, nil
@@ -301,12 +297,11 @@ func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oau
 // ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
 // and performs signature verification of the token.
 func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
-	const op = errors.Op("auth.AuthenticationService.ExtractAndVerifyIDToken")
 
 	// Extract the ID Token from oauth2 token.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, errors.E(op, "failed to extract id token")
+		return nil, errors.E("failed to extract id token")
 	}
 
 	verifier := as.provider.Verifier(&oidc.Config{
@@ -315,7 +310,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 	token, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return nil, errors.E(op, fmt.Errorf("failed to verify id token: %v", err))
+		return nil, errors.E(fmt.Errorf("failed to verify id token: %v", err))
 	}
 
 	return token, nil
@@ -323,18 +318,17 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 // Email retrieves the users email from an id token via the email claim
 func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
-	const op = errors.Op("auth.AuthenticationService.Email")
 
 	var claims struct {
 		Email         string `json:"email"`
 		EmailVerified bool   `json:"email_verified"` // TODO(ale8k): Add verification logic
 	}
 	if idToken == nil {
-		return "", errors.E(op, "id token is nil")
+		return "", errors.E("id token is nil")
 	}
 
 	if err := idToken.Claims(&claims); err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to extract claims: %v", err))
+		return "", errors.E(fmt.Errorf("failed to extract claims: %v", err))
 	}
 
 	return claims.Email, nil
@@ -343,19 +337,18 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 // MintSessionToken mints a session token to be used when logging into JIMM
 // via an access token. The token only contains the user's email for authentication.
 func (as *AuthenticationService) MintSessionToken(email string) (string, error) {
-	const op = errors.Op("auth.AuthenticationService.MintAccessToken")
 
 	token, err := jwt.NewBuilder().
 		Subject(email).
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
 		Build()
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to build access token: %v", err))
+		return "", errors.E(fmt.Errorf("failed to build access token: %v", err))
 	}
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to sign access token: %v", err))
+		return "", errors.E(fmt.Errorf("failed to sign access token: %v", err))
 	}
 
 	return base64.StdEncoding.EncodeToString(freshToken), nil
@@ -369,19 +362,18 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 // this as a separate method from `MintSessionToken` allows for future changes to
 // the migration token without affecting the session token.
 func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username string) (string, error) {
-	const op = errors.Op("auth.AuthenticationService.MintMigrationToken")
 
 	token, err := jwt.NewBuilder().
 		Subject(username).
 		Expiration(time.Now().Add(migrationTokenExpiry)).
 		Build()
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to mint migration token: %v", err))
+		return "", errors.E(fmt.Errorf("failed to mint migration token: %v", err))
 	}
 
 	migrationToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to sign migration token: %v", err))
+		return "", errors.E(fmt.Errorf("failed to sign migration token: %v", err))
 	}
 
 	return base64.StdEncoding.EncodeToString(migrationToken), nil
@@ -396,9 +388,9 @@ func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username
 // The error code returned here is used by the Juju CLI to know when to start a
 // device login flow, prompting the user to login again.
 func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, err error) {
-	const op = errors.Op("auth.AuthenticationService.VerifySessionToken")
+
 	errorFn := func(message string) error {
-		return errors.E(op, message, errors.CodeSessionTokenInvalid)
+		return errors.E(message, errors.CodeSessionTokenInvalid)
 	}
 	defer func() {
 		if err != nil {
@@ -435,14 +427,13 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 // UpdateIdentity updates the database with the display name and access token set for the user.
 // And, if present, a refresh token.
 func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
-	const op = errors.Op("auth.UpdateIdentity")
 
 	db := as.db
 
 	// TODO(ale8k): Add test case for this
 	u, err := dbmodel.NewIdentity(email)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	// TODO(babakks): If user does not exist, we will create one with an empty
@@ -451,7 +442,7 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	// this should be changed and split apart so it is intentional what entities
 	// we are creating or fetching.
 	if err := db.GetIdentity(ctx, u); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	u.AccessToken = token.AccessToken
@@ -459,7 +450,7 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	u.AccessTokenExpiry = token.Expiry
 	u.AccessTokenType = token.TokenType
 	if err := db.UpdateIdentity(ctx, u); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
@@ -509,11 +500,10 @@ func (as *AuthenticationService) CreateBrowserSession(
 	r *http.Request,
 	email string,
 ) error {
-	const op = errors.Op("auth.AuthenticationService.CreateBrowserSession")
 
 	session, err := as.sessionStore.Get(r, SessionName)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	session.IsNew = true                            // Sets cookie to a fresh new cookie
@@ -522,7 +512,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 
 	session.Values[SessionIdentityKey] = email
 	if err = session.Save(r, w); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -531,7 +521,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 // retrieving new access tokens upon expiry. If this cannot be done, the cookie
 // is deleted and an error is returned.
 func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (_ context.Context, err error) {
-	const op = errors.Op("auth.AuthenticationService.AuthenticateBrowserSession")
+
 	defer func() {
 		if err != nil {
 			servermon.AuthenticationFailCount.WithLabelValues("AuthenticateBrowserSession").Inc()
@@ -542,26 +532,26 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		return ctx, errors.E(op, fmt.Errorf("failed to retrieve session: %v", err))
+		return ctx, errors.E(fmt.Errorf("failed to retrieve session: %v", err))
 	}
 	session = sessionCrossOriginSafe(session, as.secureCookies)
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return ctx, errors.E(op, errors.CodeForbidden, "session is missing identity key")
+		return ctx, errors.E(errors.CodeForbidden, "session is missing identity key")
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
 	if err != nil {
 		// If the user's access token AND refresh token have expired
 		// then we will fail authentication here.
-		return ctx, errors.E(op, fmt.Errorf("failed to validate and update status token: %v", err))
+		return ctx, errors.E(fmt.Errorf("failed to validate and update status token: %v", err))
 	}
 
 	ctx = ContextWithSessionIdentity(ctx, identityId)
 
 	if err := as.extendSession(session, w, req); err != nil {
-		return ctx, errors.E(op, err)
+		return ctx, errors.E(err)
 	}
 
 	return ctx, nil
@@ -573,25 +563,24 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 //     the expired session upon next run.
 //   - It resets the access tokens for this user
 func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error {
-	const op = errors.Op("auth.AuthenticationService.Logout")
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to retrieve session: %v", err))
+		return errors.E(fmt.Errorf("failed to retrieve session: %v", err))
 	}
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return errors.E(op, "session is missing identity key")
+		return errors.E("session is missing identity key")
 	}
 
 	identityIdStr, ok := identityId.(string)
 	if !ok {
-		return errors.E(op, fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
+		return errors.E(fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
 	}
 
 	if err := as.deleteSession(session, w, req); err != nil {
-		return errors.E(op, fmt.Errorf("failed to delete session: %v", err))
+		return errors.E(fmt.Errorf("failed to delete session: %v", err))
 	}
 
 	if err := as.UpdateIdentity(ctx, identityIdStr, &oauth2.Token{
@@ -600,7 +589,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 		Expiry:       time.Now(),
 		TokenType:    "",
 	}); err != nil {
-		return errors.E(op, fmt.Errorf("failed to update identity: %v", err))
+		return errors.E(fmt.Errorf("failed to update identity: %v", err))
 	}
 
 	return nil
@@ -610,21 +599,20 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 // according to the current database schema for identities. This is likely subject
 // to change in the future.
 func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResponse, error) {
-	const op = errors.Op("auth.AuthenticationService.Whoami")
 
 	identityId := SessionIdentityFromContext(ctx)
 	if identityId == "" {
-		return nil, errors.E(op, "no identity in context")
+		return nil, errors.E("no identity in context")
 	}
 
 	// TODO(ale8k) CSS-8227: Add test case for this
 	u, err := dbmodel.NewIdentity(identityId)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	if err := as.db.GetIdentity(ctx, u); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return &params.WhoamiResponse{
@@ -637,11 +625,10 @@ func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResp
 // validateAndUpdateAccessToken validates the access tokens expiry, and if it cannot, then
 // it attempts to refresh the access token.
 func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Context, email any) error {
-	const op = errors.Op("auth.AuthenticationService.validateAndUpdateAccessToken")
 
 	emailStr, ok := email.(string)
 	if !ok {
-		return errors.E(op, fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
+		return errors.E(fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
 	}
 
 	db := as.db
@@ -649,11 +636,11 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 	// TODO(ale8k) CSS-8228: Add test case for this
 	u, err := dbmodel.NewIdentity(emailStr)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	if err := db.GetIdentity(ctx, u); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	t := &oauth2.Token{
@@ -670,7 +657,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 	}
 
 	if err := as.refreshIdentitiesToken(ctx, emailStr, t); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
@@ -681,50 +668,46 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 //
 // This is to be called only when a token is expired.
 func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, email string, t *oauth2.Token) error {
-	const op = errors.Op("auth.AuthenticationService.refreshIdentitiesToken")
 
 	tSrc := as.oauthConfig.TokenSource(ctx, t)
 
 	// Get a new access and refresh token (token source only has Token())
 	newToken, err := tSrc.Token()
 	if err != nil {
-		return errors.E(op, err, fmt.Errorf("failed to refresh token: %w", err))
+		return errors.E(err, fmt.Errorf("failed to refresh token: %w", err))
 	}
 
 	if err := as.UpdateIdentity(ctx, email, newToken); err != nil {
-		return errors.E(op, err, fmt.Errorf("failed to update identity: %w", err))
+		return errors.E(err, fmt.Errorf("failed to update identity: %w", err))
 	}
 
 	return nil
 }
 
 func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
-	const op = errors.Op("auth.AuthenticationService.deleteSession")
 
 	if err := as.modifySession(session, w, req, -1); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
 }
 
 func (as *AuthenticationService) extendSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
-	const op = errors.Op("auth.AuthenticationService.extendSession")
 
 	if err := as.modifySession(session, w, req, as.sessionCookieMaxAge); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
 }
 
 func (as *AuthenticationService) modifySession(session *sessions.Session, w http.ResponseWriter, req *http.Request, maxAge int) error {
-	const op = errors.Op("auth.AuthenticationService.modifySession")
 
 	session.Options.MaxAge = maxAge
 
 	if err := session.Save(req, w); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil

@@ -54,22 +54,21 @@ func (j *JujuManager) forEachController(ctx context.Context, controllers []dbmod
 
 // ControllerInfo returns info about a controller connected to JIMM.
 func (j *JujuManager) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
-	const op = errors.Op("jimm.ListControllers")
+
 	ctl := dbmodel.Controller{
 		Name: name,
 	}
 	if err := j.Database.GetController(ctx, &ctl); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return &ctl, nil
 }
 
 // ListControllers returns a list of controllers the user has access to.
 func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
-	const op = errors.Op("jimm.ListControllers")
 
 	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var controllers []dbmodel.Controller
@@ -78,7 +77,7 @@ func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) (
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return controllers, nil
@@ -87,10 +86,9 @@ func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) (
 // SetControllerDeprecated records if the controller is to be deprecated.
 // No new models or clouds can be added to a deprecated controller.
 func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
-	const op = errors.Op("jimm.SetControllerDeprecated")
 
 	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -107,7 +105,7 @@ func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga
 		return db.UpdateController(ctx, &c)
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
@@ -115,10 +113,9 @@ func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga
 
 // RemoveController removes a controller.
 func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
-	const op = errors.Op("jimm.RemoveController")
 
 	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -155,7 +152,7 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 		return db.DeleteController(ctx, &c)
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
@@ -163,10 +160,9 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 
 // FullModelStatus returns the full status of the juju model.
 func (j *JujuManager) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
-	const op = errors.Op("jimm.RemoveController")
 
 	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	model := dbmodel.Model{
@@ -177,17 +173,17 @@ func (j *JujuManager) FullModelStatus(ctx context.Context, user *openfga.User, m
 	}
 	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	api, err := j.dial(ctx, &model.Controller, modelTag, nil)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	status, err := api.Status(ctx, patterns)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return status, nil
@@ -230,11 +226,10 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 
 // InitiateInternalMigration initiates a model migration between two controllers within JIMM.
 func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
-	const op = errors.Op("jimm.InitiateInternalMigration")
 
 	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
 	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+		return jujuparams.InitiateMigrationResult{}, errors.E(err)
 	}
 
 	model := dbmodel.Model{}
@@ -243,15 +238,15 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 	if err != nil {
 		s := strings.Split(modelNameOrUUID, "/")
 		if len(s) != 2 {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model target")
+			return jujuparams.InitiateMigrationResult{}, errors.E("invalid model target")
 		}
 
 		owner, name := s[0], s[1]
 		if !names.IsValidUser(owner) {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid user name")
+			return jujuparams.InitiateMigrationResult{}, errors.E("invalid user name")
 		}
 		if !names.IsValidModelName(name) {
-			return jujuparams.InitiateMigrationResult{}, errors.E(op, "invalid model name")
+			return jujuparams.InitiateMigrationResult{}, errors.E("invalid model name")
 		}
 
 		model.Name = name
@@ -265,12 +260,12 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 
 	err = j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(op, err)
+		return jujuparams.InitiateMigrationResult{}, errors.E(err)
 	}
 	spec := jujuparams.MigrationSpec{ModelTag: model.ResourceTag().String(), TargetInfo: migrationTarget}
 	result, err := initiateInternalMigration(ctx, j, user, spec)
 	if err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 	return result, nil
 }
@@ -284,7 +279,6 @@ func (j *JujuManager) PrepareModelMigration(
 	targetControllerName string,
 	userMapping map[string]string,
 ) (string, error) {
-	const op = errors.Op("jujumanager.PrepareModelMigration")
 
 	err := j.Database.Transaction(func(d *db.Database) error {
 		ctl := dbmodel.Controller{Name: targetControllerName}
@@ -300,7 +294,7 @@ func (j *JujuManager) PrepareModelMigration(
 		}
 		err := d.GetModel(ctx, model)
 		if err == nil {
-			return errors.E(op, "model migration for the specified model is already in progress/completed")
+			return errors.E("model migration for the specified model is already in progress/completed")
 		} else if errors.ErrorCode(err) != errors.CodeNotFound {
 			return err
 		}
@@ -316,12 +310,12 @@ func (j *JujuManager) PrepareModelMigration(
 		return nil
 	})
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to add incoming model migration details: %w", err))
+		return "", errors.E(fmt.Errorf("failed to add incoming model migration details: %w", err))
 	}
 
 	migrationToken, err := j.migrationTokenGenerator.NewMigrationToken(ctx, user.Name)
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to generate migration token: %w", err))
+		return "", errors.E(fmt.Errorf("failed to generate migration token: %w", err))
 	}
 
 	return migrationToken, nil
@@ -331,33 +325,32 @@ func (j *JujuManager) PrepareModelMigration(
 // model could be migrated to. This includes controllers that support the model's
 // cloud region and version, but excludes the controller the model is already on.
 func (j *JujuManager) ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error) {
-	const op = errors.Op("jimm.ListMigrationTargets")
 
 	if !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var model dbmodel.Model
 	model.SetTag(modelTag)
 	if err := j.Database.GetModel(ctx, &model); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	currentVersion, err := version.Parse(model.Controller.AgentVersion)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	cloudRegion, err := j.Database.FindRegionByCloudName(ctx, model.CloudRegion.CloudName, model.CloudRegion.Name)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	var controllers []dbmodel.Controller
 	for _, ctl := range cloudRegion.Controllers {
 		candidateVersion, err := version.Parse(ctl.Controller.AgentVersion)
 		if err != nil {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 
 		if model.Controller.ID != ctl.Controller.ID &&

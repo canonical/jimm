@@ -91,39 +91,36 @@ func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateAr
 
 // AddModel adds the specified model to JIMM.
 func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
-	const op = errors.Op("jimm.AddModel")
-	zapctx.Info(ctx, string(op))
-
 	owner, err := dbmodel.NewIdentity(args.Owner.Id())
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	err = j.Database.GetIdentity(ctx, owner)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	// Only JIMM admins are able to add models on behalf of other users.
 	if owner.Name != user.Name && !user.JimmAdmin {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithOwner(owner)
 	builder = builder.WithName(args.Name)
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	builder = builder.WithCloud(user, args.Cloud)
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	// fetch cloud defaults
 	cloudDefaults := dbmodel.CloudDefaults{
@@ -132,7 +129,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	}
 	err = j.Database.CloudDefaults(ctx, &cloudDefaults)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return nil, errors.E(op, "failed to fetch cloud defaults")
+		return nil, errors.E("failed to fetch cloud defaults")
 	}
 	builder = builder.WithConfig(cloudDefaults.Defaults)
 
@@ -144,7 +141,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	}
 	err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return nil, errors.E(op, "failed to fetch cloud defaults")
+		return nil, errors.E("failed to fetch cloud defaults")
 	}
 	builder = builder.WithConfig(cloudRegionDefaults.Defaults)
 
@@ -152,10 +149,10 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	// we must check the user has add-model permission on the cloud
 	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModelToCloud(ctx, builder.cloud.ResourceTag())
 	if err != nil {
-		return nil, errors.E(op, "permission check failed")
+		return nil, errors.E("permission check failed")
 	}
 	if !canAddModel {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// last but not least, use the provided config values
@@ -165,23 +162,23 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	if args.CloudCredential != (names.CloudCredentialTag{}) {
 		builder = builder.WithCloudCredential(args.CloudCredential)
 		if err := builder.Error(); err != nil {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 	}
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	defer builder.Cleanup()
 
 	builder = builder.CreateControllerModel()
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	builder = builder.UpdateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	mi := builder.JujuModelInfo()
@@ -191,7 +188,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	controllerTag := builder.controller.ResourceTag()
 
 	if err := j.addModelPermissions(ctx, ownerUser, modelTag, controllerTag); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return mi, nil
 }
@@ -242,28 +239,25 @@ func (j *JujuManager) addModelPermissions(ctx context.Context, owner *openfga.Us
 // access to the model then the returned error will have the code
 // CodeUnauthorized.
 func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
-	const op = errors.Op("jimm.ModelInfo")
-	zapctx.Info(ctx, string(op))
-
 	var m dbmodel.Model
 	m.SetTag(mt)
 	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	if ok, err := user.IsModelReader(ctx, mt); !ok || err != nil {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, nil)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	defer api.Close()
 
 	modelInfo, err := j.modelInfo(ctx, &m, api)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return j.mergeModelInfo(ctx, user, modelInfo, m)
@@ -359,7 +353,6 @@ func (m *modelSummariesMap) addModelSummary(summary jujuparams.ModelSummaryResul
 // ListModelSummaries returns the list of modelsummary the user has access to.
 // It queries the controllers and then merge the info from the JIMM db.
 func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
-	const op = errors.Op("jimm.ListModelSummaries")
 
 	modelSummariesSafeMap := modelSummariesMap{}
 	modelSummaryResults := []jujuparams.ModelSummaryResult{}
@@ -385,7 +378,7 @@ func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User
 		return nil
 	})
 	if err != nil {
-		return jujuparams.ModelSummaryResults{}, errors.E(op, err)
+		return jujuparams.ModelSummaryResults{}, errors.E(err)
 	}
 
 	// we query the model summaries for each controller
@@ -431,9 +424,6 @@ func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User
 // mergeModelInfo replaces fields on the juju model info object with
 // information from JIMM where JIMM specific information should be used.
 func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, modelInfo *jujuparams.ModelInfo, jimmModel dbmodel.Model) (*jujuparams.ModelInfo, error) {
-	const op = errors.Op("jimm.mergeModelInfo")
-	zapctx.Info(ctx, string(op))
-
 	modelInfo.CloudCredentialTag = jimmModel.CloudCredential.Tag().String()
 	modelInfo.ControllerUUID = jimmModel.Controller.UUID
 	modelInfo.OwnerTag = jimmModel.Owner.Tag().String()
@@ -449,7 +439,7 @@ func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, mo
 	} {
 		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, jimmModel.ResourceTag(), relation)
 		if err != nil {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 		for _, u := range usersWithSpecifiedRelation {
 			// Since we are checking user relations in decreasing level of
@@ -463,7 +453,7 @@ func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, mo
 
 	modelAccess, err := j.permissionManager.GetUserModelAccess(ctx, user, jimmModel.ResourceTag())
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	users := make([]jujuparams.ModelUserInfo, 0, len(userAccess))
@@ -497,9 +487,6 @@ func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, mo
 // CodeNotFound, If the given user does not have admin access to the model
 // then the returned error will have the code CodeUnauthorized.
 func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
-	const op = errors.Op("jimm.ModelStatus")
-	zapctx.Info(ctx, string(op))
-
 	var ms jujuparams.ModelStatus
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		ms.OwnerTag = m.Owner.Tag().String()
@@ -519,7 +506,7 @@ func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt na
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return &ms, nil
 }
@@ -555,9 +542,6 @@ func (j *JujuManager) deleteModel(ctx context.Context, mt names.ModelTag) error 
 // returned unmodified and iteration will stop immediately. The given
 // function should not update the database.
 func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
-	const op = errors.Op("jimm.ForEachUserModel")
-	zapctx.Info(ctx, string(op))
-
 	errStop := errors.E("stop")
 	var iterErr error
 	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
@@ -565,7 +549,7 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 
 		access, err := j.permissionManager.GetUserModelAccess(ctx, user, model.ResourceTag())
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		if access == "read" || access == "write" || access == "admin" {
 			if err := f(&model, jujuparams.UserAccessPermission(access)); err != nil {
@@ -582,7 +566,7 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 	case errStop:
 		return iterErr
 	default:
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 }
 
@@ -594,11 +578,8 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 // error the error will be returned unmodified and iteration will stop
 // immediately. The given function should not update the database.
 func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
-	const op = errors.Op("jimm.ForEachModel")
-	zapctx.Info(ctx, string(op))
-
 	if !user.JimmAdmin {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	errStop := errors.E("stop")
@@ -616,7 +597,7 @@ func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f fu
 	case errStop:
 		return iterErr
 	default:
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 }
 
@@ -625,9 +606,6 @@ func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f fu
 // with a code of CodeUnauthorized is returned. Any error returned from
 // the juju API will not have it's code masked.
 func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
-	const op = errors.Op("jimm.DestroyModel")
-	zapctx.Info(ctx, string(op))
-
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		m.Life = state.Dying.String()
 		if err := j.Database.UpdateModel(ctx, m); err != nil {
@@ -647,7 +625,7 @@ func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt n
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	// NOTE (alesstimec) If we remove OpenFGA relation now, the user
@@ -663,9 +641,6 @@ func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt n
 // If the given user is not a controller superuser or a model admin an
 // error with the code CodeUnauthorized is returned.
 func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
-	const op = errors.Op("jimm.DumpModel")
-	zapctx.Info(ctx, string(op))
-
 	var dump string
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
@@ -673,7 +648,7 @@ func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt name
 		return err
 	})
 	if err != nil {
-		return "", errors.E(op, err)
+		return "", errors.E(err)
 	}
 	return dump, nil
 }
@@ -682,9 +657,6 @@ func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt name
 // controller. If the given user is not a controller superuser or a model
 // admin an error with the code CodeUnauthorized is returned.
 func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
-	const op = errors.Op("jimm.DumpModelDB")
-	zapctx.Info(ctx, string(op))
-
 	var dump map[string]interface{}
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
@@ -692,7 +664,7 @@ func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt na
 		return err
 	})
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return dump, nil
 }
@@ -704,14 +676,11 @@ func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt na
 // the controller doesn't support the ValidateModelUpgrades command the
 // CodeNotImplemented error code will be propagated back to the client.
 func (j *JujuManager) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt names.ModelTag, force bool) error {
-	const op = errors.Op("jimm.ValidateModelUpgrade")
-	zapctx.Info(ctx, string(op))
-
 	err := j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, api API) error {
 		return api.ValidateModelUpgrade(ctx, mt, force)
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -733,34 +702,31 @@ func (j *JujuManager) doModelAdmin(ctx context.Context, user *openfga.User, mt n
 }
 
 func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.ModelTag, requireRelation openfga.Relation, f func(*dbmodel.Model, API) error) error {
-	const op = errors.Op("jimm.doModel")
-	zapctx.Info(ctx, string(op))
-
 	var m dbmodel.Model
 	m.SetTag(mt)
 
 	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	hasAccess, err := user.HasModelRelation(ctx, mt, requireRelation)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	if !hasAccess {
 		// If the user doesn't have correct access on the model return
 		// an unauthorized error.
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, nil)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	defer api.Close()
 	if err := f(&m, api); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -768,11 +734,8 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 // ChangeModelCredential changes the credential used with a model on both
 // the controller and the local database.
 func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
-	const op = errors.Op("jimm.ChangeModelCredential")
-	zapctx.Info(ctx, string(op))
-
 	if !user.JimmAdmin && user.Tag() != cloudCredentialTag.Owner() {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	credential := dbmodel.CloudCredential{}
@@ -780,32 +743,32 @@ func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.U
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	var m *dbmodel.Model
 	err = j.doModelAdmin(ctx, user, modelTag, func(model *dbmodel.Model, api API) error {
 		_, err = j.updateControllerCloudCredential(ctx, &credential, api.UpdateCredential)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 
 		err = api.ChangeModelCredential(ctx, modelTag, cloudCredentialTag)
 		if err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		m = model
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	m.CloudCredential = credential
 	m.CloudCredentialID = credential.ID
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	return nil
@@ -814,19 +777,16 @@ func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.U
 // ListModels list the models that the user has access to. It intentionally excludes the
 // controller model as this call is used within the context of login and register commands.
 func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
-	const op = errors.Op("jimm.ListModels")
-	zapctx.Info(ctx, string(op))
-
 	// Get uuids of models the user has access to
 	uuids, err := user.ListModels(ctx, ofganames.ReaderRelation)
 	if err != nil {
-		return nil, errors.E(op, fmt.Sprintf("failed to list user models: %v", err))
+		return nil, errors.E(fmt.Sprintf("failed to list user models: %v", err))
 	}
 
 	// Get the models from the database
 	models, err := j.Database.GetModelsByUUID(ctx, uuids)
 	if err != nil {
-		return nil, errors.E(op, fmt.Sprintf("failed to get models by uuid: %v", err))
+		return nil, errors.E(fmt.Sprintf("failed to get models by uuid: %v", err))
 	}
 
 	// Create map for lookup later
@@ -875,7 +835,7 @@ func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]bas
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(op, fmt.Sprintf("failed to list models: %v", err))
+		return nil, errors.E(fmt.Sprintf("failed to list models: %v", err))
 	}
 
 	return userModels, nil

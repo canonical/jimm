@@ -111,18 +111,18 @@ type ProxyHelpers struct {
 // tokenGen is used to authenticate the user and generate JWT token.
 // connectController provides the function to return a connection to the desired controller endpoint.
 func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
-	const op = errors.Op("rpc.ProxySockets")
+
 	if helpers.ConnectController == nil {
-		return errors.E(op, "missing controller connect function")
+		return errors.E("missing controller connect function")
 	}
 	if helpers.AuditLog == nil {
-		return errors.E(op, "missing audit log function")
+		return errors.E("missing audit log function")
 	}
 	if helpers.LoginService == nil {
-		return errors.E(op, "missing login service function")
+		return errors.E("missing login service function")
 	}
 	if helpers.RedirectInfo == nil {
-		return errors.E(op, "missing redirect info function")
+		return errors.E("missing redirect info function")
 	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
@@ -155,7 +155,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			zapctx.Debug(ctx, "Proxy error", zap.Error(err))
 		}
 	case <-ctx.Done():
-		err = errors.E(op, "Context cancelled")
+		err = errors.E("Context cancelled")
 		zapctx.Debug(ctx, "Context cancelled")
 	}
 	// Close the client connection to ensure everything is cleaned up.
@@ -434,13 +434,13 @@ func (p *clientProxy) start(ctx context.Context) error {
 // makeControllerConnection dials a controller and starts a go routine for
 // proxying requests from the controller to the client.
 func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
-	const op = errors.Op("rpc.makeControllerConnection")
+
 	var createConnErr error
 	// Create the controller connection once.
 	p.connectController.Do(func() {
 		connWithMetadata, err := p.createControllerConn(ctx)
 		if err != nil {
-			createConnErr = errors.E(op, err)
+			createConnErr = errors.E(err)
 			return
 		}
 
@@ -612,14 +612,13 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 // extra permission checks for an operation. If the client performed anonymous
 // login, an error is always returned since we cannot authorize an anonymous user.
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
-	const op = errors.Op("rpc.redoLogin")
 
 	if p.anonymousLogin {
-		return errors.E(op, errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
+		return errors.E(errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
 	}
 	loginMsg := p.msgs.getLoginMessage()
 	if loginMsg == nil {
-		return errors.E(op, errors.CodeUnauthorized, "Haven't received login yet")
+		return errors.E(errors.CodeUnauthorized, "Haven't received login yet")
 	}
 	err := addJWT(ctx, loginMsg, permissions, p.tokenGen)
 	if err != nil {
@@ -634,19 +633,19 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 
 // addJWT adds a JWT token to the the provided message.
 func addJWT(ctx context.Context, msg *message, permissions map[string]interface{}, tokenGen TokenGenerator) error {
-	const op = errors.Op("rpc.addJWT")
+
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
-		return errors.E(op, "nil messsage")
+		return errors.E("nil messsage")
 	}
 	var lr params.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	jwt, err := tokenGen.MakeToken(ctx, permissions)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
@@ -655,7 +654,7 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 	// Marshal it again to JSON.
 	data, err := json.Marshal(lr)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	// And add it to the message.
 	msg.Params = data

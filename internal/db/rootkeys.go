@@ -16,7 +16,7 @@ import (
 
 // GetKey implements Backing.GetKey.
 func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
-	const op = errors.Op("db.FindLatestKey")
+	const op = "db.FindLatestKey"
 
 	if err := d.ready(); err != nil {
 		return dbrootkeystore.RootKey{}, bakery.ErrNotFound
@@ -33,7 +33,7 @@ func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
 		if err == gorm.ErrRecordNotFound {
 			return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 		}
-		return dbrootkeystore.RootKey{}, errors.E(op, err)
+		return dbrootkeystore.RootKey{}, errors.E(err)
 	}
 	return dbrootkeystore.RootKey{
 		Id:      rk.ID,
@@ -45,7 +45,7 @@ func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
 
 // FindLatestKey implements Backing.FindLatestKey.
 func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.Time) (_ dbrootkeystore.RootKey, err error) {
-	const op = errors.Op("db.FindLatestKey")
+	const op = "db.FindLatestKey"
 
 	if err := d.ready(); err != nil {
 		return dbrootkeystore.RootKey{}, bakery.ErrNotFound
@@ -63,7 +63,7 @@ func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.
 		if err == gorm.ErrRecordNotFound {
 			return dbrootkeystore.RootKey{}, nil
 		}
-		return dbrootkeystore.RootKey{}, errors.E(op, dbError(err))
+		return dbrootkeystore.RootKey{}, errors.E(dbError(err))
 	}
 	return dbrootkeystore.RootKey{
 		Id:      rk.ID,
@@ -75,10 +75,10 @@ func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.
 
 // InsertKey implements Backing.InsertKey.
 func (d *Database) InsertKey(key dbrootkeystore.RootKey) (err error) {
-	const op = errors.Op("db.InsertKey")
+	const op = "db.InsertKey"
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -92,7 +92,7 @@ func (d *Database) InsertKey(key dbrootkeystore.RootKey) (err error) {
 		RootKey:   key.RootKey,
 	}
 	if err := d.DB.Create(&rk).Error; err != nil {
-		return errors.E(op, dbError(err))
+		return errors.E(dbError(err))
 	}
 	return nil
 }

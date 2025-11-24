@@ -26,10 +26,9 @@ import (
 // superuser or the owner of the credentials then an error with a code of
 // CodeUnauthorized will be returned.
 func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
-	const op = errors.Op("jimm.GetCloudCredential")
 
 	if !user.JimmAdmin && user.Name != tag.Owner().Id() {
-		return nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var credential dbmodel.CloudCredential
@@ -37,7 +36,7 @@ func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	return &credential, nil
@@ -46,10 +45,9 @@ func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User
 // RevokeCloudCredential checks that the credential with the given path
 // can be revoked  and revokes the credential.
 func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error {
-	const op = errors.Op("jimm.RevokeCloudCredential")
 
 	if user.Name != tag.Owner().Id() {
-		return errors.E(op, errors.CodeUnauthorized, "unauthorized")
+		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var credential dbmodel.CloudCredential
@@ -61,7 +59,7 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 			// It is not an error to revoke an non-existent credential
 			return nil
 		}
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	credential.Valid = sql.NullBool{
@@ -71,20 +69,20 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	// Before we accepted the force flag to remove the credential regardless of the references count.
 	// Now we want to ensure that the credential is not used by any models before removing it to maintain
 	// referential integrity.
 	if len(models) > 0 {
-		return errors.E(op, errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
+		return errors.E(errors.CodeBadRequest, fmt.Sprintf("cloud credential still used by %d model(s)", len(models)))
 	}
 
 	cloud := dbmodel.Cloud{
 		Name: credential.CloudName,
 	}
 	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	var controllers []dbmodel.Controller
@@ -108,12 +106,12 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 	})
 
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	err = j.Database.DeleteCloudCredential(ctx, &credential)
 	if err != nil {
-		return errors.E(op, err, "failed to revoke credential in local database")
+		return errors.E(err, "failed to revoke credential in local database")
 	}
 	return nil
 }
@@ -130,19 +128,18 @@ type UpdateCloudCredentialArgs struct {
 // and updates it in the local database and all controllers
 // to which it is deployed.
 func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.User, args UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
-	const op = errors.Op("jimm.UpdateCloudCredential")
 
 	var resultMu sync.Mutex
 	var result []jujuparams.UpdateCredentialModelResult
 	if user.Tag() != args.CredentialTag.Owner() {
 		if !user.JimmAdmin {
-			return result, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+			return result, errors.E(errors.CodeUnauthorized, "unauthorized")
 		}
 		// ensure the user we are adding the credential for exists.
 		var u2 dbmodel.Identity
 		u2.SetTag(args.CredentialTag.Owner())
 		if err := j.Database.GetIdentity(ctx, &u2); err != nil {
-			return result, errors.E(op, err)
+			return result, errors.E(err)
 		}
 	}
 
@@ -151,19 +148,19 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 
 	// Confirm the cloud exists.
 	var cloud dbmodel.Cloud
 	cloud.SetTag(names.NewCloudTag(credential.CloudName))
 	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 	var controllers []dbmodel.Controller
 	seen := make(map[uint]bool)
@@ -186,7 +183,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 			return err
 		})
 		if err != nil {
-			return result, errors.E(op, err)
+			return result, errors.E(err)
 		}
 	}
 	var modelsErr bool
@@ -203,7 +200,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 	}
 
 	if err := j.updateCredential(ctx, &credential, args.Credential.Attributes); err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
@@ -219,20 +216,19 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 		return nil
 	})
 	if err != nil {
-		return result, errors.E(op, err)
+		return result, errors.E(err)
 	}
 	return result, nil
 }
 
 // updateCredential updates the credential stored in JIMM's database.
 func (j *JujuManager) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential, attr map[string]string) error {
-	const op = errors.Op("jimm.updateCredential")
 
 	if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
-		return errors.E(op, fmt.Errorf("failed to store credential id: %w", err))
+		return errors.E(fmt.Errorf("failed to store credential id: %w", err))
 	}
 	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), attr); err != nil {
-		return errors.E(op, fmt.Errorf("failed to store credentials: %w", err))
+		return errors.E(fmt.Errorf("failed to store credentials: %w", err))
 	}
 
 	return nil
@@ -243,11 +239,10 @@ func (j *JujuManager) updateControllerCloudCredential(
 	cred *dbmodel.CloudCredential,
 	f func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error),
 ) ([]jujuparams.UpdateCredentialModelResult, error) {
-	const op = errors.Op("jimm.updateControllerCloudCredential")
 
 	attr, err := j.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	models, err := f(ctx, jujuparams.TaggedCredential{
@@ -258,7 +253,7 @@ func (j *JujuManager) updateControllerCloudCredential(
 		},
 	})
 	if err != nil {
-		return models, errors.E(op, err)
+		return models, errors.E(err)
 	}
 	return models, nil
 }
@@ -270,7 +265,6 @@ func (j *JujuManager) updateControllerCloudCredential(
 // GetCloudCredentialAttributes should be used to retrive the credential
 // attributes if needed. The given function should not update the database.
 func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
-	const op = errors.Op("jimm.ForEachUserCloudCredential")
 
 	var cloud string
 	if ct != (names.CloudTag{}) {
@@ -289,7 +283,7 @@ func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel
 	if err == errStop {
 		err = iterErr
 	} else if err != nil {
-		err = errors.E(op, err)
+		err = errors.E(err)
 	}
 	return err
 }
@@ -301,22 +295,21 @@ func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel
 // other user, including controller superusers, will receive an error with
 // the code CodeUnauthorized.
 func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, user *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
-	const op = errors.Op("jimm.GetCloudCredentialAttributes")
 
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
 		if user.Name != cred.OwnerIdentityName {
-			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+			return nil, nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
 		if !user.JimmAdmin && user.Name != cred.OwnerIdentityName {
-			return nil, nil, errors.E(op, errors.CodeUnauthorized, "unauthorized")
+			return nil, nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 		}
 	}
 
 	attrs, err = j.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
-		err = errors.E(op, err)
+		err = errors.E(err)
 		return
 	}
 	if len(attrs) == 0 {
@@ -340,32 +333,29 @@ func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, user *op
 
 // getCloudCredentialAttributes retrieves the attributes for a cloud credential.
 func (j *JujuManager) getCloudCredentialAttributes(ctx context.Context, cred *dbmodel.CloudCredential) (map[string]string, error) {
-	const op = errors.Op("jimm.getCloudCredentialAttributes")
 
 	attr, err := j.CredentialStore.Get(ctx, cred.ResourceTag())
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	return attr, nil
 }
 
 // CopyCredential copies a cloud credential from one user to another.
 func (j *JujuManager) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
-	op := errors.Op("jimm.CopyCredential")
-
 	credential, err := j.GetCloudCredential(ctx, originalUser, cred)
 	if err != nil {
-		return names.CloudCredentialTag{}, nil, errors.E(op, err)
+		return names.CloudCredentialTag{}, nil, errors.E(err)
 	}
 
 	attr, err := j.getCloudCredentialAttributes(ctx, credential)
 	if err != nil {
-		return names.CloudCredentialTag{}, nil, errors.E(op, err)
+		return names.CloudCredentialTag{}, nil, errors.E(err)
 	}
 
 	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), newUser.Name, cred.Name())
 	if !names.IsValidCloudCredential(newCredID) {
-		return names.CloudCredentialTag{}, nil, errors.E(op, fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
+		return names.CloudCredentialTag{}, nil, errors.E(fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
 	}
 
 	newCredential := jujuparams.CloudCredential{

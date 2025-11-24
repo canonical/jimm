@@ -13,10 +13,10 @@ import (
 
 // AddAuditLogEntry adds a new entry to the audit log.
 func (d *Database) AddAuditLogEntry(ctx context.Context, ale *dbmodel.AuditLogEntry) (err error) {
-	const op = errors.Op("db.AddAuditLogEntry")
+	const op = "db.AddAuditLogEntry"
 
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -24,7 +24,7 @@ func (d *Database) AddAuditLogEntry(ctx context.Context, ale *dbmodel.AuditLogEn
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
 	if err := d.DB.WithContext(ctx).Create(ale).Error; err != nil {
-		return errors.E(op, dbError(err))
+		return errors.E(dbError(err))
 	}
 	return nil
 }
@@ -70,9 +70,9 @@ type AuditLogFilter struct {
 // the given filter calling f for each entry. If f returns an error
 // iteration stops immediately and the error is retuned unmodified.
 func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilter, f func(*dbmodel.AuditLogEntry) error) (err error) {
-	const op = errors.Op("db.ForEachAuditLogEntry")
+	const op = "db.ForEachAuditLogEntry"
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -107,20 +107,20 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 
 	rows, err := db.Rows()
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var ale dbmodel.AuditLogEntry
 		if err := db.ScanRows(rows, &ale); err != nil {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 		if err := f(&ale); err != nil {
 			return err
 		}
 	}
 	if rows.Err() != nil {
-		return errors.E(op, rows.Err())
+		return errors.E(rows.Err())
 	}
 	return nil
 }
@@ -128,10 +128,10 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 // CleanupAuditLogs cleans up audit logs after the auditLogRetentionPeriodInDays,
 // HARD deleting them from the database.
 func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) (_ int64, err error) {
-	const op = errors.Op("db.DeleteAuditLogsBefore")
+	const op = "db.DeleteAuditLogsBefore"
 
 	if err := d.ready(); err != nil {
-		return 0, errors.E(op, err)
+		return 0, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -144,7 +144,7 @@ func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) 
 		Where("time < ?", before).
 		Delete(&dbmodel.AuditLogEntry{})
 	if tx.Error != nil {
-		return 0, errors.E(op, dbError(tx.Error))
+		return 0, errors.E(dbError(tx.Error))
 	}
 	return tx.RowsAffected, nil
 }

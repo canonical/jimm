@@ -129,12 +129,11 @@ func rotateJWKS(ctx context.Context, credStore CredentialStore, initialExpiryTim
 // to use e and n for validation.
 // https://stackoverflow.com/questions/61395261/how-to-validate-signature-of-jwt-from-jwks-without-x5c
 func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequired <-chan time.Time, initialRotateRequiredTime time.Time) error {
-	const op = errors.Op("vault.StartJWKSRotator")
 
 	credStore := jwks.credentialStore
 
 	if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
-		return errors.E(op, fmt.Errorf("rotate jwks: %w", err))
+		return errors.E(fmt.Errorf("rotate jwks: %w", err))
 	}
 
 	// The rotation method is as follows, if an expiry is not present, we know
@@ -147,7 +146,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 			select {
 			case <-checkRotateRequired:
 				if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
-					zapctx.Error(ctx, "security failure", zap.Any("op", op), zap.NamedError("jwks-error", err))
+					zapctx.Error(ctx, "security failure", zap.NamedError("jwks-error", err))
 				}
 			case <-ctx.Done():
 				zapctx.Debug(ctx, "shutdown for JWKS rotator complete.")
@@ -164,13 +163,12 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 // It will return a jwk.Set containing the public key
 // and a PEM encoded private key for JWT signing.
 func generateJWK(ctx context.Context) (jwk.Set, []byte, error) {
-	const op = errors.Op("vault.generateJWKS")
 
 	// Due to the sensitivity of controllers, it is best we allow a larger encryption bit size
 	// and accept any negligible wire cost.
 	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	privateKeyPEM := pem.EncodeToMemory(
@@ -183,32 +181,32 @@ func generateJWK(ctx context.Context) (jwk.Set, []byte, error) {
 	// We also use the same methodology of generating UUIDs for our KID
 	kid, err := uuid.NewRandom()
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	jwks, err := jwk.FromRaw(keySet.PublicKey)
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 	err = jwks.Set(jwk.KeyIDKey, kid.String())
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	err = jwks.Set(jwk.KeyUsageKey, "sig") // Couldn't find const for this...
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	err = jwks.Set(jwk.AlgorithmKey, jwa.RS256)
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	ks := jwk.NewSet()
 	err = ks.AddKey(jwks)
 	if err != nil {
-		return nil, nil, errors.E(op, err)
+		return nil, nil, errors.E(err)
 	}
 
 	return ks, privateKeyPEM, nil

@@ -16,9 +16,9 @@ import (
 // AddOrUpdateIncomingModelMigration stores information about an incoming model migration
 // if it does not already exist, or updates it if it does.
 func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
-	const op = errors.Op("db.AddOrUpdateIncomingModelMigration")
+	const op = "db.AddOrUpdateIncomingModelMigration"
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -36,13 +36,13 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 			// If the model migration already exists, update it.
 			modelMigration.ID = lookup.ID
 		} else if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			return errors.E(op, err)
+			return errors.E(err)
 		}
 
 		db := d.DB.WithContext(ctx)
 
 		if err := db.Save(modelMigration).Error; err != nil {
-			return errors.E(op, dbError(err))
+			return errors.E(dbError(err))
 		}
 
 		return nil
@@ -54,7 +54,7 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 // This must be run within a transaction for the lock to be effective.
 // if `noWait` is true, the function will return an error if the lock cannot be acquired immediately.
 func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration, noWait bool) (err error) {
-	const op = errors.Op("db.GetIncomingMigrationWithLock")
+	const op = "db.GetIncomingMigrationWithLock"
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
 	defer durationObserver()
@@ -65,7 +65,7 @@ func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelM
 	case modelMigration.ModelUUID.Valid:
 		db = db.Where("model_uuid = ?", modelMigration.ModelUUID.String)
 	default:
-		return errors.E(op, "missing uuid", errors.CodeBadRequest)
+		return errors.E("missing uuid", errors.CodeBadRequest)
 	}
 
 	lockingClause := clause.Locking{Strength: "UPDATE"}
@@ -76,18 +76,18 @@ func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelM
 	if err := db.Preload("TargetController").First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, err, "model migration not found")
+			return errors.E(err, "model migration not found")
 		}
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // GetIncomingModelMigration returns model migration information based on the model UUID.
 func (d *Database) GetIncomingModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
-	const op = errors.Op("db.GetIncomingModelMigration")
+	const op = "db.GetIncomingModelMigration"
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -99,24 +99,24 @@ func (d *Database) GetIncomingModelMigration(ctx context.Context, modelMigration
 	case modelMigration.ModelUUID.Valid:
 		db = db.Where("model_uuid = ?", modelMigration.ModelUUID.String)
 	default:
-		return errors.E(op, "missing uuid", errors.CodeBadRequest)
+		return errors.E("missing uuid", errors.CodeBadRequest)
 	}
 
 	if err := db.Preload("TargetController").First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(op, err, "model migration not found")
+			return errors.E(err, "model migration not found")
 		}
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // DeleteIncomingModelMigration removes a model migration entry from the database.
 func (d *Database) DeleteIncomingModelMigration(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration) (err error) {
-	const op = errors.Op("db.DeleteIncomingModelMigration")
+	const op = "db.DeleteIncomingModelMigration"
 	if err := d.ready(); err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -125,16 +125,16 @@ func (d *Database) DeleteIncomingModelMigration(ctx context.Context, modelMigrat
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(modelMigration).Error; err != nil {
-		return errors.E(op, dbError(err))
+		return errors.E(dbError(err))
 	}
 	return nil
 }
 
 // GetIncomingModelMigrationsCreatedBefore returns all incoming model migrations created before the specified time.
 func (d *Database) GetIncomingModelMigrationsCreatedBefore(ctx context.Context, createBefore time.Time) (migrations []dbmodel.IncomingModelMigration, err error) {
-	const op = errors.Op("db.GetIncomingModelMigrations")
+	const op = "db.GetIncomingModelMigrations"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
@@ -144,7 +144,7 @@ func (d *Database) GetIncomingModelMigrationsCreatedBefore(ctx context.Context, 
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Where("created_at < ?", createBefore).Find(&migrations).Error; err != nil {
-		return nil, errors.E(op, dbError(err))
+		return nil, errors.E(dbError(err))
 	}
 	return migrations, nil
 }

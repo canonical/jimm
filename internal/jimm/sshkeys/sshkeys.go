@@ -29,10 +29,9 @@ func NewSSHKeyManager(store *db.Database) (*sshKeyManager, error) {
 
 // AddUserPublicKey saves a user's public key.
 func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey PublicKey) error {
-	const op = errors.Op("sshkeys.AddUserPublicKey")
 
 	if ok, reason := publicKey.valid(); !ok {
-		return errors.E(op, errors.CodeBadRequest, reason)
+		return errors.E(errors.CodeBadRequest, reason)
 	}
 
 	k := dbmodel.SSHKey{
@@ -44,27 +43,26 @@ func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.Use
 	}
 	err := sm.store.AddSSHKey(ctx, &k)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // VerifyPublicKey lists the key for a user and compares the key to find a match.
 func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
-	const op = errors.Op("sshkeys.VerifyPublicKey")
 
 	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, claimUser, db.SSHKeyModelFilter{All: true})
 	if err != nil {
-		return false, errors.E(op, err)
+		return false, errors.E(err)
 	}
 	publicKeyToCompare, err := gossh.ParsePublicKey(publicKey)
 	if err != nil {
-		return false, errors.E(op, err)
+		return false, errors.E(err)
 	}
 	for _, key := range dbKeys {
 		k, err := gossh.ParsePublicKey(key.PublicKey)
 		if err != nil {
-			return false, errors.E(op, err)
+			return false, errors.E(err)
 		}
 		if ssh.KeysEqual(k, publicKeyToCompare) {
 			return true, nil
@@ -76,17 +74,16 @@ func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, 
 
 // ListUserPublicKeys lists a user's public keys.
 func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]PublicKey, error) {
-	const op = errors.Op("sshkeys.ListUserPublicKeys")
 
 	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, user.Name, model)
 	if err != nil {
-		return nil, errors.E(op, err)
+		return nil, errors.E(err)
 	}
 	var pubKeys []PublicKey
 	for _, key := range dbKeys {
 		k, err := gossh.ParsePublicKey(key.PublicKey)
 		if err != nil {
-			return nil, errors.E(op, err)
+			return nil, errors.E(err)
 		}
 		pubKeys = append(pubKeys, PublicKey{PublicKey: k, Comment: key.KeyComment})
 	}
@@ -95,22 +92,20 @@ func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.U
 
 // RemoveUserKeyByComment removes a user's public key(s) by the key comment.
 func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
-	const op = errors.Op("sshkeys.RemoveUserKeyByComment")
 
 	err := sm.store.RemoveSSHKeyByComment(ctx, user.Name, model, comment)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
 
 // RemoveUserKeyByFingerprint removes a user's public key by the key fingerprint.
 func (sm *sshKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
-	const op = errors.Op("sshkeys.RemoveUserKeyByFingerprint")
 
 	err := sm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, model, fingerprint)
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }

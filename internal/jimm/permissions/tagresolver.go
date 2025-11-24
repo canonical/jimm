@@ -344,12 +344,11 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
 func (j *permissionManager) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
-	op := errors.Op("jimm.parseAndValidateTag")
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) == 1 {
 		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])
 		if err != nil {
-			return nil, errors.E(op, errors.CodeFailedToParseTupleKey, err)
+			return nil, errors.E(errors.CodeFailedToParseTupleKey, err)
 		}
 		return tag, nil
 	}
@@ -357,7 +356,7 @@ func (j *permissionManager) parseAndValidateTag(ctx context.Context, key string)
 	tag, err := resolveTag(j.jimmUUID, j.store, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
-		return nil, errors.E(op, errors.CodeFailedToResolveTupleResource, err)
+		return nil, errors.E(errors.CodeFailedToResolveTupleResource, err)
 	}
 	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tag.String()))
 

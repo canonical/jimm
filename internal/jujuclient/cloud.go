@@ -20,7 +20,7 @@ import (
 // the Cloud. Any error that represents a Juju API
 // failure will be of type *APIError.
 func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-	const op = errors.Op("jujuclient.CheckCredentialModels")
+
 	in := jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{cred},
 	}
@@ -29,10 +29,10 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 		Results: make([]jujuparams.UpdateCredentialResult, 1),
 	}
 	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7}, "", "CheckCredentialsModels", &in, &out); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
+		return nil, errors.E(jujuerrors.Cause(err))
 	}
 	if out.Results[0].Error != nil {
-		return out.Results[0].Models, errors.E(op, out.Results[0].Error)
+		return out.Results[0].Models, errors.E(out.Results[0].Error)
 	}
 	return out.Results[0].Models, nil
 }
@@ -51,7 +51,7 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 // Any error that represents a Juju API failure will be of type
 // *APIError.
 func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-	const op = errors.Op("jujuclient.UpdateCredential")
+
 	creds := jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{cred},
 	}
@@ -71,10 +71,10 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 	// unmarshal correctly into the latter so there is no need to use
 	// a different response type.
 	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7}, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
-		return nil, errors.E(op, jujuerrors.Cause(err))
+		return nil, errors.E(jujuerrors.Cause(err))
 	}
 	if out.Results[0].Error != nil {
-		return out.Results[0].Models, errors.E(op, out.Results[0].Error)
+		return out.Results[0].Models, errors.E(out.Results[0].Error)
 	}
 	return out.Results[0].Models, nil
 }
@@ -92,7 +92,7 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 // Any error that represents a Juju API failure will be of type
 // *APIError.
 func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCredentialTag) error {
-	const op = errors.Op("jujuclient.RevokeCredential")
+
 	out := jujuparams.ErrorResults{
 		Results: make([]jujuparams.ErrorResult, 1),
 	}
@@ -103,11 +103,11 @@ func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCreden
 		}},
 	}
 	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7}, "", "RevokeCredentialsCheckModels", &in, &out); err != nil {
-		return errors.E(op, jujuerrors.Cause(err))
+		return errors.E(jujuerrors.Cause(err))
 	}
 
 	if out.Results[0].Error != nil {
-		return errors.E(op, out.Results[0].Error)
+		return errors.E(out.Results[0].Error)
 	}
 	return nil
 }

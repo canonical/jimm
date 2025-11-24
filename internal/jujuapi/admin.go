@@ -44,12 +44,12 @@ var facadeInit = make(map[string]func(r *controllerRoot) []int)
 // Upon successful login, the user is then expected to retrieve an access token using
 // GetDeviceAccessToken.
 func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceResponse, error) {
-	const op = errors.Op("jujuapi.LoginDevice")
+
 	response := params.LoginDeviceResponse{}
 
 	deviceResponse, err := r.jimm.LoginManager().LoginDevice(ctx)
 	if err != nil {
-		return response, errors.E(op, err, errors.CodeUnauthorized)
+		return response, errors.E(err, errors.CodeUnauthorized)
 	}
 	// NOTE: As this is on the controller root struct, and a new controller root
 	// is created per WS, it is EXPECTED that the subsequent call to GetDeviceSessionToken
@@ -68,12 +68,12 @@ func (r *controllerRoot) LoginDevice(ctx context.Context) (params.LoginDeviceRes
 // where the subject of the JWT contains the user's email - enabling identification
 // of the said user's session.
 func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetDeviceSessionTokenResponse, error) {
-	const op = errors.Op("jujuapi.GetDeviceSessionToken")
+
 	response := params.GetDeviceSessionTokenResponse{}
 
 	token, err := r.jimm.LoginManager().GetDeviceSessionToken(ctx, r.deviceOAuthResponse)
 	if err != nil {
-		return response, errors.E(op, err, errors.CodeUnauthorized)
+		return response, errors.E(err, errors.CodeUnauthorized)
 	}
 
 	response.SessionToken = token
@@ -87,11 +87,10 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 // It may be misleading in that it does not interact with cookies at all, but this will only ever
 // be successful upon the http layer login being successful.
 func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams.LoginResult, error) {
-	const op = errors.Op("jujuapi.LoginWithSessionCookie")
 
 	user, err := r.jimm.LoginManager().LoginWithSessionCookie(ctx, r.identityId)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err, errors.CodeUnauthorized)
+		return jujuparams.LoginResult{}, errors.E(err, errors.CodeUnauthorized)
 	}
 
 	r.mu.Lock()
@@ -101,7 +100,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 	// Get server version for LoginResult
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(err)
 	}
 
 	return jujuparams.LoginResult{
@@ -119,12 +118,11 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 // whether or not they're an admin and place the user on the controller root
 // such that subsequent facade method calls can access the authenticated user.
 func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.LoginWithSessionTokenRequest) (jujuparams.LoginResult, error) {
-	const op = errors.Op("jujuapi.LoginWithSessionToken")
 
 	user, err := r.jimm.LoginManager().LoginWithSessionToken(ctx, req.SessionToken)
 	if err != nil {
 		// Avoid masking the error code on err below. The Juju CLI uses it to determine when to initiate login see [OAuthAuthenticator.VerifySessionToken].
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(err)
 	}
 
 	// TODO(ale8k): This isn't needed I don't think as controller roots are unique
@@ -136,7 +134,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	// Get server version for LoginResult
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(err)
 	}
 
 	return jujuparams.LoginResult{
@@ -151,7 +149,6 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 // LoginWithClientCredentials handles logging into the JIMM with the client ID
 // and secret created by the IdP.
 func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req params.LoginWithClientCredentialsRequest) (jujuparams.LoginResult, error) {
-	const op = errors.Op("jujuapi.LoginWithClientCredentials")
 
 	user, err := r.jimm.LoginManager().LoginClientCredentials(ctx, req.ClientID, req.ClientSecret)
 	if err != nil {
@@ -165,7 +162,7 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 	// Get server version for LoginResult
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(op, err)
+		return jujuparams.LoginResult{}, errors.E(err)
 	}
 
 	return jujuparams.LoginResult{

@@ -147,16 +147,15 @@ func NewBootstrapManager(
 // It requires the user to be an admin and returns the status, error message, logs,
 // and a watermark for pagination.
 func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobId uuid.UUID, offset int) (params.GetJobInfoResponse, error) {
-	const op = errors.Op("jimm.GetJobInfo")
 
 	job, err := b.tracker.GetJob(ctx, jobId)
 	if err != nil {
-		return params.GetJobInfoResponse{}, errors.E(op, "failed to get job info", err)
+		return params.GetJobInfoResponse{}, errors.E("failed to get job info", err)
 	}
 
 	loggies, newOffset, err := b.store.QueryJobLog(ctx, jobId, offset)
 	if err != nil {
-		return params.GetJobInfoResponse{}, errors.E(op, "failed to query job logs", err)
+		return params.GetJobInfoResponse{}, errors.E("failed to query job logs", err)
 	}
 	return params.GetJobInfoResponse{
 		Status:    params.JobStatus(job.Status),
@@ -168,19 +167,18 @@ func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobI
 
 // StopJob stops a bootstrap job by its ID.
 func (b *bootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
-	const op = errors.Op("jimm.StopJob")
 
 	if user == nil {
-		return errors.E(op, "user cannot be nil")
+		return errors.E("user cannot be nil")
 	}
 
 	if jobId == uuid.Nil {
-		return errors.E(op, "job ID cannot be nil")
+		return errors.E("job ID cannot be nil")
 	}
 
 	err := b.tracker.StopJob(ctx, jobId)
 	if err != nil {
-		return errors.E(op, "failed to stop job", err)
+		return errors.E("failed to stop job", err)
 	}
 
 	return nil
@@ -188,19 +186,18 @@ func (b *bootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobI
 
 // StartBootstrap starts a bootstrap job with the provided parameters.
 func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params BootstrapParams) (string, error) {
-	const op = errors.Op("jimm.StartBootstrapJob")
 
 	if b.jimmWellknownJWKSEndpoint == "" {
-		return "", errors.E(op, "bootstrap login token refresh URL is not configured. Cannot proceed with bootstrap. Please configure it and try again.")
+		return "", errors.E("bootstrap login token refresh URL is not configured. Cannot proceed with bootstrap. Please configure it and try again.")
 	}
 
 	if err := params.validate(); err != nil {
-		return "", errors.E(op, fmt.Errorf("invalid bootstrap parameters: %v", err))
+		return "", errors.E(fmt.Errorf("invalid bootstrap parameters: %v", err))
 	}
 
 	temp, err := os.MkdirTemp("", "juju-data-dir")
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
+		return "", errors.E(fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
 	}
 
 	jobId, err := b.tracker.Run(
@@ -228,7 +225,7 @@ func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 		maxJobDuration,
 	)
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to start bootstrap job: %w", err))
+		return "", errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
 	}
 
 	return jobId.String(), nil
@@ -547,11 +544,10 @@ func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId uuid.UUID, log
 
 // StartDestroyControllerJob starts a destroy-controller job
 func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *openfga.User, params DestroyControllerParams) (string, error) {
-	const op = errors.Op("jimm.StartDestroyControllerJob")
 
 	jujuDataDir, err := os.MkdirTemp("", "juju-data-dir")
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
+		return "", errors.E(fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
 	}
 
 	jobId, err := b.tracker.Run(
@@ -561,7 +557,7 @@ func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 		maxJobDuration,
 	)
 	if err != nil {
-		return "", errors.E(op, fmt.Errorf("failed to start bootstrap job: %w", err))
+		return "", errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
 	}
 
 	return jobId.String(), nil

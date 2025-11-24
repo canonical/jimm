@@ -17,7 +17,6 @@ import (
 // LockBootstrap acquires the bootstrap lock for controller bootstrap operations.
 // It returns an error if the lock cannot be acquired.
 func (d *Database) LockBootstrap(ctx context.Context, ttl time.Duration) error {
-	op := errors.Op("db.LockBootstrap")
 	err := d.Transaction(func(tx *Database) error {
 		lock := &dbmodel.BootstrapLock{}
 		// This is equivalent to a SELECT FOR UPDATE in SQL,
@@ -38,7 +37,7 @@ func (d *Database) LockBootstrap(ctx context.Context, ttl time.Duration) error {
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }
@@ -46,7 +45,6 @@ func (d *Database) LockBootstrap(ctx context.Context, ttl time.Duration) error {
 // UnlockBootstrap releases the bootstrap lock for controller bootstrap operations.
 // It returns an error if the lock was not held or could not be released.
 func (d *Database) UnlockBootstrap(ctx context.Context) error {
-	op := errors.Op("db.LockBootstrap")
 	err := d.Transaction(func(tx *Database) error {
 		lock := &dbmodel.BootstrapLock{}
 		if err := tx.DB.First(lock).Error; err != nil {
@@ -63,7 +61,7 @@ func (d *Database) UnlockBootstrap(ctx context.Context) error {
 		return nil
 	})
 	if err != nil {
-		return errors.E(op, err)
+		return errors.E(err)
 	}
 	return nil
 }

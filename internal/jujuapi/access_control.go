@@ -26,16 +26,16 @@ const (
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupRequest) (apiparams.AddGroupResponse, error) {
-	const op = errors.Op("jujuapi.AddGroup")
+
 	resp := apiparams.AddGroupResponse{}
 
 	if !jimmnames.IsValidGroupName(req.Name) {
-		return resp, errors.E(op, errors.CodeBadRequest, "invalid group name")
+		return resp, errors.E(errors.CodeBadRequest, "invalid group name")
 	}
 
 	groupEntry, err := r.jimm.GroupManager().AddGroup(ctx, r.user, req.Name)
 	if err != nil {
-		return resp, errors.E(op, fmt.Errorf("failed to add group: %w", err))
+		return resp, errors.E(fmt.Errorf("failed to add group: %w", err))
 	}
 	resp = apiparams.AddGroupResponse{Group: apiparams.Group{
 		Name:      groupEntry.Name,
@@ -49,22 +49,21 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 
 // GetGroup returns group information based on a UUID or name.
 func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupRequest) (apiparams.Group, error) {
-	const op = errors.Op("jujuapi.GetGroup")
 
 	var groupEntry *dbmodel.GroupEntry
 	var err error
 	switch {
 	case req.UUID != "" && req.Name != "":
-		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "only one of UUID or Name should be provided")
+		return apiparams.Group{}, errors.E(errors.CodeBadRequest, "only one of UUID or Name should be provided")
 	case req.UUID != "":
 		groupEntry, err = r.jimm.GroupManager().GetGroupByUUID(ctx, r.user, req.UUID)
 	case req.Name != "":
 		groupEntry, err = r.jimm.GroupManager().GetGroupByName(ctx, r.user, req.Name)
 	default:
-		return apiparams.Group{}, errors.E(op, errors.CodeBadRequest, "no UUID or Name provided")
+		return apiparams.Group{}, errors.E(errors.CodeBadRequest, "no UUID or Name provided")
 	}
 	if err != nil {
-		return apiparams.Group{}, errors.E(op, fmt.Errorf("failed to get group: %w", err))
+		return apiparams.Group{}, errors.E(fmt.Errorf("failed to get group: %w", err))
 	}
 
 	return apiparams.Group{
@@ -77,36 +76,33 @@ func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupReq
 
 // RenameGroup renames a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
-	const op = errors.Op("jujuapi.RenameGroup")
 
 	if !jimmnames.IsValidGroupName(req.NewName) {
-		return errors.E(op, errors.CodeBadRequest, "invalid group name")
+		return errors.E(errors.CodeBadRequest, "invalid group name")
 	}
 
 	if err := r.jimm.GroupManager().RenameGroup(ctx, r.user, req.Name, req.NewName); err != nil {
-		return errors.E(op, fmt.Errorf("failed to rename group: %w", err))
+		return errors.E(fmt.Errorf("failed to rename group: %w", err))
 	}
 	return nil
 }
 
 // RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
 func (r *controllerRoot) RemoveGroup(ctx context.Context, req apiparams.RemoveGroupRequest) error {
-	const op = errors.Op("jujuapi.RemoveGroup")
 
 	if err := r.jimm.GroupManager().RemoveGroup(ctx, r.user, req.Name); err != nil {
-		return errors.E(op, fmt.Errorf("failed to remove group: %w", err))
+		return errors.E(fmt.Errorf("failed to remove group: %w", err))
 	}
 	return nil
 }
 
 // ListGroup lists relational access control groups within JIMMs DB.
 func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroupsRequest) (apiparams.ListGroupResponse, error) {
-	const op = errors.Op("jujuapi.ListGroups")
 
 	pagination := pagination.NewOffsetFilter(req.Limit, req.Offset)
 	groups, err := r.jimm.GroupManager().ListGroups(ctx, r.user, pagination, "")
 	if err != nil {
-		return apiparams.ListGroupResponse{}, errors.E(op, fmt.Errorf("failed to list groups: %w", err))
+		return apiparams.ListGroupResponse{}, errors.E(fmt.Errorf("failed to list groups: %w", err))
 	}
 	groupsResponse := make([]apiparams.Group, len(groups))
 	for i, g := range groups {
@@ -124,10 +120,9 @@ func (r *controllerRoot) ListGroups(ctx context.Context, req apiparams.ListGroup
 // AddRelation creates a tuple between two objects [if applicable]
 // within OpenFGA.
 func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelationRequest) error {
-	const op = errors.Op("jujuapi.AddRelation")
 
 	if err := r.jimm.PermissionManager().AddRelation(ctx, r.user, req.Tuples); err != nil {
-		return errors.E(op, fmt.Errorf("failed to add relation: %w", err))
+		return errors.E(fmt.Errorf("failed to add relation: %w", err))
 	}
 	return nil
 }
@@ -135,11 +130,10 @@ func (r *controllerRoot) AddRelation(ctx context.Context, req apiparams.AddRelat
 // RemoveRelation removes a tuple between two objects [if applicable]
 // within OpenFGA.
 func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.RemoveRelationRequest) error {
-	const op = errors.Op("jujuapi.RemoveRelation")
 
 	err := r.jimm.PermissionManager().RemoveRelation(ctx, r.user, req.Tuples)
 	if err != nil {
-		return errors.E(op, fmt.Errorf("failed to remove relation: %w", err))
+		return errors.E(fmt.Errorf("failed to remove relation: %w", err))
 	}
 	return nil
 }
@@ -148,13 +142,13 @@ func (r *controllerRoot) RemoveRelation(ctx context.Context, req apiparams.Remov
 // against another tuple within OpenFGA.
 // This corresponds directly to /stores/{store_id}/check.
 func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckRelationRequest) (apiparams.CheckRelationResponse, error) {
-	const op = errors.Op("jujuapi.CheckRelation")
+
 	checkResp := apiparams.CheckRelationResponse{Allowed: false}
 
 	allowed, err := r.jimm.PermissionManager().CheckRelation(ctx, r.user, req.Tuple, false)
 	if err != nil {
 		checkResp.Error = err.Error()
-		return checkResp, errors.E(op, fmt.Errorf("failed to check relation: %w", err))
+		return checkResp, errors.E(fmt.Errorf("failed to check relation: %w", err))
 	}
 	checkResp.Allowed = allowed
 	zapctx.Debug(ctx, "check request", zap.String("allowed", strconv.FormatBool(allowed)))
@@ -164,12 +158,12 @@ func (r *controllerRoot) CheckRelation(ctx context.Context, req apiparams.CheckR
 // CheckRelations performs an authorisation check for a list of tuples.
 // It returns a list of results, each with an Allowed boolean and an optional error message.
 func (r *controllerRoot) CheckRelations(ctx context.Context, req apiparams.CheckRelationsRequest) (apiparams.CheckRelationsResponse, error) {
-	const op = errors.Op("jujuapi.CheckRelations")
+
 	checksResp := apiparams.CheckRelationsResponse{}
 
 	results, err := r.jimm.PermissionManager().CheckRelations(ctx, r.user, req.Tuples)
 	if err != nil {
-		return checksResp, errors.E(op, fmt.Errorf("failed to check relations: %w", err))
+		return checksResp, errors.E(fmt.Errorf("failed to check relations: %w", err))
 	}
 	for _, result := range results {
 		resp := apiparams.CheckRelationResponse{
@@ -186,11 +180,10 @@ func (r *controllerRoot) CheckRelations(ctx context.Context, req apiparams.Check
 
 // ListRelationshipTuples returns a list of tuples matching the specified filter.
 func (r *controllerRoot) ListRelationshipTuples(ctx context.Context, req apiparams.ListRelationshipTuplesRequest) (apiparams.ListRelationshipTuplesResponse, error) {
-	const op = errors.Op("jujuapi.ListRelationshipTuples")
 
 	responseTuples, ct, err := r.jimm.PermissionManager().ListRelationshipTuples(ctx, r.user, req.Tuple, req.PageSize, req.ContinuationToken)
 	if err != nil {
-		return apiparams.ListRelationshipTuplesResponse{}, errors.E(op, fmt.Errorf("failed to list relations: %w", err))
+		return apiparams.ListRelationshipTuplesResponse{}, errors.E(fmt.Errorf("failed to list relations: %w", err))
 	}
 	errors := []string{}
 	tuples := make([]apiparams.RelationshipTuple, len(responseTuples))

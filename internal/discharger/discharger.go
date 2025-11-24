@@ -33,20 +33,19 @@ type MacaroonDischargerConfig struct {
 
 // NewMacaroonDischarger creates a new MacaroonDischarger instance with the provided configuration, database, and offer authorizer.
 func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, offerAuthorizer jimm.OfferAuthorizer) (*MacaroonDischarger, error) {
-	op := errors.Op("discharger.NewMacaroonDischarger")
 	var kp bakery.KeyPair
 	if cfg.PublicKey == "" || cfg.PrivateKey == "" {
 		return nil, errors.E("missing bakery private/public key")
 	} else {
 		if err := kp.Private.UnmarshalText([]byte(cfg.PrivateKey)); err != nil {
-			return nil, errors.E(op, err, "cannot unmarshal private key")
+			return nil, errors.E(err, "cannot unmarshal private key")
 		}
 		if err := kp.Public.UnmarshalText([]byte(cfg.PublicKey)); err != nil {
-			return nil, errors.E(op, err, "cannot unmarshal public key")
+			return nil, errors.E(err, "cannot unmarshal public key")
 		}
 	}
 	if offerAuthorizer == nil {
-		return nil, errors.E(op, "userMappingManager cannot be nil")
+		return nil, errors.E("userMappingManager cannot be nil")
 	}
 
 	checker := checkers.New(jjmacaroon.MacaroonNamespace)
