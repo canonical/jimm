@@ -65,6 +65,34 @@ func (s *dbSuite) TestGetIdentity(c *qt.C) {
 	c.Check(u4, qt.DeepEquals, u3)
 }
 
+func (s *dbSuite) TestGetIdentityConcurrent(c *qt.C) {
+	ctx := context.Background()
+	i, err := dbmodel.NewIdentity("bob")
+	c.Assert(err, qt.IsNil)
+	err = s.Database.GetIdentity(ctx, i)
+	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
+
+	err = s.Database.Migrate(ctx)
+	c.Assert(err, qt.IsNil)
+
+	N := 50
+	errorChannel := make(chan error, N)
+	for i := 0; i < N; i++ {
+		go func() {
+			u, err := dbmodel.NewIdentity("bob@canonical.com")
+			c.Check(err, qt.IsNil)
+
+			errorChannel <- s.Database.GetIdentity(ctx, u)
+		}()
+	}
+
+	for i := 0; i < N; i++ {
+		err = <-errorChannel
+		c.Assert(err, qt.IsNil)
+	}
+}
+
 func (s *dbSuite) TestIdentityUserCreatedLogging(c *qt.C) {
 	ctx := context.Background()
 

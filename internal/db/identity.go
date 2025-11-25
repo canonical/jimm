@@ -5,6 +5,8 @@ package db
 import (
 	"context"
 
+	"gorm.io/gorm/clause"
+
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/logger"
@@ -36,14 +38,24 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
 
-	db := d.DB.WithContext(ctx)
-	result := db.Where("name = ?", u.Name).FirstOrCreate(&u)
+	result := d.DB.WithContext(ctx).Clauses(clause.OnConflict{
+		DoNothing: true,
+	}).Create(&u)
 	if result.Error != nil {
+		return errors.E(op, result.Error)
+	}
+
+	// Check if a new identity was created.
+	if result.RowsAffected > 0 {
+		logger.LogUserCreated(ctx, u.Name)
+		return nil
+	}
+
+	// If we didn't create it, it must exist (or we raced and lost). Fetch it.
+	if err = d.DB.WithContext(ctx).Where("name = ?", u.Name).First(&u).Error; err != nil {
 		return errors.E(op, err)
 	}
-	if result.RowsAffected == 1 {
-		logger.LogUserCreated(ctx, u.Name)
-	}
+
 	return nil
 }
 
