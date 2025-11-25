@@ -132,7 +132,7 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 		// if c.UnavailableSince is valid, then we can delete is
 		// if c.UnavailableSince is no valid, then we can't delete is
 		// if force is true, we can always delete is
-		if !(force || c.UnavailableSince.Valid) {
+		if !force && !c.UnavailableSince.Valid {
 			return errors.E(errors.CodeStillAlive, "controller is still alive")
 		}
 

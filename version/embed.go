@@ -1,6 +1,5 @@
 // Copyright 2021 Canonical Ltd.
 
-// +build version
 //go:build version
 
 package version

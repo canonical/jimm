@@ -90,7 +90,7 @@ func (j *permissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 	}
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == user.Name
 	// Admins can check any relation, non-admins can only check their own.
-	if !(user.JimmAdmin || userCheckingSelf) {
+	if !user.JimmAdmin && !userCheckingSelf {
 		return allowed, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 

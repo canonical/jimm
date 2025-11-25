@@ -166,11 +166,8 @@ type LegacyControllerResponse struct {
 
 // AddCloudToController adds the specified cloud to a specific controller.
 func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams.AddCloudToControllerRequest) error {
+	force := req.Force != nil && *req.Force
 
-	force := false
-	if req.Force != nil && *req.Force {
-		force = true
-	}
 	cloud := cloudFromParams(req.Name, req.Cloud)
 	if err := r.jimm.JujuManager().AddCloudToController(ctx, r.user, req.ControllerName, names.NewCloudTag(req.Name), cloud, force); err != nil {
 		return errors.E(err)

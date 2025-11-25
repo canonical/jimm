@@ -252,7 +252,7 @@ func (j *loginManager) getOrCreateIdentity(ctx context.Context, identifier strin
 
 func (j *loginManager) updateLastLogin(ctx context.Context, identity *dbmodel.Identity) error {
 	identity.LastLogin = sql.NullTime{
-		Time:  j.store.DB.Config.NowFunc(),
+		Time:  j.store.DB.NowFunc(),
 		Valid: true,
 	}
 	return j.store.UpdateIdentity(ctx, identity)

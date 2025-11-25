@@ -769,7 +769,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 
 		return controllerLoginMessageFnc(user)
 	case "LoginWithSessionCookie":
-		user, err := p.loginService.LoginWithSessionCookie(ctx, p.modelProxy.authenticatedIdentityID)
+		user, err := p.loginService.LoginWithSessionCookie(ctx, p.authenticatedIdentityID)
 		if err != nil {
 			return errorFnc(err)
 		}

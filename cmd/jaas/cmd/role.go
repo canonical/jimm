@@ -271,7 +271,7 @@ func (c *removeRoleCommand) Run(ctxt *cmd.Context) error {
 			return errors.E(err, "Failed to read from input.")
 		}
 		text = strings.ReplaceAll(text, "\n", "")
-		if !(text == "y" || text == "Y") {
+		if text != "y" && text != "Y" {
 			return nil
 		}
 	}

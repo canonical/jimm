@@ -322,7 +322,7 @@ type BakeryClientWrapper struct {
 
 // CookieJar returns an http.CookieJar used to store macaroon cookies.
 func (b BakeryClientWrapper) CookieJar() http.CookieJar {
-	return b.Client.Jar
+	return b.Jar
 }
 
 // BakeryClient returns the bakery client for this connection.

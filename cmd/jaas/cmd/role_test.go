@@ -30,7 +30,7 @@ func (s *roleSuite) TestAddRoleSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	role := &dbmodel.RoleEntry{Name: "test-role"}
-	err = s.JimmCmdSuite.JIMM.Database.GetRole(context.Background(), role)
+	err = s.JIMM.Database.GetRole(context.Background(), role)
 	c.Assert(err, gc.IsNil)
 	c.Assert(role.ID, gc.Equals, uint(1))
 	c.Assert(role.Name, gc.Equals, "test-role")
@@ -49,7 +49,7 @@ func (s *roleSuite) TestRenameRoleSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 
-	roleEntry, err := s.JimmCmdSuite.JIMM.Database.AddRole(context.TODO(), "test-role")
+	roleEntry, err := s.JIMM.Database.AddRole(context.TODO(), "test-role")
 	c.Assert(err, gc.IsNil)
 	c.Assert(roleEntry.UUID, gc.Not(gc.Equals), "")
 
@@ -57,7 +57,7 @@ func (s *roleSuite) TestRenameRoleSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	role := &dbmodel.RoleEntry{Name: "renamed-role"}
-	err = s.JimmCmdSuite.JIMM.Database.GetRole(context.TODO(), role)
+	err = s.JIMM.Database.GetRole(context.TODO(), role)
 	c.Assert(err, gc.IsNil)
 	c.Assert(role.ID, gc.Equals, uint(1))
 	c.Assert(role.Name, gc.Equals, "renamed-role")
@@ -74,14 +74,14 @@ func (s *roleSuite) TestRemoveRoleSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 
-	_, err := s.JimmCmdSuite.JIMM.Database.AddRole(context.TODO(), "test-role")
+	_, err := s.JIMM.Database.AddRole(context.TODO(), "test-role")
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "-y")
 	c.Assert(err, gc.IsNil)
 
 	role := &dbmodel.RoleEntry{Name: "test-role"}
-	err = s.JimmCmdSuite.JIMM.Database.GetRole(context.TODO(), role)
+	err = s.JIMM.Database.GetRole(context.TODO(), role)
 	c.Assert(err, gc.ErrorMatches, "record not found")
 }
 
@@ -105,7 +105,7 @@ func (s *roleSuite) TestListRolesSuperuser(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		_, err := s.JimmCmdSuite.JIMM.Database.AddRole(context.TODO(), fmt.Sprint("test-role", i))
+		_, err := s.JIMM.Database.AddRole(context.TODO(), fmt.Sprint("test-role", i))
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -122,7 +122,7 @@ func (s *roleSuite) TestListRolesLimitSuperuser(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		_, err := s.JimmCmdSuite.JIMM.Database.AddRole(context.TODO(), fmt.Sprint("test-role", i))
+		_, err := s.JIMM.Database.AddRole(context.TODO(), fmt.Sprint("test-role", i))
 		c.Assert(err, gc.IsNil)
 	}
 

@@ -82,7 +82,7 @@ func (c *jobStopCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to stop job: %v", err)
 	}
-	_, err = ctxt.Stdout.Write([]byte(fmt.Sprintf("Job %s has been stopped.\n", c.jobId)))
+	_, err = fmt.Fprintf(ctxt.Stdout, "Job %s has been stopped.\n", c.jobId)
 	if err != nil {
 		return fmt.Errorf("failed to write output: %v", err)
 	}

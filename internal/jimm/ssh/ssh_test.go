@@ -178,7 +178,7 @@ func (s *sshManagerSuite) TestPublicKeyHandler(c *qt.C) {
 	// Test that the PublicKeyHandler returns the correct user when the public key is valid.
 	user, err := s.sshManager.PublicKeyHandler(ctx, s.userWithAccess.Name, s.publicKey.Marshal())
 	c.Assert(err, qt.IsNil)
-	c.Assert(user.Identity.Name, qt.Equals, "alice@canonical.com")
+	c.Assert(user.Name, qt.Equals, "alice@canonical.com")
 
 	// Test that the PublicKeyHandler returns an error when the public key is invalid.
 	_, err = s.sshManager.PublicKeyHandler(ctx, s.userWithoutAccess.Name, s.publicKey.Marshal())

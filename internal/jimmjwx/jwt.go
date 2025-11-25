@@ -56,7 +56,7 @@ func (v CredentialCache) Get(ctx context.Context) (jwk.Set, error) {
 	if val, ok := v.c.Get(jwksCacheKey); ok {
 		return val, nil
 	}
-	ks, err := v.CredentialStore.GetJWKS(ctx)
+	ks, err := v.GetJWKS(ctx)
 	if err != nil {
 		return nil, err
 	}

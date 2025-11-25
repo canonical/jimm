@@ -47,14 +47,14 @@ type GocheckTester struct {
 
 // Name implements Tester.Name.
 func (t GocheckTester) Name() string {
-	return t.C.TestName()
+	return t.TestName()
 }
 
 func (t GocheckTester) Cleanup(f func()) {
 	if t.AddCleanup != nil {
 		t.AddCleanup(f)
 	} else {
-		t.C.Logf("warning: gocheck does not support Cleanup functions; make sure you're using suite's tear-down method")
+		t.Logf("warning: gocheck does not support Cleanup functions; make sure you're using suite's tear-down method")
 	}
 }
 

@@ -80,9 +80,9 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 		},
 	}
 
-	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	_, err := s.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	_, err = s.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 
 	for i, tc := range tests {
@@ -93,7 +93,7 @@ func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
 			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.JimmCmdSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+			tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			// NOTE: this is a bad test because it relies on the number of related objects. So all the
@@ -142,7 +142,7 @@ func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.JimmCmdSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+	tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Assert(len(tuples), gc.Equals, 4)
@@ -174,9 +174,9 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 	}
 
 	// Create groups and relation
-	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group1)
+	_, err := s.JIMM.Database.AddGroup(context.Background(), group1)
 	c.Assert(err, gc.IsNil)
-	_, err = s.JimmCmdSuite.JIMM.Database.AddGroup(context.Background(), group2)
+	_, err = s.JIMM.Database.AddGroup(context.Background(), group2)
 	c.Assert(err, gc.IsNil)
 	totalKeys := 2
 	for _, tc := range tests {
@@ -192,7 +192,7 @@ func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
 			c.Assert(err, gc.ErrorMatches, tc.message)
 		} else {
 			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.JimmCmdSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+			tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 			c.Assert(err, gc.IsNil)
 			c.Assert(ct, gc.Equals, "")
 			totalKeys--
@@ -227,7 +227,7 @@ func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
 	c.Assert(err, gc.IsNil)
 
-	tuples, ct, err := s.JimmCmdSuite.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
+	tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ct, gc.Equals, "")
 	c.Logf("existing relations %v", tuples)

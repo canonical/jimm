@@ -206,7 +206,7 @@ func (s *apiProxySuite) TestSessionTokenLoginProvider(c *gc.C) {
 	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.IsNil)
 	var output bytes.Buffer
-	s.JIMMSuite.EnableDeviceFlow(aliceUser.Name)
+	s.EnableDeviceFlow(aliceUser.Name)
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,
@@ -281,7 +281,7 @@ func (s *apiProxySuite) TestModelStatus(c *gc.C) {
 func (s *apiProxySuite) TestModelStatusWithoutPermission(c *gc.C) {
 	fooUser := openfga.NewUser(&dbmodel.Identity{Name: "foo@canonical.com"}, s.JIMM.OpenFGAClient)
 	var output bytes.Buffer
-	s.JIMMSuite.EnableDeviceFlow(fooUser.Name)
+	s.EnableDeviceFlow(fooUser.Name)
 	conn, err := s.openCustomLoginProvider(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: false,

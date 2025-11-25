@@ -92,7 +92,7 @@ func (s *sshSuite) Init(c *qt.C) {
 			},
 		},
 		PasswordHandler: func(ctx gliderssh.Context, password string) bool {
-			return "valid-jwt" == password
+			return password == "valid-jwt"
 		},
 	}
 	go func() {

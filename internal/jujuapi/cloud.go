@@ -200,11 +200,8 @@ func (r *controllerRoot) credential(ctx context.Context, cloudCredentialTag stri
 
 // AddCloud implements the AddCloud method of the Cloud (v2) facade.
 func (r *controllerRoot) AddCloud(ctx context.Context, args jujuparams.AddCloudArgs) error {
+	force := args.Force != nil && *args.Force
 
-	force := false
-	if args.Force != nil && *args.Force {
-		force = true
-	}
 	if err := r.jimm.JujuManager().AddHostedCloud(ctx, r.user, names.NewCloudTag(args.Name), cloudFromParams(args.Name, args.Cloud), force); err != nil {
 		return errors.E(err)
 	}

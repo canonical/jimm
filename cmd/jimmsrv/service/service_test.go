@@ -444,7 +444,7 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			bakeryClient := httpbakery.NewClient()
 			// Give the bakery client the transport config from the test server client
 			// so that the bakery client has the necessary certs for the test server.
-			bakeryClient.Client.Transport = srv.Client().Transport
+			bakeryClient.Transport = srv.Client().Transport
 			ms, err := bakeryClient.DischargeAll(context.TODO(), m)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)

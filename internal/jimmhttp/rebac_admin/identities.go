@@ -171,9 +171,10 @@ func (s *identitiesService) PatchIdentityRoles(ctx context.Context, identityId s
 			Relation:     ofganames.AssigneeRelation.String(),
 			TargetObject: jimmnames.NewRoleTag(p.Role).String(),
 		}
-		if p.Op == resources.IdentityRolesPatchItemOpAdd {
+		switch p.Op {
+		case resources.IdentityRolesPatchItemOpAdd:
 			additions = append(additions, t)
-		} else if p.Op == "remove" {
+		case "remove":
 			deletions = append(deletions, t)
 		}
 	}
@@ -267,9 +268,10 @@ func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId 
 			Relation:     ofganames.MemberRelation.String(),
 			TargetObject: jimmnames.NewGroupTag(p.Group).String(),
 		}
-		if p.Op == "add" {
+		switch p.Op {
+		case "add":
 			additions = append(additions, t)
-		} else if p.Op == "remove" {
+		case "remove":
 			deletions = append(deletions, t)
 		}
 	}

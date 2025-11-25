@@ -30,7 +30,7 @@ func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	group := &dbmodel.GroupEntry{Name: "test-group"}
-	err = s.JimmCmdSuite.JIMM.Database.GetGroup(context.TODO(), group)
+	err = s.JIMM.Database.GetGroup(context.TODO(), group)
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "test-group")
@@ -49,7 +49,7 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 
-	groupEntry, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	groupEntry, err := s.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
 	c.Assert(groupEntry.UUID, gc.Not(gc.Equals), "")
 
@@ -57,7 +57,7 @@ func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	group := &dbmodel.GroupEntry{Name: "renamed-group"}
-	err = s.JimmCmdSuite.JIMM.Database.GetGroup(context.TODO(), group)
+	err = s.JIMM.Database.GetGroup(context.TODO(), group)
 	c.Assert(err, gc.IsNil)
 	c.Assert(group.ID, gc.Equals, uint(1))
 	c.Assert(group.Name, gc.Equals, "renamed-group")
@@ -74,14 +74,14 @@ func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
 	// alice is superuser
 	bClient := s.SetupCLIAccess(c, "alice")
 
-	_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), "test-group")
+	_, err := s.JIMM.Database.AddGroup(context.TODO(), "test-group")
 	c.Assert(err, gc.IsNil)
 
 	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
 	c.Assert(err, gc.IsNil)
 
 	group := &dbmodel.GroupEntry{Name: "test-group"}
-	err = s.JimmCmdSuite.JIMM.Database.GetGroup(context.TODO(), group)
+	err = s.JIMM.Database.GetGroup(context.TODO(), group)
 	c.Assert(err, gc.ErrorMatches, "record not found")
 }
 
@@ -105,7 +105,7 @@ func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
+		_, err := s.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -126,7 +126,7 @@ func (s *groupSuite) TestListGroupsLimitSuperuser(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
 
 	for i := 0; i < 3; i++ {
-		_, err := s.JimmCmdSuite.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
+		_, err := s.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
 		c.Assert(err, gc.IsNil)
 	}
 
