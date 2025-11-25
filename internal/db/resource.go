@@ -77,9 +77,9 @@ func (d *Database) ListResources(ctx context.Context, limit, offset int, namePre
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	query, err := buildQuery(db, offset, limit, namePrefixFilter, typeFilter)

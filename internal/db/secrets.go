@@ -41,9 +41,9 @@ func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) (er
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	// On conflict perform an upset to make the operation resemble a Put.
 	db := d.DB.WithContext(ctx).Clauses(clause.OnConflict{
@@ -68,9 +68,9 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err e
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 
@@ -98,9 +98,9 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) (er
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 
@@ -118,9 +118,9 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), nil)
 	err = d.GetSecret(ctx, &secret)
@@ -146,9 +146,9 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	dataJson, err := json.Marshal(attr)
 	if err != nil {
@@ -167,9 +167,9 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 		return "", "", errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, nil)
 	err = d.GetSecret(ctx, &secret)
@@ -203,9 +203,9 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secretData := make(map[string]string)
 	secretData[usernameKey] = username
@@ -226,9 +226,9 @@ func (d *Database) CleanupJWKS(ctx context.Context) (err error) {
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err = d.DeleteSecret(ctx, &secret)
@@ -256,9 +256,9 @@ func (d *Database) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err = d.GetSecret(ctx, &secret)
@@ -280,9 +280,9 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) 
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err = d.GetSecret(ctx, &secret)
@@ -305,9 +305,9 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
 		return time.Time{}, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
 	err = d.GetSecret(ctx, &secret)
@@ -330,9 +330,9 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	jwksJson, err := json.Marshal(jwks)
 	if err != nil {
@@ -351,9 +351,9 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err error
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	privateKeyJson, err := json.Marshal(pem)
 	if err != nil {
@@ -371,9 +371,9 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err err
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	expiryJson, err := json.Marshal(expiry)
 	if err != nil {
@@ -391,9 +391,9 @@ func (d *Database) CleanupOAuthSecrets(ctx context.Context) (err error) {
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
 	if err := d.DeleteSecret(ctx, &secret); err != nil {

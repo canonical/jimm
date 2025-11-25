@@ -25,6 +25,10 @@ func (d *Database) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine strin
 		return errors.E(err)
 	}
 
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
 	return d.Transaction(func(d *Database) error {
 		// Blocks all other operations, including reads, writes, and other locks.
 		if err := d.DB.Exec(jobLoglockQuery).Error; err != nil {
@@ -68,9 +72,9 @@ func (d *Database) QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int)
 		return loggies, nextOffsetValue, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	var logs []dbmodel.JobLog
 	err = d.Transaction(func(d *Database) error {

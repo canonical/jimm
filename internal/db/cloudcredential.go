@@ -20,9 +20,9 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if cred.CloudName == "" || cred.OwnerIdentityName == "" || cred.Name == "" {
 		return errors.E(errors.CodeBadRequest, fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name))
@@ -50,9 +50,9 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if cred.CloudName == "" || cred.OwnerIdentityName == "" || cred.Name == "" {
 		return errors.E(errors.CodeNotFound, fmt.Sprintf("cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name))
@@ -81,9 +81,9 @@ func (d *Database) ForEachCloudCredential(ctx context.Context, identityName, clo
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	db = db.Model(dbmodel.CloudCredential{})
@@ -115,9 +115,9 @@ func (d *Database) DeleteCloudCredential(ctx context.Context, cred *dbmodel.Clou
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(cred).Error; err != nil {

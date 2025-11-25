@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db
 
@@ -17,9 +17,9 @@ func (d *Database) AddRole(ctx context.Context, name string) (re *dbmodel.RoleEn
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	re = &dbmodel.RoleEntry{
 		Name: name,
@@ -39,9 +39,9 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if role.UUID == "" && role.Name == "" {
 		return errors.E("must specify uuid or name")
@@ -75,9 +75,9 @@ func (d *Database) UpdateRoleName(ctx context.Context, oldName, name string) (er
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	model := d.DB.WithContext(ctx).Model(&dbmodel.RoleEntry{})
 	model.Where("name = ?", oldName)
@@ -100,9 +100,9 @@ func (d *Database) RemoveRole(ctx context.Context, role *dbmodel.RoleEntry) (err
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if err := d.DB.WithContext(ctx).Delete(role).Error; err != nil {
 		return errors.E(dbError(err))
@@ -118,9 +118,9 @@ func (d *Database) ListRoles(ctx context.Context, limit, offset int, match strin
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	if match != "" {
@@ -146,9 +146,9 @@ func (d *Database) CountRoles(ctx context.Context) (count int, err error) {
 	if err := d.ready(); err != nil {
 		return 0, errors.E(err)
 	}
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	var c int64
 	var g dbmodel.RoleEntry

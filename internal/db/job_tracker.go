@@ -23,9 +23,9 @@ func (d *Database) AddJob(ctx context.Context, jobType string) (jobId uuid.UUID,
 		return jobId, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 
@@ -54,9 +54,9 @@ func (d *Database) GetJob(ctx context.Context, job *dbmodel.JobTrackerEntry) err
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if job.JobID == uuid.Nil {
 		return errors.E(errors.CodeBadRequest, "job ID cannot be empty")
@@ -77,9 +77,9 @@ func (d *Database) GetJobStopSignal(ctx context.Context, jobId uuid.UUID) (stopS
 		return false, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	var entry dbmodel.JobTrackerEntry
@@ -98,9 +98,9 @@ func (d *Database) StopJob(ctx context.Context, jobId uuid.UUID) (err error) {
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 
@@ -139,7 +139,6 @@ func (d *Database) SetJobSuccessful(ctx context.Context, jobId uuid.UUID) (err e
 // SetJobFailed sets the job status to failed and records the error message.
 // It returns an error if the job does not exist or if the update fails.
 func (d *Database) SetJobFailed(ctx context.Context, jobId uuid.UUID, jobErr error) (err error) {
-	const op = "db.SetJobFailed"
 	entry := dbmodel.JobTrackerEntry{
 		JobID: jobId,
 	}
@@ -156,9 +155,9 @@ func (d *Database) updateJob(ctx context.Context, entry dbmodel.JobTrackerEntry)
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	result := db.Model(&entry).Select("status", "error").Updates(entry)
@@ -181,9 +180,9 @@ func (d *Database) GetJobStatus(ctx context.Context, jobId uuid.UUID) (status db
 		return status, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	entry := &dbmodel.JobTrackerEntry{}

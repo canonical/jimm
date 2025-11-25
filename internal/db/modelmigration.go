@@ -21,9 +21,9 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	err = d.Transaction(func(d *Database) error {
 		lookup := dbmodel.IncomingModelMigration{
@@ -56,9 +56,9 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelMigration *dbmodel.IncomingModelMigration, noWait bool) (err error) {
 	const op = "db.GetIncomingMigrationWithLock"
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	switch {
@@ -90,9 +90,9 @@ func (d *Database) GetIncomingModelMigration(ctx context.Context, modelMigration
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	switch {
@@ -119,9 +119,9 @@ func (d *Database) DeleteIncomingModelMigration(ctx context.Context, modelMigrat
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(modelMigration).Error; err != nil {
@@ -137,9 +137,9 @@ func (d *Database) GetIncomingModelMigrationsCreatedBefore(ctx context.Context, 
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 

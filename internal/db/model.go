@@ -21,9 +21,9 @@ func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) (err erro
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 
@@ -41,9 +41,9 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if err := d.ready(); err != nil {
 		return errors.E(err)
@@ -86,9 +86,9 @@ func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID ui
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	var models []dbmodel.Model
@@ -106,9 +106,9 @@ func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err e
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Save(model).Error; err != nil {
@@ -124,9 +124,9 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err e
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 	db := d.DB.WithContext(ctx)
 	switch {
 	case model.UUID.Valid:
@@ -153,9 +153,9 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
 	db = preloadModel("", db)
@@ -184,9 +184,9 @@ func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) (_ 
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	var models []dbmodel.Model
 	db := d.DB.WithContext(ctx)
@@ -220,13 +220,17 @@ func preloadModel(prefix string, db *gorm.DB) *gorm.DB {
 
 // GetModelsByController retrieves a list of models hosted on the specified controller.
 // Note that because we do not preload here, foreign key references will be empty.
-func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Controller) ([]dbmodel.Model, error) {
+func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Controller) (models []dbmodel.Model, err error) {
 	const op = "db.GetModelsByController"
 
 	if err := d.ready(); err != nil {
 		return nil, errors.E(err)
 	}
-	var models []dbmodel.Model
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
 	db := d.DB.WithContext(ctx)
 	if err := db.Model(ctl).Association("Models").Find(&models); err != nil {
 		return nil, errors.E(dbError(err))
@@ -235,17 +239,22 @@ func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Contro
 }
 
 // CountModelsByController counts the number of models hosted on a controller.
-func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Controller) (int, error) {
+func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Controller) (count int, err error) {
 	const op = "db.CountModelsByController"
 
 	if err := d.ready(); err != nil {
 		return 0, errors.E(err)
 	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
 	db := d.DB.WithContext(ctx)
 	asc := db.Model(ctl).Association("Models")
-	count := asc.Count()
+	count = int(asc.Count())
 	if err := asc.Error; err != nil {
 		return 0, errors.E(dbError(err))
 	}
-	return int(count), nil
+	return count, nil
 }

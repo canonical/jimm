@@ -17,9 +17,9 @@ func (d *Database) AddSSHKey(ctx context.Context, sshKey *dbmodel.SSHKey) (err e
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if err := d.DB.WithContext(ctx).Create(sshKey).Error; err != nil {
 		dbErr := dbError(err)
@@ -40,9 +40,9 @@ func (d *Database) RemoveSSHKeyByFingerprint(ctx context.Context, identityName s
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	query := d.DB.Where("identity_name = ?", identityName).
 		Where("model_uuid = ?", model.ModelUUID).
@@ -68,9 +68,9 @@ func (d *Database) RemoveSSHKeyByComment(ctx context.Context, identityName strin
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	query := d.DB.Where("key_comment = ?", comment).
 		Where("model_uuid = ?", model.ModelUUID).
@@ -94,9 +94,9 @@ func (d *Database) ListSSHKeysForUser(ctx context.Context, identityName string, 
 		return nil, errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 	query := d.DB.Where("identity_name = ?", identityName)
 	if !model.All {
 		query = query.Where("model_uuid = ?", model.ModelUUID)

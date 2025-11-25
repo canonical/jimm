@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package db
 
@@ -22,9 +22,9 @@ func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
 		return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	rk := dbmodel.RootKey{
 		ID: id,
@@ -51,9 +51,9 @@ func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.
 		return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.Where("created_at > ?", createdAfter)
 	db = db.Where("expires BETWEEN ? AND ?", expiresAfter, expiresBefore)
@@ -81,9 +81,9 @@ func (d *Database) InsertKey(key dbrootkeystore.RootKey) (err error) {
 		return errors.E(err)
 	}
 
-	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, string(op))
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, string(op))
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	rk := dbmodel.RootKey{
 		ID:        key.Id,

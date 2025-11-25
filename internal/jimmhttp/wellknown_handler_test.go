@@ -83,7 +83,6 @@ func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
 		"Err":     nil,
 		"Info":    nil,
 		"Message": "JWKS does not exist yet",
-		"Op":      "wellknownapi.JWKS",
 	})
 }
 
@@ -114,7 +113,6 @@ func TestWellknownAPIJWKSJSONHandles500(t *testing.T) {
 		"Info":    nil,
 		"Err":     nil,
 		"Message": "something went wrong...",
-		"Op":      "wellknownapi.JWKS",
 	})
 }
 

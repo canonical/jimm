@@ -67,7 +67,6 @@ func (d *Database) Transaction(f func(*Database) error) error {
 // by the current data model. If the database is not configured then an error
 // with a code of errors.CodeServerConfiguration will be returned.
 func (d *Database) Migrate(ctx context.Context) error {
-	const op = "db.Migrate"
 	if d == nil || d.DB == nil {
 		return errors.E(errors.CodeServerConfiguration, "database not configured")
 	}
