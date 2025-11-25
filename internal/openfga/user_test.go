@@ -350,20 +350,31 @@ func (s *userTestSuite) TestControllerAccess(c *gc.C) {
 func (s *userTestSuite) TestCanAddModelToController(c *gc.C) {
 	ctx := context.Background()
 
+	groupUUID := uuid.NewString()
+	group := jimmnames.NewGroupTag(groupUUID)
+
 	controllerUUID, err := uuid.NewRandom()
 	c.Assert(err, gc.IsNil)
 	controller := names.NewControllerTag(controllerUUID.String())
 
+	// eve has addmodel access via group membership
 	eve := names.NewUserTag("eve")
+	// alice has addmodel access set directly
 	alice := names.NewUserTag("alice")
+	// mike does not have access
+	mike := names.NewUserTag("mike")
 
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(eve),
-		Relation: ofganames.AdministratorRelation,
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
+	}, {
+		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
+		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(controller),
 	}, {
 		Object:   ofganames.ConvertTag(alice),
-		Relation: ofganames.AuditLogViewerRelation,
+		Relation: ofganames.CanAddModelRelation,
 		Target:   ofganames.ConvertTag(controller),
 	}}
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
@@ -373,15 +384,22 @@ func (s *userTestSuite) TestCanAddModelToController(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	aliceIdentity, err := dbmodel.NewIdentity(alice.Id())
 	c.Assert(err, gc.IsNil)
+	mikeIdentity, err := dbmodel.NewIdentity(mike.Id())
+	c.Assert(err, gc.IsNil)
 
 	eveUser := openfga.NewUser(eveIdentity, s.ofgaClient)
 	aliceUser := openfga.NewUser(aliceIdentity, s.ofgaClient)
+	mikeUser := openfga.NewUser(mikeIdentity, s.ofgaClient)
 
 	canAddModel, err := eveUser.IsAllowedAddModelToController(ctx, controller)
 	c.Assert(err, gc.IsNil)
 	c.Assert(canAddModel, gc.Equals, true)
 
 	canAddModel, err = aliceUser.IsAllowedAddModelToController(ctx, controller)
+	c.Assert(err, gc.IsNil)
+	c.Assert(canAddModel, gc.Equals, true)
+
+	canAddModel, err = mikeUser.IsAllowedAddModelToController(ctx, controller)
 	c.Assert(err, gc.IsNil)
 	c.Assert(canAddModel, gc.Equals, false)
 }
