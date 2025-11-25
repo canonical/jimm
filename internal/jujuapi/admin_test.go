@@ -235,8 +235,6 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "failed to decode token.*")
 
 	// Test token base64 encoded passes authentication
-	//
-	//nolint:gosimple
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest(sessionTokenResp), &loginResult)
 	c.Assert(err, gc.IsNil)
 	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)

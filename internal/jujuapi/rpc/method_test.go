@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package rpc_test
 
@@ -66,7 +66,7 @@ var procTests = []struct {
 	expectPanic: "method has invalid signature",
 }, {
 	name:        "bad result order",
-	f:           func(ctx context.Context, objID string, params S1) (err error, resutlt S2) { return },
+	f:           func(ctx context.Context, objID string, params S1) (err error, resutlt S2) { return }, //nolint:staticcheck // ST1008: error should be returned as the last argument
 	expectPanic: "method has invalid signature",
 }}
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/juju/juju/core/migration"
-	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -22,7 +21,7 @@ type MigrationMocks struct {
 	Activate_             func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
 	AbortMigration_       func(ctx context.Context, user *openfga.User, modelUUID string) error
 	CheckMachines_        func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
-	Import_               func(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error
+	Import_               func(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
 	LatestLogTime_        func(ctx context.Context, modelUUID string) (time.Time, error)
 	ListMigrationTargets_ func(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
 }

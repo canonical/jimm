@@ -14,7 +14,6 @@ import (
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
-	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -47,7 +46,6 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
 	"github.com/canonical/jimm/v3/pkg/api/params"
-	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // RoleManager provides a means to manage roles within JIMM.
@@ -119,15 +117,15 @@ type PermissionManager interface {
 	// These methods handle generic permission management through manipulation of OpenFGA tuples.
 
 	// AddRelation creates the provided slice of tuples.
-	AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
+	AddRelation(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error
 	// RemoveRelation removes the provided slice of tuples.
-	RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error
+	RemoveRelation(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error
 	// CheckRelation checks whether the provided tuple provides access.
-	CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (bool, error)
+	CheckRelation(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, trace bool) (bool, error)
 	// CheckRelations checks whether the provided tuples provide access.
-	CheckRelations(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) ([]openfga.CheckResult, error)
+	CheckRelations(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) ([]openfga.CheckResult, error)
 	// ListRelationshipTuples lists a page of tuples based on the provided tuple constraints.
-	ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
+	ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
 	// ListObjectRelations lists all the tuples that an object has a direct relation with.
 	ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
 	// ListResources lists all resources known to JIMM.
@@ -261,7 +259,7 @@ type JujuManager interface {
 	// can use the IncomingModelMigration table versus which must use the plain Models table.
 
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
-	Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
+	Prechecks(ctx context.Context, user *openfga.User, model coremigration.ModelInfo) error
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
 	Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error

@@ -172,7 +172,7 @@ func TestGetIdentityGroups(t *testing.T) {
 			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, dbmodel.IdentityCreationError
+			return nil, dbmodel.ErrIdentityCreation
 		},
 	}
 	permissionManager := mocks.PermissionManager{
@@ -221,7 +221,7 @@ func TestPatchIdentityGroups(t *testing.T) {
 			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, dbmodel.IdentityCreationError
+			return nil, dbmodel.ErrIdentityCreation
 		},
 	}
 	permissionManager := mocks.PermissionManager{
@@ -288,7 +288,7 @@ func TestGetIdentityRoles(t *testing.T) {
 			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, dbmodel.IdentityCreationError
+			return nil, dbmodel.ErrIdentityCreation
 		},
 	}
 	permissionManager := mocks.PermissionManager{
@@ -337,7 +337,7 @@ func TestPatchIdentityRoles(t *testing.T) {
 			if id == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, dbmodel.IdentityCreationError
+			return nil, dbmodel.ErrIdentityCreation
 		},
 	}
 	permissionManager := mocks.PermissionManager{

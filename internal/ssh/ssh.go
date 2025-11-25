@@ -69,7 +69,7 @@ type Server struct {
 func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (Server, error) {
 	zapctx.Info(ctx, "NewJumpServer")
 	if sshManager == nil {
-		return Server{}, fmt.Errorf("Cannot create JumpSSHServer with a nil ssh manager.")
+		return Server{}, fmt.Errorf("cannot create JumpSSHServer with a nil ssh manager")
 	}
 	config = setConfigDefaults(config)
 
@@ -95,7 +95,7 @@ func NewJumpServer(ctx context.Context, config Config, sshManager SSHManager) (S
 	}
 	hostKey, err := gossh.ParsePrivateKey([]byte(config.HostKey))
 	if err != nil {
-		return Server{}, fmt.Errorf("Cannot parse hostkey.")
+		return Server{}, fmt.Errorf("cannot parse hostkey")
 	}
 	server.AddHostKey(hostKey)
 

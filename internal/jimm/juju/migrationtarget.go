@@ -12,7 +12,6 @@ import (
 
 	"github.com/juju/description/v9"
 	jujucrossmodel "github.com/juju/juju/core/crossmodel"
-	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/rpc/params"
@@ -150,8 +149,7 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 // calling the method of the same name on the target Juju controller.
 // As part of all model migrations passing through JIMM, it modifies the model description
 // to replace any local user references with their external mapping.
-func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
-
+func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model coremigration.ModelInfo) error {
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: model.UUID,
@@ -231,7 +229,7 @@ func (j *JujuManager) validateUserMapping(modelDescription description.Model, us
 		}
 	}
 	if len(missingUserMessages) > 0 {
-		return fmt.Errorf("user mapping is missing the following users:\n%s\n", strings.Join(missingUserMessages, "\n"))
+		return fmt.Errorf("user mapping is missing the following users:\n%s", strings.Join(missingUserMessages, "\n"))
 	}
 	return nil
 }
@@ -271,7 +269,7 @@ func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, mo
 
 // modifyMigrationInfo modifies the description of the model migration
 // to replace any local user references with their external mapping.
-func (j *JujuManager) modifyMigrationInfo(model *migration.ModelInfo, userMapping dbmodel.StringMap) error {
+func (j *JujuManager) modifyMigrationInfo(model *coremigration.ModelInfo, userMapping dbmodel.StringMap) error {
 	if !model.Owner.IsLocal() {
 		// If the owner is not a local user, we do not modify it.
 		// This is useful when migrating a model from one JIMM

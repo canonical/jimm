@@ -12,7 +12,6 @@ import (
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
-	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
@@ -161,7 +160,7 @@ type API struct {
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(names.CloudTag) error
-	Prechecks_                         func(migration.ModelInfo) error
+	Prechecks_                         func(coremigration.ModelInfo) error
 	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	RevokeCredential_                  func(context.Context, names.CloudCredentialTag) error
 	RevokeModelAccess_                 func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
@@ -400,7 +399,7 @@ func (a *API) Ping(ctx context.Context) error {
 	return a.Ping_(ctx)
 }
 
-func (a *API) Prechecks(model migration.ModelInfo) error {
+func (a *API) Prechecks(model coremigration.ModelInfo) error {
 	if a.Prechecks_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}

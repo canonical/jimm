@@ -13,7 +13,6 @@ import (
 	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/applicationoffers"
 	"github.com/juju/juju/api/client/modelmanager"
-	"github.com/juju/juju/api/controller/controller"
 	controllerapi "github.com/juju/juju/api/controller/controller"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -143,13 +142,13 @@ func (c *migrateModelCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *migrateModelCommand) Init(args []string) error {
 	if len(args) < 2 {
-		return errors.New("Missing controller name and model target arguments")
+		return errors.New("missing controller name and model target arguments")
 	}
 	// Note that modelName is a fully qualified model name, i.e. "owner/model-name".
 	c.modelName = args[0]
 	c.targetController = args[1]
 	if c.userMappingFile == "" {
-		return errors.New("Missing user mapping file. Please provide a user mapping file with the --user-mapping flag.")
+		return errors.New("missing user mapping file - please provide a user mapping file with the --user-mapping flag")
 	}
 	return nil
 }
@@ -244,7 +243,7 @@ func (c *migrateModelCommand) parseUserMappingFile() (map[string]string, error) 
 }
 
 // getMigrationSpec creates the migration spec that will be used to initiate the migration.
-func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (controller.MigrationSpec, error) {
+func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (controllerapi.MigrationSpec, error) {
 	store := c.store
 	accountDetails, err := store.AccountDetails(c.targetController)
 	if err != nil {
@@ -256,7 +255,7 @@ func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (
 		return controllerapi.MigrationSpec{}, fmt.Errorf("could not find controller %q: %w", c.targetController, err)
 	}
 
-	return controller.MigrationSpec{
+	return controllerapi.MigrationSpec{
 		SkipUserChecks:        true,
 		TargetControllerUUID:  controllerInfo.ControllerUUID,
 		TargetControllerAlias: c.targetController,
@@ -321,7 +320,7 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 		}
 	}
 	if len(missingUserMessages) > 0 {
-		return fmt.Errorf("user mapping is missing the following users:\n%s\n", strings.Join(missingUserMessages, "\n"))
+		return fmt.Errorf("user mapping is missing the following users:\n%s", strings.Join(missingUserMessages, "\n"))
 	}
 
 	return nil

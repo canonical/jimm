@@ -21,7 +21,6 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jujuhttp "github.com/juju/http/v2"
 	"github.com/juju/juju/api/base"
-	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -85,7 +84,7 @@ func (d *Dialer) createAdminLoginRequest(ctx context.Context, ctl *dbmodel.Contr
 	permissions := make(map[string]string)
 	permissions[ctl.ResourceTag().String()] = "superuser"
 	if modelTag.Id() != "" {
-		permissions[modelTag.String()] = string(params.ModelAdminAccess)
+		permissions[modelTag.String()] = string(jujuparams.ModelAdminAccess)
 	}
 	for k, v := range additionalPermissions {
 		permissions[k] = v

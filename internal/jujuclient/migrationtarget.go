@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/juju/juju/api/controller/migrationtarget"
-	"github.com/juju/juju/core/migration"
 	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -15,7 +14,7 @@ import (
 
 // PreChecks checks that the target controller is able to accept the
 // model being migrated.
-func (c Connection) Prechecks(model migration.ModelInfo) error {
+func (c Connection) Prechecks(model coremigration.ModelInfo) error {
 	migrationTarget := migrationtarget.NewClient(&c)
 	return migrationTarget.Prechecks(model)
 }

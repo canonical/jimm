@@ -16,7 +16,6 @@ import (
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/life"
 	jujurpc "github.com/juju/juju/rpc"
-	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -2186,15 +2185,15 @@ func TestModelSummaries(t *testing.T) {
 
 	tests := []struct {
 		description            string
-		controllerAPISummaries []params.ModelSummaryResult
-		expectedSummaries      []params.ModelSummaryResult
+		controllerAPISummaries []jujuparams.ModelSummaryResult
+		expectedSummaries      []jujuparams.ModelSummaryResult
 		expectedSummariesSize  int
 	}{
 		{
 			description: "info from controller, so all models available",
-			controllerAPISummaries: []params.ModelSummaryResult{
+			controllerAPISummaries: []jujuparams.ModelSummaryResult{
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:           "model-1",
 						UUID:           "00000002-0000-0000-0000-000000000001",
 						Type:           "iaas",
@@ -2202,14 +2201,14 @@ func TestModelSummaries(t *testing.T) {
 						IsController:   false,
 						DefaultSeries:  "series-1",
 						Life:           "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "available",
 						},
 						UserAccess: "testtest",
 					},
 				},
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:           "model-2",
 						UUID:           "00000002-0000-0000-0000-000000000002",
 						Type:           "iaas",
@@ -2217,16 +2216,16 @@ func TestModelSummaries(t *testing.T) {
 						IsController:   false,
 						DefaultSeries:  "series-2",
 						Life:           "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "available",
 						},
 						UserAccess: "admin",
 					},
 				},
 			},
-			expectedSummaries: []params.ModelSummaryResult{
+			expectedSummaries: []jujuparams.ModelSummaryResult{
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:               "model-1",
 						UUID:               "00000002-0000-0000-0000-000000000001",
 						Type:               "iaas",
@@ -2239,15 +2238,15 @@ func TestModelSummaries(t *testing.T) {
 						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
 						OwnerTag:           "user-alice@canonical.com",
 						Life:               "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "available",
 						},
 						UserAccess: "admin",
 					},
-					Error: (*params.Error)(nil),
+					Error: (*jujuparams.Error)(nil),
 				},
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:               "model-2",
 						UUID:               "00000002-0000-0000-0000-000000000002",
 						Type:               "iaas",
@@ -2260,7 +2259,7 @@ func TestModelSummaries(t *testing.T) {
 						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
 						OwnerTag:           "user-alice@canonical.com",
 						Life:               "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "available",
 						},
 						UserAccess: "admin",
@@ -2271,9 +2270,9 @@ func TestModelSummaries(t *testing.T) {
 		},
 		{
 			description: "partial info from controller, so one model is not available and info are not filled in.",
-			controllerAPISummaries: []params.ModelSummaryResult{
+			controllerAPISummaries: []jujuparams.ModelSummaryResult{
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:           "model-1",
 						UUID:           "00000002-0000-0000-0000-000000000001",
 						Type:           "iaas",
@@ -2281,16 +2280,16 @@ func TestModelSummaries(t *testing.T) {
 						IsController:   false,
 						DefaultSeries:  "",
 						Life:           "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "available",
 						},
 						UserAccess: "testtest",
 					},
 				},
 			},
-			expectedSummaries: []params.ModelSummaryResult{
+			expectedSummaries: []jujuparams.ModelSummaryResult{
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:               "model-1",
 						UUID:               "00000002-0000-0000-0000-000000000001",
 						Type:               "iaas",
@@ -2303,15 +2302,15 @@ func TestModelSummaries(t *testing.T) {
 						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
 						OwnerTag:           "user-alice@canonical.com",
 						Life:               "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "available",
 						},
 						UserAccess: "admin",
 					},
-					Error: (*params.Error)(nil),
+					Error: (*jujuparams.Error)(nil),
 				},
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:               "model-2",
 						UUID:               "00000002-0000-0000-0000-000000000002",
 						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
@@ -2322,7 +2321,7 @@ func TestModelSummaries(t *testing.T) {
 						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
 						OwnerTag:           "user-alice@canonical.com",
 						Life:               "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "unavailable",
 						},
 						UserAccess: "admin",
@@ -2333,9 +2332,9 @@ func TestModelSummaries(t *testing.T) {
 		},
 		{
 			description: "no info from controller, so all models unavailable",
-			expectedSummaries: []params.ModelSummaryResult{
+			expectedSummaries: []jujuparams.ModelSummaryResult{
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:               "model-1",
 						UUID:               "00000002-0000-0000-0000-000000000001",
 						Type:               "",
@@ -2348,14 +2347,14 @@ func TestModelSummaries(t *testing.T) {
 						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
 						OwnerTag:           "user-alice@canonical.com",
 						Life:               "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "unavailable",
 						},
 						UserAccess: "admin",
 					},
 				},
 				{
-					Result: &params.ModelSummary{
+					Result: &jujuparams.ModelSummary{
 						Name:               "model-2",
 						UUID:               "00000002-0000-0000-0000-000000000002",
 						Type:               "",
@@ -2368,7 +2367,7 @@ func TestModelSummaries(t *testing.T) {
 						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
 						OwnerTag:           "user-alice@canonical.com",
 						Life:               "alive",
-						Status: params.EntityStatus{
+						Status: jujuparams.EntityStatus{
 							Status: "unavailable",
 						},
 						UserAccess: "admin",

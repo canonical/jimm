@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package dbmodel
 
@@ -16,15 +16,15 @@ import (
 )
 
 var (
-	// IdentityCreationError holds the error to be returned on failures to create
+	// ErrIdentityCreation holds the error to be returned on failures to create
 	// an identity model.
-	IdentityCreationError = errors.New("identity name cannot be empty")
+	ErrIdentityCreation = errors.New("identity name cannot be empty")
 )
 
 // NewIdentity returns an Identity with the Name and DisplayName fields set.
 func NewIdentity(name string) (*Identity, error) {
 	if name == "" {
-		return nil, IdentityCreationError
+		return nil, ErrIdentityCreation
 	}
 	i := &Identity{
 		Name: name,

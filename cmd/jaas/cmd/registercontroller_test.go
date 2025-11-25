@@ -9,7 +9,6 @@ import (
 
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/jujuclient"
-	jjclient "github.com/juju/juju/jujuclient"
 	gc "gopkg.in/check.v1"
 	"sigs.k8s.io/yaml"
 
@@ -25,7 +24,7 @@ type registerControllerDryRunSuite struct {
 var _ = gc.Suite(&registerControllerDryRunSuite{})
 
 func (s *registerControllerDryRunSuite) TestRegisterControllerDryRun(c *gc.C) {
-	store := jjclient.NewMemStore()
+	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
 		APIEndpoints:   []string{"127.0.0.1:17070"},
@@ -55,7 +54,7 @@ password: super-secret-password
 }
 
 func (s *registerControllerDryRunSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
-	store := jjclient.NewMemStore()
+	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
 		APIEndpoints:   []string{"127.0.0.1:17070"},
@@ -85,7 +84,7 @@ password: super-secret-password
 }
 
 func (s *registerControllerDryRunSuite) TestControllerInfoWithTlsFlag(c *gc.C) {
-	store := jjclient.NewMemStore()
+	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
 		APIEndpoints:   []string{"127.0.0.1:17070"},
@@ -115,7 +114,7 @@ password: super-secret-password
 }
 
 func (s *registerControllerDryRunSuite) TestControllerInfoWithCustomPublicAddress(c *gc.C) {
-	store := jjclient.NewMemStore()
+	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
 		APIEndpoints:   []string{"127.0.0.1:17070"},
@@ -145,7 +144,7 @@ password: super-secret-password
 }
 
 func (s *registerControllerDryRunSuite) TestControllerInfoWithLocalFlagAndCustomPublicAddress(c *gc.C) {
-	store := jjclient.NewMemStore()
+	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
 		APIEndpoints:   []string{"127.0.0.1:17070"},

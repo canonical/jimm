@@ -15,7 +15,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/api"
-	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -325,14 +324,14 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 	// For responses extract errors. For requests extract params.
 	if isResponse {
 		// Extract errors from bulk and non-bulk calls.
-		var allErrors params.ErrorResults
+		var allErrors jujuparams.ErrorResults
 		if msg.Response != nil {
 			err := json.Unmarshal(msg.Response, &allErrors)
 			if err != nil {
 				return errors.E(fmt.Errorf("failed to unmarshal message response: %w", err))
 			}
 		}
-		singleError := params.ErrorResult{Error: &params.Error{Message: msg.Error, Code: msg.ErrorCode, Info: msg.ErrorInfo}}
+		singleError := jujuparams.ErrorResult{Error: &jujuparams.Error{Message: msg.Error, Code: msg.ErrorCode, Info: msg.ErrorInfo}}
 		allErrors.Results = append(allErrors.Results, singleError)
 		jsonErr, err := json.Marshal(allErrors)
 		if err != nil {
@@ -581,7 +580,7 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 		return permissionMap, nil
 	}
 
-	var er params.ErrorResults
+	var er jujuparams.ErrorResults
 	err := json.Unmarshal(msg.Response, &er)
 	if err != nil {
 		zapctx.Error(ctx, "failed to read response error", zap.Error(err))
@@ -638,7 +637,7 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 	if msg == nil {
 		return errors.E("nil messsage")
 	}
-	var lr params.LoginRequest
+	var lr jujuparams.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
 		return errors.E(err)
 	}
@@ -699,7 +698,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		if err != nil {
 			return errorFnc(err)
 		}
-		data, err := json.Marshal(params.LoginRequest{
+		data, err := json.Marshal(jujuparams.LoginRequest{
 			AuthTag: names.NewUserTag(user.Name).String(),
 			Token:   base64.StdEncoding.EncodeToString(jwt),
 		})
@@ -798,7 +797,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 // Legacy login requests from users (i.e., those with a user tag) are not supported
 // in JIMM and will return an error.
 func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*message, error) {
-	var request params.LoginRequest
+	var request jujuparams.LoginRequest
 	err := json.Unmarshal(msg.Params, &request)
 	if err != nil {
 		return nil, err
