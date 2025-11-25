@@ -1,90 +1,78 @@
-# Golangci-lint configuration.
-#
-# If a line has a comment, it means it has been changed from the default.
-# This helps us understand what we're tweaking and why.
-
+version: "2"
 run:
-  timeout: "5m" # Allow at least 5 minutes
   issues-exit-code: 1
   tests: true
   allow-parallel-runners: false
   allow-serial-runners: false
-
-issues:
-  exclude-use-default: true
-  exclude-case-sensitive: false
-  exclude-dirs-use-default: true
-  max-issues-per-linter: 50
-  max-same-issues: 3
-  new: false
-  fix: true
-  whole-files: false
-
-output:
-  print-issued-lines: true
-  print-linter-name: true
-  show-stats: false
-  sort-results: true
-  formats:
-    - format: github-actions
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    # The following linters are enabled by default
+    - bodyclose
+    - durationcheck
     - errcheck
-    - gosimple
+    - gocognit
+    - gocritic
+    - goheader
+    - gosec
     - govet
+    - importas
     - ineffassign
+    - nilerr
+    - promlinter
+    - reassign
+    - sqlclosecheck
     - staticcheck
     - unused
-
-    # The following linters are additional
-
-    # Bug based linters
-    - gosec
-    - sqlclosecheck
-    - reassign
-    - nilerr
-    - durationcheck
-    - bodyclose
-    # - contextcheck # Issue right now
-
-    # Style based linters
-    - promlinter
-    - gocritic 
-    - gocognit
-    - goheader
-    - importas
+  settings:
+    gocognit:
+      min-complexity: 30
+    goheader:
+      template: Copyright {{MOD-YEAR}} Canonical.
+    gosec:
+      excludes:
+        - G601
+      severity: low
+      confidence: low
+    importas:
+      alias:
+        - pkg: github.com/juju/juju/rpc/params
+          alias: jujuparams
+        - pkg: github.com/canonical/jimm/v3/internal/openfga/names
+          alias: ofganames
+        - pkg: github.com/frankban/quicktest
+          alias: qt
+      no-unaliased: false
+      no-extra-aliases: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 50
+  max-same-issues: 3
+  whole-files: false
+  new: false
+  fix: true
+formatters:
+  enable:
     - gci
-
-linters-settings:
-  gosec:
-    exclude-generated: false
-    severity: low
-    confidence: low
-    excludes:
-      - G601 # Implicit memory aliasing in for loop. Fixed in Go1.22+, as such exclude.
-  gocognit:
-    min-complexity: 30
-  goheader:
-    template: |-
-      Copyright {{MOD-YEAR}} Canonical.
-      
-  importas:
-    no-unaliased: false
-    no-extra-aliases: false
-    alias:
-      - pkg: github.com/juju/juju/rpc/params
-        alias: jujuparams
-      - pkg: github.com/canonical/jimm/v3/internal/openfga/names
-        alias: ofganames
-      - pkg: github.com/frankban/quicktest
-        alias: qt
-  gci:
-    skip-generated: true
-    custom-order: true
-    sections:
-      - standard
-      - default
-      - localmodule
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+      custom-order: true
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
