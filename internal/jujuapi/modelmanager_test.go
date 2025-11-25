@@ -33,7 +33,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/kubetest"
 )
 
-const jujuVersion = "3.6.9"
+const jujuVersion = "3.6.12"
 
 type modelManagerSuite struct {
 	websocketSuite

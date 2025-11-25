@@ -290,5 +290,5 @@ func (s *migrateModelSuite) TestReadUserMappingFailsWithEmptyYaml(c *gc.C) {
 
 func (s *migrateModelSuite) TestCommandsFailsWithMissingArgs(c *gc.C) {
 	_, err := cmdtesting.RunCommand(c, NewMigrateModelCommandForTesting(jjclient.NewMemStore(), nil), "myController")
-	c.Assert(err, gc.ErrorMatches, "Missing controller name and model target arguments")
+	c.Assert(err, gc.ErrorMatches, "missing controller name and model target arguments")
 }

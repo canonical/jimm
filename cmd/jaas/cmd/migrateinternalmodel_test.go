@@ -57,5 +57,5 @@ func (s *migrateInternalModelSuite) TestMigrateInternalModelCommandSuperuser(c *
 func (s *migrateInternalModelSuite) TestMigrateInternalModelCommandFailsWithMissingArgs(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "alice")
 	_, err := cmdtesting.RunCommand(c, cmd.NewMigrateInternalModelCommandForTesting(s.ClientStore(), bClient), "myController")
-	c.Assert(err, gc.ErrorMatches, "Missing controller name and model target arguments")
+	c.Assert(err, gc.ErrorMatches, "missing controller name and model target arguments")
 }
