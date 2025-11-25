@@ -314,9 +314,20 @@ func (c *Connection) HTTPClient() (*httprequest.Client, error) {
 	return nil, errors.E(errors.CodeNotImplemented)
 }
 
+// BakeryClientWrapper wraps an httpbakery.Client to implement
+// the MacaroonDischarger interface.
+type BakeryClientWrapper struct {
+	*httpbakery.Client
+}
+
+// CookieJar returns an http.CookieJar used to store macaroon cookies.
+func (b BakeryClientWrapper) CookieJar() http.CookieJar {
+	return b.Client.Jar
+}
+
 // BakeryClient returns the bakery client for this connection.
 func (c *Connection) BakeryClient() base.MacaroonDischarger {
-	return httpbakery.NewClient()
+	return BakeryClientWrapper{httpbakery.NewClient()}
 }
 
 // APICall makes a call to the API server with the given object type,

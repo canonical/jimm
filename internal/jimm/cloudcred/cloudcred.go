@@ -1,6 +1,4 @@
-// Copyright 2024 Canonical.
-
-//go:generate go run generate.go -o attr.go
+// Copyright 2025 Canonical.
 
 package cloudcred
 

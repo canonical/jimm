@@ -15,7 +15,6 @@ import (
 	jujucmdcommon "github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
-	_ "github.com/juju/juju/provider/all"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 

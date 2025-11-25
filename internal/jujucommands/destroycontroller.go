@@ -9,7 +9,6 @@ import (
 
 	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/juju/jujuclient"
-	_ "github.com/juju/juju/provider/lxd"
 )
 
 // DestroyControllerCmdParams holds the parameters to tear-down a controller.
