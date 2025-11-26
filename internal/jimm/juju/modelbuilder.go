@@ -202,6 +202,11 @@ func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
 		return b
 	}
 	b.candidates = candidateControllers
+	// Error early with a helpful message if no
+	// candidate controllers are available.
+	if len(b.candidates) == 0 {
+		b.err = errors.E("no available controllers - check permissions to controllers and list of available controllers")
+	}
 	return b
 }
 
@@ -478,7 +483,7 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 func (b *modelBuilder) selectController() error {
 	// if no controllers are found, we return an error
 	if len(b.candidates) == 0 {
-		return fmt.Errorf("unsupported cloud region %s/%s", b.cloud.Name, b.cloudRegion)
+		return fmt.Errorf("unsupported cloud region %s/%s - confirm access to the cloud/controller", b.cloud.Name, b.cloudRegion)
 	}
 
 	// shuffle controllers according to their priority
