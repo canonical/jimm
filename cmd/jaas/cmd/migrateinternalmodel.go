@@ -76,7 +76,7 @@ func (c *migrateInternalModelCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *migrateInternalModelCommand) Init(args []string) error {
 	if len(args) < 2 {
-		return errors.E("Missing controller name and model target arguments")
+		return errors.E("missing controller name and model target arguments")
 	}
 	for i, arg := range args {
 		if i == 0 {
