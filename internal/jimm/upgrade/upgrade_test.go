@@ -20,6 +20,8 @@ import (
 type upgradeManagerSuite struct {
 	bootstrapManager *mocks.MockBootstrapManager
 	jujuManager      *mocks.MockJujuManager
+	store            *mocks.MockStore
+	dialer           *mocks.MockDialer
 }
 
 func (s *upgradeManagerSuite) setupTest(c *qt.C) *gomock.Controller {
@@ -27,13 +29,16 @@ func (s *upgradeManagerSuite) setupTest(c *qt.C) *gomock.Controller {
 
 	s.bootstrapManager = mocks.NewMockBootstrapManager(ctrl)
 	s.jujuManager = mocks.NewMockJujuManager(ctrl)
+	s.store = mocks.NewMockStore(ctrl)
+	s.dialer = mocks.NewMockDialer(ctrl)
+
 	return ctrl
 }
 
 func (s *upgradeManagerSuite) TestNewUpgradeManager(c *qt.C) {
 	defer s.setupTest(c)
 
-	_, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager)
+	_, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -41,7 +46,7 @@ func (s *upgradeManagerSuite) TestNewUpgradeManager_InvalidParams(c *qt.C) {
 	ctrl := s.setupTest(c)
 	defer ctrl.Finish()
 
-	_, err := upgrade.NewUpgradeManager(nil, nil)
+	_, err := upgrade.NewUpgradeManager(nil, nil, nil, nil)
 	c.Assert(err, qt.ErrorMatches, "bootstrap manager cannot be nil")
 }
 
@@ -51,7 +56,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_RejectsCurrentVersionNewerTha
 
 	ctx := c.Context()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
 	c.Assert(err, qt.IsNil)
 
 	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
@@ -74,7 +79,7 @@ func (s *upgradeManagerSuite) TestCloneController_Success(c *qt.C) {
 	ctrl := s.setupTest(c)
 	defer ctrl.Finish()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
 	c.Assert(err, qt.IsNil)
 
 	jobId := "550e8400-e29b-41d4-a716-446655440000"
@@ -95,7 +100,7 @@ func (s *upgradeManagerSuite) TestCloneController_Error(c *qt.C) {
 	ctrl := s.setupTest(c)
 	defer ctrl.Finish()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
 	c.Assert(err, qt.IsNil)
 
 	errorToReturn := errors.New("bootstrap error")
@@ -111,7 +116,7 @@ func (s *upgradeManagerSuite) TestCloneController_WaitForJobCompletionError(c *q
 	ctrl := s.setupTest(c)
 	defer ctrl.Finish()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
 	c.Assert(err, qt.IsNil)
 
 	jobId := "550e8400-e29b-41d4-a716-446655440000"
@@ -131,6 +136,8 @@ func (s *upgradeManagerSuite) TestCloneController_WaitForJobCompletionError(c *q
 
 //go:generate mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
 //go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
+//go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
+//go:generate mockgen -typed -destination=./mocks/dialer.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju Dialer
 func TestUpgradeManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &upgradeManagerSuite{})
 }

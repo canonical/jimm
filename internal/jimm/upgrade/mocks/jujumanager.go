@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	dbmodel "github.com/canonical/jimm/v3/internal/dbmodel"
-	juju "github.com/canonical/jimm/v3/internal/jimm/juju"
 	openfga "github.com/canonical/jimm/v3/internal/openfga"
 	params "github.com/juju/juju/rpc/params"
 	names "github.com/juju/names/v5"
@@ -43,89 +42,6 @@ func NewMockJujuManager(ctrl *gomock.Controller) *MockJujuManager {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockJujuManager) EXPECT() *MockJujuManagerMockRecorder {
 	return m.recorder
-}
-
-// Dial mocks base method.
-func (m *MockJujuManager) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, permissons ...juju.Permission) (juju.API, error) {
-	m.ctrl.T.Helper()
-	varargs := []any{ctx, ctl, modelTag, user}
-	for _, a := range permissons {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "Dial", varargs...)
-	ret0, _ := ret[0].(juju.API)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Dial indicates an expected call of Dial.
-func (mr *MockJujuManagerMockRecorder) Dial(ctx, ctl, modelTag, user any, permissons ...any) *MockJujuManagerDialCall {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, ctl, modelTag, user}, permissons...)
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Dial", reflect.TypeOf((*MockJujuManager)(nil).Dial), varargs...)
-	return &MockJujuManagerDialCall{Call: call}
-}
-
-// MockJujuManagerDialCall wrap *gomock.Call
-type MockJujuManagerDialCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJujuManagerDialCall) Return(arg0 juju.API, arg1 error) *MockJujuManagerDialCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJujuManagerDialCall) Do(f func(context.Context, *dbmodel.Controller, names.ModelTag, *openfga.User, ...juju.Permission) (juju.API, error)) *MockJujuManagerDialCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJujuManagerDialCall) DoAndReturn(f func(context.Context, *dbmodel.Controller, names.ModelTag, *openfga.User, ...juju.Permission) (juju.API, error)) *MockJujuManagerDialCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetControllerByName mocks base method.
-func (m *MockJujuManager) GetControllerByName(ctx context.Context, controllerName string) (*dbmodel.Controller, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetControllerByName", ctx, controllerName)
-	ret0, _ := ret[0].(*dbmodel.Controller)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetControllerByName indicates an expected call of GetControllerByName.
-func (mr *MockJujuManagerMockRecorder) GetControllerByName(ctx, controllerName any) *MockJujuManagerGetControllerByNameCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetControllerByName", reflect.TypeOf((*MockJujuManager)(nil).GetControllerByName), ctx, controllerName)
-	return &MockJujuManagerGetControllerByNameCall{Call: call}
-}
-
-// MockJujuManagerGetControllerByNameCall wrap *gomock.Call
-type MockJujuManagerGetControllerByNameCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJujuManagerGetControllerByNameCall) Return(arg0 *dbmodel.Controller, arg1 error) *MockJujuManagerGetControllerByNameCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJujuManagerGetControllerByNameCall) Do(f func(context.Context, string) (*dbmodel.Controller, error)) *MockJujuManagerGetControllerByNameCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJujuManagerGetControllerByNameCall) DoAndReturn(f func(context.Context, string) (*dbmodel.Controller, error)) *MockJujuManagerGetControllerByNameCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
 }
 
 // GetModel mocks base method.

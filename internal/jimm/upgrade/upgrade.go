@@ -40,20 +40,26 @@ type JujuManager interface {
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
-	Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, permissons ...jimmjuju.Permission) (jimmjuju.API, error)
-	GetControllerByName(ctx context.Context, controllerName string) (*dbmodel.Controller, error)
+}
+
+type Store interface {
+	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
 }
 
 // upgradeManager provides a means to manage controller upgrades within JIMM.
 type upgradeManager struct {
 	bootstrapManager BootstrapManager
 	jujuManager      JujuManager
+	store            Store
+	dialer           jimmjuju.Dialer
 }
 
 // NewUpgradeManager creates a new UpgradeManager instance.
 func NewUpgradeManager(
 	bootstrapManager BootstrapManager,
 	jujumanager JujuManager,
+	store Store,
+	dialer jimmjuju.Dialer,
 ) (*upgradeManager, error) {
 	if bootstrapManager == nil {
 		return nil, errors.E("bootstrap manager cannot be nil")
@@ -61,6 +67,8 @@ func NewUpgradeManager(
 	return &upgradeManager{
 		bootstrapManager: bootstrapManager,
 		jujuManager:      jujumanager,
+		store:            store,
+		dialer:           dialer,
 	}, nil
 }
 
@@ -88,7 +96,7 @@ func (j *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCredential, errors.E(errors.CodeBadRequest, "target version must be greater than current version")
 	}
 
-	api, err := j.jujuManager.Dial(ctx, &m.Controller, names.ModelTag{}, nil)
+	api, err := j.dialer.Dial(ctx, &m.Controller, names.ModelTag{}, nil, nil)
 	if err != nil {
 		return bootstrapCloud, bootstrapCredential, errors.E("failed to dial the controller", err)
 	}
@@ -204,12 +212,12 @@ func (j *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 		return errors.E("failed to confirm internal migration completed", err)
 	}
 
-	dbCtrl, err := j.jujuManager.GetControllerByName(ctx, targetControllerName)
-	if err != nil {
-		return errors.E("failed to get target controller by name", err)
+	dbCtrl := &dbmodel.Controller{Name: targetControllerName}
+	if err := j.store.GetController(ctx, dbCtrl); err != nil {
+		return errors.E(errors.CodeNotFound, err, "controller not found")
 	}
 
-	api, err := j.jujuManager.Dial(ctx, dbCtrl, names.ModelTag{}, nil)
+	api, err := j.dialer.Dial(ctx, dbCtrl, names.ModelTag{}, nil, nil)
 	if err != nil {
 		return errors.E("failed to dial target controller", err)
 	}
