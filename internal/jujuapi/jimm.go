@@ -707,8 +707,6 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 }
 
 func (r *controllerRoot) UpgradeTo(ctx context.Context, req apiparams.UpgradeToRequest) (apiparams.UpgradeToResponse, error) {
-	const op = errors.Op("jujuapi.UpgradeTo")
-
 	// TODO: Deal with permissions later Alex
 	// if !r.user.JimmAdmin {
 	// 	return apiparams.UpgradeToResponse{}, errors.E(op, errors.CodeUnauthorized, "unauthorized")
@@ -716,12 +714,12 @@ func (r *controllerRoot) UpgradeTo(ctx context.Context, req apiparams.UpgradeToR
 
 	mt, err := names.ParseModelTag(req.ModelTag)
 	if err != nil {
-		return apiparams.UpgradeToResponse{}, errors.E(op, err, errors.CodeBadRequest, "invalid model tag")
+		return apiparams.UpgradeToResponse{}, errors.E(err, errors.CodeBadRequest, "invalid model tag")
 	}
 
 	targetVersion, err := jujuversion.Parse(req.TargetControllerVersion)
 	if err != nil {
-		return apiparams.UpgradeToResponse{}, errors.E(op, err, errors.CodeBadRequest, "invalid target upgrade version")
+		return apiparams.UpgradeToResponse{}, errors.E(err, errors.CodeBadRequest, "invalid target upgrade version")
 	}
 
 	_, _ = mt, targetVersion
