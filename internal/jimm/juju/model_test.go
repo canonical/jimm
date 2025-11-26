@@ -180,6 +180,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -188,6 +191,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -284,6 +290,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -292,6 +301,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -389,6 +401,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -397,6 +412,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -484,6 +502,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -492,6 +513,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 users:
 - username: alice@canonical.com
   controller-access: superuser
@@ -578,6 +602,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -586,6 +613,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 users:
 - username: alice@canonical.com
   controller-access: login
@@ -644,6 +674,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -652,6 +685,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -705,6 +741,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-000000000002
   cloud: test-cloud-2
@@ -713,6 +752,9 @@ controllers:
   - cloud: test-cloud-2
     region: test-region-2
     priority: 1
+  users:
+  - user: alice@canonical.com
+    access: add-model
 models:
 - name: test-model
   owner: alice@canonical.com
@@ -775,6 +817,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -783,6 +828,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, errors.E("a silly error")
@@ -834,6 +882,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -842,6 +893,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 1
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -868,7 +922,7 @@ users:
 		CloudTag:    names.NewCloudTag("test-cloud").String(),
 		CloudRegion: "test-region-1",
 	},
-	expectError: "unauthorized",
+	expectError: "not authorized.*",
 }, {
 	name: "CreateModelWithImplicitCloud",
 	env: `
@@ -907,6 +961,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -915,6 +972,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1017,6 +1077,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -1025,6 +1088,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1081,6 +1147,9 @@ controllers:
   - cloud: test-cloud
     region: default
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -1089,6 +1158,9 @@ controllers:
   - cloud: test-cloud
     region: default
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1191,6 +1263,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1249,6 +1324,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1377,16 +1455,16 @@ func assertCreateModelArgs(expectedArgs *jujuparams.ModelCreateArgs, fnc func(co
 			return fmt.Errorf("name mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
 		}
 		if expectedArgs.OwnerTag != args.OwnerTag {
-			return fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.OwnerTag, args.OwnerTag)
 		}
 		if expectedArgs.CloudTag != args.CloudTag {
-			return fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.CloudTag, args.CloudTag)
 		}
 		if expectedArgs.CloudRegion != args.CloudRegion {
-			return fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.CloudRegion, args.CloudRegion)
 		}
 		if expectedArgs.CloudCredentialTag != args.CloudCredentialTag {
-			return fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.CloudCredentialTag, args.CloudCredentialTag)
 		}
 		return fnc(ctx, args, mi)
 	}
@@ -3113,9 +3191,6 @@ func TestAddModelDeletedController(t *testing.T) {
 	api := &jimmtest.API{
 		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
-		},
-		GrantJIMMModelAdmin_: func(context.Context, names.ModelTag) error {
-			return nil
 		},
 		CreateModel_: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000004

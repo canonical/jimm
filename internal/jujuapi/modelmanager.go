@@ -186,7 +186,8 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 	defer cancel()
 
 	var mca juju.ModelCreateArgs
-	if err := mca.FromJujuModelCreateArgs(&args); err != nil {
+	var targetController string // This will be populated at a later stage based on user input.
+	if err := mca.FromJujuModelCreateArgs(&args, targetController); err != nil {
 		return jujuparams.ModelInfo{}, errors.E(err)
 	}
 	info, err := r.jimm.JujuManager().AddModel(ctx, r.user, &mca)

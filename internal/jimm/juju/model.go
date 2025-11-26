@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"sort"
 	"strings"
 	"sync"
@@ -42,20 +42,24 @@ func shuffleRegionControllers(controllers []dbmodel.CloudRegionControllerPriorit
 
 // ModelCreateArgs contains parameters used to add a new model.
 type ModelCreateArgs struct {
-	Name            string
-	Owner           names.UserTag
-	Config          map[string]interface{}
-	Cloud           names.CloudTag
-	CloudRegion     string
-	CloudCredential names.CloudCredentialTag
+	Name             string
+	Owner            names.UserTag
+	Config           map[string]interface{}
+	Cloud            names.CloudTag
+	CloudRegion      string
+	CloudCredential  names.CloudCredentialTag
+	TargetController string
 }
 
 // FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
-func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs) error {
+// TODO(Kian): refactor to move targetController into jujuparams.ModelCreateArgs
+// if it ends up there.
+func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs, targetController string) error {
 	if args.Name == "" {
 		return errors.E("name not specified")
 	}
 	a.Name = args.Name
+	a.TargetController = targetController
 	a.Config = args.Config
 	a.CloudRegion = args.CloudRegion
 	if args.CloudTag != "" {
@@ -108,7 +112,13 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 
 	builder := newModelBuilder(ctx, j)
 	builder = builder.WithOwner(owner)
+	builder = builder.WithAuthorizer(user)
 	builder = builder.WithName(args.Name)
+	if err := builder.Error(); err != nil {
+		return nil, errors.E(err)
+	}
+
+	builder = builder.WithController(args.TargetController)
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(err)
 	}
@@ -144,16 +154,6 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 		return nil, errors.E("failed to fetch cloud defaults")
 	}
 	builder = builder.WithConfig(cloudRegionDefaults.Defaults)
-
-	// at this point we know which cloud will host the model and
-	// we must check the user has add-model permission on the cloud
-	canAddModel, err := openfga.NewUser(owner, j.OpenFGAClient).IsAllowedAddModelToCloud(ctx, builder.cloud.ResourceTag())
-	if err != nil {
-		return nil, errors.E("permission check failed")
-	}
-	if !canAddModel {
-		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
-	}
 
 	// last but not least, use the provided config values
 	// overriding all defaults

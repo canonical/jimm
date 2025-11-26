@@ -5,6 +5,8 @@ package juju
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sort"
 
 	jujupermission "github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -18,6 +20,23 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+type candidateController struct {
+	// controller is a candidate controller for the new model.
+	controller dbmodel.Controller
+	// priority decides an ordering for controller selection
+	// based on the cloud-region.
+	priority uint
+}
+
+func shuffleCandidateControllers(controllers []candidateController) {
+	shuffle(len(controllers), func(i, j int) {
+		controllers[i], controllers[j] = controllers[j], controllers[i]
+	})
+	sort.SliceStable(controllers, func(i, j int) bool {
+		return controllers[i].priority > controllers[j].priority
+	})
+}
+
 func newModelBuilder(ctx context.Context, j *JujuManager) *modelBuilder {
 	return &modelBuilder{
 		ctx:         ctx,
@@ -30,8 +49,10 @@ type modelBuilder struct {
 	err error
 
 	jujuManager *JujuManager
+	ofgaUser    *openfga.User
 
 	name               string
+	candidates         []candidateController
 	config             map[string]interface{}
 	owner              *dbmodel.Identity
 	credential         *dbmodel.CloudCredential
@@ -93,6 +114,16 @@ func (b *modelBuilder) WithOwner(owner *dbmodel.Identity) *modelBuilder {
 	return b
 }
 
+// WithAuthorizer returns a builder with the specified OpenFGA user
+// that will be used to authorize the model creation.
+func (b *modelBuilder) WithAuthorizer(ofgaUser *openfga.User) *modelBuilder {
+	if b.err != nil {
+		return b
+	}
+	b.ofgaUser = ofgaUser
+	return b
+}
+
 // WithName returns a builder with the specified model name.
 func (b *modelBuilder) WithName(name string) *modelBuilder {
 	if b.err != nil {
@@ -113,9 +144,74 @@ func (b *modelBuilder) WithConfig(cfg map[string]interface{}) *modelBuilder {
 	return b
 }
 
+// WithController returns a builder with the specified target controller
+// if it exists and the user has access to it.
+// An empty controllerName means no specific controller is targeted.
+func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
+	if b.err != nil {
+		return b
+	}
+	if b.ofgaUser == nil {
+		b.err = errors.E("authorizer not specified")
+		return b
+	}
+	if controllerName != "" {
+		targetController := dbmodel.Controller{
+			Name: controllerName,
+		}
+		err := b.jujuManager.Database.GetController(b.ctx, &targetController)
+		if err != nil {
+			b.err = errors.E(err, fmt.Sprintf("controller %q not found", controllerName))
+			return b
+		}
+		ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, targetController.ResourceTag())
+		if err != nil {
+			b.err = errors.E(err, "failed to verify permissions for adding model to controller")
+			return b
+		}
+		if !ok {
+			b.err = errors.E(errors.CodeUnauthorized, fmt.Sprintf("not authorized to add model to controller %q", controllerName))
+			return b
+		}
+		b.candidates = append(b.candidates, candidateController{
+			controller: targetController,
+			priority:   0, // priority is unknown until we select the cloud-region
+		})
+		return b
+	}
+
+	var candidateControllers []candidateController
+	err := b.jujuManager.Database.ForEachController(b.ctx, func(c *dbmodel.Controller) error {
+		if c.Deprecated {
+			return nil
+		}
+		ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, c.ResourceTag())
+		if err != nil {
+			return fmt.Errorf("failed to verify permissions for adding model to controller: %v", err)
+		}
+		if ok {
+			candidateControllers = append(candidateControllers, candidateController{
+				controller: *c,
+				priority:   0, // priority is unknown until we select the clou-region
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		b.err = err
+		return b
+	}
+	b.candidates = candidateControllers
+	return b
+}
+
 // WithCloud returns a builder with the specified cloud.
 func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *modelBuilder {
 	if b.err != nil {
+		return b
+	}
+	if b.ofgaUser == nil {
+		b.err = errors.E("authorizer not specified")
 		return b
 	}
 
@@ -133,7 +229,28 @@ func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *mode
 		b.err = err
 		return b
 	}
+	ok, err := b.ofgaUser.IsAllowedAddModelToCloud(b.ctx, c.ResourceTag())
+	if err != nil {
+		b.err = errors.E(err, "failed to verify permissions for adding model to cloud")
+		return b
+	}
+	if !ok {
+		b.err = errors.E(errors.CodeUnauthorized, fmt.Sprintf("not authorized to add model to cloud %q", cloud.Id()))
+		return b
+	}
 	b.cloud = &c
+
+	// Filter the candidate controllers based on the cloud.
+	matchCloud := func(r dbmodel.CloudRegionControllerPriority) bool {
+		return r.CloudRegion.CloudName == c.Name
+	}
+	var candidateControllers []candidateController
+	for _, controller := range b.candidates {
+		if slices.ContainsFunc(controller.controller.CloudRegions, matchCloud) {
+			candidateControllers = append(candidateControllers, controller)
+		}
+	}
+	b.candidates = candidateControllers
 
 	return b
 }
@@ -175,50 +292,53 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		b.err = errors.E("cloud not specified")
 		return b
 	}
-	// if the region is not specified, we pick the first cloud region
-	// with any associated controllers
+
+	// Filter the candidate controllers based on the specified region.
+	// If the region is not specified, we pick the first cloud region
+	// with any associated candidate controller
 	if region == "" {
+		// Make a map of supported regions in the cloud from among the candidate controllers.
+		supported := make(map[string]struct{})
+		for _, c := range b.candidates {
+			for _, cr := range c.controller.CloudRegions {
+				if cr.CloudRegion.CloudName == b.cloud.Name {
+					supported[cr.CloudRegion.Name] = struct{}{}
+				}
+			}
+		}
+
+		// Pick the first supported region from the cloud's regions.
 		for _, r := range b.cloud.Regions {
-			regionControllers := r.Controllers
-			if len(regionControllers) == 0 {
-				continue
-			}
-			region = r.Name
-			break
-		}
-	}
-	// loop through all cloud regions
-	for _, r := range b.cloud.Regions {
-		// if the region matches
-		if r.Name != region {
-			continue
-		}
-		// consider all non-deprecated controller for the region
-		var regionControllers []dbmodel.CloudRegionControllerPriority
-		for _, ctrl := range r.Controllers {
-			if !ctrl.Controller.Deprecated {
-				regionControllers = append(regionControllers, ctrl)
+			if _, ok := supported[r.Name]; ok {
+				region = r.Name
+				break
 			}
 		}
-		if len(regionControllers) == 0 {
-			b.err = errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported cloud region %s/%s", b.cloud.Name, region))
-			return b
+	}
+
+	// If there is no such region we will get a zero valued object below.
+	cloudRegion := b.cloud.Region(region)
+	if cloudRegion.Name == "" {
+		b.err = errors.E(errors.CodeNotFound, fmt.Sprintf("cloud region %q not found in cloud %q", region, b.cloud.Name))
+		return b
+	}
+	b.cloudRegion = region
+	b.cloudRegionID = cloudRegion.ID
+	b.cloudRegionVirtual = cloudRegion.Virtual
+
+	// Filter candidate controllers based on the specified region.
+	var candidateControllers []candidateController
+	for _, candidate := range b.candidates {
+		if i := slices.IndexFunc(cloudRegion.Controllers, func(crp dbmodel.CloudRegionControllerPriority) bool {
+			return crp.ControllerID == candidate.controller.ID
+		}); i != -1 {
+			candidateControllers = append(candidateControllers, candidateController{
+				controller: candidate.controller,
+				priority:   cloudRegion.Controllers[i].Priority,
+			})
 		}
-		// shuffle controllers
-		shuffleRegionControllers(regionControllers)
-
-		// and select the first controller in the slice
-		b.cloudRegion = region
-		b.cloudRegionID = r.ID
-		b.cloudRegionVirtual = r.Virtual
-		b.controller = &regionControllers[0].Controller
-
-		break
 	}
-	// we looped through all cloud regions and could not find a match
-	if b.cloudRegionID == 0 {
-		b.err = errors.E("cloudregion not found", errors.CodeNotFound)
-	}
+	b.candidates = candidateControllers
 	return b
 }
 
@@ -264,17 +384,10 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 		b.err = errors.E("owner not specified")
 		return b
 	}
-	// if at this point the cloud region is not specified we
-	// try to select a region/controller among the available
-	// regions/controllers for the specified cloud
-	if b.cloudRegionID == 0 {
-		// if selectCloudRegion returns an error that means we have
-		// no regions/controllers for the specified cloud - we
-		// error and abort
-		if err := b.selectCloudRegion(); err != nil {
-			b.err = errors.E(err)
-			return b
-		}
+	// make a final controller selection
+	if err := b.selectController(); err != nil {
+		b.err = errors.E(err)
+		return b
 	}
 	// if controller is still not selected, there's nothing
 	// we can do - either a cloud or a cloud region was specified
@@ -306,8 +419,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name))
 			return b
 		} else {
-			zapctx.Error(b.ctx, "failed to store model information", zaputil.Error(err))
-			b.err = errors.E(err, "failed to store model information")
+			b.err = errors.E(fmt.Errorf("failed to store model information: %w", err))
 			return b
 		}
 	}
@@ -359,29 +471,20 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	return b
 }
 
-func (b *modelBuilder) selectCloudRegion() error {
-	if b.cloudRegionID != 0 {
-		return nil
-	}
-	if b.cloud == nil {
-		return errors.E("cloud not specified")
-	}
-
-	var regionControllers []dbmodel.CloudRegionControllerPriority
-	for _, r := range b.cloud.Regions {
-		regionControllers = append(regionControllers, r.Controllers...)
-	}
-
+// selectController selects a controller to use for the model.
+// It assumes that the candidates slice is already filtered
+// based on the specified cloud and region and/or the user's
+// specified target controller.
+func (b *modelBuilder) selectController() error {
 	// if no controllers are found, we return an error
-	if len(regionControllers) == 0 {
-		return errors.E(fmt.Sprintf("unsupported cloud %s", b.cloud.Name))
+	if len(b.candidates) == 0 {
+		return fmt.Errorf("unsupported cloud region %s/%s", b.cloud.Name, b.cloudRegion)
 	}
 
 	// shuffle controllers according to their priority
-	shuffleRegionControllers(regionControllers)
+	shuffleCandidateControllers(b.candidates)
 
-	b.cloudRegionID = regionControllers[0].CloudRegionID
-	b.controller = &regionControllers[0].Controller
+	b.controller = &b.candidates[0].controller
 
 	return nil
 }
@@ -471,17 +574,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// controller.
 			b.err = errors.E(err, errors.CodeBadRequest)
 		}
-		return b
-	}
-
-	// Grant JIMM admin access to the model. Note that if this fails,
-	// the local database entry will be deleted but the model
-	// will remain on the controller and will trigger the "already exists
-	// in the backend controller" message above when the user
-	// attempts to create a model with the same name again.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = errors.E(err)
 		return b
 	}
 
