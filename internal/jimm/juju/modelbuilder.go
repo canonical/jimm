@@ -420,7 +420,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	api, err := b.jujuManager.Dial(
+	api, err := b.jujuManager.dial(
 		b.ctx,
 		b.controller,
 		names.ModelTag{},

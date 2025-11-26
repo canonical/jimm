@@ -79,7 +79,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 		return errors.E(err)
 	}
 
-	api, err := j.Dial(ctx, &model.Controller, names.ModelTag{}, nil)
+	api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, nil)
 	if err != nil {
 		return errors.E(err)
 	}
@@ -208,7 +208,7 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 		return errors.E(errors.CodeNotFound)
 	}
 
-	api, err := j.Dial(
+	api, err := j.dial(
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
@@ -357,7 +357,7 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 	// controller. The all-watcher events do not include enough
 	// information to reasonably keep the local database up-to-date,
 	// and it would be non-trivial to make it do so.
-	api, err := j.Dial(
+	api, err := j.dial(
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
@@ -516,7 +516,7 @@ func (j *JujuManager) queryControllersForOffers(ctx context.Context, user *openf
 
 	for _, ctl := range controllers {
 		eg.Go(func() error {
-			api, err := j.Dial(ctx, ctl, names.ModelTag{}, nil)
+			api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
 			if err != nil {
 				return errors.E(err)
 			}
@@ -571,7 +571,7 @@ func (j *JujuManager) doApplicationOfferAdmin(ctx context.Context, user *openfga
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	// add offer admin claim
-	api, err := j.Dial(
+	api, err := j.dial(
 		ctx,
 		&offer.Model.Controller,
 		names.ModelTag{},
