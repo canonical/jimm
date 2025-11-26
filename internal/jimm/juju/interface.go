@@ -116,12 +116,6 @@ type API interface {
 	// a user.
 	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 
-	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
-	GrantJIMMModelAdmin(context.Context, names.ModelTag) error
-
-	// GrantModelAccess grants model access to a user.
-	GrantModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
-
 	// IsBroken returns true if the API connection has failed.
 	IsBroken() bool
 
@@ -167,9 +161,6 @@ type API interface {
 
 	// RevokeCredential revokes a credential.
 	RevokeCredential(context.Context, names.CloudCredentialTag) error
-
-	// RevokeModelAccess revokes model access from a user.
-	RevokeModelAccess(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 
 	// SupportsModelSummaryWatcher returns true if the connection supports
 	// a ModelSummaryWatcher.

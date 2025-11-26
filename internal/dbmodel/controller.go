@@ -132,31 +132,6 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	return ci
 }
 
-// ToJujuRedirectInfoResult converts a controller entry to a juju
-// RedirectInfoResult value.
-func (c Controller) ToJujuRedirectInfoResult() jujuparams.RedirectInfoResult {
-	var servers [][]jujuparams.HostPort
-	host, port, err := net.SplitHostPort(c.PublicAddress)
-	if err == nil {
-		port, err := net.LookupPort("tcp", port)
-		if err == nil {
-			servers = append(servers, []jujuparams.HostPort{{
-				Address: jujuparams.Address{
-					Value: host,
-					Scope: "public",
-					Type:  "hostname",
-				},
-				Port: port,
-			}})
-		}
-	}
-	servers = append(servers, [][]jujuparams.HostPort(c.Addresses)...)
-	return jujuparams.RedirectInfoResult{
-		Servers: servers,
-		CACert:  c.CACertificate,
-	}
-}
-
 const (
 	// CloudRegionControllerPriorityDeployed is the priority given to the
 	// controller when deploying to a cloud region to which the controller
