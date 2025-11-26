@@ -382,7 +382,7 @@ func newModelImporter(jimm *JujuManager, newOwner string) (modelImporter, error)
 }
 
 func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName string, modelTag names.ModelTag) error {
-	controller, err := m.jimm.getControllerByName(ctx, controllerName)
+	controller, err := m.jimm.GetControllerByName(ctx, controllerName)
 	if err != nil {
 		return err
 	}
@@ -758,7 +758,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 // ControllerConfig returns the controller config for the specified controller.
 func (j *JujuManager) ControllerConfig(ctx context.Context, controllerName string) (jujucontroller.Config, error) {
 
-	controller, err := j.getControllerByName(ctx, controllerName)
+	controller, err := j.GetControllerByName(ctx, controllerName)
 	if err != nil {
 		return jujucontroller.Config{}, errors.E(err)
 	}

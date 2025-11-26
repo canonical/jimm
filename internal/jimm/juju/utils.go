@@ -51,7 +51,7 @@ func (j *JujuManager) checkControllerAdminAccess(ctx context.Context, user *open
 **/
 
 // getController gets the controller from the database by name.
-func (j *JujuManager) getControllerByName(ctx context.Context, controllerName string) (*dbmodel.Controller, error) {
+func (j *JujuManager) GetControllerByName(ctx context.Context, controllerName string) (*dbmodel.Controller, error) {
 	controller := dbmodel.Controller{Name: controllerName}
 	err := j.Database.GetController(ctx, &controller)
 	if err != nil {
