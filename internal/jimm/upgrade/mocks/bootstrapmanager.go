@@ -5,6 +5,7 @@
 //
 //	mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
 //
+
 // Package mocks is a generated GoMock package.
 package mocks
 
@@ -22,6 +23,7 @@ import (
 type MockBootstrapManager struct {
 	ctrl     *gomock.Controller
 	recorder *MockBootstrapManagerMockRecorder
+	isgomock struct{}
 }
 
 // MockBootstrapManagerMockRecorder is the mock recorder for MockBootstrapManager.
@@ -42,78 +44,78 @@ func (m *MockBootstrapManager) EXPECT() *MockBootstrapManagerMockRecorder {
 }
 
 // StartBootstrapJob mocks base method.
-func (m *MockBootstrapManager) StartBootstrapJob(arg0 context.Context, arg1 *openfga.User, arg2 bootstrap.BootstrapParams) (string, error) {
+func (m *MockBootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StartBootstrapJob", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "StartBootstrapJob", ctx, user, params)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // StartBootstrapJob indicates an expected call of StartBootstrapJob.
-func (mr *MockBootstrapManagerMockRecorder) StartBootstrapJob(arg0, arg1, arg2 any) *BootstrapManagerStartBootstrapJobCall {
+func (mr *MockBootstrapManagerMockRecorder) StartBootstrapJob(ctx, user, params any) *MockBootstrapManagerStartBootstrapJobCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartBootstrapJob", reflect.TypeOf((*MockBootstrapManager)(nil).StartBootstrapJob), arg0, arg1, arg2)
-	return &BootstrapManagerStartBootstrapJobCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StartBootstrapJob", reflect.TypeOf((*MockBootstrapManager)(nil).StartBootstrapJob), ctx, user, params)
+	return &MockBootstrapManagerStartBootstrapJobCall{Call: call}
 }
 
-// BootstrapManagerStartBootstrapJobCall wrap *gomock.Call
-type BootstrapManagerStartBootstrapJobCall struct {
+// MockBootstrapManagerStartBootstrapJobCall wrap *gomock.Call
+type MockBootstrapManagerStartBootstrapJobCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *BootstrapManagerStartBootstrapJobCall) Return(arg0 string, arg1 error) *BootstrapManagerStartBootstrapJobCall {
+func (c *MockBootstrapManagerStartBootstrapJobCall) Return(arg0 string, arg1 error) *MockBootstrapManagerStartBootstrapJobCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *BootstrapManagerStartBootstrapJobCall) Do(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (string, error)) *BootstrapManagerStartBootstrapJobCall {
+func (c *MockBootstrapManagerStartBootstrapJobCall) Do(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (string, error)) *MockBootstrapManagerStartBootstrapJobCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *BootstrapManagerStartBootstrapJobCall) DoAndReturn(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (string, error)) *BootstrapManagerStartBootstrapJobCall {
+func (c *MockBootstrapManagerStartBootstrapJobCall) DoAndReturn(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (string, error)) *MockBootstrapManagerStartBootstrapJobCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // WaitForJobCompletion mocks base method.
-func (m *MockBootstrapManager) WaitForJobCompletion(arg0 context.Context, arg1 uuid.UUID, arg2 bootstrap.WaitConfig) error {
+func (m *MockBootstrapManager) WaitForJobCompletion(ctx context.Context, jobId uuid.UUID, config bootstrap.WaitConfig) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WaitForJobCompletion", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "WaitForJobCompletion", ctx, jobId, config)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // WaitForJobCompletion indicates an expected call of WaitForJobCompletion.
-func (mr *MockBootstrapManagerMockRecorder) WaitForJobCompletion(arg0, arg1, arg2 any) *BootstrapManagerWaitForJobCompletionCall {
+func (mr *MockBootstrapManagerMockRecorder) WaitForJobCompletion(ctx, jobId, config any) *MockBootstrapManagerWaitForJobCompletionCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForJobCompletion", reflect.TypeOf((*MockBootstrapManager)(nil).WaitForJobCompletion), arg0, arg1, arg2)
-	return &BootstrapManagerWaitForJobCompletionCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitForJobCompletion", reflect.TypeOf((*MockBootstrapManager)(nil).WaitForJobCompletion), ctx, jobId, config)
+	return &MockBootstrapManagerWaitForJobCompletionCall{Call: call}
 }
 
-// BootstrapManagerWaitForJobCompletionCall wrap *gomock.Call
-type BootstrapManagerWaitForJobCompletionCall struct {
+// MockBootstrapManagerWaitForJobCompletionCall wrap *gomock.Call
+type MockBootstrapManagerWaitForJobCompletionCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *BootstrapManagerWaitForJobCompletionCall) Return(arg0 error) *BootstrapManagerWaitForJobCompletionCall {
+func (c *MockBootstrapManagerWaitForJobCompletionCall) Return(arg0 error) *MockBootstrapManagerWaitForJobCompletionCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *BootstrapManagerWaitForJobCompletionCall) Do(f func(context.Context, uuid.UUID, bootstrap.WaitConfig) error) *BootstrapManagerWaitForJobCompletionCall {
+func (c *MockBootstrapManagerWaitForJobCompletionCall) Do(f func(context.Context, uuid.UUID, bootstrap.WaitConfig) error) *MockBootstrapManagerWaitForJobCompletionCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *BootstrapManagerWaitForJobCompletionCall) DoAndReturn(f func(context.Context, uuid.UUID, bootstrap.WaitConfig) error) *BootstrapManagerWaitForJobCompletionCall {
+func (c *MockBootstrapManagerWaitForJobCompletionCall) DoAndReturn(f func(context.Context, uuid.UUID, bootstrap.WaitConfig) error) *MockBootstrapManagerWaitForJobCompletionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -53,46 +53,15 @@ type upgradeManager struct {
 // NewUpgradeManager creates a new UpgradeManager instance.
 func NewUpgradeManager(
 	bootstrapManager BootstrapManager,
+	jujumanager JujuManager,
 ) (*upgradeManager, error) {
 	if bootstrapManager == nil {
 		return nil, errors.E("bootstrap manager cannot be nil")
 	}
 	return &upgradeManager{
 		bootstrapManager: bootstrapManager,
+		jujuManager:      jujumanager,
 	}, nil
-}
-
-// UpgradeTo upgrades a controller by fetching its configuration and initiating
-// a bootstrap job with that configuration, then waits for the bootstrap to complete.
-func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, params UpgradeParams) error {
-	if user == nil {
-		return errors.E("user cannot be nil")
-	}
-
-	zapctx.Info(ctx, "starting controller upgrade", zap.String("controller-name", params.ControllerName))
-
-	// Start the bootstrap job
-	jobId, err := u.bootstrapManager.StartBootstrapJob(ctx, user, bootstrap.BootstrapParams{
-		CLIVersion:         params.CLIVersion,
-		CloudNameAndRegion: params.CloudNameAndRegion,
-		ControllerName:     params.ControllerName,
-		CloudCred:          params.CloudCred,
-		PersonalCloud:      params.PersonalCloud,
-		UserConfig:         params.UserConfig,
-	})
-	if err != nil {
-		return errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
-	}
-	parsedJobId, err := uuid.Parse(jobId)
-	if err != nil {
-		return errors.E(fmt.Errorf("failed to parse bootstrap job ID: %w", err))
-	}
-	// Wait for the bootstrap job to complete
-	if err := u.bootstrapManager.WaitForJobCompletion(ctx, parsedJobId, bootstrap.WaitConfig{}); err != nil {
-		return errors.E(fmt.Errorf("bootstrap job failed: %w", err))
-	}
-
-	return nil
 }
 
 // PrepareUpgradeTo prepares the necessary cloud and credential information
@@ -169,6 +138,39 @@ func (j *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 	}
 
 	return bootstrapCloud, bootstrapCredential, nil
+}
+
+// CloneController upgrades a controller by fetching its configuration and initiating
+// a bootstrap job with that configuration, then waits for the bootstrap to complete.
+func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User, params CloneControllerParams) error {
+	if user == nil {
+		return errors.E("user cannot be nil")
+	}
+
+	zapctx.Info(ctx, "starting controller upgrade", zap.String("controller-name", params.ControllerName))
+
+	// Start the bootstrap job
+	jobId, err := u.bootstrapManager.StartBootstrapJob(ctx, user, bootstrap.BootstrapParams{
+		CLIVersion:         params.CLIVersion,
+		CloudNameAndRegion: params.CloudNameAndRegion,
+		ControllerName:     params.ControllerName,
+		CloudCred:          params.CloudCred,
+		PersonalCloud:      params.PersonalCloud,
+		UserConfig:         params.UserConfig,
+	})
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
+	}
+	parsedJobId, err := uuid.Parse(jobId)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to parse bootstrap job ID: %w", err))
+	}
+	// Wait for the bootstrap job to complete
+	if err := u.bootstrapManager.WaitForJobCompletion(ctx, parsedJobId, bootstrap.WaitConfig{}); err != nil {
+		return errors.E(fmt.Errorf("bootstrap job failed: %w", err))
+	}
+
+	return nil
 }
 
 // MigrateAndUpgradeModel migrates a model to a new controller and upgrades the model's agent to the controller's agent version.

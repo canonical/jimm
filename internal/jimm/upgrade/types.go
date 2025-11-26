@@ -6,8 +6,8 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 )
 
-// UpgradeParams defines the parameters required for bootstrapping a Juju controller.
-type UpgradeParams struct {
+// CloneControllerParams defines the parameters required for bootstrapping a Juju controller.
+type CloneControllerParams struct {
 	CLIVersion string
 
 	CloudNameAndRegion string
