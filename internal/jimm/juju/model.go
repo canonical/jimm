@@ -249,7 +249,7 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, nil)
+	api, err := j.Dial(ctx, &m.Controller, names.ModelTag{}, nil)
 	if err != nil {
 		return nil, errors.E(err)
 	}
@@ -297,7 +297,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, errFromAPI erro
 		if err := j.Database.GetModel(ctx, model); err != nil {
 			return nil, err
 		}
-		api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, nil)
+		api, err := j.Dial(ctx, &model.Controller, names.ModelTag{}, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -720,7 +720,7 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, nil)
+	api, err := j.Dial(ctx, &m.Controller, names.ModelTag{}, nil)
 	if err != nil {
 		return errors.E(err)
 	}

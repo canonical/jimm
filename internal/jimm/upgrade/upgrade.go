@@ -40,6 +40,7 @@ type JujuManager interface {
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
+	Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, permissons ...jimmjuju.Permission) (jimmjuju.API, error)
 }
 
 // upgradeManager provides a means to manage controller upgrades within JIMM.

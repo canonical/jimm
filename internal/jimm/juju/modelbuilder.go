@@ -420,12 +420,12 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	api, err := b.jujuManager.dial(
+	api, err := b.jujuManager.Dial(
 		b.ctx,
 		b.controller,
 		names.ModelTag{},
 		nil,
-		permission{
+		Permission{
 			resource: b.cloud.ResourceTag().String(),
 			relation: string(jujupermission.AddModelAccess),
 		},

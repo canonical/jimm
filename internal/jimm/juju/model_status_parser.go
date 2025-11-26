@@ -165,7 +165,7 @@ func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
 	if !ok {
 		return errors.E("failed to parse model tag")
 	}
-	api, err := f.jujuManager.dial(ctx, &f.model.Controller, modelTag, nil)
+	api, err := f.jujuManager.Dial(ctx, &f.model.Controller, modelTag, nil)
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial controller for model", zap.String("controller-uuid", f.model.Controller.UUID), zap.String("model-uuid", f.model.UUID.String), zap.Error(err))
 	}
