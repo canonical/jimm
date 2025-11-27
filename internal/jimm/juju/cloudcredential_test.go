@@ -80,6 +80,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -93,6 +96,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -191,6 +197,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -204,6 +213,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -282,6 +294,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -295,6 +310,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -376,6 +394,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -389,6 +410,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -486,6 +510,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -499,6 +526,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -595,6 +625,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -608,6 +641,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -886,6 +922,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -899,6 +938,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -960,6 +1002,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -973,6 +1018,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -1030,6 +1078,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -1043,6 +1094,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -1123,6 +1177,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 			err = j.Database.AddController(context.Background(), &controller1)
 			c.Assert(err, qt.Equals, nil)
 
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
+			c.Assert(err, qt.Equals, nil)
+
 			controller2 := dbmodel.Controller{
 				Name:        "test-controller-2",
 				UUID:        "00000000-0000-0000-0000-0000-0000000000002",
@@ -1136,6 +1193,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller2)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller2.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			cred := dbmodel.CloudCredential{
@@ -1277,6 +1337,9 @@ func TestGetCloudCredential(t *testing.T) {
 				}},
 			}
 			err = j.Database.AddController(context.Background(), &controller1)
+			c.Assert(err, qt.Equals, nil)
+
+			err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
 			c.Assert(err, qt.Equals, nil)
 
 			controller2 := dbmodel.Controller{
@@ -1787,6 +1850,9 @@ func TestCopyCredential(t *testing.T) {
 		}},
 	}
 	err = j.Database.AddController(context.Background(), &controller1)
+	c.Assert(err, qt.Equals, nil)
+
+	err = j.OpenFGAClient.AddController(context.Background(), j.ResourceTag(), controller1.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 
 	cred := dbmodel.CloudCredential{

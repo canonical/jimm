@@ -78,6 +78,17 @@ func (s *websocketSuite) SetUpTest(c *gc.C) {
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.Credential2)
 	c.Assert(err, gc.Equals, nil)
 
+	// Grant Charlie add-model access to controller-1
+	controller := dbmodel.Controller{Name: "controller-1"}
+	err = s.JIMM.Database.GetController(ctx, &controller)
+	c.Assert(err, gc.Equals, nil)
+	err = s.OFGAClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(controller.ResourceTag()),
+	})
+	c.Assert(err, gc.Equals, nil)
+
 	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
 	s.Model2 = new(dbmodel.Model)
 	s.Model2.SetTag(mt)

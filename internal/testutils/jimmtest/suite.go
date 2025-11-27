@@ -397,10 +397,6 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	user := s.NewUser(u)
-	err = user.SetModelAccess(context.Background(), names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
-	c.Assert(err, gc.Equals, nil)
-
 	return names.NewModelTag(mi.UUID)
 }
 
@@ -500,6 +496,17 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.CloudCredential = new(dbmodel.CloudCredential)
 	s.CloudCredential.SetTag(cct)
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
+	c.Assert(err, gc.Equals, nil)
+
+	// Grant bob add-model access to controller-1
+	controller := dbmodel.Controller{Name: "controller-1"}
+	err = s.JIMM.Database.GetController(ctx, &controller)
+	c.Assert(err, gc.Equals, nil)
+	err = s.OFGAClient.AddRelation(ctx, cofga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(controller.ResourceTag()),
+	})
 	c.Assert(err, gc.Equals, nil)
 
 	mt := s.AddModel(c, names.NewUserTag("bob@canonical.com"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)
