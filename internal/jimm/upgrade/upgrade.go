@@ -30,12 +30,14 @@ type BootstrapManager interface {
 	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
 }
 
+// JujuManager defines the juju manager methods required by the upgrade manager.
 type JujuManager interface {
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
 }
 
+// Store defines the store methods required by the upgrade manager.
 type Store interface {
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
 }
