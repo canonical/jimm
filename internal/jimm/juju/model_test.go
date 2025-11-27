@@ -3350,6 +3350,9 @@ func TestAddModelDeletedController(t *testing.T) {
 		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
+		GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
+			return nil
+		},
 		CreateModel_: createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000004
 status:

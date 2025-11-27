@@ -61,6 +61,39 @@ func (s *modelmanagerSuite) TestCreateModelError(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `cloud "nosuchcloud" not found, expected one of \["`+jimmtest.TestCloudName+`"\] \(not found\)`)
 }
 
+func (s *modelmanagerSuite) TestGrantJIMMModelAdmin(c *gc.C) {
+	ctx := context.Background()
+
+	var info jujuparams.ModelInfo
+	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+		Name:     "test-model",
+		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
+	}, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.API.GrantJIMMModelAdmin(ctx, names.NewModelTag(info.UUID))
+	c.Assert(err, gc.Equals, nil)
+
+	err = s.API.ModelInfo(ctx, &info)
+	c.Assert(err, gc.Equals, nil)
+
+	var access jujuparams.UserAccessPermission
+	for _, u := range info.Users {
+		if u.UserName == s.APIInfo(c).Tag.Id() {
+			access = u.Access
+		}
+	}
+	c.Check(access, gc.Equals, jujuparams.ModelAdminAccess)
+}
+
+func (s *modelmanagerSuite) TestGrantJIMMModelAdminError(c *gc.C) {
+	ctx := context.Background()
+
+	err := s.API.GrantJIMMModelAdmin(ctx, names.NewModelTag("00000000-0000-0000-0000-000000000000"))
+	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
+	c.Check(err, gc.ErrorMatches, `could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
+}
+
 func (s *modelmanagerSuite) TestModelInfo(c *gc.C) {
 	ctx := context.Background()
 

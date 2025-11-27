@@ -761,6 +761,9 @@ func TestUpdateCloudCredential(t *testing.T) {
 						}}, nil
 					}
 				},
+				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+					return nil
+				},
 				CreateModel_: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
@@ -1232,6 +1235,9 @@ func TestRevokeCloudCredential(t *testing.T) {
 						ModelUUID: "00000001-0000-0000-0000-0000-000000000001",
 						ModelName: "test-model",
 					}}, nil
+				},
+				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+					return nil
 				},
 				CreateModel_: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
 					mi.Name = args.Name
