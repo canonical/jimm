@@ -3,11 +3,14 @@
 package upgrade_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
+	"github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/version/v2"
 	"go.uber.org/mock/gomock"
 
@@ -22,6 +25,7 @@ type upgradeManagerSuite struct {
 	jujuManager      *mocks.MockJujuManager
 	store            *mocks.MockStore
 	dialer           *mocks.MockDialer
+	api              *mocks.MockAPI
 }
 
 func (s *upgradeManagerSuite) setupTest(c *qt.C) *gomock.Controller {
@@ -31,6 +35,7 @@ func (s *upgradeManagerSuite) setupTest(c *qt.C) *gomock.Controller {
 	s.jujuManager = mocks.NewMockJujuManager(ctrl)
 	s.store = mocks.NewMockStore(ctrl)
 	s.dialer = mocks.NewMockDialer(ctrl)
+	s.api = mocks.NewMockAPI(ctrl)
 
 	return ctrl
 }
@@ -73,6 +78,95 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_RejectsCurrentVersionNewerTha
 
 	_, _, err = upgradeMgr.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
 	c.Assert(err, qt.ErrorMatches, ".*target version must be greater than current version.*")
+}
+
+func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
+	ctrl := s.setupTest(c)
+	defer ctrl.Finish()
+
+	ctx := c.Context()
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	c.Assert(err, qt.IsNil)
+
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+	targetVersion, err := version.Parse("4.1.0")
+	c.Assert(err, qt.IsNil)
+
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), modelUUID).
+		Return(dbmodel.Model{
+			Controller: dbmodel.Controller{
+				AgentVersion: "3.6.9",
+			},
+		},
+			nil,
+		)
+	// TODO: I'm passing gomock.Any() for ctrl as it's a pointer, but we know it, how do you deep equals an argument?
+	s.dialer.EXPECT().
+		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(s.api, nil)
+
+	s.api.EXPECT().
+		ControllerModelSummary(ctx, gomock.Any()).
+		DoAndReturn(func(ctx context.Context, modelSummary *jujuparams.ModelSummary) error {
+			// Mutate the pointer argument to simulate controller response
+			*modelSummary = jujuparams.ModelSummary{
+				CloudTag:           "cloud-aws",
+				CloudCredentialTag: "cloudcred-aws_alice_mycredential",
+			}
+			return nil
+		})
+
+	// Cloud client calls this
+	s.api.EXPECT().BestFacadeVersion(gomock.Any())
+	s.api.EXPECT().
+		APICall("Cloud", gomock.Any(), gomock.Any(), "CredentialContents", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(facade string, version int, id string, request string, params, response interface{}) error {
+			if ptr, ok := response.(*jujuparams.CredentialContentResults); ok {
+				// Now mutate the dereferenced pointer
+				*ptr = jujuparams.CredentialContentResults{
+					Results: []jujuparams.CredentialContentResult{
+						{
+							Result: &jujuparams.ControllerCredentialInfo{
+								Content: jujuparams.CredentialContent{
+									Name:     "mycredential",
+									Cloud:    "aws",
+									AuthType: string(cloud.AccessKeyAuthType),
+									Attributes: map[string]string{
+										"access-key": "AKIA...",
+									},
+								},
+							},
+						},
+					},
+				}
+			}
+			return nil
+		})
+
+	s.api.EXPECT().
+		APICall("Cloud", gomock.Any(), gomock.Any(), "Cloud", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(facade string, version int, id string, request string, params, response interface{}) error {
+			if ptr, ok := response.(*jujuparams.CloudResults); ok {
+				// Now mutate the dereferenced pointer
+				*ptr = jujuparams.CloudResults{
+					Results: []jujuparams.CloudResult{
+						{
+							Cloud: &jujuparams.Cloud{
+								IsControllerCloud: true,
+							},
+						},
+					},
+				}
+			}
+			return nil
+		})
+
+	ctrlCloud, ctrlCredential, err := upgradeMgr.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctrlCloud.IsControllerCloud, qt.Equals, true)
+	c.Assert(ctrlCredential.AuthType(), qt.Equals, cloud.AccessKeyAuthType)
 }
 
 func (s *upgradeManagerSuite) TestCloneController_Success(c *qt.C) {
@@ -138,6 +232,7 @@ func (s *upgradeManagerSuite) TestCloneController_WaitForJobCompletionError(c *q
 //go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
 //go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
 //go:generate mockgen -typed -destination=./mocks/dialer.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju Dialer
+//go:generate mockgen -typed -destination=./mocks/api.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju API
 func TestUpgradeManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &upgradeManagerSuite{})
 }

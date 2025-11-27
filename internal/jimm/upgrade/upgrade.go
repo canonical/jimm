@@ -137,12 +137,13 @@ func (j *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		credentialContents[0].Result.Content.Attributes,
 	)
 
-	// TODO: Instead of credential contents, perhaps this is OK?
-	// cloudCredRes, err := cloudClient.Credentials(ctrlCloudCred)
-
 	bootstrapCloud, err = cloudClient.Cloud(ctrlCloud)
 	if err != nil {
 		return bootstrapCloud, bootstrapCredential, errors.E("failed to get cloud from controller model summary", err)
+	}
+
+	if !bootstrapCloud.IsControllerCloud {
+		return bootstrapCloud, bootstrapCredential, errors.E("controller cloud is not marked as a controller cloud")
 	}
 
 	return bootstrapCloud, bootstrapCredential, nil
