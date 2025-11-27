@@ -138,7 +138,7 @@ var DefaultReservedCloudNames = []string{
 // creating the cloud then that error code will be preserved.
 func (j *JujuManager) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
 
-	controller, err := j.GetControllerByName(ctx, controllerName)
+	controller, err := j.getControllerByName(ctx, controllerName)
 	if err != nil {
 		return errors.E(err)
 	}

@@ -213,7 +213,7 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 		&offer.Model.Controller,
 		names.ModelTag{},
 		user,
-		Permission{
+		permission{
 			resource: names.NewApplicationOfferTag(offer.UUID).String(),
 			relation: accessLevel,
 		},

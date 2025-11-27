@@ -425,7 +425,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		b.controller,
 		names.ModelTag{},
 		nil,
-		Permission{
+		permission{
 			resource: b.cloud.ResourceTag().String(),
 			relation: string(jujupermission.AddModelAccess),
 		},
