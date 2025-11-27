@@ -102,7 +102,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 		},
 			nil,
 		)
-	// TODO: I'm passing gomock.Any() for ctrl as it's a pointer, but we know it, how do you deep equals an argument?
+
 	s.dialer.EXPECT().
 		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
@@ -118,7 +118,6 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 			return nil
 		})
 
-	// Cloud client calls this
 	s.api.EXPECT().BestFacadeVersion(gomock.Any())
 	s.api.EXPECT().
 		APICall("Cloud", gomock.Any(), gomock.Any(), "CredentialContents", gomock.Any(), gomock.Any()).
