@@ -20,7 +20,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
-	jimmjuju "github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -47,7 +46,7 @@ type upgradeManager struct {
 	bootstrapManager BootstrapManager
 	jujuManager      JujuManager
 	store            Store
-	dialer           jimmjuju.Dialer
+	dialer           Dialer
 }
 
 // NewUpgradeManager creates a new UpgradeManager instance.
@@ -55,7 +54,7 @@ func NewUpgradeManager(
 	bootstrapManager BootstrapManager,
 	jujumanager JujuManager,
 	store Store,
-	dialer jimmjuju.Dialer,
+	dialer Dialer,
 ) (*upgradeManager, error) {
 	if bootstrapManager == nil {
 		return nil, errors.E("bootstrap manager cannot be nil")
