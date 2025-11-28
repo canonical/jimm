@@ -16,6 +16,7 @@ import (
 	reflect "reflect"
 
 	base "github.com/juju/juju/api/base"
+	cloud "github.com/juju/juju/cloud"
 	params "github.com/juju/juju/rpc/params"
 	names "github.com/juju/names/v5"
 	gomock "go.uber.org/mock/gomock"
@@ -198,6 +199,44 @@ func (c *MockUpgradeManagerAPICloseCall) DoAndReturn(f func() error) *MockUpgrad
 	return c
 }
 
+// Cloud mocks base method.
+func (m *MockUpgradeManagerAPI) Cloud(tag names.CloudTag, arg1 *cloud.Cloud) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Cloud", tag, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Cloud indicates an expected call of Cloud.
+func (mr *MockUpgradeManagerAPIMockRecorder) Cloud(tag, arg1 any) *MockUpgradeManagerAPICloudCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cloud", reflect.TypeOf((*MockUpgradeManagerAPI)(nil).Cloud), tag, arg1)
+	return &MockUpgradeManagerAPICloudCall{Call: call}
+}
+
+// MockUpgradeManagerAPICloudCall wrap *gomock.Call
+type MockUpgradeManagerAPICloudCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUpgradeManagerAPICloudCall) Return(arg0 error) *MockUpgradeManagerAPICloudCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUpgradeManagerAPICloudCall) Do(f func(names.CloudTag, *cloud.Cloud) error) *MockUpgradeManagerAPICloudCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUpgradeManagerAPICloudCall) DoAndReturn(f func(names.CloudTag, *cloud.Cloud) error) *MockUpgradeManagerAPICloudCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ConnectControllerStream mocks base method.
 func (m *MockUpgradeManagerAPI) ConnectControllerStream(path string, attrs url.Values, headers http.Header) (base.Stream, error) {
 	m.ctrl.T.Helper()
@@ -348,6 +387,45 @@ func (c *MockUpgradeManagerAPIControllerModelSummaryCall) Do(f func(context.Cont
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUpgradeManagerAPIControllerModelSummaryCall) DoAndReturn(f func(context.Context, *params.ModelSummary) error) *MockUpgradeManagerAPIControllerModelSummaryCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// CredentialContents mocks base method.
+func (m *MockUpgradeManagerAPI) CredentialContents(arg0, credential string, withSecrets bool) ([]params.CredentialContentResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CredentialContents", arg0, credential, withSecrets)
+	ret0, _ := ret[0].([]params.CredentialContentResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CredentialContents indicates an expected call of CredentialContents.
+func (mr *MockUpgradeManagerAPIMockRecorder) CredentialContents(arg0, credential, withSecrets any) *MockUpgradeManagerAPICredentialContentsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CredentialContents", reflect.TypeOf((*MockUpgradeManagerAPI)(nil).CredentialContents), arg0, credential, withSecrets)
+	return &MockUpgradeManagerAPICredentialContentsCall{Call: call}
+}
+
+// MockUpgradeManagerAPICredentialContentsCall wrap *gomock.Call
+type MockUpgradeManagerAPICredentialContentsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUpgradeManagerAPICredentialContentsCall) Return(arg0 []params.CredentialContentResult, arg1 error) *MockUpgradeManagerAPICredentialContentsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUpgradeManagerAPICredentialContentsCall) Do(f func(string, string, bool) ([]params.CredentialContentResult, error)) *MockUpgradeManagerAPICredentialContentsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUpgradeManagerAPICredentialContentsCall) DoAndReturn(f func(string, string, bool) ([]params.CredentialContentResult, error)) *MockUpgradeManagerAPICredentialContentsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

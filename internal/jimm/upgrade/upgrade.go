@@ -9,7 +9,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/juju/juju/api/client/cloud"
+	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -39,6 +39,36 @@ type JujuManager interface {
 // Store defines the store methods required by the upgrade manager.
 type Store interface {
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
+}
+
+// A Dialer provides a connection to a controller.
+type Dialer interface {
+	// Dial creates an API connection to a controller. If the given
+	// model-tag is non-zero the connection will be to that model,
+	// otherwise the connection is to the controller. After successfully
+	// dialing the controller the UUID, AgentVersion and HostPorts fields
+	// in the given controller should be updated to the values provided
+	// by the controller.
+	Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (UpgradeManagerAPI, error)
+}
+
+// UpgradeManagerAPI defines the subset of the Juju API used by the UpgradeManager.
+type UpgradeManagerAPI interface {
+	// API implements the base.APICallCloser so that we can
+	// use the juju api clients to interact with juju controllers.
+	base.APICallCloser
+
+	// ControllerModelSummary fetches the model summary of the model on the
+	// controller that hosts the controller machines.
+	ControllerModelSummary(context.Context, *jujuparams.ModelSummary) error
+
+	// CredentialContents returns contents of the credential values for the specified
+	// cloud and credential name. Secrets will be included if requested.
+	CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
+
+	// Cloud retrieves information about the given cloud. Cloud uses the
+	// Cloud procedure on the Cloud facade.
+	Cloud(tag names.CloudTag, cloud *jujucloud.Cloud) error
 }
 
 // upgradeManager provides a means to manage controller upgrades within JIMM.
@@ -96,14 +126,10 @@ func (j *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCredential, errors.E(fmt.Errorf("failed to dial the controller: %w", err))
 	}
 
-	// TODO: When adding controller, import controller models, then we can find the controller model
-	// based on it's UUID via ModelInfo and not iterate through model summaries checking IsController.
 	var ctrlModelSummary jujuparams.ModelSummary
 	if err := api.ControllerModelSummary(ctx, &ctrlModelSummary); err != nil {
 		return bootstrapCloud, bootstrapCredential, errors.E(fmt.Errorf("failed to get controller model summary: %w", err))
 	}
-
-	cloudClient := cloud.NewClient(api)
 
 	ctrlCloud, err := names.ParseCloudTag(ctrlModelSummary.CloudTag)
 	if err != nil {
@@ -114,7 +140,7 @@ func (j *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCredential, errors.E(fmt.Errorf("failed to parse cloud credential tag from controller model summary: %w", err))
 	}
 
-	credentialContents, err := cloudClient.CredentialContents(ctrlCloud.Id(), ctrlCloudCred.Id(), true)
+	credentialContents, err := api.CredentialContents(ctrlCloud.Id(), ctrlCloudCred.Id(), true)
 	if err != nil {
 		return bootstrapCloud, bootstrapCredential, errors.E(fmt.Errorf("failed to get credential contents from controller model summary: %w", err))
 	}
@@ -134,8 +160,7 @@ func (j *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		credentialContents[0].Result.Content.Attributes,
 	)
 
-	bootstrapCloud, err = cloudClient.Cloud(ctrlCloud)
-	if err != nil {
+	if err := api.Cloud(ctrlCloud, &bootstrapCloud); err != nil {
 		return bootstrapCloud, bootstrapCredential, errors.E(fmt.Errorf("failed to get cloud from controller model summary: %w", err))
 	}
 

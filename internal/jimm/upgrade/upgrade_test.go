@@ -10,7 +10,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/juju/juju/cloud"
+	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 	"go.uber.org/mock/gomock"
 
@@ -118,46 +120,30 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 			return nil
 		})
 
-	s.api.EXPECT().BestFacadeVersion(gomock.Any())
 	s.api.EXPECT().
-		APICall("Cloud", gomock.Any(), gomock.Any(), "CredentialContents", gomock.Any(), gomock.Any()).
-		DoAndReturn(func(facade string, version int, id string, request string, params, response interface{}) error {
-			if ptr, ok := response.(*jujuparams.CredentialContentResults); ok {
-				// Now mutate the dereferenced pointer
-				*ptr = jujuparams.CredentialContentResults{
-					Results: []jujuparams.CredentialContentResult{
-						{
-							Result: &jujuparams.ControllerCredentialInfo{
-								Content: jujuparams.CredentialContent{
-									Name:     "mycredential",
-									Cloud:    "aws",
-									AuthType: string(cloud.AccessKeyAuthType),
-									Attributes: map[string]string{
-										"access-key": "AKIA...",
-									},
-								},
+		CredentialContents("aws", "aws/alice/mycredential", true).
+		DoAndReturn(func(c string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
+			return []jujuparams.CredentialContentResult{
+				{
+					Result: &jujuparams.ControllerCredentialInfo{
+						Content: jujuparams.CredentialContent{
+							Name:     "mycredential",
+							Cloud:    "aws",
+							AuthType: string(cloud.AccessKeyAuthType),
+							Attributes: map[string]string{
+								"access-key": "AKIA...",
 							},
 						},
 					},
-				}
-			}
-			return nil
+				},
+			}, nil
 		})
 
 	s.api.EXPECT().
-		APICall("Cloud", gomock.Any(), gomock.Any(), "Cloud", gomock.Any(), gomock.Any()).
-		DoAndReturn(func(facade string, version int, id string, request string, params, response interface{}) error {
-			if ptr, ok := response.(*jujuparams.CloudResults); ok {
-				// Now mutate the dereferenced pointer
-				*ptr = jujuparams.CloudResults{
-					Results: []jujuparams.CloudResult{
-						{
-							Cloud: &jujuparams.Cloud{
-								IsControllerCloud: true,
-							},
-						},
-					},
-				}
+		Cloud(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(tag names.CloudTag, cloud *jujucloud.Cloud) error {
+			*cloud = jujucloud.Cloud{
+				IsControllerCloud: true,
 			}
 			return nil
 		})
@@ -166,6 +152,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctrlCloud.IsControllerCloud, qt.Equals, true)
 	c.Assert(ctrlCredential.AuthType(), qt.Equals, cloud.AccessKeyAuthType)
+	c.Assert(ctrlCredential.Attributes()["access-key"], qt.Equals, "AKIA...")
 }
 
 func (s *upgradeManagerSuite) TestCloneController_Success(c *qt.C) {

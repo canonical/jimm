@@ -151,3 +151,10 @@ func (c Connection) UpdateCloud(tag names.CloudTag, cloud jujucloud.Cloud) error
 	cloudAPI := cloudapi.NewClient(&c)
 	return cloudAPI.UpdateCloud(cloud)
 }
+
+// CredentialContents returns contents of the credential values for the specified
+// cloud and credential name. Secrets will be included if requested.
+func (c Connection) CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
+	cloudAPI := cloudapi.NewClient(&c)
+	return cloudAPI.CredentialContents(cloud, credential, withSecrets)
+}
