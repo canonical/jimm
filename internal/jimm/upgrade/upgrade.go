@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -20,6 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -41,42 +41,12 @@ type Store interface {
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
 }
 
-// A Dialer provides a connection to a controller.
-type Dialer interface {
-	// Dial creates an API connection to a controller. If the given
-	// model-tag is non-zero the connection will be to that model,
-	// otherwise the connection is to the controller. After successfully
-	// dialing the controller the UUID, AgentVersion and HostPorts fields
-	// in the given controller should be updated to the values provided
-	// by the controller.
-	Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (UpgradeManagerAPI, error)
-}
-
-// UpgradeManagerAPI defines the subset of the Juju API used by the UpgradeManager.
-type UpgradeManagerAPI interface {
-	// API implements the base.APICallCloser so that we can
-	// use the juju api clients to interact with juju controllers.
-	base.APICallCloser
-
-	// ControllerModelSummary fetches the model summary of the model on the
-	// controller that hosts the controller machines.
-	ControllerModelSummary(context.Context, *jujuparams.ModelSummary) error
-
-	// CredentialContents returns contents of the credential values for the specified
-	// cloud and credential name. Secrets will be included if requested.
-	CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
-
-	// Cloud retrieves information about the given cloud. Cloud uses the
-	// Cloud procedure on the Cloud facade.
-	Cloud(tag names.CloudTag, cloud *jujucloud.Cloud) error
-}
-
 // upgradeManager provides a means to manage controller upgrades within JIMM.
 type upgradeManager struct {
 	bootstrapManager BootstrapManager
 	jujuManager      JujuManager
 	store            Store
-	dialer           Dialer
+	dialer           juju.Dialer
 }
 
 // NewUpgradeManager creates a new UpgradeManager instance.
@@ -84,7 +54,7 @@ func NewUpgradeManager(
 	bootstrapManager BootstrapManager,
 	jujumanager JujuManager,
 	store Store,
-	dialer Dialer,
+	dialer juju.Dialer,
 ) (*upgradeManager, error) {
 	if bootstrapManager == nil {
 		return nil, errors.E("bootstrap manager cannot be nil")

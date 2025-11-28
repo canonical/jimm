@@ -26,7 +26,7 @@ type upgradeManagerSuite struct {
 	jujuManager      *mocks.MockJujuManager
 	store            *mocks.MockStore
 	dialer           *mocks.MockDialer
-	api              *mocks.MockUpgradeManagerAPI
+	api              *mocks.MockAPI
 }
 
 func (s *upgradeManagerSuite) setupTest(c *qt.C) *gomock.Controller {
@@ -36,7 +36,7 @@ func (s *upgradeManagerSuite) setupTest(c *qt.C) *gomock.Controller {
 	s.jujuManager = mocks.NewMockJujuManager(ctrl)
 	s.store = mocks.NewMockStore(ctrl)
 	s.dialer = mocks.NewMockDialer(ctrl)
-	s.api = mocks.NewMockUpgradeManagerAPI(ctrl)
+	s.api = mocks.NewMockAPI(ctrl)
 
 	return ctrl
 }
@@ -216,8 +216,8 @@ func (s *upgradeManagerSuite) TestCloneController_WaitForJobCompletionError(c *q
 //go:generate mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
 //go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
 //go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
-//go:generate mockgen -typed -destination=./mocks/dialer.go -package=mocks . Dialer
-//go:generate mockgen -typed -destination=./mocks/api.go -package=mocks . UpgradeManagerAPI
+//go:generate mockgen -typed -destination=./mocks/dialer.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju Dialer
+//go:generate mockgen -typed -destination=./mocks/api.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju API
 func TestUpgradeManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &upgradeManagerSuite{})
 }

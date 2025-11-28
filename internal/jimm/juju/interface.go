@@ -203,6 +203,10 @@ type API interface {
 
 	// ListModels returns all UserModel's on the controller.
 	ListModels(ctx context.Context) ([]base.UserModel, error)
+
+	// CredentialContents returns contents of the credential values for the specified
+	// cloud and credential name. Secrets will be included if requested.
+	CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
 }
 
 // PermissionManager provides a way to manage permissions within JIMM.
