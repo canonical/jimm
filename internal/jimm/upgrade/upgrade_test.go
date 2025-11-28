@@ -9,7 +9,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	"github.com/juju/juju/cloud"
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -122,14 +121,14 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 
 	s.api.EXPECT().
 		CredentialContents("aws", "aws/alice/mycredential", true).
-		DoAndReturn(func(c string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
+		DoAndReturn(func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 			return []jujuparams.CredentialContentResult{
 				{
 					Result: &jujuparams.ControllerCredentialInfo{
 						Content: jujuparams.CredentialContent{
 							Name:     "mycredential",
 							Cloud:    "aws",
-							AuthType: string(cloud.AccessKeyAuthType),
+							AuthType: string(jujucloud.AccessKeyAuthType),
 							Attributes: map[string]string{
 								"access-key": "AKIA...",
 							},
@@ -151,7 +150,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 	ctrlCloud, ctrlCredential, err := upgradeMgr.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctrlCloud.IsControllerCloud, qt.Equals, true)
-	c.Assert(ctrlCredential.AuthType(), qt.Equals, cloud.AccessKeyAuthType)
+	c.Assert(ctrlCredential.AuthType(), qt.Equals, jujucloud.AccessKeyAuthType)
 	c.Assert(ctrlCredential.Attributes()["access-key"], qt.Equals, "AKIA...")
 }
 
