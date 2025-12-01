@@ -119,7 +119,7 @@ func TestModelCreateArgs(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			var a juju.ModelCreateArgs
-			err := a.FromJujuModelCreateArgs(&test.args, "")
+			err := a.FromJujuModelCreateArgs(&test.args)
 			if test.expectedError == "" {
 				c.Assert(err, qt.IsNil)
 				c.Assert(a, qt.CmpEquals(opts...), test.expectedArgs)
@@ -140,11 +140,10 @@ var addModelTests = []struct {
 	jimmAdmin           bool
 	// This cloudCredTag is used to manually populate a dummy cloud credential
 	// into JIMM's credential store and then applied onto args before adding a model.
-	cloudCredTag     names.CloudCredentialTag
-	args             jujuparams.ModelCreateArgs
-	TargetController string
-	expectModel      dbmodel.Model
-	expectError      string
+	cloudCredTag names.CloudCredentialTag
+	args         jujuparams.ModelCreateArgs
+	expectModel  dbmodel.Model
+	expectError  string
 }{{
 	name: "CreateModelWithCloudRegion",
 	env: `
@@ -1469,12 +1468,12 @@ users:
 	jimmAdmin:    false,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: jujuparams.ModelCreateArgs{
-		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
-		CloudRegion: "test-region-1",
+		Name:             "test-model",
+		OwnerTag:         names.NewUserTag("alice@canonical.com").String(),
+		CloudTag:         names.NewCloudTag("test-cloud").String(),
+		CloudRegion:      "test-region-1",
+		TargetController: "controller-1",
 	},
-	TargetController: "controller-1",
 	expectModel: dbmodel.Model{
 		Name: "test-model",
 		UUID: sql.NullString{
@@ -1534,7 +1533,7 @@ func TestAddModel(t *testing.T) {
 
 			test.args.CloudCredentialTag = test.cloudCredTag.String()
 			args := juju.ModelCreateArgs{}
-			err = args.FromJujuModelCreateArgs(&test.args, test.TargetController)
+			err = args.FromJujuModelCreateArgs(&test.args)
 			c.Assert(err, qt.IsNil)
 
 			_, err = j.AddModel(context.Background(), user, &args)
@@ -3442,7 +3441,7 @@ controllers:
 		CloudTag:           names.NewCloudTag("test-cloud").String(),
 		CloudRegion:        "test-region-1",
 		CloudCredentialTag: cloudCredTag.String(),
-	}, "")
+	})
 	c.Assert(err, qt.IsNil)
 
 	// According to controller priority for test-region-1, we would

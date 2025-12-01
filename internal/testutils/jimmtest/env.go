@@ -197,11 +197,9 @@ func (ctl Controller) addControllerRelations(c *qt.C, db *db.Database, client *o
 		default:
 			c.Fatalf("unknown controller access level: %s", u.Access)
 		}
-		if client != nil {
-			user := openfga.NewUser(&dbUser, client)
-			err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), relation)
-			c.Assert(err, qt.IsNil)
-		}
+		user := openfga.NewUser(&dbUser, client)
+		err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), relation)
+		c.Assert(err, qt.IsNil)
 	}
 }
 

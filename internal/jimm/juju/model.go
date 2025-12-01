@@ -42,24 +42,24 @@ func shuffleRegionControllers(controllers []dbmodel.CloudRegionControllerPriorit
 
 // ModelCreateArgs contains parameters used to add a new model.
 type ModelCreateArgs struct {
-	Name             string
-	Owner            names.UserTag
-	Config           map[string]interface{}
-	Cloud            names.CloudTag
-	CloudRegion      string
-	CloudCredential  names.CloudCredentialTag
+	Name            string
+	Owner           names.UserTag
+	Config          map[string]interface{}
+	Cloud           names.CloudTag
+	CloudRegion     string
+	CloudCredential names.CloudCredentialTag
+	// TargetController is optional and specifies the controller
+	// name which should host the new model.
 	TargetController string
 }
 
 // FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
-// TODO(Kian): refactor to move targetController into jujuparams.ModelCreateArgs
-// if it ends up there.
-func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs, targetController string) error {
+func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs) error {
 	if args.Name == "" {
 		return errors.E("name not specified")
 	}
 	a.Name = args.Name
-	a.TargetController = targetController
+	a.TargetController = args.TargetController
 	a.Config = args.Config
 	a.CloudRegion = args.CloudRegion
 	if args.CloudTag != "" {
@@ -118,7 +118,11 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 		return nil, errors.E(err)
 	}
 
-	builder = builder.WithController(args.TargetController)
+	if args.TargetController != "" {
+		builder = builder.WithController(args.TargetController)
+	} else {
+		builder = builder.WithAnyController()
+	}
 	if err := builder.Error(); err != nil {
 		return nil, errors.E(err)
 	}
