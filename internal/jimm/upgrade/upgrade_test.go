@@ -246,6 +246,17 @@ func (s *upgradeManagerSuite) TestMigrateAndUpgradeModel_Success(c *qt.C) {
 			UUID: mt.Id(),
 		}, nil)
 
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), mt.Id()).
+		Return(
+			dbmodel.Model{
+				Controller: dbmodel.Controller{
+					Name: targetController,
+				},
+			},
+			nil,
+		)
+
 	s.store.EXPECT().
 		GetController(ctx, gomock.Any()).
 		DoAndReturn(func(ctx context.Context, ctrl *dbmodel.Controller) error {

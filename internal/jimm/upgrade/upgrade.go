@@ -27,6 +27,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+var (
+	AlreadyUpgradedError = jujuerrors.New("model has already been upgraded")
+)
+
 // BootstrapManager defines the bootstrap manager methods required by the upgrade manager.
 type BootstrapManager interface {
 	WaitForJobCompletion(ctx context.Context, jobId uuid.UUID, config bootstrap.WaitConfig) error
@@ -213,11 +217,22 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 			Attempts: 10,
 			Delay:    5 * time.Second,
 			Func: func() error {
-				// TODO: We don't care about the user here. We just wanna know if internal migration completed.
-				// Our ModelInfo handles the redirect, it'll error until the migration is complete (traversing the redirect err to
-				// the new controller). Can we remove the user?
 				mi, err = u.jujuManager.ModelInfo(ctx, user, mt)
-				return err
+				if err != nil {
+					return err
+				}
+
+				m, err := u.jujuManager.GetModel(ctx, mi.UUID)
+				if err != nil {
+					return err
+				}
+
+				// It hasn't migrated yet, so error out.
+				if m.Controller.Name != targetControllerName {
+					return errors.E("model has not yet migrated to target controller")
+				}
+
+				return nil
 			},
 			Clock: clock.WallClock,
 		},
@@ -245,7 +260,7 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 		// that manual intervention is required.
 	}
 	if jujuerrors.Is(upgradeErr, jujuerrors.AlreadyExists) {
-		upgradeErr = jujuerrors.New("model has already been upgraded")
+		upgradeErr = AlreadyUpgradedError
 	}
 
 	if upgradeErr != nil {
