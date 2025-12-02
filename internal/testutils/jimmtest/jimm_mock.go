@@ -27,6 +27,7 @@ type JIMM struct {
 	ConfigManager_     func() jimm.ConfigManager
 	OfferAuthorizer_   func() jimm.OfferAuthorizer
 	BootstapManager_   func() jimm.BootstrapManager
+	UpgradeManager_    func() jimm.UpgradeManager
 }
 
 func (j *JIMM) RoleManager() jimm.RoleManager {
@@ -111,4 +112,11 @@ func (j *JIMM) BootstrapManager() jimm.BootstrapManager {
 		return nil
 	}
 	return j.BootstapManager_()
+}
+
+func (j *JIMM) UpgradeManager() jimm.UpgradeManager {
+	if j.UpgradeManager_ == nil {
+		return nil
+	}
+	return j.UpgradeManager_()
 }

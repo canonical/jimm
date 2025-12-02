@@ -39,6 +39,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/role"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
+	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
@@ -316,6 +317,14 @@ type BootstrapManager interface {
 	StartDestroyControllerJob(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (string, error)
 }
 
+// UpgradeManager provides methods to manage controller cloning and model automated upgrades.
+type UpgradeManager interface {
+	CloneController(ctx context.Context, user *openfga.User, params upgrade.CloneControllerParams) error
+	MigrateAndUpgradeModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, targetVersion version.Number) (version.Number, error)
+	PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, jujucloud.Credential, error)
+	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -546,6 +555,13 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.bootstrapManager = bootstrapManager
 
+	upgradeManager, err := upgrade.NewUpgradeManager(j.bootstrapManager, j.jujuManager, j.Database, j.Dialer)
+	if err != nil {
+		return nil, err
+	}
+
+	j.upgradeManager = upgradeManager
+
 	return j, nil
 }
 
@@ -592,6 +608,9 @@ type JIMM struct {
 
 	// bootstrapManager provides a means to manage bootstrap jobs.
 	bootstrapManager BootstrapManager
+
+	// upgradeManager provides a means to manage controller cloning and model automated upgrades.
+	upgradeManager UpgradeManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -667,4 +686,9 @@ func (j *JIMM) OfferAuthorizer() OfferAuthorizer {
 // BootstrapManager returns a manager that enables operations related to bootstrap jobs.
 func (j *JIMM) BootstrapManager() BootstrapManager {
 	return j.bootstrapManager
+}
+
+// UpgradeManager returns a manager that enables operations related to controller cloning and model automated upgrades.
+func (j *JIMM) UpgradeManager() UpgradeManager {
+	return j.upgradeManager
 }

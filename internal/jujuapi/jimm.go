@@ -25,6 +25,7 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/canonical/jimm/v3/version"
+	jujuversion "github.com/juju/version/v2"
 )
 
 func init() {
@@ -67,6 +68,7 @@ func init() {
 		stopJob := rpc.Method(r.StopJob)
 		startBootstrapJob := rpc.Method(r.StartBootstrapJob)
 		startDestroyControllerJob := rpc.Method(r.StartDestroyControllerJob)
+		upgradeToMethod := rpc.Method(r.UpgradeTo)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddController", addControllerMethod)
@@ -84,6 +86,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
 		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
+
 		// JIMM ReBAC RPC
 		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "GetGroup", getGroupMethod)
@@ -111,6 +114,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "StopJob", stopJob)
 		r.AddMethod("JIMM", 4, "StartBootstrapJob", startBootstrapJob)
 		r.AddMethod("JIMM", 4, "StartDestroyControllerJob", startDestroyControllerJob)
+		// JIMM Upgrades
+		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
 
 		return []int{4}
 	}
@@ -700,5 +705,35 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 
 	return apiparams.StartJobResponse{
 		JobID: jobID,
+	}, nil
+}
+
+// UpgradeTo upgrades the controller hosting the given model by cloning a new controller
+// at the requested version and migrating the model to it (phase 1 automated upgrade).
+func (r *controllerRoot) UpgradeTo(ctx context.Context, req apiparams.UpgradeToRequest) (apiparams.UpgradeToResponse, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
+
+	mt, err := names.ParseModelTag(req.ModelTag)
+	if err != nil {
+		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeBadRequest, fmt.Errorf("invalid model tag %q: %w", req.ModelTag, err))
+	}
+
+	targetControllerVersion, err := jujuversion.Parse(req.TargetControllerVersion)
+	if err != nil {
+		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeBadRequest, fmt.Errorf("invalid target controller version %q: %w", req.TargetControllerVersion, err))
+	}
+
+	_, err = r.jimm.UpgradeManager().UpgradeTo(ctx, r.user, mt.Id(), targetControllerVersion)
+	if err != nil {
+		return apiparams.UpgradeToResponse{
+			Success: false,
+			Error:   err.Error(),
+		}, nil
+	}
+
+	return apiparams.UpgradeToResponse{
+		Success: true,
 	}, nil
 }

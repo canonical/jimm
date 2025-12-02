@@ -20,6 +20,7 @@ type JIMM interface {
 	JujuManager() jimm.JujuManager
 	ConfigManager() jimm.ConfigManager
 	BootstrapManager() jimm.BootstrapManager
+	UpgradeManager() jimm.UpgradeManager
 
 	ResourceTag() names.ControllerTag
 	PubSubHub() *pubsub.Hub

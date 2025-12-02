@@ -985,3 +985,63 @@ func (s *jimmSuite) TestListMigrationTargets(c *gc.C) {
 		},
 	}})
 }
+
+// TestUpgradeTo_Unauthorized verifies non-admins cannot call the facade.
+func (s *jimmSuite) TestUpgradeTo_Unauthorized(c *gc.C) {
+	conn := s.open(c, nil, "bob")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	req := apiparams.UpgradeToRequest{
+		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetControllerVersion: s.Model.Controller.AgentVersion,
+	}
+	_, err := client.UpgradeTo(&req)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+}
+
+// TestUpgradeTo_InvalidModelTag verifies invalid model tags are rejected.
+func (s *jimmSuite) TestUpgradeTo_InvalidModelTag(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	req := apiparams.UpgradeToRequest{
+		ModelTag:                "invalid-model-tag",
+		TargetControllerVersion: s.Model.Controller.AgentVersion,
+	}
+	_, err := client.UpgradeTo(&req)
+	c.Assert(err, gc.ErrorMatches, `(invalid model tag "invalid-model-tag": )?"invalid-model-tag" is not a valid tag \(bad request\)`)
+}
+
+// TestUpgradeTo_InvalidVersion verifies invalid version strings are rejected.
+func (s *jimmSuite) TestUpgradeTo_InvalidVersion(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	req := apiparams.UpgradeToRequest{
+		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetControllerVersion: "not-a-version",
+	}
+	_, err := client.UpgradeTo(&req)
+	c.Assert(err, gc.ErrorMatches, `invalid target controller version "not-a-version": .* \(bad request\)`)
+}
+
+// TestUpgradeTo_TargetVersionLowerOrEqual ensures we return a success=false response when the target is <= current.
+func (s *jimmSuite) TestUpgradeTo_TargetVersionLowerOrEqual(c *gc.C) {
+	conn := s.open(c, nil, "alice")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	// Use the current controller version to guarantee target <= current.
+	req := apiparams.UpgradeToRequest{
+		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetControllerVersion: s.Model.Controller.AgentVersion,
+	}
+	resp, err := client.UpgradeTo(&req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp.Success, gc.Equals, false)
+	c.Assert(resp.Error, gc.Matches, ".*target version must be greater than current version.*")
+}
