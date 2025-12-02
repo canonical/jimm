@@ -90,6 +90,9 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	// Always add controller name & cloud at the end
 	args = append(args, b.CloudNameAndRegion, b.ControllerName)
 
+	// why
+	args = append(args, "--bootstrap-constraints=arch=arm64")
+
 	return args
 }
 
@@ -156,9 +159,10 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	// We only accept a single credential for bootstrapping.
 	cloudCred := jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
-			p.CloudCred.Label: p.CloudCred,
+			cloudName: p.CloudCred,
 		},
 	}
+
 	if err := store.UpdateCredential(cloudName, cloudCred); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
 	}
