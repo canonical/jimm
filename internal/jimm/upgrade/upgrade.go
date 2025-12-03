@@ -286,14 +286,8 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 // and migrates the model to that controller. This is "Phase 1" of the
 // automated upgrade process.
 //
-// TODO:
-//   - Currently this only works with personal clouds.
-//     We need to extend it to work with public clouds
-//     (i.e., not send the cloud and just region and credential)
-//   - K8S clouds are determined by the HostCloudRegion of the controller model summary.
-//     We need to handle that case here. It may look something like "if caas" again.
-//   - No original configuration from the source controller is carried through, this will need adding.
-//   - We need to name the controller, at the moment it's just a timestamp.
+// This currently only works with personal, none-kubernetes clouds.
+// Further work in Phase 2 is expected to be done here: https://warthogs.atlassian.net/browse/JUJU-8918
 func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error) {
 	var chosenVersion version.Number
 	var newControllerName string = fmt.Sprintf("controller-%d", time.Now().Unix())
