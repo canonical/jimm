@@ -260,7 +260,7 @@ type JujuManager interface {
 	// can use the IncomingModelMigration table versus which must use the plain Models table.
 
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
-	Prechecks(ctx context.Context, user *openfga.User, model coremigration.ModelInfo) error
+	Prechecks(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
 	Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error

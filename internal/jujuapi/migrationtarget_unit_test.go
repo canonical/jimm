@@ -16,6 +16,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -129,7 +130,7 @@ func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 	preChecksCalled := false
 	jujuManager := mocks.JujuManager{
 		MigrationMocks: mocks.MigrationMocks{
-			Prechecks_: func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
+			Prechecks_: func(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error {
 				preChecksCalled = true
 				c.Assert(model.UUID, gc.Equals, "00000001-0000-0000-0000-000000000001")
 				c.Assert(model.Owner.Id(), gc.Equals, "bob")

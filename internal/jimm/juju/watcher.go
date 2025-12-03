@@ -103,6 +103,8 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 		}
 	}()
 
+	currentControllerVersion := ctl.AgentVersion
+
 	// connect to the controller
 	api, err = w.Dialer.Dial(ctx, ctl, names.ModelTag{}, nil, nil)
 	if err != nil {
@@ -113,6 +115,9 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 	}
 	if ctl.UnavailableSince.Valid {
 		ctl.UnavailableSince = sql.NullTime{}
+		updateController = true
+	}
+	if ctl.AgentVersion != currentControllerVersion {
 		updateController = true
 	}
 	return api, nil

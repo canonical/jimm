@@ -12,11 +12,12 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 type MigrationMocks struct {
-	Prechecks_            func(ctx context.Context, user *openfga.User, model migration.ModelInfo) error
+	Prechecks_            func(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error
 	AdoptResources_       func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
 	Activate_             func(ctx context.Context, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
 	AbortMigration_       func(ctx context.Context, user *openfga.User, modelUUID string) error
@@ -33,7 +34,7 @@ func (j *MigrationMocks) AbortMigration(ctx context.Context, user *openfga.User,
 	return j.AbortMigration_(ctx, user, modelUUID)
 }
 
-func (j *MigrationMocks) Prechecks(ctx context.Context, user *openfga.User, model migration.ModelInfo) error {
+func (j *MigrationMocks) Prechecks(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error {
 	if j.Prechecks_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}

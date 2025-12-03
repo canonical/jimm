@@ -34,6 +34,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test-cloud
   region: test-cloud-region
+  agent-version: 3.6.0
 models:
 - name: model-1
   type: iaas
@@ -331,6 +332,59 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	err = w.Database.GetController(context.Background(), &ctl)
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctl.UnavailableSince.Valid, qt.IsFalse)
+}
+
+func TestWatcherUpdatesControllerVersion(t *testing.T) {
+	c := qt.New(t)
+	ctx := t.Context()
+
+	dialerCalled := make(chan struct{}, 1)
+
+	w := juju.NewWatcherWithControllerUnavailableChan(
+		&db.Database{
+			DB: jimmtest.PostgresDB(c, nil),
+		},
+		&jimmtest.Dialer{
+			API: &jimmtest.API{
+				SupportsModelSummaryWatcher_: true,
+				WatchAllModelSummaries_: func(ctx context.Context) (string, error) {
+					dialerCalled <- struct{}{}
+					return "", errors.E("some-error")
+				},
+			},
+			AgentVersion: "3.6.12",
+		},
+		&testPublisher{},
+		nil,
+	)
+
+	env := jimmtest.ParseEnvironment(c, testWatcherEnv)
+	err := w.Database.Migrate(ctx)
+	c.Assert(err, qt.IsNil)
+	env.PopulateDB(c, w.Database)
+
+	ctl := dbmodel.Controller{
+		Name: "controller-1",
+	}
+
+	err = w.Database.GetController(ctx, &ctl)
+	c.Assert(err, qt.IsNil)
+
+	c.Check(ctl.AgentVersion, qt.Equals, "3.6.0")
+
+	watcherContext, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		_ = w.WatchAllModelSummaries(watcherContext, time.Millisecond)
+	})
+	<-dialerCalled
+	cancel()
+	wg.Wait()
+
+	err = w.Database.GetController(ctx, &ctl)
+	c.Assert(err, qt.IsNil)
+	c.Check(ctl.AgentVersion, qt.Equals, "3.6.12")
 }
 
 func checkIfContextCanceled(c *qt.C, ctx context.Context, err error) {

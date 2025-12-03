@@ -9,7 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/description/v9"
+	descriptionv9 "github.com/juju/description/v9"
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -17,7 +17,9 @@ import (
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	jimmdescription "github.com/canonical/jimm/v3/internal/description"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -224,12 +226,33 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
+func toJimmDescription(c *qt.C, modelDesc descriptionv9.Model) jimmdescription.Model {
+	serializedDescription, err := descriptionv9.Serialize(modelDesc)
+	c.Assert(err, qt.IsNil)
+
+	jimmDesc, err := jimmdescription.Deserialize(serializedDescription, version.MustParse("3.6.0"))
+	c.Assert(err, qt.IsNil)
+	return jimmDesc
+}
+
+func toJimmMigratingInfo(c *qt.C, modelInfo migration.ModelInfo) juju.MigratingModelInfo {
+	jimmDesc := toJimmDescription(c, modelInfo.ModelDescription)
+	return juju.MigratingModelInfo{
+		UUID:                   modelInfo.UUID,
+		Owner:                  modelInfo.Owner,
+		Name:                   modelInfo.Name,
+		AgentVersion:           modelInfo.AgentVersion,
+		ControllerAgentVersion: modelInfo.ControllerAgentVersion,
+		ModelDescription:       jimmDesc,
+	}
+}
+
 func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
 	api := &jimmtest.API{
-		Prechecks_: func(mi migration.ModelInfo) error {
+		Prechecks_: func(mi params.MigrationModelInfo) error {
 			return nil
 		},
 	}
@@ -247,10 +270,10 @@ func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	// Below is a simple model description with no users that have access.
-	descriptionArgs := description.ModelArgs{
+	descriptionArgs := descriptionv9.ModelArgs{
 		AgentVersion: "3.2.1",
 		Owner:        names.NewUserTag("bob"),
-		Type:         description.IAAS,
+		Type:         descriptionv9.IAAS,
 		Cloud:        "test",
 		Config: map[string]interface{}{
 			"uuid": migratingModelUUID,
@@ -258,20 +281,21 @@ func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 		},
 		CloudRegion: "test-region",
 	}
-	modelDescription := description.NewModel(descriptionArgs)
+	modelDescription := descriptionv9.NewModel(descriptionArgs)
 
-	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+	modelDescription.SetCloudCredential(descriptionv9.CloudCredentialArgs{
 		Owner: names.NewUserTag("bob"),
 		Name:  "test-cred",
 		Cloud: names.NewCloudTag("test"),
 	})
-	modelInfo := migration.ModelInfo{
+
+	modelInfo := juju.MigratingModelInfo{
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag("bob"),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.2.1"),
 		ControllerAgentVersion: version.MustParse("3.2.1"),
-		ModelDescription:       modelDescription,
+		ModelDescription:       toJimmDescription(c, modelDescription),
 	}
 	err := j.Prechecks(ctx, user, modelInfo)
 	c.Assert(err, qt.IsNil)
@@ -289,16 +313,16 @@ func TestPreChecks_ValidatesUserMapping(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err := j.Prechecks(ctx, user, modelInfoWithUnmappedUsers())
+	err := j.Prechecks(ctx, user, modelInfoWithUnmappedUsers(c))
 	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jane\" who has admin access to the model$.*`)
 	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jack\" who has admin access to offer "test-offer"$.*`)
 }
 
-func modelInfoWithUnmappedUsers() migration.ModelInfo {
-	descriptionArgs := description.ModelArgs{
+func modelInfoWithUnmappedUsers(c *qt.C) juju.MigratingModelInfo {
+	descriptionArgs := descriptionv9.ModelArgs{
 		AgentVersion: "3.2.1",
 		Owner:        names.NewUserTag("bob"),
-		Type:         description.IAAS,
+		Type:         descriptionv9.IAAS,
 		Cloud:        "test",
 		Config: map[string]interface{}{
 			"uuid": migratingModelUUID,
@@ -306,36 +330,37 @@ func modelInfoWithUnmappedUsers() migration.ModelInfo {
 		},
 		CloudRegion: "test-region",
 	}
-	modelDescription := description.NewModel(descriptionArgs)
+	modelDescription := descriptionv9.NewModel(descriptionArgs)
 
 	// Add a user with admin access that is not mapped.
-	userArgs := description.UserArgs{
+	userArgs := descriptionv9.UserArgs{
 		Name:        names.NewUserTag("jane"),
 		DisplayName: "jane",
 		Access:      "admin",
 	}
 	modelDescription.AddUser(userArgs)
-	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+	modelDescription.SetCloudCredential(descriptionv9.CloudCredentialArgs{
 		Owner: names.NewUserTag("bob"),
 		Name:  "test-cred",
 		Cloud: names.NewCloudTag("test"),
 	})
-	appArgs := description.ApplicationArgs{}
+	appArgs := descriptionv9.ApplicationArgs{}
 	app := modelDescription.AddApplication(appArgs)
 
 	// Add an offer with an ACL for a user that is not mapped.
-	offerArgs := description.ApplicationOfferArgs{
+	offerArgs := descriptionv9.ApplicationOfferArgs{
 		OfferName: "test-offer",
 		ACL:       map[string]string{"jack": "admin"},
 	}
 	app.AddOffer(offerArgs)
-	modelInfo := migration.ModelInfo{
+
+	modelInfo := juju.MigratingModelInfo{
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag("bob"),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.2.1"),
 		ControllerAgentVersion: version.MustParse("3.2.1"),
-		ModelDescription:       modelDescription,
+		ModelDescription:       toJimmDescription(c, modelDescription),
 	}
 	return modelInfo
 }
@@ -345,7 +370,7 @@ func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
 	ctx := context.Background()
 
 	api := &jimmtest.API{
-		Prechecks_: func(mi migration.ModelInfo) error {
+		Prechecks_: func(mmi params.MigrationModelInfo) error {
 			return nil
 		},
 	}
@@ -369,23 +394,23 @@ func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	everyoneUserArgs := description.UserArgs{
+	everyoneUserArgs := descriptionv9.UserArgs{
 		Name:   names.NewUserTag("everyone@external"),
 		Access: "read",
 	}
 	model.ModelDescription.AddUser(everyoneUserArgs)
 
-	appArgs := description.ApplicationArgs{}
+	appArgs := descriptionv9.ApplicationArgs{}
 	app := model.ModelDescription.AddApplication(appArgs)
 
 	// Add an offer with an ACL for the everyone@external user.
-	offerArgs := description.ApplicationOfferArgs{
+	offerArgs := descriptionv9.ApplicationOfferArgs{
 		OfferName: "test-offer",
 		ACL:       map[string]string{"everyone@external": "read"},
 	}
 	app.AddOffer(offerArgs)
 
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -396,11 +421,17 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	// Validate that the API request to Juju is made with a modified version
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
-		Prechecks_: func(mi migration.ModelInfo) error {
-			c.Check(mi.UUID, qt.Equals, migratingModelUUID)
-			c.Check(mi.Owner.Id(), qt.Equals, "alice@canonical.com")
-			c.Check(mi.ModelDescription.Users(), qt.HasLen, 0)
-			c.Check(mi.ModelDescription.Owner().String(), qt.Equals, "user-alice@canonical.com")
+		Prechecks_: func(mmi params.MigrationModelInfo) error {
+			c.Check(mmi.UUID, qt.Equals, migratingModelUUID)
+			c.Check(mmi.OwnerTag, qt.Equals, "alice@canonical.com")
+			// Deserialize the model description and validate its contents.
+			modelDescription, err := descriptionv9.Deserialize(mmi.ModelDescription)
+			c.Check(err, qt.IsNil)
+			if err != nil {
+				return nil
+			}
+			c.Check(modelDescription.Users(), qt.HasLen, 0)
+			c.Check(modelDescription.Owner().String(), qt.Equals, "user-alice@canonical.com")
 			return nil
 		},
 	}
@@ -424,7 +455,7 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -454,7 +485,7 @@ func TestPrechecks_MissingCloudRegion(t *testing.T) {
 		CloudRegionName:     "test-region-not-found",
 	})
 
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test".*`)
 }
 
@@ -484,7 +515,7 @@ func TestPrechecks_MissingCloud(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test-not-found".*`)
 }
 
@@ -514,7 +545,7 @@ func TestPrechecks_MissingCloudCredential(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `^cloudcredential "test/alice@canonical.com/test-cred-not-found" not found$`)
 }
 
@@ -523,7 +554,7 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 	ctx := context.Background()
 
 	api := &jimmtest.API{
-		Prechecks_: func(mi migration.ModelInfo) error {
+		Prechecks_: func(mmi params.MigrationModelInfo) error {
 			return errors.E("controller unreachable")
 		},
 	}
@@ -547,7 +578,7 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `.*controller unreachable`)
 }
 
@@ -570,7 +601,7 @@ func TestPrechecks_MissingUserMapping(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `(?s).*user mapping is missing the following users.*`)
 }
 
@@ -598,7 +629,7 @@ func TestPrechecks_InvalidOwner(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err = j.Prechecks(ctx, user, model)
+	err = j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `.*invalid external user mapping "" for local user "bob"`)
 }
 
@@ -621,7 +652,7 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, model)
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
@@ -851,11 +882,11 @@ type modelDescriptionArgs struct {
 	CloudRegionName     string
 }
 
-func newModelDescription(args modelDescriptionArgs) description.Model {
-	descriptionArgs := description.ModelArgs{
+func newModelDescription(args modelDescriptionArgs) descriptionv9.Model {
+	descriptionArgs := descriptionv9.ModelArgs{
 		AgentVersion: "3.2.1",
 		Owner:        names.NewUserTag(args.Owner),
-		Type:         description.IAAS,
+		Type:         descriptionv9.IAAS,
 		Cloud:        args.CloudName,
 		Config: map[string]interface{}{
 			"uuid": migratingModelUUID,
@@ -863,14 +894,14 @@ func newModelDescription(args modelDescriptionArgs) description.Model {
 		},
 		CloudRegion: args.CloudRegionName,
 	}
-	modelDescription := description.NewModel(descriptionArgs)
-	userArgs := description.UserArgs{
+	modelDescription := descriptionv9.NewModel(descriptionArgs)
+	userArgs := descriptionv9.UserArgs{
 		Name:        names.NewUserTag(args.Owner),
 		DisplayName: args.Owner,
 		Access:      "admin",
 	}
 	modelDescription.AddUser(userArgs)
-	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
+	modelDescription.SetCloudCredential(descriptionv9.CloudCredentialArgs{
 		Owner: names.NewUserTag(args.Owner),
 		Name:  args.CloudCredentialName,
 		Cloud: names.NewCloudTag(args.CloudName),
@@ -991,7 +1022,7 @@ func TestImport_Success(t *testing.T) {
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
 		Import_: func(bytes []byte) error {
-			desc, err := description.Deserialize(bytes)
+			desc, err := descriptionv9.Deserialize(bytes)
 			c.Check(err, qt.IsNil)
 			c.Check(desc.Tag().Id(), qt.Equals, migratingModelUUID)
 			c.Check(desc.Owner(), qt.Equals, names.NewUserTag("alice@canonical.com"))
@@ -1022,15 +1053,15 @@ func TestImport_Success(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	desc.SetStatus(description.StatusArgs{Value: "available"})
-	app := desc.AddApplication(description.ApplicationArgs{
+	desc.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+	app := desc.AddApplication(descriptionv9.ApplicationArgs{
 		Tag: names.NewApplicationTag("test-app"),
 	})
 	appOfferUUID := "00000000-0000-0000-0000-000000000001"
-	app.SetStatus(description.StatusArgs{
+	app.SetStatus(descriptionv9.StatusArgs{
 		Value: "active",
 	})
-	app.AddOffer(description.ApplicationOfferArgs{
+	app.AddOffer(descriptionv9.ApplicationOfferArgs{
 		OfferUUID:              appOfferUUID,
 		OfferName:              "test-offer",
 		ApplicationName:        "test-app",
@@ -1038,7 +1069,7 @@ func TestImport_Success(t *testing.T) {
 		Endpoints:              map[string]string{"foo": "bar"},
 		ACL:                    map[string]string{"bob": "write"},
 	})
-	bytes, err := description.Serialize(desc)
+	bytes, err := descriptionv9.Serialize(desc)
 	c.Assert(err, qt.IsNil)
 
 	err = j.Import(ctx, user, params.SerializedModel{
@@ -1099,10 +1130,10 @@ func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	desc.SetStatus(description.StatusArgs{Value: "available"})
+	desc.SetStatus(descriptionv9.StatusArgs{Value: "available"})
 	// Intentionally resetting cloud credential to simulate missing cloud credential.
-	desc.SetCloudCredential(description.CloudCredentialArgs{})
-	bytes, err := description.Serialize(desc)
+	desc.SetCloudCredential(descriptionv9.CloudCredentialArgs{})
+	bytes, err := descriptionv9.Serialize(desc)
 	c.Assert(err, qt.IsNil)
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
@@ -1144,8 +1175,8 @@ func TestImport_UserNotFoundInUserMapping(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	desc.SetStatus(description.StatusArgs{Value: "available"})
-	bytes, err := description.Serialize(desc)
+	desc.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+	bytes, err := descriptionv9.Serialize(desc)
 	c.Assert(err, qt.IsNil)
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
@@ -1188,8 +1219,8 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 		CloudCredentialName: "test-cred-not-found",
 		CloudRegionName:     "test-region",
 	})
-	desc.SetStatus(description.StatusArgs{Value: "available"})
-	bytes, err := description.Serialize(desc)
+	desc.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+	bytes, err := descriptionv9.Serialize(desc)
 	c.Assert(err, qt.IsNil)
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
@@ -1238,8 +1269,8 @@ func TestImport_APIFailure(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	desc.SetStatus(description.StatusArgs{Value: "available"})
-	bytes, err := description.Serialize(desc)
+	desc.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+	bytes, err := descriptionv9.Serialize(desc)
 	c.Assert(err, qt.IsNil)
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,

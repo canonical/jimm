@@ -1859,7 +1859,7 @@ func (c *MockAPIPingCall) DoAndReturn(f func(context.Context) error) *MockAPIPin
 }
 
 // Prechecks mocks base method.
-func (m *MockAPI) Prechecks(model migration.ModelInfo) error {
+func (m *MockAPI) Prechecks(model params.MigrationModelInfo) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Prechecks", model)
 	ret0, _ := ret[0].(error)
@@ -1885,13 +1885,13 @@ func (c *MockAPIPrechecksCall) Return(arg0 error) *MockAPIPrechecksCall {
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIPrechecksCall) Do(f func(migration.ModelInfo) error) *MockAPIPrechecksCall {
+func (c *MockAPIPrechecksCall) Do(f func(params.MigrationModelInfo) error) *MockAPIPrechecksCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIPrechecksCall) DoAndReturn(f func(migration.ModelInfo) error) *MockAPIPrechecksCall {
+func (c *MockAPIPrechecksCall) DoAndReturn(f func(params.MigrationModelInfo) error) *MockAPIPrechecksCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

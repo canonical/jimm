@@ -160,7 +160,7 @@ type API struct {
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(names.CloudTag) error
-	Prechecks_                         func(coremigration.ModelInfo) error
+	Prechecks_                         func(jujuparams.MigrationModelInfo) error
 	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	RevokeCredential_                  func(context.Context, names.CloudCredentialTag) error
 	RevokeModelAccess_                 func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
@@ -401,7 +401,7 @@ func (a *API) Ping(ctx context.Context) error {
 	return a.Ping_(ctx)
 }
 
-func (a *API) Prechecks(model coremigration.ModelInfo) error {
+func (a *API) Prechecks(model jujuparams.MigrationModelInfo) error {
 	if a.Prechecks_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}

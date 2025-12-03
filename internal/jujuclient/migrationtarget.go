@@ -5,6 +5,7 @@ package jujuclient
 import (
 	"time"
 
+	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	coremigration "github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -14,9 +15,35 @@ import (
 
 // PreChecks checks that the target controller is able to accept the
 // model being migrated.
-func (c Connection) Prechecks(model coremigration.ModelInfo) error {
-	migrationTarget := migrationtarget.NewClient(&c)
-	return migrationTarget.Prechecks(model)
+//
+// This method uses a raw facade call because Juju's API client accepts
+// a `github.com/juju/description` type rather than a byte slice for
+// the model description, and we need to be able to accept different version
+// of the description depending on the target controller version.
+func (c Connection) Prechecks(model jujuparams.MigrationModelInfo) error {
+	// Pass all the known facade versions to the controller so that it
+	// can check that the target controller supports them. Passing all of them
+	// ensures that we don't have to update this code when new facades are
+	// added, or if the controller wants to change the logic service side.
+	supported := api.SupportedFacadeVersions()
+	versions := make(map[string][]int, len(supported))
+	for name, version := range supported {
+		versions[name] = version
+	}
+
+	args := jujuparams.MigrationModelInfo{
+		UUID:                   model.UUID,
+		Name:                   model.Name,
+		OwnerTag:               model.OwnerTag,
+		AgentVersion:           model.AgentVersion,
+		ControllerAgentVersion: model.ControllerAgentVersion,
+		FacadeVersions:         versions,
+		ModelDescription:       model.ModelDescription,
+	}
+	if err := c.CallHighestFacadeVersion(c.Context(), "MigrationTarget", []int{6}, "", "Prechecks", &args, nil); err != nil {
+		return err
+	}
+	return nil
 }
 
 // AdoptResources asks the cloud provider to update the controller

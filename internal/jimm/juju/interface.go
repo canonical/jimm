@@ -156,7 +156,7 @@ type API interface {
 	Ping(context.Context) error
 
 	// PreChecks runs pre-checks for a model migration.
-	Prechecks(model migration.ModelInfo) error
+	Prechecks(model jujuparams.MigrationModelInfo) error
 
 	// RemoveCloud removes a cloud.
 	RemoveCloud(names.CloudTag) error

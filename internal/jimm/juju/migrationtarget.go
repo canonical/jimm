@@ -10,11 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/description/v9"
+	"github.com/canonical/jimm/v3/internal/description"
 	jujucrossmodel "github.com/juju/juju/core/crossmodel"
 	coremigration "github.com/juju/juju/core/migration"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/juju/rpc/params"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -149,13 +150,14 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 // calling the method of the same name on the target Juju controller.
 // As part of all model migrations passing through JIMM, it modifies the model description
 // to replace any local user references with their external mapping.
-func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model coremigration.ModelInfo) error {
+func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model MigratingModelInfo) error {
 	incomingModel := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
 			String: model.UUID,
 			Valid:  true,
 		},
 	}
+
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
@@ -193,7 +195,18 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model c
 	}
 	defer api.Close()
 
-	err = api.Prechecks(model)
+	serializedModel, err := model.ModelDescription.Serialize()
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to serialize model description: %w", err))
+	}
+	err = api.Prechecks(jujuparams.MigrationModelInfo{
+		UUID:                   model.UUID,
+		OwnerTag:               model.Owner.String(),
+		Name:                   model.Name,
+		AgentVersion:           model.AgentVersion,
+		ControllerAgentVersion: model.AgentVersion,
+		ModelDescription:       serializedModel,
+	})
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to run pre-checks for migration: %w", err))
 	}
@@ -269,7 +282,7 @@ func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, mo
 
 // modifyMigrationInfo modifies the description of the model migration
 // to replace any local user references with their external mapping.
-func (j *JujuManager) modifyMigrationInfo(model *coremigration.ModelInfo, userMapping dbmodel.StringMap) error {
+func (j *JujuManager) modifyMigrationInfo(model *MigratingModelInfo, userMapping dbmodel.StringMap) error {
 	if !model.Owner.IsLocal() {
 		// If the owner is not a local user, we do not modify it.
 		// This is useful when migrating a model from one JIMM
@@ -309,7 +322,7 @@ func modifyModelDescription(modelDescription description.Model, userMapping dbmo
 		modelDescription.SetOwner(names.NewUserTag(newOwner))
 	}
 
-	modelDescription.SetUsers(nil)
+	modelDescription.ClearUsers()
 
 	// change cloud credendial owner if it is a local user
 	credentials := modelDescription.CloudCredential()
@@ -454,15 +467,19 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 //   - Calls the import method on the target Juju controller to import the model.
 func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error {
 
-	modelDescription, err := description.Deserialize(serialized.Bytes)
+	// Determine the model UUID from the serialized description
+	// and later use the model UUID to get the target controller
+	// version so that we re-encode the description correctly.
+	modelUUID, err := description.TryDetermineModelUUID(serialized.Bytes)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to deserialize model description: %w", err))
+		return errors.E(fmt.Errorf("failed to determine model UUID: %w", err))
 	}
 
 	var (
 		model             *dbmodel.Model
 		offers            []*dbmodel.ApplicationOffer
 		incomingMigration *dbmodel.IncomingModelMigration
+		modelDescription  description.Model
 	)
 
 	// Start a transaction to acquire the incoming model migration record with a
@@ -471,7 +488,7 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 	// of the model implies that the migration record can no longer be modified.
 	err = j.Database.Transaction(func(d *db.Database) error {
 		incomingMigration = &dbmodel.IncomingModelMigration{
-			ModelUUID: sql.NullString{String: modelDescription.Tag().Id(), Valid: true},
+			ModelUUID: sql.NullString{String: modelUUID, Valid: true},
 		}
 
 		// Set noWait to false to allow the transaction to wait for the lock.
@@ -479,6 +496,16 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 		err = d.GetIncomingModelMigrationWithLock(ctx, incomingMigration, noWait)
 		if err != nil {
 			return errors.E(fmt.Errorf("failed to get incoming model migration: %w", err))
+		}
+
+		controllerVersion, err := version.Parse(incomingMigration.TargetController.AgentVersion)
+		if err != nil {
+			return errors.E(fmt.Errorf("failed to parse target controller agent version %q: %w", incomingMigration.TargetController.AgentVersion, err))
+		}
+
+		modelDescription, err = description.Deserialize(serialized.Bytes, controllerVersion)
+		if err != nil {
+			return errors.E(fmt.Errorf("failed to deserialize model description: %w", err))
 		}
 
 		err = modifyModelDescription(modelDescription, incomingMigration.UserMapping)
@@ -511,7 +538,7 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 	}
 	defer api.Close()
 
-	serializedDescrition, err := description.Serialize(modelDescription)
+	serializedDescrition, err := modelDescription.Serialize()
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to serialize model description: %w", err))
 	}
