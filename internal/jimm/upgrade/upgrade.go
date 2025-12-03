@@ -286,7 +286,7 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 // and migrates the model to that controller. This is "Phase 1" of the
 // automated upgrade process.
 //
-// This currently only works with personal, none-kubernetes clouds.
+// This currently only works with personal, non-kubernetes clouds.
 // Further work in Phase 2 is expected to be done here: https://warthogs.atlassian.net/browse/JUJU-8918
 func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error) {
 	var chosenVersion version.Number
