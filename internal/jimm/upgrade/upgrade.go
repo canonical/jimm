@@ -106,7 +106,7 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 	}
 
 	if currentVersion.Compare(targetVersion) == 1 {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(errors.CodeBadRequest, "target version must be greater than current version or equal to current version")
+		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(errors.CodeBadRequest, "target version must be greater than or equal to current version")
 	}
 
 	api, err := u.dialer.Dial(ctx, &m.Controller, names.ModelTag{}, nil, nil)

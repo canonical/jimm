@@ -83,7 +83,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_RejectsCurrentVersionNewerTha
 		}, nil)
 
 	_, _, _, err = upgradeMgr.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
-	c.Assert(err, qt.ErrorMatches, ".*target version must be greater than current version.*")
+	c.Assert(err, qt.ErrorMatches, ".*target version must be greater than or equal to current version.*")
 }
 
 func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
