@@ -319,9 +319,6 @@ type BootstrapManager interface {
 
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.
 type UpgradeManager interface {
-	CloneController(ctx context.Context, user *openfga.User, params upgrade.CloneControllerParams) error
-	MigrateAndUpgradeModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, targetVersion version.Number) (version.Number, error)
-	PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, jujucloud.Credential, error)
 	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error)
 }
 

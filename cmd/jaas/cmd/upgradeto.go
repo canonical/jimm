@@ -108,7 +108,7 @@ func (c *upgradeToCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err)
 	}
 	if !resp.Success {
-		err = c.out.Write(ctxt, resp.Error)
+		err = c.out.Write(ctxt, resp)
 		if err != nil {
 			return errors.E(err)
 		}

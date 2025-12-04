@@ -1040,8 +1040,6 @@ func (s *jimmSuite) TestUpgradeTo_TargetVersionLowerOrEqual(c *gc.C) {
 		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
 		TargetControllerVersion: s.Model.Controller.AgentVersion,
 	}
-	resp, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp.Success, gc.Equals, false)
-	c.Assert(resp.Error, gc.Matches, ".*target version must be greater than current version.*")
+	_, err := client.UpgradeTo(&req)
+	c.Assert(err, gc.ErrorMatches, `failed to run upgrade to: failed to prepare for upgrade: target version must be greater than current version \(bad request\)`)
 }

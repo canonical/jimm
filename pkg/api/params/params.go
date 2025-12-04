@@ -246,8 +246,7 @@ type UpgradeToRequest struct {
 
 // UpgradeToResponse holds the response for phase 1 of an automated upgrade.
 type UpgradeToResponse struct {
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
+	Success bool `json:"success"`
 }
 
 // FullModelStatusRequest is the request that is sent in a FullModelStatus method.

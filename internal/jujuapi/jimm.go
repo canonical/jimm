@@ -727,10 +727,7 @@ func (r *controllerRoot) UpgradeTo(ctx context.Context, req apiparams.UpgradeToR
 
 	_, err = r.jimm.UpgradeManager().UpgradeTo(ctx, r.user, mt.Id(), targetControllerVersion)
 	if err != nil {
-		return apiparams.UpgradeToResponse{
-			Success: false,
-			Error:   err.Error(),
-		}, nil
+		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeBadRequest, fmt.Errorf("failed to run upgrade to: %w", err))
 	}
 
 	return apiparams.UpgradeToResponse{

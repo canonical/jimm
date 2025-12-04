@@ -9,7 +9,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/cmd/v3/cmdtesting"
@@ -92,16 +91,9 @@ func (s *upgradeToSuite) TestUpgradeToWithFailureResponse(c *gc.C) {
 		ModelTag:                testModelTag,
 	}
 
-	s.jimmClient.EXPECT().UpgradeTo(upgradeToParams).Return(apiparams.UpgradeToResponse{
-		Success: false,
-		Error:   testErrorMessage,
-	}, nil)
+	// Now the error is returned directly by UpgradeTo instead of embedded in the response.
+	s.jimmClient.EXPECT().UpgradeTo(upgradeToParams).Return(apiparams.UpgradeToResponse{}, errors.New(testErrorMessage))
 	s.jimmClient.EXPECT().Close().Return(nil)
-
-	s.writer.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
-		c.Check(strings.Contains(string(b), testErrorMessage), gc.Equals, true)
-		return len(b), nil
-	})
 
 	upgradeToCmd := &upgradeToCommand{
 		jimmAPIFunc: func() (JIMMAPI, error) {
@@ -121,7 +113,7 @@ func (s *upgradeToSuite) TestUpgradeToWithFailureResponse(c *gc.C) {
 		Stdout:  s.writer,
 	}
 	err := upgradeToCmd.Run(ctx)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, gc.ErrorMatches, ".*"+testErrorMessage+".*")
 }
 
 func (s *upgradeToSuite) TestUpgradeToWithError(c *gc.C) {
