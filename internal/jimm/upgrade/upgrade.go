@@ -328,14 +328,6 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 	// For now, we're always setting it.
 	cloneParams.PersonalCloud = bsCloud
 
-	zapctx.Info(ctx, "ALEX UpgradeTo cloneParams",
-		zap.String("CLIVersion", cloneParams.CLIVersion),
-		zap.String("CloudNameAndRegion", cloneParams.CloudNameAndRegion),
-		zap.String("ControllerName", cloneParams.ControllerName),
-		zap.String("CloudCred.AuthType", string(cloneParams.CloudCred.AuthType())),
-		zap.String("PersonalCloud.Name", cloneParams.PersonalCloud.Name),
-	)
-
 	// TODO: If K8S, override CloudNameAndRegion with HostCloudRegion from controller model summary.
 
 	// TODO: Map user config from source controller here.

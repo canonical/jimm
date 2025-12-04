@@ -574,11 +574,11 @@ func (b *bootstrapManager) tryCleanupController(ctx context.Context, jujuCmd Juj
 func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-chan jujucommands.OutputLine, jobId uuid.UUID) error {
 	for output := range outputCh {
 		if output.Err != nil {
-			zapctx.Error(ctx, "ALEX: command output error", zap.Error(output.Err))
+			zapctx.Error(ctx, "command output error", zap.Error(output.Err))
 			b.writeJobLog(ctx, jobId, output.Err.Error())
 			return errors.E(fmt.Errorf("command failed: %w", output.Err))
 		}
-		zapctx.Debug(ctx, "ALEX: command output", zap.String("line", output.Line))
+		zapctx.Debug(ctx, "command output", zap.String("line", output.Line))
 		b.writeJobLog(ctx, jobId, output.Line)
 	}
 	return nil
