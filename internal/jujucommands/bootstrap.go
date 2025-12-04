@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -90,8 +91,9 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	// Always add controller name & cloud at the end
 	args = append(args, b.CloudNameAndRegion, b.ControllerName)
 
-	// why
-	args = append(args, "--bootstrap-constraints=arch=arm64")
+	// Add architecture constraint to ensure juju bootstraps with the correct arch.
+	// Without this, the controller application that is deployed can be deployed with the wrong architecture.
+	args = append(args, fmt.Sprintf("--bootstrap-constraints=%s", fmt.Sprintf("arch=%s", runtime.GOARCH)))
 
 	return args
 }
