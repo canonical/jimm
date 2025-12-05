@@ -161,6 +161,9 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	// We only accept a single credential for bootstrapping.
 	cloudCred := jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
+			// TODO: Keying the credential by name is one means to ensure the
+			// credential is correctly passed and as we're using a single credential,
+			// this is OK. Ideally we should key it on name.
 			cloudName: p.CloudCred,
 		},
 	}
