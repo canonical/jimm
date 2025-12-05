@@ -2151,3 +2151,101 @@ func TestRevokeOfferAccessOnController(t *testing.T) {
 		}
 	}
 }
+
+const offerNotFoundTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+- name: controller-2
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+models:
+- name: model-1
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: controller-2
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-1
+  owner: bob@canonical.com
+  life: alive
+  users:
+  - user: bob@canonical.com
+    access: admin
+application-offers:
+- name: offer-1
+  url: test-offer-url
+  uuid: 00000012-0000-0000-0000-000000000001
+  model-name: model-1
+  model-owner: bob@canonical.com
+  application-name: application-1
+  application-description: app description 1
+`
+
+func TestFindApplicationOffers_MultipleControllers(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	// Define expected offer from the "good" controller
+	// Details copy the offer defined in the test environment
+	expectedOffer := jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
+			OfferUUID: "00000012-0000-0000-0000-000000000001",
+			OfferURL:  "test-offer-url",
+			OfferName: "offer-1",
+		},
+	}
+
+	controller1Dialed := false
+	// Setup dialers for two controllers
+	dialers := jimmtest.DialerMap{
+		"controller-1": &jimmtest.Dialer{
+			API: &jimmtest.API{
+				FindApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+					controller1Dialed = true
+					return nil, errors.E(errors.CodeNotFound, "offer not found")
+				},
+			},
+		},
+		"controller-2": &jimmtest.Dialer{
+			API: &jimmtest.API{
+				FindApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+					return []jujuparams.ApplicationOfferAdminDetailsV5{expectedOffer}, nil
+				},
+			},
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: dialers,
+	})
+
+	// Initialize environment with one controller
+	env := jimmtest.ParseEnvironment(c, offerNotFoundTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	user, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	filters := []jujuparams.OfferFilter{{
+		OfferName: "test-offer",
+		ModelName: "model-1",
+		OwnerName: "bob@canonical.com",
+	}}
+
+	offers, err := j.FindApplicationOffers(ctx, openfga.NewUser(user, j.OpenFGAClient), filters...)
+	c.Assert(err, qt.IsNil)
+	c.Assert(offers, qt.HasLen, 1)
+	c.Check(offers[0].OfferUUID, qt.Equals, expectedOffer.OfferUUID)
+	c.Check(controller1Dialed, qt.IsTrue)
+}

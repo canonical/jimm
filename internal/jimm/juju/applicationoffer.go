@@ -516,6 +516,9 @@ func (j *JujuManager) queryControllersForOffers(ctx context.Context, user *openf
 
 	for _, ctl := range controllers {
 		eg.Go(func() error {
+			// Return early if a single controller has an error
+			// to avoid misleading clients about what exists which
+			// could cause unneeded reconciliation.
 			api, err := j.dial(ctx, ctl, names.ModelTag{}, nil)
 			if err != nil {
 				return errors.E(err)
@@ -523,6 +526,9 @@ func (j *JujuManager) queryControllersForOffers(ctx context.Context, user *openf
 			defer api.Close()
 			controllerOffers, err := query(api)
 			if err != nil {
+				if errors.ErrorCode(err) == errors.CodeNotFound {
+					return nil
+				}
 				return errors.E(err)
 			}
 			for _, offer := range controllerOffers {
