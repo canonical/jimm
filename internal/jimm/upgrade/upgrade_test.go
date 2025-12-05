@@ -125,7 +125,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 		})
 
 	s.api.EXPECT().
-		CredentialContents("aws", "aws/alice/mycredential", true).
+		CredentialContents("aws", "mycredential", true).
 		DoAndReturn(func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 			return []jujuparams.CredentialContentResult{
 				{
