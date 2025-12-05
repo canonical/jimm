@@ -228,7 +228,9 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 				return nil
 			},
 			Clock: clock.WallClock,
-		}); err != nil {
+		},
+	); err != nil {
+		return controllerChosenVersion, errors.E(fmt.Errorf("failed to initiate internal migration: %w", err))
 	}
 
 	mt, err := names.ParseModelTag(iimResult.ModelTag)
