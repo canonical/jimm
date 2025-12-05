@@ -313,7 +313,10 @@ require (
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 )
 
-require github.com/ulikunitz/xz v0.5.12
+require (
+	github.com/juju/description/v10 v10.0.0
+	github.com/ulikunitz/xz v0.5.12
+)
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v6 v6.4.0 // indirect
