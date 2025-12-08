@@ -277,12 +277,7 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 		return controllerChosenVersion, errors.E(fmt.Errorf("failed to dial target controller: %w", err))
 	}
 
-	zapctx.Debug(ctx, "upgrading model agent after migration")
-
-	controllerChosenVersion, err = u.upgradeModel(ctx, api, modelUUID, targetVersion, true)
-	if err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to dry-run upgrade model after migration: %w", err))
-	}
+	zapctx.Debug(ctx, "upgrading model agent after migration", zap.String("model-uuid", mi.Name))
 
 	controllerChosenVersion, err = u.upgradeModel(ctx, api, modelUUID, targetVersion, false)
 	if err != nil {
