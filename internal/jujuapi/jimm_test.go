@@ -1030,7 +1030,7 @@ func (s *jimmSuite) TestUpgradeTo_InvalidVersion(c *gc.C) {
 }
 
 // TestUpgradeTo_TargetVersionLowerOrEqual ensures we return a success=false response when the target is <= current.
-func (s *jimmSuite) TestUpgradeTo_TargetVersionLowerOrEqual(c *gc.C) {
+func (s *jimmSuite) TestUpgradeTo_TargetVersionLower(c *gc.C) {
 	conn := s.open(c, nil, "alice")
 	defer conn.Close()
 
@@ -1038,8 +1038,8 @@ func (s *jimmSuite) TestUpgradeTo_TargetVersionLowerOrEqual(c *gc.C) {
 	// Use the current controller version to guarantee target <= current.
 	req := apiparams.UpgradeToRequest{
 		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetControllerVersion: s.Model.Controller.AgentVersion,
+		TargetControllerVersion: "1.0.0",
 	}
 	_, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.ErrorMatches, `failed to run upgrade to: failed to prepare for upgrade: target version must be greater than current version \(bad request\)`)
+	c.Assert(err, gc.ErrorMatches, `failed to run upgrade to: failed to prepare for upgrade: target version must be greater than or equal to current version \(bad request\)`)
 }

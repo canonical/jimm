@@ -115,6 +115,7 @@ func (j *Tracker) monitorJob(id uuid.UUID, jobErrCh chan error, cancelJob contex
 		select {
 		case err := <-jobErrCh:
 			if err != nil {
+				zapctx.Error(ctx, "job failed", zap.String("id", id.String()), zap.Error(err))
 				if err := j.store.SetJobFailed(ctx, id, err); err != nil {
 					zapctx.Error(ctx, "error marking the job as failed", zap.Error(err), zap.String("id", id.String()))
 				}

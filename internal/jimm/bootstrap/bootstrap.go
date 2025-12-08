@@ -577,6 +577,7 @@ func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-
 			b.writeJobLog(ctx, jobId, output.Err.Error())
 			return errors.E(fmt.Errorf("command failed: %w", output.Err))
 		}
+		zapctx.Debug(ctx, "command output", zap.String("job-id", jobId.String()), zap.String("line", output.Line))
 		b.writeJobLog(ctx, jobId, output.Line)
 	}
 	return nil

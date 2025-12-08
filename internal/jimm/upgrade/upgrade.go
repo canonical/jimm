@@ -105,8 +105,8 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(err)
 	}
 
-	if currentVersion.Compare(targetVersion) >= 0 {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(errors.CodeBadRequest, "target version must be greater than current version")
+	if currentVersion.Compare(targetVersion) == 1 {
+		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(errors.CodeBadRequest, "target version must be greater than or equal to current version")
 	}
 
 	api, err := u.dialer.Dial(ctx, &m.Controller, names.ModelTag{}, nil, nil)
@@ -132,7 +132,7 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to parse cloud credential tag from controller model summary: %w", err))
 	}
 
-	credentialContents, err := api.CredentialContents(ctrlCloud.Id(), ctrlCloudCred.Id(), true)
+	credentialContents, err := api.CredentialContents(ctrlCloud.Id(), ctrlCloudCred.Name(), true)
 	if err != nil {
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get credential contents from controller model summary: %w", err))
 	}
@@ -206,9 +206,31 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 
 	// TODO: Once precheck PR merged, run precheck.
 
-	iimResult, err := u.jujuManager.InitiateInternalMigration(ctx, user, modelUUID, targetControllerName)
-	if err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to initiate internal migration for upgrade: %w", err))
+	// As the controller has just been bootstrapped, the controller machine can still be in a pending state.
+	// Unfortunately Juju doesn't return a typed error for us to examine, and the best we've got is the error message string.
+	// So we retry a few times here to allow the controller machine to come up.
+	var iimResult jujuparams.InitiateMigrationResult
+	if err := retry.Call(
+		retry.CallArgs{
+			Attempts: 10,
+			Delay:    5 * time.Second,
+			// We could consider all errors fatal, bar: target prechecks failed: machine 0 not running (pending)
+			// IsFatalError:
+			Func: func() error {
+				zapctx.Debug(ctx, "Attempting to initiate internal migration")
+				r, err := u.jujuManager.InitiateInternalMigration(ctx, user, modelUUID, targetControllerName)
+				if err != nil {
+					zapctx.Error(ctx, "Failed to initiate internal migration", zap.Error(err))
+					return err
+				}
+
+				iimResult = r
+				return nil
+			},
+			Clock: clock.WallClock,
+		},
+	); err != nil {
+		return controllerChosenVersion, errors.E(fmt.Errorf("failed to initiate internal migration: %w", err))
 	}
 
 	mt, err := names.ParseModelTag(iimResult.ModelTag)

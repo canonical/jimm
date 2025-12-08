@@ -83,7 +83,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_RejectsCurrentVersionNewerTha
 		}, nil)
 
 	_, _, _, err = upgradeMgr.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
-	c.Assert(err, qt.ErrorMatches, ".*target version must be greater than current version.*")
+	c.Assert(err, qt.ErrorMatches, ".*target version must be greater than or equal to current version.*")
 }
 
 func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
@@ -125,7 +125,7 @@ func (s *upgradeManagerSuite) TestPrepareUpgradeTo_Success(c *qt.C) {
 		})
 
 	s.api.EXPECT().
-		CredentialContents("aws", "aws/alice/mycredential", true).
+		CredentialContents("aws", "mycredential", true).
 		DoAndReturn(func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 			return []jujuparams.CredentialContentResult{
 				{
@@ -323,7 +323,7 @@ func (s *upgradeManagerSuite) TestUpgradeTo_Success(c *qt.C) {
 		})
 
 	s.api.EXPECT().
-		CredentialContents("aws", "aws/alice/mycredential", true).
+		CredentialContents("aws", "mycredential", true).
 		DoAndReturn(func(cloud, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 			return []jujuparams.CredentialContentResult{
 				{

@@ -4,8 +4,10 @@ package jujucommands_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
@@ -61,6 +63,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				"bootstrap-timeout=1000",
 				"testregion/testcloud",
 				"my-controller",
+				fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 			},
 		},
 		{
@@ -82,6 +85,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				"bootstrap-timeout=1000",
 				"testregion/testcloud",
 				"my-controller",
+				fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 			},
 		},
 		{
@@ -98,6 +102,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				"login-token-refresh-url=myurl.com",
 				"testregion/testcloud",
 				"my-controller",
+				fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 			},
 		},
 	}
@@ -115,8 +120,11 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
+
 	mockRunner := mocks.NewMockRunner(ctrl)
+
 	dir := c.TempDir()
+
 	mockRunner.EXPECT().JujuDataDir().Return(dir).AnyTimes()
 	mockRunner.EXPECT().RunJujuCmd(testCtx, gomock.Any()).DoAndReturn(func(ctx context.Context, args []string) (<-chan jujucommands.OutputLine, error) {
 		outputCh := make(chan jujucommands.OutputLine, 1)
@@ -166,11 +174,12 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 	// Now we check the cred is added
 	personalCloudCred, err := store.CredentialForCloud("testcloud")
 	c.Assert(err, qt.IsNil)
+
 	// Check just attributes, if the populated in memory credential is set for the "testcloud",
 	// then we're sure the credential to be used is the one we provided for our provided cloud.
 	// (Given it also exists in the temp directory)
 	c.Assert(
-		personalCloudCred.AuthCredentials["bootstrap-credential"].Attributes(),
+		personalCloudCred.AuthCredentials["testcloud"].Attributes(),
 		qt.DeepEquals,
 		cloudCred.Attributes(),
 	)
@@ -230,7 +239,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PublicCloudWr
 	personalCloudCred, err := store.CredentialForCloud("aws")
 	c.Assert(err, qt.IsNil)
 	c.Assert(
-		personalCloudCred.AuthCredentials["bootstrap-credential"].Attributes(),
+		personalCloudCred.AuthCredentials["aws"].Attributes(),
 		qt.DeepEquals,
 		cloudCred.Attributes(),
 	)

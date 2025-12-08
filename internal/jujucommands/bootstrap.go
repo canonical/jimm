@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -90,6 +91,10 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	// Always add controller name & cloud at the end
 	args = append(args, b.CloudNameAndRegion, b.ControllerName)
 
+	// Add architecture constraint to ensure juju bootstraps with the correct arch.
+	// Without this, the controller application that is deployed can be deployed with the wrong architecture.
+	args = append(args, fmt.Sprintf("--bootstrap-constraints=%s", fmt.Sprintf("arch=%s", runtime.GOARCH)))
+
 	return args
 }
 
@@ -156,9 +161,13 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	// We only accept a single credential for bootstrapping.
 	cloudCred := jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
-			p.CloudCred.Label: p.CloudCred,
+			// TODO: Keying the credential by name is one means to ensure the
+			// credential is correctly passed and as we're using a single credential,
+			// this is OK. Ideally we should key it on name.
+			cloudName: p.CloudCred,
 		},
 	}
+
 	if err := store.UpdateCredential(cloudName, cloudCred); err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to set credential: %w", err)
 	}

@@ -583,6 +583,7 @@ func (r *controllerRoot) ListMigrationTargets(ctx context.Context, req apiparams
 	for _, ctl := range dbControllers {
 		controllersInfo = append(controllersInfo, ctl.ToAPIControllerInfo())
 	}
+
 	return apiparams.ListControllersResponse{
 		Controllers: controllersInfo,
 	}, nil
