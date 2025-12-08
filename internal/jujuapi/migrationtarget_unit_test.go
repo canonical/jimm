@@ -162,10 +162,11 @@ func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	args := jujuparams.MigrationModelInfo{
-		UUID:             "00000001-0000-0000-0000-000000000001",
-		Name:             "test-model",
-		OwnerTag:         names.NewUserTag("bob").String(),
-		ModelDescription: serialisedDescription,
+		UUID:                   "00000001-0000-0000-0000-000000000001",
+		Name:                   "test-model",
+		OwnerTag:               names.NewUserTag("bob").String(),
+		ControllerAgentVersion: version.MustParse("3.6.9"),
+		ModelDescription:       serialisedDescription,
 	}
 
 	// Validate access denied without JIMM admin permissions.

@@ -15,6 +15,7 @@ import (
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	jujuversion "github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -25,7 +26,6 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/canonical/jimm/v3/version"
-	jujuversion "github.com/juju/version/v2"
 )
 
 func init() {

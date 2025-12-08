@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/description"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/v3/internal/description"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"

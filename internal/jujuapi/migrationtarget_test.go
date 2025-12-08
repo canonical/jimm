@@ -69,8 +69,8 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 		UUID:                   modelUUID,
 		Owner:                  names.NewUserTag("alice"),
 		Name:                   "test-model",
-		ControllerAgentVersion: version.MustParse("3.5.0"),
-		AgentVersion:           version.MustParse("3.5.0"),
+		ControllerAgentVersion: version.MustParse("3.6.9"),
+		AgentVersion:           version.MustParse("3.6.9"),
 		ModelDescription:       modelDescription,
 	}
 	client := migrationtarget.NewClient(conn)

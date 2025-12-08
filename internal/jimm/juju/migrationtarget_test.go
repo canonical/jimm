@@ -270,18 +270,14 @@ func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	// Below is a simple model description with no users that have access.
-	descriptionArgs := descriptionv9.ModelArgs{
-		AgentVersion: "3.6.9",
-		Owner:        names.NewUserTag("bob"),
-		Type:         descriptionv9.IAAS,
-		Cloud:        "test",
-		Config: map[string]interface{}{
-			"uuid": migratingModelUUID,
-			"name": "test-model",
-		},
-		CloudRegion: "test-region",
+	descriptionArgs := modelDescriptionArgs{
+		Owner:           "bob",
+		CloudName:       "test",
+		CloudRegionName: "test-region",
 	}
-	modelDescription := descriptionv9.NewModel(descriptionArgs)
+
+	modelDescription := newModelDescription(descriptionArgs)
+	modelDescription.SetUsers(nil)
 
 	modelDescription.SetCloudCredential(descriptionv9.CloudCredentialArgs{
 		Owner: names.NewUserTag("bob"),
@@ -319,18 +315,13 @@ func TestPreChecks_ValidatesUserMapping(t *testing.T) {
 }
 
 func modelInfoWithUnmappedUsers(c *qt.C) juju.MigratingModelInfo {
-	descriptionArgs := descriptionv9.ModelArgs{
-		AgentVersion: "3.6.9",
-		Owner:        names.NewUserTag("bob"),
-		Type:         descriptionv9.IAAS,
-		Cloud:        "test",
-		Config: map[string]interface{}{
-			"uuid": migratingModelUUID,
-			"name": "test-model",
-		},
-		CloudRegion: "test-region",
+	descriptionArgs := modelDescriptionArgs{
+		Owner:           "bob",
+		CloudName:       "test",
+		CloudRegionName: "test-region",
 	}
-	modelDescription := descriptionv9.NewModel(descriptionArgs)
+	modelDescription := newModelDescription(descriptionArgs)
+	modelDescription.SetUsers(nil)
 
 	// Add a user with admin access that is not mapped.
 	userArgs := descriptionv9.UserArgs{
@@ -344,13 +335,22 @@ func modelInfoWithUnmappedUsers(c *qt.C) juju.MigratingModelInfo {
 		Name:  "test-cred",
 		Cloud: names.NewCloudTag("test"),
 	})
-	appArgs := descriptionv9.ApplicationArgs{}
+	appArgs := descriptionv9.ApplicationArgs{
+		Tag: names.NewApplicationTag("foo"),
+	}
 	app := modelDescription.AddApplication(appArgs)
+	app.SetStatus(descriptionv9.StatusArgs{
+		Value: "available",
+	})
 
-	// Add an offer with an ACL for a user that is not mapped.
+	// Add an offer with an ACL for the everyone@external user.
 	offerArgs := descriptionv9.ApplicationOfferArgs{
-		OfferName: "test-offer",
-		ACL:       map[string]string{"jack": "admin"},
+		OfferUUID:              "86d97176-c9a7-4333-bb54-84f85f7d8aaa",
+		OfferName:              "test-offer",
+		ACL:                    map[string]string{"jack": "admin"},
+		ApplicationName:        "foo",
+		Endpoints:              map[string]string{"foo": "foo"},
+		ApplicationDescription: "a description",
 	}
 	app.AddOffer(offerArgs)
 
@@ -400,13 +400,22 @@ func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
 	}
 	model.ModelDescription.AddUser(everyoneUserArgs)
 
-	appArgs := descriptionv9.ApplicationArgs{}
+	appArgs := descriptionv9.ApplicationArgs{
+		Tag: names.NewApplicationTag("foo"),
+	}
 	app := model.ModelDescription.AddApplication(appArgs)
+	app.SetStatus(descriptionv9.StatusArgs{
+		Value: "available",
+	})
 
 	// Add an offer with an ACL for the everyone@external user.
 	offerArgs := descriptionv9.ApplicationOfferArgs{
-		OfferName: "test-offer",
-		ACL:       map[string]string{"everyone@external": "read"},
+		OfferUUID:              "86d97176-c9a7-4333-bb54-84f85f7d8aaa",
+		OfferName:              "test-offer",
+		ACL:                    map[string]string{"everyone@external": "read"},
+		ApplicationName:        "foo",
+		Endpoints:              map[string]string{"foo": "foo"},
+		ApplicationDescription: "a description",
 	}
 	app.AddOffer(offerArgs)
 
@@ -423,7 +432,7 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	api := &jimmtest.API{
 		Prechecks_: func(mmi params.MigrationModelInfo) error {
 			c.Check(mmi.UUID, qt.Equals, migratingModelUUID)
-			c.Check(mmi.OwnerTag, qt.Equals, "alice@canonical.com")
+			c.Check(mmi.OwnerTag, qt.Equals, "user-alice@canonical.com")
 			// Deserialize the model description and validate its contents.
 			modelDescription, err := descriptionv9.Deserialize(mmi.ModelDescription)
 			c.Check(err, qt.IsNil)
