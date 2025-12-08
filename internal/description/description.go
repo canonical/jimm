@@ -83,13 +83,13 @@ func Deserialize(raw []byte, targetControllerVersion version.Number) (Model, err
 	case 9:
 		desc, err := descriptionv9.Deserialize(raw)
 		if err != nil {
-			return nil, errors.E("failed to deserialize v9 model description: %w", err)
+			return nil, errors.E(fmt.Errorf("failed to deserialize v9 model description: %w", err))
 		}
 		return &migrationDescriptionV9{desc: desc}, nil
 	case 10:
 		desc, err := descriptionv10.Deserialize(raw)
 		if err != nil {
-			return nil, errors.E("failed to deserialize v10 model description: %w", err)
+			return nil, errors.E(fmt.Errorf("failed to deserialize v10 model description: %w", err))
 		}
 		return &migrationDescriptionV10{desc: desc}, nil
 	default:
@@ -104,7 +104,7 @@ func migrationDescriptionVersion(controllerVersion version.Number) (int, error) 
 
 	switch {
 	case v.Compare(version.MustParse("3.6.9")) < 0:
-		return 0, errors.E("unsupported controller version, must be at least 3.6.9")
+		return 0, errors.E(fmt.Errorf("unsupported controller version %s, must be at least 3.6.9", controllerVersion))
 	case v.Compare(version.MustParse("3.6.9")) >= 0 && v.Compare(version.MustParse("3.6.12")) <= 0:
 		return 9, nil
 	case v.Compare(version.MustParse("3.6.13")) == 0:

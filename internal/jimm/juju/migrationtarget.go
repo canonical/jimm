@@ -10,11 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/description"
 	jujucrossmodel "github.com/juju/juju/core/crossmodel"
 	coremigration "github.com/juju/juju/core/migration"
 	"github.com/juju/juju/environs/config"
-	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -24,6 +22,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/description"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -465,7 +464,7 @@ func (j *JujuManager) Activate(ctx context.Context, modelTag names.ModelTag, mig
 //   - Imports the model into JIMM's state.
 //   - Adds permissions for the model and application offers.
 //   - Calls the import method on the target Juju controller to import the model.
-func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized params.SerializedModel) error {
+func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error {
 
 	// Determine the model UUID from the serialized description
 	// and later use the model UUID to get the target controller

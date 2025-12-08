@@ -43,7 +43,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test
   region: test-region-1
-  agent-version: 3.2.1
+  agent-version: 3.6.9
   public-address: foo.com
 users:
 - username: alice@canonical.com
@@ -66,7 +66,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test
   region: test-region-1
-  agent-version: 3.2.1
+  agent-version: 3.6.9
   public-address: foo.com
 users:
 - username: alice@canonical.com
@@ -230,7 +230,7 @@ func toJimmDescription(c *qt.C, modelDesc descriptionv9.Model) jimmdescription.M
 	serializedDescription, err := descriptionv9.Serialize(modelDesc)
 	c.Assert(err, qt.IsNil)
 
-	jimmDesc, err := jimmdescription.Deserialize(serializedDescription, version.MustParse("3.6.0"))
+	jimmDesc, err := jimmdescription.Deserialize(serializedDescription, version.MustParse("3.6.9"))
 	c.Assert(err, qt.IsNil)
 	return jimmDesc
 }
@@ -271,7 +271,7 @@ func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 
 	// Below is a simple model description with no users that have access.
 	descriptionArgs := descriptionv9.ModelArgs{
-		AgentVersion: "3.2.1",
+		AgentVersion: "3.6.9",
 		Owner:        names.NewUserTag("bob"),
 		Type:         descriptionv9.IAAS,
 		Cloud:        "test",
@@ -293,8 +293,8 @@ func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag("bob"),
 		Name:                   "test-model",
-		AgentVersion:           version.MustParse("3.2.1"),
-		ControllerAgentVersion: version.MustParse("3.2.1"),
+		AgentVersion:           version.MustParse("3.6.9"),
+		ControllerAgentVersion: version.MustParse("3.6.9"),
 		ModelDescription:       toJimmDescription(c, modelDescription),
 	}
 	err := j.Prechecks(ctx, user, modelInfo)
@@ -320,7 +320,7 @@ func TestPreChecks_ValidatesUserMapping(t *testing.T) {
 
 func modelInfoWithUnmappedUsers(c *qt.C) juju.MigratingModelInfo {
 	descriptionArgs := descriptionv9.ModelArgs{
-		AgentVersion: "3.2.1",
+		AgentVersion: "3.6.9",
 		Owner:        names.NewUserTag("bob"),
 		Type:         descriptionv9.IAAS,
 		Cloud:        "test",
@@ -358,8 +358,8 @@ func modelInfoWithUnmappedUsers(c *qt.C) juju.MigratingModelInfo {
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag("bob"),
 		Name:                   "test-model",
-		AgentVersion:           version.MustParse("3.2.1"),
-		ControllerAgentVersion: version.MustParse("3.2.1"),
+		AgentVersion:           version.MustParse("3.6.9"),
+		ControllerAgentVersion: version.MustParse("3.6.9"),
 		ModelDescription:       toJimmDescription(c, modelDescription),
 	}
 	return modelInfo
@@ -428,7 +428,7 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 			modelDescription, err := descriptionv9.Deserialize(mmi.ModelDescription)
 			c.Check(err, qt.IsNil)
 			if err != nil {
-				return nil
+				return err
 			}
 			c.Check(modelDescription.Users(), qt.HasLen, 0)
 			c.Check(modelDescription.Owner().String(), qt.Equals, "user-alice@canonical.com")
@@ -664,7 +664,7 @@ func TestAdoptResources_Success(t *testing.T) {
 	// has been activated so the incoming model migration
 	// row was deleted and the model has been created.
 
-	controllerVersion := version.MustParse("3.2.1")
+	controllerVersion := version.MustParse("3.6.9")
 	modelUUID := "00000002-0000-0000-0000-000000000001"
 
 	// Validate that the API request to Juju is made with a modified version
@@ -699,7 +699,7 @@ func TestAdoptResources_NoModel(t *testing.T) {
 
 	j := newTestJujuManager(c, nil)
 
-	err := j.AdoptResources(ctx, nil, "foo", version.MustParse("3.2.1"))
+	err := j.AdoptResources(ctx, nil, "foo", version.MustParse("3.6.9"))
 	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 }
 
@@ -884,7 +884,7 @@ type modelDescriptionArgs struct {
 
 func newModelDescription(args modelDescriptionArgs) descriptionv9.Model {
 	descriptionArgs := descriptionv9.ModelArgs{
-		AgentVersion: "3.2.1",
+		AgentVersion: "3.6.9",
 		Owner:        names.NewUserTag(args.Owner),
 		Type:         descriptionv9.IAAS,
 		Cloud:        args.CloudName,
@@ -906,6 +906,7 @@ func newModelDescription(args modelDescriptionArgs) descriptionv9.Model {
 		Name:  args.CloudCredentialName,
 		Cloud: names.NewCloudTag(args.CloudName),
 	})
+	modelDescription.SetStatus(descriptionv9.StatusArgs{Value: "available"})
 	return modelDescription
 }
 
@@ -914,8 +915,8 @@ func newMigrationInfo(args modelDescriptionArgs) migration.ModelInfo {
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag(args.Owner),
 		Name:                   "test-model",
-		AgentVersion:           version.MustParse("3.2.1"),
-		ControllerAgentVersion: version.MustParse("3.2.1"),
+		AgentVersion:           version.MustParse("3.6.9"),
+		ControllerAgentVersion: version.MustParse("3.6.9"),
 		ModelDescription:       newModelDescription(args),
 	}
 	return modelInfo
@@ -935,7 +936,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test-cloud
   region: test-region-1
-  agent-version: 3.2.1
+  agent-version: 3.6.9
 models:
 - name: model-1
   uuid: 00000002-0000-0000-0000-000000000001
@@ -997,7 +998,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test
   region: test-region-1
-  agent-version: 3.2.1
+  agent-version: 3.6.9
   public-address: foo.com
   cloud-regions:
   - cloud: test
@@ -1053,7 +1054,7 @@ func TestImport_Success(t *testing.T) {
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	desc.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+
 	app := desc.AddApplication(descriptionv9.ApplicationArgs{
 		Tag: names.NewApplicationTag("test-app"),
 	})
@@ -1310,7 +1311,7 @@ controllers:
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test
   region: test-region
-  agent-version: 3.2.1
+  agent-version: 3.6.9
   public-address: foo.com
 models:
 - name: test-model
