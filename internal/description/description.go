@@ -8,12 +8,13 @@ package description
 import (
 	"fmt"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	descriptionv10 "github.com/juju/description/v10"
 	descriptionv9 "github.com/juju/description/v9"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 const latestDescriptionVersion = 10
