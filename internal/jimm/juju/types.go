@@ -9,7 +9,6 @@ import (
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/description"
 )
 
 // MigratingModelInfo is used to report basic details about a model.
@@ -19,7 +18,7 @@ type MigratingModelInfo struct {
 	Name                   string
 	AgentVersion           version.Number
 	ControllerAgentVersion version.Number
-	ModelDescription       description.Model
+	RawModelDescription    []byte
 }
 
 // ControllerCreds represent the admin username and password

@@ -162,25 +162,35 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model M
 		return errors.E(fmt.Errorf("failed to get model migration %q: %w", model.UUID, err))
 	}
 
-	err = j.validateUserMapping(model.ModelDescription, incomingModel.UserMapping)
+	targetControllerVersion, err := version.Parse(incomingModel.TargetController.AgentVersion)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to parse target controller agent version %q: %w", incomingModel.TargetController.AgentVersion, err))
+	}
+
+	modelDescription, err := description.Deserialize(model.RawModelDescription, targetControllerVersion)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to deserialize model description: %w", err))
+	}
+
+	err = j.validateUserMapping(modelDescription, incomingModel.UserMapping)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to validate user mapping: %w", err))
 	}
 
-	err = j.modifyMigrationInfo(&model, incomingModel.UserMapping)
+	model.Owner, err = j.modifyMigrationInfo(modelDescription, incomingModel.UserMapping)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to modify migration info: %w", err))
 	}
 
-	_, err = j.Database.FindRegionByCloudName(ctx, model.ModelDescription.CloudCredential().Cloud(), model.ModelDescription.CloudRegion())
+	_, err = j.Database.FindRegionByCloudName(ctx, modelDescription.CloudCredential().Cloud(), modelDescription.CloudRegion())
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to find region for cloud %q: %w", model.ModelDescription.CloudCredential().Cloud(), err))
+		return errors.E(fmt.Errorf("failed to find region for cloud %q: %w", modelDescription.CloudCredential().Cloud(), err))
 	}
 
 	cloudCredential := &dbmodel.CloudCredential{
-		CloudName:         model.ModelDescription.CloudCredential().Cloud(),
-		OwnerIdentityName: model.ModelDescription.Owner().Id(),
-		Name:              model.ModelDescription.CloudCredential().Name(),
+		CloudName:         modelDescription.CloudCredential().Cloud(),
+		OwnerIdentityName: modelDescription.Owner().Id(),
+		Name:              modelDescription.CloudCredential().Name(),
 	}
 
 	err = j.Database.GetCloudCredential(ctx, cloudCredential)
@@ -194,7 +204,7 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model M
 	}
 	defer api.Close()
 
-	serializedModel, err := model.ModelDescription.Serialize()
+	serializedModel, err := modelDescription.Serialize()
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to serialize model description: %w", err))
 	}
@@ -281,31 +291,31 @@ func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, mo
 
 // modifyMigrationInfo modifies the description of the model migration
 // to replace any local user references with their external mapping.
-func (j *JujuManager) modifyMigrationInfo(model *MigratingModelInfo, userMapping dbmodel.StringMap) error {
-	if !model.Owner.IsLocal() {
+// It returns the new owner of the model after modification.
+func (j *JujuManager) modifyMigrationInfo(model description.Model, userMapping dbmodel.StringMap) (names.UserTag, error) {
+	if !model.Owner().IsLocal() {
 		// If the owner is not a local user, we do not modify it.
 		// This is useful when migrating a model from one JIMM
 		// controller to another, where the owner is already an external user.
-		return nil
+		return model.Owner(), nil
 	}
 
-	newOwner, ok := userMapping[model.Owner.Id()]
+	newOwner, ok := userMapping[model.Owner().Id()]
 	if !ok {
 		// If the owner is not found in the user mappings, we return an error.
 		// This is to ensure that the migration does not proceed with an invalid owner.
-		return errors.E(fmt.Errorf("no external user mapping found for local user %q", model.Owner.Id()))
+		return names.UserTag{}, errors.E(fmt.Errorf("no external user mapping found for local user %q", model.Owner().Id()))
 	}
 	if !names.IsValidUser(newOwner) {
-		return errors.E(fmt.Errorf("invalid external user mapping %q for local user %q", newOwner, model.Owner.Id()))
+		return names.UserTag{}, errors.E(fmt.Errorf("invalid external user mapping %q for local user %q", newOwner, model.Owner().Id()))
 	}
 
 	newOwnerTag := names.NewUserTag(newOwner)
-	model.Owner = newOwnerTag
-	err := modifyModelDescription(model.ModelDescription, userMapping)
+	err := modifyModelDescription(model, userMapping)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to modify model description: %w", err))
+		return names.UserTag{}, errors.E(fmt.Errorf("failed to modify model description: %w", err))
 	}
-	return nil
+	return newOwnerTag, nil
 }
 
 // modifyModelDescription modifies the model description to replace local user references

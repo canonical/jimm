@@ -17,7 +17,6 @@ import (
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	jimmdescription "github.com/canonical/jimm/v3/internal/description"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -226,24 +225,16 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
-func toJimmDescription(c *qt.C, modelDesc descriptionv9.Model) jimmdescription.Model {
-	serializedDescription, err := descriptionv9.Serialize(modelDesc)
-	c.Assert(err, qt.IsNil)
-
-	jimmDesc, err := jimmdescription.Deserialize(serializedDescription, version.MustParse("3.6.9"))
-	c.Assert(err, qt.IsNil)
-	return jimmDesc
-}
-
 func toJimmMigratingInfo(c *qt.C, modelInfo migration.ModelInfo) juju.MigratingModelInfo {
-	jimmDesc := toJimmDescription(c, modelInfo.ModelDescription)
+	rawDescription, err := descriptionv9.Serialize(modelInfo.ModelDescription)
+	c.Assert(err, qt.IsNil)
 	return juju.MigratingModelInfo{
 		UUID:                   modelInfo.UUID,
 		Owner:                  modelInfo.Owner,
 		Name:                   modelInfo.Name,
 		AgentVersion:           modelInfo.AgentVersion,
 		ControllerAgentVersion: modelInfo.ControllerAgentVersion,
-		ModelDescription:       jimmDesc,
+		RawModelDescription:    rawDescription,
 	}
 }
 
@@ -285,15 +276,18 @@ func TestPreChecks_NoUsersWithAccess(t *testing.T) {
 		Cloud: names.NewCloudTag("test"),
 	})
 
+	rawDescription, err := descriptionv9.Serialize(modelDescription)
+	c.Assert(err, qt.IsNil)
+
 	modelInfo := juju.MigratingModelInfo{
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag("bob"),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.6.9"),
 		ControllerAgentVersion: version.MustParse("3.6.9"),
-		ModelDescription:       toJimmDescription(c, modelDescription),
+		RawModelDescription:    rawDescription,
 	}
-	err := j.Prechecks(ctx, user, modelInfo)
+	err = j.Prechecks(ctx, user, modelInfo)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -354,13 +348,16 @@ func modelInfoWithUnmappedUsers(c *qt.C) juju.MigratingModelInfo {
 	}
 	app.AddOffer(offerArgs)
 
+	rawDescription, err := descriptionv9.Serialize(modelDescription)
+	c.Assert(err, qt.IsNil)
+
 	modelInfo := juju.MigratingModelInfo{
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag("bob"),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.6.9"),
 		ControllerAgentVersion: version.MustParse("3.6.9"),
-		ModelDescription:       toJimmDescription(c, modelDescription),
+		RawModelDescription:    rawDescription,
 	}
 	return modelInfo
 }

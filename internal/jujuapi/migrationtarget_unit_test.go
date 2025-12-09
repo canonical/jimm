@@ -186,31 +186,6 @@ func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `"invalid-owner-tag" is not a valid tag`)
 }
 
-func (s *migrationTargetUnitSuite) TestPreChecks_InvalidModelDescription(c *gc.C) {
-	ctx := context.Background()
-
-	jimm := &jimmtest.JIMM{}
-
-	var u dbmodel.Identity
-	u.SetTag(names.NewUserTag("alice@canonical.com"))
-	user := openfga.NewUser(&u, nil)
-	user.JimmAdmin = true
-
-	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
-	jujuapi.SetUser(cr, user)
-
-	args := jujuparams.MigrationModelInfo{
-		UUID:             "00000001-0000-0000-0000-000000000001",
-		Name:             "test-model",
-		OwnerTag:         names.NewUserTag("bob").String(),
-		ModelDescription: []byte(`invalid`),
-	}
-
-	// Validate access denied without JIMM admin permissions.
-	err := cr.Prechecks(ctx, args)
-	c.Assert(err, gc.ErrorMatches, `(?s)failed to deserialize model description.*`)
-}
-
 func (s *migrationTargetUnitSuite) TestAdoptResources(c *gc.C) {
 	ctx := context.Background()
 
