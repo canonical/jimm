@@ -277,7 +277,7 @@ func (s *upgradeManagerSuite) TestMigrateAndUpgradeModel_Success(c *qt.C) {
 	s.dialer.EXPECT().Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(s.api, nil)
 
 	s.api.EXPECT().
-		UpgradeModel(mt.Id(), targetModelVersion, "", false, true).
+		UpgradeModel(mt.Id(), targetModelVersion, "", false, false).
 		Return(targetModelVersion, nil)
 
 	controllerChosenVersion, err := upgradeMgr.MigrateAndUpgradeModel(ctx, &openfga.User{}, mt.Id(), targetController, targetModelVersion)
