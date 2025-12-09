@@ -24,6 +24,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
@@ -35,7 +36,7 @@ type jimmSuite struct {
 
 var _ = gc.Suite(&jimmSuite{})
 
-func (s *jimmSuite) TestListControllers(c *gc.C) {
+func (s *jimmSuite) TestListControllersAdmin(c *gc.C) {
 	s.AddController(c, "controller-0", s.APIInfo(c))
 	s.AddController(c, "controller-2", s.APIInfo(c))
 
@@ -81,6 +82,77 @@ func (s *jimmSuite) TestListControllers(c *gc.C) {
 	}})
 }
 
+func (s *jimmSuite) TestListControllersOrdinaryUser(c *gc.C) {
+	ctx := context.Background()
+
+	ctrl0 := &dbmodel.Controller{
+		Name:      "dummy-0",
+		UUID:      "00000001-0000-0000-0000-000000000000",
+		CloudName: "dummy",
+	}
+
+	ctrl1 := &dbmodel.Controller{
+		Name:      "dummy-1",
+		UUID:      "00000001-0000-0000-0000-000000000001",
+		CloudName: "dummy",
+	}
+
+	ctrl2 := &dbmodel.Controller{
+		Name:      "dummy-2",
+		UUID:      "00000001-0000-0000-0000-000000000002",
+		CloudName: "dummy",
+	}
+
+	err := s.JIMM.Database.AddController(ctx, ctrl0)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.AddController(ctx, ctrl1)
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.AddController(ctx, ctrl2)
+	c.Assert(err, gc.IsNil)
+
+	// Explicitly set access to controllers 0 and 2, but not 1.
+	u, err := dbmodel.NewIdentity("alex@canonical.com")
+	c.Assert(err, gc.IsNil)
+
+	err = s.JIMM.Database.GetIdentity(ctx, u)
+	c.Assert(err, gc.IsNil)
+
+	openfgaUser := openfga.NewUser(u, s.JIMM.OpenFGAClient)
+
+	err = openfgaUser.SetControllerAccess(ctx, names.NewControllerTag(ctrl0.UUID), ofganames.CanAddModelRelation)
+	c.Assert(err, gc.IsNil)
+
+	err = openfgaUser.SetControllerAccess(ctx, names.NewControllerTag(ctrl2.UUID), ofganames.CanAddModelRelation)
+	c.Assert(err, gc.IsNil)
+
+	conn := s.open(c, nil, "alex@canonical.com")
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	cis, err := client.ListControllers()
+	c.Assert(err, gc.Equals, nil)
+	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{
+		{
+			Name:     "dummy-0",
+			UUID:     "00000001-0000-0000-0000-000000000000",
+			CloudTag: "cloud-dummy",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+			},
+		},
+		{
+			Name:     "dummy-2",
+			UUID:     "00000001-0000-0000-0000-000000000002",
+			CloudTag: "cloud-dummy",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+			},
+		},
+	})
+}
+
 func (s *jimmSuite) TestListControllersUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-0", s.APIInfo(c))
 	s.AddController(c, "controller-2", s.APIInfo(c))
@@ -91,14 +163,7 @@ func (s *jimmSuite) TestListControllersUnauthorized(c *gc.C) {
 	client := api.NewClient(conn)
 	cis, err := client.ListControllers()
 	c.Assert(err, gc.Equals, nil)
-	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{{
-		Name:         "jaas",
-		UUID:         jimmtest.ControllerUUID,
-		AgentVersion: s.Model.Controller.AgentVersion,
-		Status: jujuparams.EntityStatus{
-			Status: "available",
-		},
-	}})
+	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{})
 }
 
 func (s *jimmSuite) TestAddControllerPublicAddressWithoutPort(c *gc.C) {

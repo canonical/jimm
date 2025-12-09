@@ -12,6 +12,8 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -64,15 +66,19 @@ func (j *JujuManager) ControllerInfo(ctx context.Context, name string) (*dbmodel
 	return &ctl, nil
 }
 
-// ListControllers returns a list of controllers the user has access to.
+// ListControllers returns a list of controllers the user has can_addmodel to.
+// JIMM admins get all controllers.
 func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
-	if !user.JimmAdmin {
-		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
-	}
-
 	var controllers []dbmodel.Controller
 	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
-		controllers = append(controllers, *c)
+		canAddModel, err := user.IsAllowedAddModelToController(ctx, c.ResourceTag())
+		if err != nil {
+			zapctx.Error(ctx, "error checking user permissions for controller", zap.String("controller", c.Name), zap.Error(err))
+			return nil
+		}
+		if user.JimmAdmin || canAddModel {
+			controllers = append(controllers, *c)
+		}
 		return nil
 	})
 	if err != nil {

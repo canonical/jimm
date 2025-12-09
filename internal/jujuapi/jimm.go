@@ -229,39 +229,18 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 	return ctl.ToAPIControllerInfo(), nil
 }
 
-// ListControllers returns the list of juju controllers hosting models
-// as part of this JAAS system.
-// If the user is not an admin, they will only receive information about
-// JIMM itself - note that the controller name returned is "jaas".
+// ListControllers returns the list of juju controllers the user has can_addmodel access to on the controller.
 func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListControllersResponse, error) {
-
-	if !r.user.JimmAdmin {
-		// if the user isn't a controller admin return JAAS
-		// itself as the only controller.
-		srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
-		if err != nil {
-			return apiparams.ListControllersResponse{}, errors.E(err)
-		}
-		jimmCtl := apiparams.ControllerInfo{
-			Name: "jaas",
-			UUID: r.params.ControllerUUID,
-			// TODO(mhilton)enable setting the public address.
-			AgentVersion: srvVersion.String(),
-			Status: jujuparams.EntityStatus{
-				Status: "available",
-			},
-		}
-		controllers := []apiparams.ControllerInfo{jimmCtl}
-		return apiparams.ListControllersResponse{Controllers: controllers}, nil
-	}
 	dbControllers, err := r.jimm.JujuManager().ListControllers(ctx, r.user)
 	if err != nil {
 		return apiparams.ListControllersResponse{}, errors.E(err)
 	}
+
 	controllersInfo := make([]apiparams.ControllerInfo, 0, len(dbControllers))
 	for _, ctl := range dbControllers {
 		controllersInfo = append(controllersInfo, ctl.ToAPIControllerInfo())
 	}
+
 	return apiparams.ListControllersResponse{
 		Controllers: controllersInfo,
 	}, nil

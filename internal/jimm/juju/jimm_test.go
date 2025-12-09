@@ -53,9 +53,10 @@ users:
 - username: alice@canonical.com
   controller-access: superuser
 - username: bob@canonical.com
-  controller-access: login
+  can-add-model: [00000001-0000-0000-0000-000000000001, 00000001-0000-0000-0000-000000000002]
 - username: eve@canonical.com
-  controller-access: "no-access"
+  can-add-model: [00000001-0000-0000-0000-000000000001, 00000001-0000-0000-0000-000000000003]
+- username: notallowedanycontrollers@canonical.com
 `
 
 func TestControllerInfo(t *testing.T) {
@@ -92,30 +93,49 @@ func TestListControllers(t *testing.T) {
 		jimmAdmin           bool
 		expectedControllers []dbmodel.Controller
 		expectedError       string
-	}{{
-		about:     "superuser can list controllers",
-		user:      env.User("alice@canonical.com").DBObject(c, j.Database),
-		jimmAdmin: true,
-		expectedControllers: []dbmodel.Controller{
-			env.Controller("test1").DBObject(c, j.Database),
-			env.Controller("test2").DBObject(c, j.Database),
-			env.Controller("test3").DBObject(c, j.Database),
+	}{
+		{
+			about:     "superuser can list controllers",
+			user:      env.User("alice@canonical.com").DBObject(c, j.Database),
+			jimmAdmin: true,
+			expectedControllers: []dbmodel.Controller{
+				env.Controller("test1").DBObject(c, j.Database),
+				env.Controller("test2").DBObject(c, j.Database),
+				env.Controller("test3").DBObject(c, j.Database),
+			},
 		},
-	}, {
-		about:         "add-model user can not list controllers",
-		user:          env.User("bob@canonical.com").DBObject(c, j.Database),
-		expectedError: "unauthorized",
-	}, {
-		about:         "user withouth access rights cannot list controllers",
-		user:          env.User("eve@canonical.com").DBObject(c, j.Database),
-		expectedError: "unauthorized",
-	}}
+		{
+			about:     "bob has can_addmodel to test1 and test2 controllers",
+			user:      env.User("bob@canonical.com").DBObject(c, j.Database),
+			jimmAdmin: false,
+			expectedControllers: []dbmodel.Controller{
+				env.Controller("test1").DBObject(c, j.Database),
+				env.Controller("test2").DBObject(c, j.Database),
+			},
+		},
+		{
+			about:     "eve has can_addmodel to test1 and test3 controllers",
+			user:      env.User("eve@canonical.com").DBObject(c, j.Database),
+			jimmAdmin: false,
+			expectedControllers: []dbmodel.Controller{
+				env.Controller("test1").DBObject(c, j.Database),
+				env.Controller("test3").DBObject(c, j.Database),
+			},
+		},
+		{
+			about:               "user without access cannot list any controllers",
+			user:                env.User("notallowedanycontrollers@canonical.com").DBObject(c, j.Database),
+			jimmAdmin:           false,
+			expectedControllers: nil,
+		},
+	}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			user := openfga.NewUser(&test.user, j.OpenFGAClient)
 			user.JimmAdmin = test.jimmAdmin
 			controllers, err := j.ListControllers(ctx, user)
+
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			} else {
@@ -369,11 +389,11 @@ func TestRemoveAndAddController(t *testing.T) {
 	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, removeAndAddControllerTestEnv)
-	env.PopulateDB(c, j.Database)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 	controller := env.Controllers[0]
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
-	user := openfga.NewUser(&dbUser, nil)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 	user.JimmAdmin = true
 
 	err := j.RemoveController(ctx, user, "controller-1", true)
