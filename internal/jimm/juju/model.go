@@ -53,46 +53,6 @@ type ModelCreateArgs struct {
 	TargetController string
 }
 
-// FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
-func (a *ModelCreateArgs) FromJujuModelCreateArgs(args *jujuparams.ModelCreateArgs) error {
-	if args.Name == "" {
-		return errors.E("name not specified")
-	}
-	a.Name = args.Name
-	a.TargetController = args.TargetController
-	a.Config = args.Config
-	a.CloudRegion = args.CloudRegion
-	if args.CloudTag != "" {
-		ct, err := names.ParseCloudTag(args.CloudTag)
-		if err != nil {
-			return errors.E(err, errors.CodeBadRequest)
-		}
-		a.Cloud = ct
-	}
-
-	if args.OwnerTag == "" {
-		return errors.E("owner tag not specified")
-	}
-	ot, err := names.ParseUserTag(args.OwnerTag)
-	if err != nil {
-		return errors.E(err, errors.CodeBadRequest)
-	}
-	a.Owner = ot
-
-	if args.CloudCredentialTag != "" {
-		ct, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
-		if err != nil {
-			return errors.E(err, "invalid cloud credential tag")
-		}
-		if a.Cloud.Id() != "" && ct.Cloud().Id() != a.Cloud.Id() {
-			return errors.E("cloud credential cloud mismatch")
-		}
-
-		a.CloudCredential = ct
-	}
-	return nil
-}
-
 // AddModel adds the specified model to JIMM.
 func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
 	owner, err := dbmodel.NewIdentity(args.Owner.Id())

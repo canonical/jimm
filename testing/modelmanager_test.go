@@ -342,7 +342,7 @@ func (s *modelE2EManagerSuite) TestCreateModel(c *gc.C) {
 		region:        "no-such-region",
 		cloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 		credentialTag: "",
-		expectError:   `cloudregion not found \(not found\)`,
+		expectError:   `cloud region "no-such-region" not found in cloud "dummy" \(not found\)`,
 	}, {
 		about:         "local user",
 		name:          generateModelName(),
