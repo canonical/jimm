@@ -186,6 +186,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 }
 
 func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
+	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -249,6 +250,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
+	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -302,6 +304,7 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
+	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 
@@ -486,6 +489,7 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 }
 
 func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
+	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -666,6 +670,7 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 }
 
 func (s *cloudSuite) TestCredentialContents(c *gc.C) {
+	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.open(c, nil, "test")
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)

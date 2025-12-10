@@ -30,6 +30,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/utils"
+	cofga "github.com/canonical/ofga"
 )
 
 const (
@@ -293,7 +294,20 @@ func (s *E2ESuite) SetUpTest(c *gc.C) {
 	config := GetControllersConfig(c)
 	for name, info := range config.Controllers {
 		info.Validate(c, name)
-		s.AddController(c, name, info.ToAPIInfo())
+		controller := s.AddController(c, name, info.ToAPIInfo())
+
+		// Grant fixture users bob and charlie with permission to
+		// add models to the controller.
+		err := s.OFGAClient.AddRelation(context.Background(), cofga.Tuple{
+			Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
+			Relation: ofganames.CanAddModelRelation,
+			Target:   ofganames.ConvertTag(controller.ResourceTag()),
+		}, cofga.Tuple{
+			Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
+			Relation: ofganames.CanAddModelRelation,
+			Target:   ofganames.ConvertTag(controller.ResourceTag()),
+		})
+		c.Assert(err, gc.Equals, nil)
 	}
 
 	cct := names.NewCloudCredentialTag(TestE2ECloudName + "/bob@canonical.com/cred")

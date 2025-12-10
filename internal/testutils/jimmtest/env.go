@@ -183,9 +183,24 @@ func (m Model) addModelRelations(c *qt.C, db *db.Database, client *openfga.OFGAC
 }
 
 // addControllerRelations adds permissions the model should have and adds permissions for users to the controller.
-func (ctl Controller) addControllerRelations(c *qt.C, client *openfga.OFGAClient) {
+func (ctl Controller) addControllerRelations(c *qt.C, db *db.Database, client *openfga.OFGAClient) {
 	err := client.AddCloudController(context.Background(), names.NewCloudTag(ctl.Cloud), ctl.dbo.ResourceTag())
 	c.Assert(err, qt.IsNil)
+	for _, u := range ctl.Users {
+		dbUser := ctl.env.User(u.User).DBObject(c, db)
+		var relation openfga.Relation
+		switch u.Access {
+		case "admin":
+			relation = ofganames.AdministratorRelation
+		case "add-model":
+			relation = ofganames.CanAddModelRelation
+		default:
+			c.Fatalf("unknown controller access level: %s", u.Access)
+		}
+		user := openfga.NewUser(&dbUser, client)
+		err := user.SetControllerAccess(context.Background(), ctl.dbo.ResourceTag(), relation)
+		c.Assert(err, qt.IsNil)
+	}
 }
 
 // addAppOfferRelations adds permissions the application offer should have and adds permissions for users to the offer.
@@ -226,7 +241,7 @@ func (e *Environment) addJIMMRelations(c *qt.C, jimmTag names.ControllerTag, db 
 		m.addModelRelations(c, db, client)
 	}
 	for _, ctl := range e.Controllers {
-		ctl.addControllerRelations(c, client)
+		ctl.addControllerRelations(c, db, client)
 	}
 	for _, appOffer := range e.ApplicationOffers {
 		appOffer.addAppOfferRelations(c, db, client)
@@ -421,6 +436,7 @@ type Controller struct {
 	AgentVersion  string                          `json:"agent-version"`
 	PublicAddress string                          `json:"public-address"`
 	Deprecated    bool                            `json:"deprecated,omitempty"`
+	Users         []UserAccess                    `json:"users"`
 
 	env *Environment
 	dbo dbmodel.Controller

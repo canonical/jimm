@@ -11,7 +11,6 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/life"
@@ -29,107 +28,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func TestModelCreateArgs(t *testing.T) {
-	c := qt.New(t)
-
-	tests := []struct {
-		about         string
-		args          jujuparams.ModelCreateArgs
-		expectedArgs  juju.ModelCreateArgs
-		expectedError string
-	}{{
-		about: "all ok",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
-		},
-		expectedArgs: juju.ModelCreateArgs{
-			Name:            "test-model",
-			Owner:           names.NewUserTag("alice@canonical.com"),
-			Cloud:           names.NewCloudTag("test-cloud"),
-			CloudCredential: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-		},
-	}, {
-		about: "name not specified",
-		args: jujuparams.ModelCreateArgs{
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-		},
-		expectedError: "name not specified",
-	}, {
-		about: "invalid owner tag",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			OwnerTag:           "alice@canonical.com",
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-		},
-		expectedError: `"alice@canonical.com" is not a valid tag`,
-	}, {
-		about: "invalid cloud tag",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			CloudTag:           "test-cloud",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-		},
-		expectedError: `"test-cloud" is not a valid tag`,
-	}, {
-		about: "invalid cloud credential tag",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: "test-credential-1",
-		},
-		expectedError: "invalid cloud credential tag",
-	}, {
-		about: "cloud does not match cloud credential cloud",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("another-cloud/alice/test-credential-1").String(),
-		},
-		expectedError: "cloud credential cloud mismatch",
-	}, {
-		about: "owner tag not specified",
-		args: jujuparams.ModelCreateArgs{
-			Name:               "test-model",
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice/test-credential-1").String(),
-		},
-		expectedError: "owner tag not specified",
-	}}
-
-	opts := []cmp.Option{
-		cmp.Comparer(func(t1, t2 names.UserTag) bool {
-			return t1.String() == t2.String()
-		}),
-		cmp.Comparer(func(t1, t2 names.CloudTag) bool {
-			return t1.String() == t2.String()
-		}),
-		cmp.Comparer(func(t1, t2 names.CloudCredentialTag) bool {
-			return t1.String() == t2.String()
-		}),
-	}
-	for _, test := range tests {
-		c.Run(test.about, func(c *qt.C) {
-			var a juju.ModelCreateArgs
-			err := a.FromJujuModelCreateArgs(&test.args)
-			if test.expectedError == "" {
-				c.Assert(err, qt.IsNil)
-				c.Assert(a, qt.CmpEquals(opts...), test.expectedArgs)
-			} else {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
-			}
-		})
-	}
-}
-
 var addModelTests = []struct {
 	name                string
 	env                 string
@@ -141,7 +39,7 @@ var addModelTests = []struct {
 	// This cloudCredTag is used to manually populate a dummy cloud credential
 	// into JIMM's credential store and then applied onto args before adding a model.
 	cloudCredTag names.CloudCredentialTag
-	args         jujuparams.ModelCreateArgs
+	args         juju.ModelCreateArgs
 	expectModel  dbmodel.Model
 	expectError  string
 }{{
@@ -180,6 +78,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -188,6 +89,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -214,10 +118,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectModel: dbmodel.Model{
@@ -284,6 +188,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -292,6 +199,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -318,10 +228,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
-		CloudTag: names.NewCloudTag("test-cloud").String(),
+	args: juju.ModelCreateArgs{
+		Name:  "test-model",
+		Owner: names.NewUserTag("alice@canonical.com"),
+		Cloud: names.NewCloudTag("test-cloud"),
 		// Creating a model without specifying the cloud region
 		CloudRegion: "",
 	},
@@ -389,6 +299,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -397,6 +310,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -423,10 +339,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectModel: dbmodel.Model{
@@ -484,6 +400,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -492,6 +411,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 users:
 - username: alice@canonical.com
   controller-access: superuser
@@ -519,10 +441,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/bob@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("bob@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("bob@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectModel: dbmodel.Model{
@@ -578,6 +500,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -586,6 +511,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 users:
 - username: alice@canonical.com
   controller-access: login
@@ -612,10 +540,10 @@ users:
 `[1:]),
 	username:     "alice@canonical.com",
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("bob@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("bob@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectError: "unauthorized",
@@ -644,6 +572,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -652,6 +583,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -665,10 +599,10 @@ controllers:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectError: "a test error",
@@ -705,6 +639,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-000000000002
   cloud: test-cloud-2
@@ -713,6 +650,9 @@ controllers:
   - cloud: test-cloud-2
     region: test-region-2
     priority: 1
+  users:
+  - user: alice@canonical.com
+    access: add-model
 models:
 - name: test-model
   owner: alice@canonical.com
@@ -743,10 +683,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectError: "model alice@canonical.com/test-model already exists",
@@ -775,6 +715,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -783,6 +726,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, errors.E("a silly error")
@@ -805,10 +751,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectError: "failed to update cloud credential: a silly error",
@@ -834,6 +780,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -842,6 +791,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 1
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -862,13 +814,13 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
-	expectError: "unauthorized",
+	expectError: "not authorized.*",
 }, {
 	name: "CreateModelWithImplicitCloud",
 	env: `
@@ -907,6 +859,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -915,6 +870,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -942,9 +900,9 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
+	args: juju.ModelCreateArgs{
+		Name:  "test-model",
+		Owner: names.NewUserTag("alice@canonical.com"),
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",
@@ -1017,6 +975,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -1025,6 +986,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1049,9 +1013,9 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
+	args: juju.ModelCreateArgs{
+		Name:  "test-model",
+		Owner: names.NewUserTag("alice@canonical.com"),
 	},
 	expectError: "no cloud specified for model; please specify one",
 }, {
@@ -1081,6 +1045,9 @@ controllers:
   - cloud: test-cloud
     region: default
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 - name: controller-2
   uuid: 00000000-0000-0000-0000-0000-0000000000002
   cloud: test-cloud
@@ -1089,6 +1056,9 @@ controllers:
   - cloud: test-cloud
     region: default
     priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1118,10 +1088,10 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
-		CloudTag: names.NewCloudTag("test-cloud").String(),
+	args: juju.ModelCreateArgs{
+		Name:  "test-model",
+		Owner: names.NewUserTag("alice@canonical.com"),
+		Cloud: names.NewCloudTag("test-cloud"),
 		// Creating a model without specifying the cloud region
 		CloudRegion: "",
 	},
@@ -1191,6 +1161,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1217,13 +1190,13 @@ users:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
-	expectError: "unsupported cloud region test-cloud/test-region-1",
+	expectError: "no available controllers - check permissions to controllers and list of available controllers",
 }, {
 	name: "CreateModelWithAnotherUsersCredential",
 	env: `
@@ -1249,6 +1222,9 @@ controllers:
   - cloud: test-cloud
     region: test-region-1
     priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
@@ -1260,13 +1236,170 @@ controllers:
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/bob@canonical.com/test-credential-1"),
-	args: jujuparams.ModelCreateArgs{
+	args: juju.ModelCreateArgs{
 		Name:        "test-model",
-		OwnerTag:    names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:    names.NewCloudTag("test-cloud").String(),
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
 	expectError: "model owner doesn't match cloud-credential owner",
+}, {
+	name: "CreateModelWithoutPermissionOnController",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel:  nil,
+	username:     "alice@canonical.com",
+	jimmAdmin:    false,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+	args: juju.ModelCreateArgs{
+		Name:        "test-model",
+		Owner:       names.NewUserTag("alice@canonical.com"),
+		Cloud:       names.NewCloudTag("test-cloud"),
+		CloudRegion: "test-region-1",
+	},
+	expectError: "no available controllers - check permissions to controllers and list of available controllers",
+}, {
+	// Controller-2 has higher priority than controller-1
+	// but we are specifying controller-1 as the target controller
+	// so the model should be created on controller-1.
+	name: "CreateModelWithTargetController",
+	env: `
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+cloud-defaults:
+- user: alice@canonical.com
+  cloud: test-cloud
+  region: test-region-1
+  defaults:
+    key1: value1
+    key2: value2
+- user: alice@canonical.com
+  cloud: test-cloud
+  defaults:
+    key3: value3
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 0
+  users:
+  - user: alice@canonical.com
+    access: add-model
+- name: controller-2
+  uuid: 00000000-0000-0000-0000-0000-0000000000002
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 2
+  users:
+  - user: alice@canonical.com
+    access: add-model
+`[1:],
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+		return nil, nil
+	},
+	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+		return nil
+	},
+	createModel: assertConfig(map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}, createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@canonical.com
+  access: admin
+- user: bob
+  access: read
+`[1:])),
+	username:     "alice@canonical.com",
+	jimmAdmin:    false,
+	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
+	args: juju.ModelCreateArgs{
+		Name:             "test-model",
+		Owner:            names.NewUserTag("alice@canonical.com"),
+		Cloud:            names.NewCloudTag("test-cloud"),
+		CloudRegion:      "test-region-1",
+		TargetController: "controller-1",
+	},
+	expectModel: dbmodel.Model{
+		Name: "test-model",
+		UUID: sql.NullString{
+			String: "00000001-0000-0000-0000-0000-000000000001",
+			Valid:  true,
+		},
+		Owner: dbmodel.Identity{
+			Name: "alice@canonical.com",
+		},
+		Controller: dbmodel.Controller{
+			Name:        "controller-1",
+			UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+			CloudName:   "test-cloud",
+			CloudRegion: "test-region-1",
+		},
+		CloudRegion: dbmodel.CloudRegion{
+			Cloud: dbmodel.Cloud{
+				Name: "test-cloud",
+				Type: "test-provider",
+			},
+			Name: "test-region-1",
+		},
+		CloudCredential: dbmodel.CloudCredential{
+			Name:     "test-credential-1",
+			AuthType: "empty",
+		},
+		Life: state.Alive.String(),
+	},
 }}
 
 func TestAddModel(t *testing.T) {
@@ -1296,12 +1429,9 @@ func TestAddModel(t *testing.T) {
 			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 			user.JimmAdmin = test.jimmAdmin
 
-			test.args.CloudCredentialTag = test.cloudCredTag.String()
-			args := juju.ModelCreateArgs{}
-			err = args.FromJujuModelCreateArgs(&test.args)
-			c.Assert(err, qt.IsNil)
+			test.args.CloudCredential = test.cloudCredTag
 
-			_, err = j.AddModel(context.Background(), user, &args)
+			_, err = j.AddModel(context.Background(), user, &test.args)
 			if test.expectError == "" {
 				c.Assert(err, qt.IsNil)
 
@@ -1312,7 +1442,7 @@ func TestAddModel(t *testing.T) {
 				c.Assert(err, qt.IsNil)
 				c.Assert(m1, jimmtest.DBObjectEquals, test.expectModel)
 
-				ownerId := args.Owner.Id()
+				ownerId := test.args.Owner.Id()
 				if ownerId == "" {
 					ownerId = user.Tag().Id()
 				}
@@ -1377,16 +1507,16 @@ func assertCreateModelArgs(expectedArgs *jujuparams.ModelCreateArgs, fnc func(co
 			return fmt.Errorf("name mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
 		}
 		if expectedArgs.OwnerTag != args.OwnerTag {
-			return fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.OwnerTag, args.OwnerTag)
 		}
 		if expectedArgs.CloudTag != args.CloudTag {
-			return fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.CloudTag, args.CloudTag)
 		}
 		if expectedArgs.CloudRegion != args.CloudRegion {
-			return fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.CloudRegion, args.CloudRegion)
 		}
 		if expectedArgs.CloudCredentialTag != args.CloudCredentialTag {
-			return fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.CloudCredentialTag, args.CloudCredentialTag)
 		}
 		return fnc(ctx, args, mi)
 	}
@@ -3114,7 +3244,7 @@ func TestAddModelDeletedController(t *testing.T) {
 		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
-		GrantJIMMModelAdmin_: func(context.Context, names.ModelTag) error {
+		GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
 			return nil
 		},
 		CreateModel_: createModel(`
@@ -3199,15 +3329,13 @@ controllers:
 	err = j.CredentialStore.Put(ctx, cloudCredTag, map[string]string{"key": "value"})
 	c.Assert(err, qt.IsNil)
 
-	args := juju.ModelCreateArgs{}
-	err = args.FromJujuModelCreateArgs(&jujuparams.ModelCreateArgs{
-		Name:               "test-model",
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-region-1",
-		CloudCredentialTag: cloudCredTag.String(),
-	})
-	c.Assert(err, qt.IsNil)
+	args := juju.ModelCreateArgs{
+		Name:            "test-model",
+		Owner:           names.NewUserTag("alice@canonical.com"),
+		Cloud:           names.NewCloudTag("test-cloud"),
+		CloudRegion:     "test-region-1",
+		CloudCredential: cloudCredTag,
+	}
 
 	// According to controller priority for test-region-1, we would
 	// expect JIMM to use controller-1, but since it was deleted

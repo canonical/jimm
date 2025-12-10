@@ -22,6 +22,7 @@ var _ = gc.Suite(&listAuditEventsSuite{})
 func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
+	s.AddAdminUser(c, "charlie@canonical.com")
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
@@ -61,6 +62,7 @@ func (s *listAuditEventsSuite) TestListAuditEventsSuperuser(c *gc.C) {
 func (s *listAuditEventsSuite) TestListAuditEventsStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
+	s.AddAdminUser(c, "charlie@canonical.com")
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)

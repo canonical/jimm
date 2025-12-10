@@ -185,11 +185,11 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var mca juju.ModelCreateArgs
-	if err := mca.FromJujuModelCreateArgs(&args); err != nil {
+	mca, err := toAddModelArgs(args)
+	if err != nil {
 		return jujuparams.ModelInfo{}, errors.E(err)
 	}
-	info, err := r.jimm.JujuManager().AddModel(ctx, r.user, &mca)
+	info, err := r.jimm.JujuManager().AddModel(ctx, r.user, mca)
 	if err != nil {
 		servermon.ModelsCreatedFailCount.Inc()
 		return jujuparams.ModelInfo{}, errors.E(err)

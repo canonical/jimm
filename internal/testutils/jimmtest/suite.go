@@ -339,7 +339,7 @@ func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
 
-func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
+func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) *dbmodel.Controller {
 	ctl := &dbmodel.Controller{
 		UUID:          info.ControllerUUID,
 		Name:          name,
@@ -362,6 +362,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl.TLSHostname = "juju-apiserver"
 	err := s.JIMM.JujuManager().AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
+	return ctl
 }
 
 func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
@@ -395,11 +396,7 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 		CloudRegion:     region,
 		CloudCredential: cred,
 	})
-	c.Assert(err, gc.Equals, nil)
-
-	user := s.NewUser(u)
-	err = user.SetModelAccess(context.Background(), names.NewModelTag(mi.UUID), ofganames.AdministratorRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, gc.Equals, nil, gc.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", name, owner.String(), cloud.String(), region, cred.String(), err))
 
 	return names.NewModelTag(mi.UUID)
 }
@@ -500,6 +497,17 @@ func (s *BootstrapSuite) SetUpTest(c *gc.C) {
 	s.CloudCredential = new(dbmodel.CloudCredential)
 	s.CloudCredential.SetTag(cct)
 	err := s.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
+	c.Assert(err, gc.Equals, nil)
+
+	// Grant bob add-model access to controller-1
+	controller := dbmodel.Controller{Name: "controller-1"}
+	err = s.JIMM.Database.GetController(ctx, &controller)
+	c.Assert(err, gc.Equals, nil)
+	err = s.OFGAClient.AddRelation(ctx, cofga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
+		Relation: ofganames.CanAddModelRelation,
+		Target:   ofganames.ConvertTag(controller.ResourceTag()),
+	})
 	c.Assert(err, gc.Equals, nil)
 
 	mt := s.AddModel(c, names.NewUserTag("bob@canonical.com"), "model-1", names.NewCloudTag(TestCloudName), TestCloudRegionName, cct)

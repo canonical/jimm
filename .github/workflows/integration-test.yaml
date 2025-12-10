@@ -89,3 +89,7 @@ jobs:
             echo "Graceful shutdown message not found!"
             exit 1
           fi
+
+      - name: Print JIMM logs on failure
+        if: failure()
+        run: docker logs jimm

@@ -124,65 +124,6 @@ func (s *modelmanagerSuite) TestModelInfoError(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `permission denied`)
 }
 
-func (s *modelmanagerSuite) TestGrantRevokeModel(c *gc.C) {
-	ctx := context.Background()
-
-	var info jujuparams.ModelInfo
-	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
-	}, &info)
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.API.GrantModelAccess(ctx, names.NewModelTag(info.UUID), names.NewUserTag("test-user-2@canonical.com"), jujuparams.ModelReadAccess)
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.API.ModelInfo(ctx, &info)
-	c.Assert(err, gc.Equals, nil)
-
-	lessf := func(a, b jujuparams.ModelUserInfo) bool {
-		return a.UserName < b.UserName
-	}
-	c.Check(info.Users, jimmtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
-		UserName:    "test-user@canonical.com",
-		DisplayName: "test-user",
-		Access:      "admin",
-	}, {
-		UserName: "test-user-2@canonical.com",
-		Access:   "read",
-	}})
-
-	err = s.API.RevokeModelAccess(ctx, names.NewModelTag(info.UUID), names.NewUserTag("test-user-2@canonical.com"), jujuparams.ModelReadAccess)
-	c.Assert(err, gc.Equals, nil)
-
-	err = s.API.ModelInfo(ctx, &info)
-	c.Assert(err, gc.Equals, nil)
-
-	c.Check(info.Users, jimmtest.CmpEquals(cmpopts.SortSlices(lessf)), []jujuparams.ModelUserInfo{{
-		UserName:    "test-user@canonical.com",
-		DisplayName: "test-user",
-		Access:      "admin",
-	}})
-}
-
-func (s *modelmanagerSuite) TestGrantModelAccessError(c *gc.C) {
-	ctx := context.Background()
-
-	err := s.API.GrantModelAccess(ctx, names.NewModelTag("00000000-0000-0000-0000-000000000000"), names.NewUserTag("test-user-2"), jujuparams.ModelReadAccess)
-
-	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	c.Check(err, gc.ErrorMatches, `could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
-}
-
-func (s *modelmanagerSuite) TestRevokeModelAccessError(c *gc.C) {
-	ctx := context.Background()
-
-	err := s.API.RevokeModelAccess(ctx, names.NewModelTag("00000000-0000-0000-0000-000000000000"), names.NewUserTag("test-user-2"), jujuparams.ModelReadAccess)
-
-	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeNotFound)
-	c.Check(err, gc.ErrorMatches, `could not lookup model: model "00000000-0000-0000-0000-000000000000" not found`)
-}
-
 func (s *modelmanagerSuite) TestValidateModelUpgrade(c *gc.C) {
 	c.Skip("juju 3.x no longer implements this method")
 	ctx := context.Background()

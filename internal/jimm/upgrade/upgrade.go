@@ -212,8 +212,8 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 	var iimResult jujuparams.InitiateMigrationResult
 	if err := retry.Call(
 		retry.CallArgs{
-			Attempts: 10,
-			Delay:    5 * time.Second,
+			Attempts: 30,
+			Delay:    10 * time.Second,
 			// We could consider all errors fatal, bar: target prechecks failed: machine 0 not running (pending)
 			// IsFatalError:
 			Func: func() error {
@@ -241,8 +241,8 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 	var mi *jujuparams.ModelInfo
 	if err := retry.Call(
 		retry.CallArgs{
-			Attempts: 10,
-			Delay:    5 * time.Second,
+			Attempts: 30,
+			Delay:    10 * time.Second,
 			Func: func() error {
 				mi, err = u.jujuManager.ModelInfo(ctx, user, mt)
 				if err != nil {
@@ -277,21 +277,11 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 		return controllerChosenVersion, errors.E(fmt.Errorf("failed to dial target controller: %w", err))
 	}
 
-	var upgradeErr error
-	controllerChosenVersion, upgradeErr = api.UpgradeModel(mi.UUID, targetVersion, "", false, true)
-	//nolint:staticcheck // Has a description to highlight this possibility.
-	if jujuparams.IsCodeUpgradeInProgress(upgradeErr) {
-		// Apparently upgrades can have issues, that can be manually resolved, then you can run
-		// the upgrade-model command with the --reset-previous-upgrade option.
-		// We can't do that here, so we just return an error. We could possible indicate to the user here
-		// that manual intervention is required.
-	}
-	if jujuerrors.Is(upgradeErr, jujuerrors.AlreadyExists) {
-		upgradeErr = AlreadyUpgradedError
-	}
+	zapctx.Debug(ctx, "upgrading model agent after migration", zap.String("model-uuid", mi.Name))
 
-	if upgradeErr != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to upgrade model after migration: %w", upgradeErr))
+	controllerChosenVersion, err = u.upgradeModel(ctx, api, modelUUID, targetVersion, false)
+	if err != nil {
+		return controllerChosenVersion, errors.E(fmt.Errorf("failed to upgrade model after migration: %w", err))
 	}
 
 	zapctx.Info(ctx, "model migrate and upgrade complete",
@@ -350,4 +340,29 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 	}
 
 	return chosenVersion, nil
+}
+
+func (u *upgradeManager) upgradeModel(ctx context.Context, api juju.API, modelUUID string, targetVersion version.Number, dryRun bool) (version.Number, error) {
+	var upgradeErr error
+	var controllerChosenVersion version.Number
+
+	controllerChosenVersion, upgradeErr = api.UpgradeModel(modelUUID, targetVersion, "", false, dryRun)
+	//nolint:staticcheck // Has a description to highlight this possibility.
+	if jujuparams.IsCodeUpgradeInProgress(upgradeErr) {
+		zapctx.Error(ctx, "model upgrade already in progress")
+		// Apparently upgrades can have issues, that can be manually resolved, then you can run
+		// the upgrade-model command with the --reset-previous-upgrade option.
+		// We can't do that here, so we just return an error. We could possible indicate to the user here
+		// that manual intervention is required.
+	}
+	if jujuerrors.Is(upgradeErr, jujuerrors.AlreadyExists) {
+		upgradeErr = AlreadyUpgradedError
+	}
+
+	if upgradeErr != nil {
+		zapctx.Error(ctx, "failed to upgrade model after migration", zap.Error(upgradeErr))
+		return controllerChosenVersion, errors.E(fmt.Errorf("failed to upgrade model after migration: %w", upgradeErr))
+	}
+
+	return controllerChosenVersion, nil
 }

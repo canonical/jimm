@@ -147,7 +147,6 @@ type API struct {
 	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
 	GrantApplicationOfferAccess_       func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
-	GrantModelAccess_                  func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 	Import_                            func(bytes []byte) error
 	IsBroken_                          bool
 	LatestLogTime_                     func(string) (time.Time, error)
@@ -163,7 +162,6 @@ type API struct {
 	Prechecks_                         func(jujuparams.MigrationModelInfo) error
 	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	RevokeCredential_                  func(context.Context, names.CloudCredentialTag) error
-	RevokeModelAccess_                 func(context.Context, names.ModelTag, names.UserTag, jujuparams.UserAccessPermission) error
 	SupportsCheckCredentialModels_     bool
 	SupportsModelSummaryWatcher_       bool
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
@@ -327,13 +325,6 @@ func (a *API) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error
 	return a.GrantJIMMModelAdmin_(ctx, tag)
 }
 
-func (a *API) GrantModelAccess(ctx context.Context, mt names.ModelTag, ut names.UserTag, p jujuparams.UserAccessPermission) error {
-	if a.GrantModelAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.GrantModelAccess_(ctx, mt, ut, p)
-}
-
 func (a *API) IsBroken() bool {
 	return a.IsBroken_
 }
@@ -427,13 +418,6 @@ func (a *API) RevokeCredential(ctx context.Context, tag names.CloudCredentialTag
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.RevokeCredential_(ctx, tag)
-}
-
-func (a *API) RevokeModelAccess(ctx context.Context, mt names.ModelTag, ut names.UserTag, p jujuparams.UserAccessPermission) error {
-	if a.RevokeModelAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.RevokeModelAccess_(ctx, mt, ut, p)
 }
 
 func (a *API) SupportsCheckCredentialModels() bool {

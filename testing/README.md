@@ -25,7 +25,7 @@ This guide outlines the steps to set up and run the e2e test suite.
    Create the YAML file with the controller configuration used by the test suite to add the backing controller to JIMM:
 
    ```bash
-   make generate-test-env test-e2e
+   CONTROLLER=test-e2e make generate-test-env
    ```
 
 ## VS Code Configuration

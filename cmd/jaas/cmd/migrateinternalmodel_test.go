@@ -29,6 +29,8 @@ var _ = gc.Suite(&migrateInternalModelSuite{})
 // but our CLI tests are currently integration based.
 func (s *migrateInternalModelSuite) TestMigrateInternalModelCommandSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
+
+	s.AddAdminUser(c, "charlie@canonical.com")
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-1", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)

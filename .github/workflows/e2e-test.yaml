@@ -53,7 +53,7 @@ jobs:
           JWKS_DNS=jwks.localhost CONTROLLER_NAME=test-e2e ./local/jimm/setup-controller.sh
 
       - name: Generate controller config
-        run: make generate-test-env test-e2e
+        run: CONTROLLER=test-e2e make generate-test-env
 
       - name: Run E2E tests
         run: go test -v ./testing/... -timeout 30m

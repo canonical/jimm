@@ -56,6 +56,7 @@ var _ = gc.Suite(&modelStatusSuite{})
 func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
+	s.AddAdminUser(c, "charlie@canonical.com")
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
 	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
@@ -70,6 +71,7 @@ func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
 func (s *modelStatusSuite) TestModelStatus(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
 
+	s.AddAdminUser(c, "charlie@canonical.com")
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
 	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)

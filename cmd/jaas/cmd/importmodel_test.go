@@ -56,6 +56,7 @@ func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
 
 func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
 	s.AddController(c, "controller-1", s.APIInfo(c))
+	s.AddAdminUser(c, "charlie@canonical.com")
 	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
 	// Add credentials for Alice on the test cloud, they are needed for the Alice user to become the new model owner

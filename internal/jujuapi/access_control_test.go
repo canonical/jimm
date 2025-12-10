@@ -168,7 +168,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 
 	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, 13)
+	c.Assert(len(resp.Tuples), gc.Equals, 15)
 
 	// Check user access has been revoked.
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
@@ -849,8 +849,8 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
-	// first three tuples created during setup test
-	c.Assert(response.Tuples[12:], jc.DeepEquals, tuples)
+	// first tuples are created during setup test
+	c.Assert(response.Tuples[14:], jc.DeepEquals, tuples)
 	c.Assert(len(response.Errors), gc.Equals, 0)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
@@ -946,7 +946,7 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
-	responseTuples := response.Tuples[12:]
+	responseTuples := response.Tuples[14:]
 	c.Assert(responseTuples, gc.HasLen, 2)
 
 	expectedUserToGroupTuple := tuples[1]
@@ -991,8 +991,8 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	c.Assert(err, jc.ErrorIsNil)
 	tupleWithoutDBEntry := tuples[0]
 	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID
-	// first three tuples created during setup test
-	c.Assert(response.Tuples[12], gc.Equals, tupleWithoutDBEntry)
+	// first tuples are created during setup test
+	c.Assert(response.Tuples[14], gc.Equals, tupleWithoutDBEntry)
 	c.Assert(response.Errors, gc.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID})
 }
 

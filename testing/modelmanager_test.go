@@ -324,7 +324,7 @@ func (s *modelE2EManagerSuite) TestCreateModel(c *gc.C) {
 	}, {
 		about:         "unauthorized user",
 		name:          generateModelName(),
-		ownerTag:      names.NewUserTag("charlie@canonical.com").String(),
+		ownerTag:      names.NewUserTag("noauthuser@canonical.com").String(),
 		cloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 		credentialTag: "cloudcred-" + jimmtest.TestE2ECloudName + "_bob@canonical.com_cred",
 		expectError:   `unauthorized \(unauthorized access\)`,
@@ -342,7 +342,7 @@ func (s *modelE2EManagerSuite) TestCreateModel(c *gc.C) {
 		region:        "no-such-region",
 		cloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 		credentialTag: "",
-		expectError:   `cloudregion not found \(not found\)`,
+		expectError:   `cloud region "no-such-region" not found in cloud "localhost" \(not found\)`,
 	}, {
 		about:         "local user",
 		name:          generateModelName(),

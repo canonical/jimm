@@ -5,6 +5,10 @@ package jujuapi
 import (
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
+
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 )
 
 func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
@@ -43,4 +47,44 @@ func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
 		RegionConfig:      regionConfig,
 		IsControllerCloud: p.IsControllerCloud,
 	}
+}
+
+func toAddModelArgs(args jujuparams.ModelCreateArgs) (*juju.ModelCreateArgs, error) {
+	// FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
+	var a juju.ModelCreateArgs
+	if args.Name == "" {
+		return nil, errors.E("name not specified")
+	}
+	a.Name = args.Name
+	a.Config = args.Config
+	a.CloudRegion = args.CloudRegion
+	if args.CloudTag != "" {
+		ct, err := names.ParseCloudTag(args.CloudTag)
+		if err != nil {
+			return nil, errors.E(err, errors.CodeBadRequest)
+		}
+		a.Cloud = ct
+	}
+
+	if args.OwnerTag == "" {
+		return nil, errors.E("owner tag not specified")
+	}
+	ot, err := names.ParseUserTag(args.OwnerTag)
+	if err != nil {
+		return nil, errors.E(err, errors.CodeBadRequest)
+	}
+	a.Owner = ot
+
+	if args.CloudCredentialTag != "" {
+		ct, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
+		if err != nil {
+			return nil, errors.E(err, "invalid cloud credential tag")
+		}
+		if a.Cloud.Id() != "" && ct.Cloud().Id() != a.Cloud.Id() {
+			return nil, errors.E("cloud credential cloud mismatch")
+		}
+
+		a.CloudCredential = ct
+	}
+	return &a, nil
 }

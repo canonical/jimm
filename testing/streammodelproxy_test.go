@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
 	"context"
@@ -12,16 +12,17 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 type streamProxySuite struct {
-	websocketSuite
+	jimmtest.WebsocketE2ESuite
 }
 
 var _ = gc.Suite(&streamProxySuite{})
 
 func (s *streamProxySuite) TestDebugLogs(c *gc.C) {
-	conn := s.open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "bob")
+	conn := s.Open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "bob", nil)
 	defer conn.Close()
 	// Note this is enough to test that a client can make connection for streaming logs.
 	// No actual logs come through either because of the JujuConnSuite or the fact that there is no application deployed.
@@ -50,7 +51,7 @@ func (s *streamProxySuite) TestDebugLogsError(c *gc.C) {
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)
-	conn := s.open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "foo")
+	conn := s.Open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "foo", nil)
 	defer conn.Close()
 	err = s.JIMM.OpenFGAClient.RemoveRelation(ctx, tuple)
 	c.Assert(err, gc.IsNil)

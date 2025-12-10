@@ -1,21 +1,22 @@
 // Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	gc "gopkg.in/check.v1"
 )
 
 type logTransferProxySuite struct {
-	websocketSuite
+	jimmtest.WebsocketE2ESuite
 }
 
 var _ = gc.Suite(&logTransferProxySuite{})
 
 func (s *logTransferProxySuite) TestImportLogs(c *gc.C) {
-	conn := s.open(c, &api.Info{}, s.AdminUser.Name)
+	conn := s.Open(c, &api.Info{}, s.AdminUser.Name, nil)
 	defer conn.Close()
 	client := migrationtarget.NewClient(conn)
 	_, err := client.OpenLogTransferStream(s.Model.UUID.String)
@@ -25,7 +26,7 @@ func (s *logTransferProxySuite) TestImportLogs(c *gc.C) {
 // TestImportLogsError tests that an error is returned when
 // a user is not a JIMM admin.
 func (s *logTransferProxySuite) TestImportLogsError(c *gc.C) {
-	conn := s.open(c, &api.Info{}, s.AdminUser.Name)
+	conn := s.Open(c, &api.Info{}, s.AdminUser.Name, nil)
 	defer conn.Close()
 	client := migrationtarget.NewClient(conn)
 	_, err := client.OpenLogTransferStream(s.Model.UUID.String)

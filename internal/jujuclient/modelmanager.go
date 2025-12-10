@@ -133,60 +133,6 @@ func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[st
 	return resp.Results[0].Result, nil
 }
 
-// GrantModelAccess gives the given user the given access level on the
-// given model. GrantModelAccess uses the ModifyModelAccess procedure
-// on the ModelManager facade.
-func (c Connection) GrantModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
-
-	args := jujuparams.ModifyModelAccessRequest{
-		Changes: []jujuparams.ModifyModelAccess{{
-			UserTag:  userTag.String(),
-			Action:   jujuparams.GrantModelAccess,
-			Access:   access,
-			ModelTag: modelTag.String(),
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.Call(ctx, "ModelManager", 10, "", "ModifyModelAccess", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
-}
-
-// RevokeModelAccess removes the given access level from the given user on
-// the given model. Revoke ModelAccess uses the ModifyModelAccess procedure
-// on the ModelManager facade.
-func (c Connection) RevokeModelAccess(ctx context.Context, modelTag names.ModelTag, userTag names.UserTag, access jujuparams.UserAccessPermission) error {
-
-	args := jujuparams.ModifyModelAccessRequest{
-		Changes: []jujuparams.ModifyModelAccess{{
-			UserTag:  userTag.String(),
-			Action:   jujuparams.RevokeModelAccess,
-			Access:   access,
-			ModelTag: modelTag.String(),
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.Call(ctx, "ModelManager", 10, "", "ModifyModelAccess", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
-}
-
 // ControllerModelSummary retrieves the ModelSummary for the controller
 // model. ControllerModelSummary uses the ListModelSummaries procedure on
 // the ModelManager facade.
