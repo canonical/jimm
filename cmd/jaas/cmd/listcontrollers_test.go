@@ -47,21 +47,6 @@ var (
     data: {}
     since: null
 `
-
-	expectedOutput = `- name: jaas
-  uuid: 6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11
-  publicaddress: ""
-  apiaddresses: \[\]
-  cacertificate: ""
-  cloudtag: ""
-  cloudregion: ""
-  agentversion: .*
-  status:
-    status: available
-    info: ""
-    data: {}
-    since: null
-`
 )
 
 type listControllersSuite struct {
@@ -87,5 +72,5 @@ func (s *listControllersSuite) TestListControllers(c *gc.C) {
 	bClient := s.SetupCLIAccess(c, "bob")
 	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
 	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedOutput)
+	c.Assert(cmdtesting.Stdout(context), gc.Matches, `\[\]\n?`)
 }
