@@ -123,12 +123,9 @@ load-rock:
 test-auth-model:
 	fga model test --tests ./openfga/tests.fga.yaml
 
-## generate-test-env: Populate test.env with current juju controller details. Usage: make generate-test-env [controller-name]
+## generate-test-env: Populate test.env with current juju controller details. Usage: CONTROLLER=<controller-name> make generate-test-env 
 generate-test-env:
-	@./local/backing_test_controller/generate.sh --controller=$(filter-out $@,$(MAKECMDGOALS))
-
-%:
-	@:
+	@./local/backing_test_controller/generate.sh --controller=$(CONTROLLER)
 
 
 define check_dep

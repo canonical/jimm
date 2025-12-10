@@ -339,7 +339,7 @@ func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
 
-func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
+func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) *dbmodel.Controller {
 	ctl := &dbmodel.Controller{
 		UUID:          info.ControllerUUID,
 		Name:          name,
@@ -362,6 +362,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) {
 	ctl.TLSHostname = "juju-apiserver"
 	err := s.JIMM.JujuManager().AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
+	return ctl
 }
 
 func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
@@ -395,7 +396,7 @@ func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud na
 		CloudRegion:     region,
 		CloudCredential: cred,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, gc.Equals, nil, gc.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", name, owner.String(), cloud.String(), region, cred.String(), err))
 
 	return names.NewModelTag(mi.UUID)
 }
