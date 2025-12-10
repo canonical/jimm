@@ -39,24 +39,27 @@ controllers:
   cloud: test
   region: test-region-1
   agent-version: 3.2.1
+  users:
+    - username: bob@canonical.com
+      access: add-model
+    - username: eve@canonical.com
+      access: add-model
 - name: test2
   uuid: 00000001-0000-0000-0000-000000000002
   cloud: test
   region: test-region-2
   agent-version: 3.2.0
+  users:
+    - username: bob@canonical.com
+      access: add-model
 - name: test3
   uuid: 00000001-0000-0000-0000-000000000003
   cloud: test
   region: test-region-3
   agent-version: 2.1.0
-users:
-- username: alice@canonical.com
-  controller-access: superuser
-- username: bob@canonical.com
-  can-add-model: [00000001-0000-0000-0000-000000000001, 00000001-0000-0000-0000-000000000002]
-- username: eve@canonical.com
-  can-add-model: [00000001-0000-0000-0000-000000000001, 00000001-0000-0000-0000-000000000003]
-- username: notallowedanycontrollers@canonical.com
+  users:
+    - username: eve@canonical.com
+      access: add-model
 `
 
 func TestControllerInfo(t *testing.T) {

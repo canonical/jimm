@@ -76,7 +76,7 @@ func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) (
 			zapctx.Error(ctx, "error checking user permissions for controller", zap.String("controller", c.Name), zap.Error(err))
 			return nil
 		}
-		if user.JimmAdmin || canAddModel {
+		if canAddModel {
 			controllers = append(controllers, *c)
 		}
 		return nil

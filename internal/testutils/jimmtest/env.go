@@ -131,23 +131,6 @@ func (u User) addUserRelations(c *qt.C, jimmTag names.ControllerTag, db *db.Data
 		err := openfgaUser.SetControllerAccess(context.Background(), jimmTag, ofganames.AdministratorRelation)
 		c.Assert(err, qt.IsNil)
 	}
-	if len(u.CanAddModel) > 0 {
-		dbUser := u.DBObject(c, db)
-		openfgaUser := openfga.NewUser(&dbUser, client)
-
-		for _, controllerUUID := range u.CanAddModel {
-			if names.IsValidController(controllerUUID) == false {
-				c.Fatalf("invalid controller UUID for can-add-model: %s", u.CanAddModel)
-			}
-
-			err := openfgaUser.SetControllerAccess(
-				context.Background(),
-				names.NewControllerTag(controllerUUID),
-				ofganames.CanAddModelRelation,
-			)
-			c.Assert(err, qt.IsNil)
-		}
-	}
 }
 
 // addCloudRelations adds permissions the cloud should have and adds permissions for users to the cloud.
@@ -558,8 +541,6 @@ type User struct {
 	Username         string `json:"username"`
 	DisplayName      string `json:"display-name"`
 	ControllerAccess string `json:"controller-access"`
-	// CanAddModel takes a list of controller UUIDs the user can add models to.
-	CanAddModel []string `json:"can-add-model"`
 
 	env *Environment
 	dbo dbmodel.Identity
