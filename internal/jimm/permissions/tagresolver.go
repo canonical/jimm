@@ -307,10 +307,11 @@ func (t *tagResolver) cloudTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	return ofganames.ConvertTagWithRelation(cloud.ResourceTag(), t.relation), nil
 }
 
-// resolveTag resolves JIMM tag [of any kind available] (i.e., controller-mycontroller:alex@canonical.com/mymodel.myoffer)
-// into a juju string tag (i.e., controller-<controller uuid>).
+// resolveTag resolves tags with names (of any kind) i.e., controller-myController
+// into a tag with UUIDs for resources that require UUID i.e., controller-<controller uuid>.
+// Mostly just usernames are left as-is since they are already unique identifiers.
 //
-// If the JIMM tag is aleady of juju string tag form, the transformation is left alone.
+// If the tag already contains a UUID, the transformation is left alone.
 //
 // In both cases though, the resource the tag pertains to is validated to exist within the database.
 func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, error) {
