@@ -36,12 +36,10 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 	"github.com/canonical/jimm/v3/internal/servermon"
+	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
 const (
-	// JIMM claims to be a 3.6.13 client.
-	jujuClientVersion = "3.6.13"
-
 	adminUser = "admin"
 )
 
@@ -75,7 +73,7 @@ func (d *Dialer) createLoginRequest1(ctx context.Context, controllerTag names.Co
 
 	return &jujuparams.LoginRequest{
 		AuthTag:       userTag.String(),
-		ClientVersion: jujuClientVersion,
+		ClientVersion: jimmversion.JIMM_CONTROLLER_VERSION,
 		Token:         jwtString,
 	}, nil
 }

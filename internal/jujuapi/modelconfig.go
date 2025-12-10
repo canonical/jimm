@@ -5,9 +5,10 @@ package jujuapi
 import (
 	"context"
 
+	"github.com/juju/juju/rpc/params"
+
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	jimmversion "github.com/canonical/jimm/v3/version"
-	"github.com/juju/juju/rpc/params"
 )
 
 func init() {
@@ -23,7 +24,7 @@ func (r *controllerRoot) ModelGet(ctx context.Context) (params.ModelConfigResult
 	return params.ModelConfigResults{
 		Config: map[string]params.ConfigValue{
 			"agent-version": {
-				Value:  jimmversion.VersionInfo.Version,
+				Value:  jimmversion.JIMM_CONTROLLER_VERSION,
 				Source: "jimm",
 			},
 		},

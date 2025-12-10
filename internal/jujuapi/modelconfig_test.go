@@ -19,7 +19,7 @@ func (s *jimmSuite) TestModelGet(c *gc.C) {
 	defer conn.Close()
 
 	client := modelconfig.NewClient(conn)
-	jimmversion.VersionInfo.Version = "test-version"
+
 	jimmCfg, err := client.ModelGet()
 	c.Assert(err, gc.IsNil)
 
@@ -27,5 +27,5 @@ func (s *jimmSuite) TestModelGet(c *gc.C) {
 	c.Assert(ok, gc.Equals, true)
 	vers, ok := v.(string)
 	c.Assert(ok, gc.Equals, true)
-	c.Assert(vers, gc.Equals, "test-version")
+	c.Assert(vers, gc.Equals, jimmversion.JIMM_CONTROLLER_VERSION)
 }
