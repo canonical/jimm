@@ -20,6 +20,7 @@ func init() {
 	}
 }
 
+// ModelGet returns the model configuration.
 func (r *controllerRoot) ModelGet(ctx context.Context) (params.ModelConfigResults, error) {
 	return params.ModelConfigResults{
 		Config: map[string]params.ConfigValue{
