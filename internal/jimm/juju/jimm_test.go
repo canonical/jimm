@@ -40,9 +40,9 @@ controllers:
   region: test-region-1
   agent-version: 3.2.1
   users:
-    - username: bob@canonical.com
+    - user: bob@canonical.com
       access: add-model
-    - username: eve@canonical.com
+    - user: eve@canonical.com
       access: add-model
 - name: test2
   uuid: 00000001-0000-0000-0000-000000000002
@@ -50,7 +50,7 @@ controllers:
   region: test-region-2
   agent-version: 3.2.0
   users:
-    - username: bob@canonical.com
+    - user: bob@canonical.com
       access: add-model
 - name: test3
   uuid: 00000001-0000-0000-0000-000000000003
@@ -58,8 +58,11 @@ controllers:
   region: test-region-3
   agent-version: 2.1.0
   users:
-    - username: eve@canonical.com
+    - user: eve@canonical.com
       access: add-model
+users:
+  - username: alice@canonical.com
+    controller-access: superuser
 `
 
 func TestControllerInfo(t *testing.T) {
