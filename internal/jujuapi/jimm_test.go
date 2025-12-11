@@ -157,7 +157,7 @@ func (s *jimmSuite) TestListControllersUnauthorized(c *gc.C) {
 	s.AddController(c, "controller-0", s.APIInfo(c))
 	s.AddController(c, "controller-2", s.APIInfo(c))
 
-	conn := s.open(c, nil, "bob")
+	conn := s.open(c, nil, "abrandnewuserwithnopermissions")
 	defer conn.Close()
 
 	client := api.NewClient(conn)
