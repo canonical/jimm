@@ -5,8 +5,8 @@ package version
 import "strings"
 
 const (
-	// JIMM claims to be a 3.6.12 controller and client.
-	JIMM_CONTROLLER_VERSION = "3.6.12"
+	// ControllerVersion is the controller version and client JIMM claims to be.
+	ControllerVersion = "3.6.12"
 )
 
 // Version describes the current version of the code being run.

@@ -73,7 +73,7 @@ func (d *Dialer) createLoginRequest1(ctx context.Context, controllerTag names.Co
 
 	return &jujuparams.LoginRequest{
 		AuthTag:       userTag.String(),
-		ClientVersion: jimmversion.JIMM_CONTROLLER_VERSION,
+		ClientVersion: jimmversion.ControllerVersion,
 		Token:         jwtString,
 	}, nil
 }

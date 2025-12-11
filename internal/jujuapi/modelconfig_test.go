@@ -27,5 +27,5 @@ func (s *jimmSuite) TestModelGet(c *gc.C) {
 	c.Assert(ok, gc.Equals, true)
 	vers, ok := v.(string)
 	c.Assert(ok, gc.Equals, true)
-	c.Assert(vers, gc.Equals, jimmversion.JIMM_CONTROLLER_VERSION)
+	c.Assert(vers, gc.Equals, jimmversion.ControllerVersion)
 }

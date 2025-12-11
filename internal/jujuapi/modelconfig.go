@@ -24,7 +24,7 @@ func (r *controllerRoot) ModelGet(ctx context.Context) (params.ModelConfigResult
 	return params.ModelConfigResults{
 		Config: map[string]params.ConfigValue{
 			"agent-version": {
-				Value:  jimmversion.JIMM_CONTROLLER_VERSION,
+				Value:  jimmversion.ControllerVersion,
 				Source: "jimm",
 			},
 		},
