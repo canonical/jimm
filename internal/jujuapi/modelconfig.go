@@ -20,7 +20,10 @@ func init() {
 	}
 }
 
-// ModelGet returns the model configuration.
+// ModelGet returns the model configuration in JIMM's case, this is used to return the "controller" model config.
+// As JIMM doesn't have a controller model, or even an agent for that matter, we simulate this.
+//
+// It is required because the CLI reports on the agent-version during a show-controller call.
 func (r *controllerRoot) ModelGet(ctx context.Context) (params.ModelConfigResults, error) {
 	return params.ModelConfigResults{
 		Config: map[string]params.ConfigValue{
