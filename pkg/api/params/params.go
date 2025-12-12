@@ -18,6 +18,16 @@ type AddCloudToControllerRequest struct {
 	ControllerName string `json:"controller-name"`
 }
 
+// An AddModelToControllerRequest is the request sent when adding
+// a new model to a specific controller.
+type AddModelToControllerRequest struct {
+	jujuparams.ModelCreateArgs
+
+	// ControllerName is the name of the controller to which the
+	// model should be added.
+	ControllerName string `json:"controller-name"`
+}
+
 // A RemoveCloudFromControllerRequest is the request sent when removing
 // cloud from a specific controller.
 type RemoveCloudFromControllerRequest struct {

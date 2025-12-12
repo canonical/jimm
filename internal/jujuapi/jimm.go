@@ -24,6 +24,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/servermon"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/canonical/jimm/v3/version"
 )
@@ -42,6 +43,7 @@ func init() {
 		fullModelStatusMethod := rpc.Method(r.FullModelStatus)
 		updateMigratedModelMethod := rpc.Method(r.UpdateMigratedModel)
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
+		addModelToControllerMethod := rpc.Method(r.AddModelToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
 		addGroupMethod := rpc.Method(r.AddGroup)
 		getGroupMethod := rpc.Method(r.GetGroup)
@@ -83,6 +85,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "SetControllerDeprecated", setControllerDeprecatedMethod)
 		r.AddMethod("JIMM", 4, "UpdateMigratedModel", updateMigratedModelMethod)
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
+		r.AddMethod("JIMM", 4, "AddModelToController", addModelToControllerMethod)
 		r.AddMethod("JIMM", 4, "RemoveCloudFromController", removeCloudFromControllerMethod)
 		r.AddMethod("JIMM", 4, "PurgeLogs", purgeLogsMethod)
 		r.AddMethod("JIMM", 4, "MigrateModel", migrateModel)
@@ -177,6 +180,27 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 		return errors.E(err)
 	}
 	return nil
+}
+
+func (r *controllerRoot) AddModelToController(ctx context.Context, req apiparams.AddModelToControllerRequest) (jujuparams.ModelInfo, error) {
+	mca, err := toAddModelArgs(req.ModelCreateArgs)
+	if err != nil {
+		return jujuparams.ModelInfo{}, errors.E(err)
+	}
+	// Add JIMM specific field.
+	mca.TargetController = req.ControllerName
+
+	info, err := r.jimm.JujuManager().AddModel(ctx, r.user, mca)
+	if err != nil {
+		servermon.ModelsCreatedFailCount.Inc()
+		return jujuparams.ModelInfo{}, errors.E(err)
+	}
+
+	servermon.ModelsCreatedCount.Inc()
+	if r.controllerUUIDMasking {
+		info.ControllerUUID = r.params.ControllerUUID
+	}
+	return *info, nil
 }
 
 // AddController allows adds a controller to the pool of controllers

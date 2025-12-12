@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -327,6 +328,43 @@ func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
 	ctrlInfo.Models = append(ctrlInfo.Models, dbmodel.Model{})
 	_, err = root.StartDestroyControllerJob(ctx, req)
 	c.Assert(err, gc.ErrorMatches, "cannot destroy controller with models")
+}
+
+func (s *jimmUnitTestSuite) TestAddModelToController(c *gc.C) {
+	ctx := context.Background()
+
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				ModelManager: mocks.ModelManager{
+					AddModel_: func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+						c.Check(args.Name, gc.Equals, "mymodel")
+						c.Check(args.Owner.String(), gc.Equals, "user-alice@canonical.com")
+						c.Check(args.Cloud.String(), gc.Equals, "cloud-openstack")
+						c.Check(args.CloudRegion, gc.Equals, "region-1")
+						c.Check(args.CloudCredential.String(), gc.Equals, "cloudcred-openstack_alice_mycred")
+						c.Check(args.TargetController, gc.Equals, "controller-1")
+						return &jujuparams.ModelInfo{}, nil
+					},
+				},
+			}
+		},
+	}
+
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+	req := apiparams.AddModelToControllerRequest{
+		ModelCreateArgs: jujuparams.ModelCreateArgs{
+			Name:               "mymodel",
+			OwnerTag:           "user-alice@canonical.com",
+			CloudTag:           "cloud-openstack",
+			CloudRegion:        "region-1",
+			CloudCredentialTag: "cloudcred-openstack/alice/mycred",
+		},
+		ControllerName: "controller-1",
+	}
+
+	_, err := root.AddModelToController(ctx, req)
+	c.Assert(err, gc.IsNil)
 }
 
 // TestAuditLogAPIParamsConversion tests the conversion of API params to a AuditLogFilter struct.
