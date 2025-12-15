@@ -175,6 +175,10 @@ runs:
         JIMM_CONTROLLER_NAME: "jimm"
         CONTROLLER_NAME: ${{ steps.lxd-controller.outputs.name }}
 
+    - name: Grant all users with add-model access to backing controller
+      run: juju jaas add-permission user-everyone@external can_addmodel controller-${{ steps.lxd-controller.outputs.name }}
+      shell: bash
+
     - name: Provide service account with cloud-credentials
       run: ./local/jimm/setup-service-account.sh
       working-directory: ${{ github.action_path }}/../../..
