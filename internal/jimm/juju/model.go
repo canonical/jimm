@@ -48,9 +48,9 @@ type ModelCreateArgs struct {
 	Cloud           names.CloudTag
 	CloudRegion     string
 	CloudCredential names.CloudCredentialTag
-	// TargetController is optional and specifies the controller
+	// ControllerName is optional and specifies the controller
 	// name which should host the new model.
-	TargetController string
+	ControllerName string
 }
 
 // AddModel adds the specified model to JIMM.
@@ -78,8 +78,8 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 		return nil, errors.E(err)
 	}
 
-	if args.TargetController != "" {
-		builder = builder.WithController(args.TargetController)
+	if args.ControllerName != "" {
+		builder = builder.WithController(args.ControllerName)
 	} else {
 		builder = builder.WithAnyController()
 	}

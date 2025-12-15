@@ -1366,11 +1366,11 @@ users:
 	jimmAdmin:    false,
 	cloudCredTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	args: juju.ModelCreateArgs{
-		Name:             "test-model",
-		Owner:            names.NewUserTag("alice@canonical.com"),
-		Cloud:            names.NewCloudTag("test-cloud"),
-		CloudRegion:      "test-region-1",
-		TargetController: "controller-1",
+		Name:           "test-model",
+		Owner:          names.NewUserTag("alice@canonical.com"),
+		Cloud:          names.NewCloudTag("test-cloud"),
+		CloudRegion:    "test-region-1",
+		ControllerName: "controller-1",
 	},
 	expectModel: dbmodel.Model{
 		Name: "test-model",

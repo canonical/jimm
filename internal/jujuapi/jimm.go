@@ -188,7 +188,7 @@ func (r *controllerRoot) AddModelToController(ctx context.Context, req apiparams
 		return jujuparams.ModelInfo{}, errors.E(err)
 	}
 	// Add JIMM specific field.
-	mca.TargetController = req.ControllerName
+	mca.ControllerName = req.ControllerName
 
 	info, err := r.jimm.JujuManager().AddModel(ctx, r.user, mca)
 	if err != nil {
