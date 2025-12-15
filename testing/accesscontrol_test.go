@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
 	"context"
@@ -22,31 +22,17 @@ import (
 )
 
 type accessControlSuite struct {
-	websocketSuite
+	jimmtest.WebsocketE2ESuite
 }
 
 var _ = gc.Suite(&accessControlSuite{})
-
-func (s *accessControlSuite) SetUpTest(c *gc.C) {
-	s.websocketSuite.SetUpTest(c)
-
-	// We need to add the default controller, so that
-	// we can resolve its tag when listing application offers.
-	ctl := dbmodel.Controller{
-		Name:      "default_test_controller",
-		UUID:      jimmtest.DefaultControllerUUID,
-		CloudName: jimmtest.TestCloudName,
-	}
-	err := s.JIMM.Database.AddController(context.Background(), &ctl)
-	c.Assert(err, jc.ErrorIsNil)
-}
 
 /*
  Group facade related tests
 */
 
 func (s *accessControlSuite) TestAddGroup(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -59,7 +45,7 @@ func (s *accessControlSuite) TestAddGroup(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestGetGroup(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -83,7 +69,7 @@ func (s *accessControlSuite) TestGetGroup(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -163,12 +149,16 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(checkResp.Allowed, gc.Equals, true)
 
+	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	c.Assert(err, gc.IsNil)
+	previousTupleCount := len(resp.Tuples)
+
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: group2.Name})
 	c.Assert(err, gc.IsNil)
 
-	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
+	resp, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
 	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, 15)
+	c.Assert(len(resp.Tuples), gc.Equals, previousTupleCount-4)
 
 	// Check user access has been revoked.
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
@@ -180,7 +170,7 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -202,7 +192,7 @@ func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestListGroups(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -818,10 +808,15 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 
 func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	ctx := context.Background()
+
 	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
+	c.Assert(err, jc.ErrorIsNil)
+	initialTupleCount := len(response.Tuples)
+
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
@@ -847,10 +842,13 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
+	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// first tuples are created during setup test
-	c.Assert(response.Tuples[14:], jc.DeepEquals, tuples)
+	c.Assert(response.Tuples[initialTupleCount:], jc.DeepEquals, tuples)
+	if len(response.Errors) != 0 {
+		c.Logf("Errors: %+v", response.Errors)
+	}
 	c.Assert(len(response.Errors), gc.Equals, 0)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
@@ -914,7 +912,11 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
+	c.Assert(err, jc.ErrorIsNil)
+	initialTupleCount := len(response.Tuples)
+
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
@@ -943,10 +945,10 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
+	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
-	responseTuples := response.Tuples[14:]
+	responseTuples := response.Tuples[initialTupleCount:]
 	c.Assert(responseTuples, gc.HasLen, 2)
 
 	expectedUserToGroupTuple := tuples[1]
@@ -966,7 +968,11 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
 	defer closeClient()
 
-	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
+	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
+	c.Assert(err, jc.ErrorIsNil)
+	initialTupleCount := len(response.Tuples)
+
+	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
 	c.Assert(err, jc.ErrorIsNil)
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
 	c.Assert(err, jc.ErrorIsNil)
@@ -987,17 +993,17 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	err = s.JIMM.Database.RemoveGroup(ctx, group)
 	c.Assert(err, jc.ErrorIsNil)
 
-	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
+	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
 	c.Assert(err, jc.ErrorIsNil)
 	tupleWithoutDBEntry := tuples[0]
 	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID
 	// first tuples are created during setup test
-	c.Assert(response.Tuples[14], gc.Equals, tupleWithoutDBEntry)
+	c.Assert(response.Tuples[initialTupleCount], gc.Equals, tupleWithoutDBEntry)
 	c.Assert(response.Errors, gc.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID})
 }
 
 func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
-	conn := s.open(c, nil, "bob")
+	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 
@@ -1547,7 +1553,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	c.Assert(err, gc.IsNil)
 	c.Assert(len(offer.UUID), gc.Equals, 36)
 
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	client := api.NewClient(conn)
 
 	return *u, group, controller, model, offer, cloud, cred, client, func() {

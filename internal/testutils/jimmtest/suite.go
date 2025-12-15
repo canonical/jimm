@@ -194,10 +194,6 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 
 	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
-
-	// add jimmtest.DefaultControllerUUID as a controller to JIMM
-	err = s.OFGAClient.AddController(ctx, s.JIMM.ResourceTag(), names.NewControllerTag(DefaultControllerUUID))
-	c.Assert(err, gc.Equals, nil)
 }
 
 // jwkSetFromPrivateKeyFile reads a PEM-encoded RSA private key from a file

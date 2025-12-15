@@ -1,6 +1,6 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 */
 
 func (s *accessControlSuite) TestAddRole(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -33,7 +33,7 @@ func (s *accessControlSuite) TestAddRole(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestGetRole(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -63,7 +63,7 @@ func (s *accessControlSuite) TestGetRole(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestRemoveRole(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -146,7 +146,7 @@ func (s *accessControlSuite) TestRemoveRoleRemovesTuples(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestRenameRole(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -168,7 +168,7 @@ func (s *accessControlSuite) TestRenameRole(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestListRoles(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -198,7 +198,7 @@ func (s *accessControlSuite) TestListRoles(c *gc.C) {
 }
 
 func (s *accessControlSuite) TestUnauthorizedUserForRoleManagerment(c *gc.C) {
-	conn := s.open(c, nil, "not-authorized-user")
+	conn := s.Open(c, nil, "not-authorized-user", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 
