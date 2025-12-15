@@ -182,6 +182,7 @@ func (r *controllerRoot) AddCloudToController(ctx context.Context, req apiparams
 	return nil
 }
 
+// AddModelToController adds a new model to a specific controller.
 func (r *controllerRoot) AddModelToController(ctx context.Context, req apiparams.AddModelToControllerRequest) (jujuparams.ModelInfo, error) {
 	mca, err := toAddModelArgs(req.ModelCreateArgs)
 	if err != nil {
