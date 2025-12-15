@@ -4,6 +4,7 @@ package testing
 
 import (
 	"context"
+	"database/sql"
 	"slices"
 	"time"
 
@@ -1123,4 +1124,57 @@ func (s *jimmSuite) TestUpgradeTo_TargetVersionLower(c *gc.C) {
 	}
 	_, err := client.UpgradeTo(&req)
 	c.Assert(err, gc.ErrorMatches, `failed to run upgrade to: failed to prepare for upgrade: target version must be greater than or equal to current version \(bad request\)`)
+}
+
+func (s *jimmSuite) TestCreateModelOnTargetController(c *gc.C) {
+	conn := s.Open(c, nil, "bob", nil)
+	defer conn.Close()
+
+	// Generate unique model names for each test
+	generateModelName := func() string {
+		return petname.Generate(2, "-")
+	}
+
+	controllerName, conf := s.GetOneControllerConfig(c)
+
+	name := generateModelName()
+	ownerTag := names.NewUserTag("bob@canonical.com").String()
+	cloudTag := names.NewCloudTag(jimmtest.TestE2ECloudName).String()
+	credentialTag := "cloudcred-" + jimmtest.TestE2ECloudName + "_bob@canonical.com_cred"
+
+	var mi jujuparams.ModelInfo
+	err := conn.APICall("JIMM", 4, "", "AddModelToController", apiparams.AddModelToControllerRequest{
+		ModelCreateArgs: jujuparams.ModelCreateArgs{
+			Name:               name,
+			OwnerTag:           ownerTag,
+			CloudTag:           cloudTag,
+			CloudCredentialTag: credentialTag,
+		},
+		ControllerName: controllerName,
+	}, &mi)
+	c.Assert(err, gc.IsNil)
+
+	model := dbmodel.Model{
+		UUID: sql.NullString{String: mi.UUID, Valid: true},
+	}
+	err = s.JIMM.Database.GetModel(context.Background(), &model)
+	c.Assert(err, gc.IsNil)
+
+	// Make sure the model is hosted on the specified controller
+	c.Assert(model.Controller.UUID, gc.Equals, conf.UUID)
+
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(mi.Name, gc.Equals, name)
+	c.Assert(mi.UUID, gc.Not(gc.Equals), "")
+	c.Assert(mi.OwnerTag, gc.Equals, ownerTag)
+	c.Assert(mi.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
+	c.Assert(mi.Users, gc.Not(gc.HasLen), 0)
+
+	tag, err := names.ParseCloudCredentialTag(mi.CloudCredentialTag)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(tag.String(), gc.Equals, credentialTag)
+
+	ct, err := names.ParseCloudTag(cloudTag)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(ct.Id()).String())
 }
