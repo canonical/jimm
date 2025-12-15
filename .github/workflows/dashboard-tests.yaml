@@ -9,6 +9,10 @@ on:
     # Run twice a week: Mondays and Wednesdays at 03:00 UTC
     - cron: '0 3 * * 1,3'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-dashboard:
     name: Test JIMM with the Juju dashboard
