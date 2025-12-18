@@ -7,7 +7,7 @@ on:
     types: [labeled]
   schedule:
     # Run twice a week: Mondays and Wednesdays at 03:00 UTC
-    - cron: '0 3 * * 1,3'
+    - cron: "0 3 * * 1,3"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,7 +21,7 @@ jobs:
     # See https://stackoverflow.com/a/74829754
     # Because we also call this from other events, we need to allow those too.
     #
-    # Allow 'push' events as workflow_call passes the same event payload from the 
+    # Allow 'push' events as workflow_call passes the same event payload from the
     # calling workflow and we trigger releases on tag push.
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -47,7 +47,7 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"/CodeQL
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"/Ruby
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"/Java_Temurin-Hotspot_jdk
-          
+
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
 
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
 
       - name: Go vendor to speed up docker build
         run: go mod vendor
@@ -71,7 +71,7 @@ jobs:
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run integration tests
-        uses: canonical/juju-dashboard/.github/actions/run-playwright@f10fb23537cb3c652d664e92d5afa095e96fa433
+        uses: canonical/juju-dashboard/.github/actions/run-playwright@399187ff7a8a272a260c2e7ff65c1f2611994114
         with:
           test-identifier: e2e-jimm-docker-keycloak
         env:
