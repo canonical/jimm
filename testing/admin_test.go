@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
 	"context"
@@ -32,20 +32,20 @@ import (
 )
 
 type adminSuite struct {
-	websocketSuite
+	jimmtest.WebsocketE2ESuite
 }
 
 func (s *adminSuite) SetUpTest(c *gc.C) {
 	s.UseRealAuthentication(c)
-	s.websocketSuite.SetUpTest(c)
+	s.WebsocketE2ESuite.SetUpTest(c)
 }
 
 var _ = gc.Suite(&adminSuite{})
 
 func (s *adminSuite) TestLoginToController(c *gc.C) {
-	conn := s.open(c, &api.Info{
+	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
-	}, "test")
+	}, "test", nil)
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
 	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
@@ -117,7 +117,7 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 	c.Assert(err, gc.IsNil)
 	jar.SetCookies(jimmURL, cookies)
 
-	conn := s.openWithDialWebsocket(
+	conn := s.OpenWithDialWebsocket(
 		c,
 		&api.Info{
 			SkipLogin: true,
@@ -137,13 +137,12 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 
 // TestBrowserLoginNoCookie attempts to login without a cookie.
 func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
-	conn := s.open(
+	conn := s.Open(
 		c,
 		&api.Info{
 			SkipLogin: true,
 		},
-		"test",
-	)
+		"test", nil)
 	defer conn.Close()
 
 	lr := &jujuparams.LoginResult{}
@@ -157,9 +156,9 @@ func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
 // Within the test are clear comments explaining what is happening when and why.
 // Please refer to these comments for further details.
 func (s *adminSuite) TestDeviceLogin(c *gc.C) {
-	conn := s.open(c, &api.Info{
+	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
-	}, "test")
+	}, "test", nil)
 	defer conn.Close()
 
 	err := s.JIMM.Database.Migrate(context.Background())
@@ -298,9 +297,9 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, p
 }
 
 func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
-	conn := s.open(c, &api.Info{
+	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
-	}, "test")
+	}, "test", nil)
 	defer conn.Close()
 
 	const (

@@ -11,12 +11,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"runtime"
 	"sync"
 
 	petname "github.com/dustinkirkland/golang-petname"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/application"
+	"github.com/juju/juju/core/constraints"
 	jclient "github.com/juju/juju/jujuclient"
 	"github.com/juju/juju/rpc/jsoncodec"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -206,8 +208,9 @@ func (s *WebsocketE2ESuite) DeployApplication(c *gc.C, user *openfga.User, model
 		ApplicationName: appName,
 		Channel:         utils.Ptr("latest/stable"),
 		NumUnits:        utils.Ptr(1),
+		Cons:            constraints.Value{Arch: utils.Ptr(runtime.GOARCH)},
 	})
-	for err := range errs {
+	for _, err := range errs {
 		c.Assert(err, gc.Equals, nil)
 	}
 
@@ -266,6 +269,18 @@ func (s *WebsocketE2ESuite) openNoAssert(c *gc.C, d loginDetails, modelTag *name
 func (s *WebsocketE2ESuite) Open(c *gc.C, info *api.Info, username string, modelTag *names.ModelTag) api.Connection {
 	ld := loginDetails{info: info, username: username}
 	conn, err := s.openNoAssert(c, ld, modelTag)
+	c.Assert(err, gc.Equals, nil)
+	return conn
+}
+
+func (s *WebsocketE2ESuite) OpenWithDialWebsocket(
+	c *gc.C,
+	info *api.Info,
+	username string,
+	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
+) api.Connection {
+	ld := loginDetails{info: info, username: username, dialWebsocket: dialWebsocket}
+	conn, err := s.openNoAssert(c, ld, nil)
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }

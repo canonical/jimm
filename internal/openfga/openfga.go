@@ -112,6 +112,7 @@ func (o *OFGAClient) setResourceAccess(ctx context.Context, object, target names
 	if err != nil {
 		// if the tuple already exist we don't return an error.
 		// TODO we should opt to check against specific errors via checking their code/metadata.
+		// This is not needed if Openfga server is >= 1.10.0 because of idempotent writes.
 		if strings.Contains(err.Error(), "cannot write a tuple which already exists") {
 			return nil
 		}
@@ -134,6 +135,7 @@ func (o *OFGAClient) unsetResourceAccess(ctx context.Context, object, target nam
 	if err != nil {
 		// if the tuple already exist we don't return an error.
 		// TODO we should opt to check against specific errors via checking their code/metadata.
+		// This is not needed if Openfga server is >= 1.10.0 because of idempotent deletes.
 		if strings.Contains(err.Error(), "cannot delete a tuple which does not exist") {
 			return nil
 		}
@@ -186,7 +188,7 @@ func (o *OFGAClient) AddRelation(ctx context.Context, tuples ...Tuple) (err erro
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, op)
 
-	return o.cofgaClient.AddRelation(ctx, tuples...)
+	return o.cofgaClient.AddRelationIdempotent(ctx, tuples...)
 }
 
 // RemoveRelation removes given relations (tuples).
@@ -197,7 +199,7 @@ func (o *OFGAClient) RemoveRelation(ctx context.Context, tuples ...Tuple) (err e
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, op)
 
-	return o.cofgaClient.RemoveRelation(ctx, tuples...)
+	return o.cofgaClient.RemoveRelationIdempotent(ctx, tuples...)
 }
 
 // ListObjects returns all object IDs of <objType> that a user has the relation <relation> to.

@@ -512,13 +512,23 @@ func (m *modelImporter) setModelCloud(ctx context.Context) error {
 		return err
 	}
 
-	cr := cloud.Region(m.modelInfo.CloudRegion)
-	if cr.Name != m.modelInfo.CloudRegion {
-		return errors.E("cloud region not found")
-	}
+	if m.modelInfo.CloudRegion != "" {
+		cr := cloud.Region(m.modelInfo.CloudRegion)
+		if cr.Name != m.modelInfo.CloudRegion {
+			return errors.E("cloud region not found")
+		}
 
-	m.model.CloudRegionID = cr.ID
-	m.model.CloudRegion = cr
+		m.model.CloudRegionID = cr.ID
+		m.model.CloudRegion = cr
+	} else {
+		if len(cloud.Regions) != 1 {
+			return errors.E("expected one cloud region, found %d", len(cloud.Regions))
+		}
+		// because this cloud only has the one region, we can safely
+		// assume the model deployed to this region.
+		m.model.CloudRegionID = cloud.Regions[0].ID
+		m.model.CloudRegion = cloud.Regions[0]
+	}
 
 	return nil
 }

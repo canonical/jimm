@@ -5,7 +5,6 @@ package openfga_test
 import (
 	"context"
 	"strconv"
-	"strings"
 	"testing"
 
 	cofga "github.com/canonical/ofga"
@@ -88,11 +87,7 @@ func (suite *openFGATestSuite) TestRemovingTuplesFromOFGASucceeds(c *gc.C) {
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
-	// Delete before insert should fail
-	err := suite.ofgaClient.RemoveRelation(ctx, tuple1, tuple2)
-	c.Assert(strings.Contains(err.Error(), "cannot delete a tuple which does not exist"), gc.Equals, true)
-
-	err = suite.ofgaClient.AddRelation(ctx, tuple1, tuple2)
+	err := suite.ofgaClient.AddRelation(ctx, tuple1, tuple2)
 	c.Assert(err, gc.IsNil)
 
 	// Delete after insert should succeed.

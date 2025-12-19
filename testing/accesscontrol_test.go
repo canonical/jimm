@@ -497,9 +497,9 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 			c.Assert(err, gc.IsNil)
 			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
-			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
-			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
+			c.Assert(key.User, gc.DeepEquals, tc.want.Object.String())
+			c.Assert(key.Relation, gc.DeepEquals, tc.want.Relation.String())
+			c.Assert(key.Object, gc.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
@@ -775,9 +775,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
 		c.Assert(err, gc.IsNil)
 		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-		c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
-		c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
-		c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
+		c.Assert(key.User, gc.DeepEquals, tc.want.Object.String())
+		c.Assert(key.Relation, gc.DeepEquals, tc.want.Relation.String())
+		c.Assert(key.Object, gc.DeepEquals, tc.want.Target.String())
 
 		err = client.RemoveRelation(&apiparams.RemoveRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
@@ -799,9 +799,9 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			operation := change.GetOperation()
 			c.Assert(string(operation), gc.Equals, "TUPLE_OPERATION_DELETE")
 			key := change.GetTupleKey()
-			c.Assert(*key.User, gc.DeepEquals, tc.want.Object.String())
-			c.Assert(*key.Relation, gc.DeepEquals, tc.want.Relation.String())
-			c.Assert(*key.Object, gc.DeepEquals, tc.want.Target.String())
+			c.Assert(key.User, gc.DeepEquals, tc.want.Object.String())
+			c.Assert(key.Relation, gc.DeepEquals, tc.want.Relation.String())
+			c.Assert(key.Object, gc.DeepEquals, tc.want.Target.String())
 		}
 	}
 }

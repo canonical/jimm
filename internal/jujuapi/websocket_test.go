@@ -178,18 +178,6 @@ func (s *websocketSuite) openCustomLoginProvider(c *gc.C, info *api.Info, userna
 	return s.openNoAssert(c, ld)
 }
 
-func (s *websocketSuite) openWithDialWebsocket(
-	c *gc.C,
-	info *api.Info,
-	username string,
-	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
-) api.Connection {
-	ld := loginDetails{info: info, username: username, dialWebsocket: dialWebsocket}
-	conn, err := s.openNoAssert(c, ld)
-	c.Assert(err, gc.Equals, nil)
-	return conn
-}
-
 type apiProxySuite struct {
 	websocketSuite
 }

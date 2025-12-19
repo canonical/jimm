@@ -25,7 +25,7 @@ require (
 require (
 	github.com/antonlindstrom/pgstore v0.0.0-20220421113606-e3a6e3fed12a
 	github.com/canonical/go-service v1.0.0
-	github.com/canonical/ofga v0.10.0
+	github.com/canonical/ofga v0.16.1
 	github.com/canonical/rebac-admin-ui-handlers v0.2.0
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/dustinkirkland/golang-petname v0.0.0-20240428194347-eebcea082ee0
@@ -50,13 +50,13 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mattn/go-colorable v0.1.14
 	github.com/oklog/ulid/v2 v2.1.1
-	github.com/openfga/go-sdk v0.2.2
+	github.com/openfga/go-sdk v0.7.3
 	github.com/openfga/language/pkg/go v0.2.0-beta.2.0.20251027165255-0f8f255e5f6c
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rogpeppe/fastuuid v1.2.0
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.27.1
 	golang.org/x/oauth2 v0.33.0
 	golang.org/x/sync v0.18.0
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c

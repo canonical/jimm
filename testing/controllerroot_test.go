@@ -1,10 +1,11 @@
 // Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
 	"context"
 
+	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jc "github.com/juju/testing/checkers"
@@ -13,7 +14,7 @@ import (
 )
 
 type controllerrootSuite struct {
-	websocketSuite
+	jimmtest.WebsocketE2ESuite
 }
 
 var _ = gc.Suite(&controllerrootSuite{})
@@ -25,7 +26,7 @@ func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 	err := s.JIMM.Database.UpdateController(ctx, &s.Model.Controller)
 	c.Assert(err, gc.Equals, nil)
 
-	conn := s.open(c, nil, "test")
+	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 
 	v, ok := conn.ServerVersion()
@@ -34,10 +35,10 @@ func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
 }
 
 func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
-	conn := s.open(c, &api.Info{
+	conn := s.Open(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
-	}, "test")
+	}, "test", nil)
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("Admin", 3, "", "Logout", nil, &resp)
@@ -45,7 +46,7 @@ func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 }
 
 func (s *controllerrootSuite) TestUnimplementedRootFails(c *gc.C) {
-	conn := s.open(c, nil, "test")
+	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("NoSuch", 1, "", "Method", nil, &resp)

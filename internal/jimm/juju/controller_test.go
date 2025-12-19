@@ -535,7 +535,6 @@ func TestImportModel(t *testing.T) {
 		jimmAdmin      bool
 		expectedModel  dbmodel.Model
 		expectedError  string
-		deltas         []jujuparams.Delta
 		offers         []jujuparams.ApplicationOfferAdminDetailsV5
 	}{{
 		about:          "model imported",
@@ -581,63 +580,79 @@ func TestImportModel(t *testing.T) {
 			info.AgentVersion = newVersion("2.1.0")
 			return nil
 		},
-		deltas: []jujuparams.Delta{{
-			Entity: &jujuparams.ModelUpdate{
-				ModelUUID:      "00000002-0000-0000-0000-000000000001",
-				Name:           "test-model",
-				Owner:          "alice@canonical.com",
-				Life:           life.Value(state.Alive.String()),
-				ControllerUUID: "00000001-0000-0000-0000-000000000001",
-				Status: jujuparams.StatusInfo{
-					Current: "available",
-					Message: "updated status message",
-					Version: "1.2.3",
-					Since:   &now,
+		expectedModel: dbmodel.Model{
+			Name: "test-model",
+			UUID: sql.NullString{
+				String: "00000002-0000-0000-0000-000000000001",
+				Valid:  true,
+			},
+			Owner: dbmodel.Identity{
+				Name:        "alice@canonical.com",
+				DisplayName: "Alice",
+			},
+			Controller: dbmodel.Controller{
+				Name:         "test-controller",
+				UUID:         "00000001-0000-0000-0000-000000000001",
+				CloudName:    "test-cloud",
+				CloudRegion:  "test-region-1",
+				AgentVersion: "3.2.1",
+			},
+			CloudRegion: dbmodel.CloudRegion{
+				Cloud: dbmodel.Cloud{
+					Name: "test-cloud",
+					Type: "test",
 				},
-				SLA: jujuparams.ModelSLAInfo{
-					Level: "1",
-					Owner: "me",
-				},
+				Name: "test-region",
 			},
-		}, {
-			Entity: &jujuparams.ApplicationInfo{
-				ModelUUID:       "00000002-0000-0000-0000-000000000001",
-				Name:            "app-1",
-				Exposed:         true,
-				CharmURL:        "cs:app-1",
-				Life:            life.Value(state.Alive.String()),
-				MinUnits:        1,
-				WorkloadVersion: "2",
+			CloudCredential: dbmodel.CloudCredential{
+				Name: "test-credential",
 			},
-		}, {
-			Entity: &jujuparams.MachineInfo{
-				ModelUUID: "00000002-0000-0000-0000-000000000001",
-				Id:        "machine-1",
-				Life:      life.Value(state.Alive.String()),
-				Hostname:  "test-machine-1",
-			},
-		}, {
-			Entity: &jujuparams.UnitInfo{
-				ModelUUID:   "00000002-0000-0000-0000-000000000001",
-				Name:        "app-1/1",
-				Application: "app-1",
-				CharmURL:    "cs:app-1",
-				Life:        "starting",
-				MachineId:   "machine-1",
-			},
-		}, {
-			// TODO (ashipika) ApplicationOfferInfo is currently ignored. Consider
-			// fetching application offer details from the controller.
-			Entity: &jujuparams.ApplicationOfferInfo{
-				ModelUUID:            "00000002-0000-0000-0000-000000000001",
-				OfferName:            "test-offer-1",
-				OfferUUID:            "00000003-0000-0000-0000-000000000001",
-				ApplicationName:      "app-1",
-				CharmName:            "cs:~test-charmers/test-charm",
-				TotalConnectedCount:  17,
-				ActiveConnectedCount: 7,
-			},
-		}},
+			Life: state.Alive.String(),
+		},
+	}, {
+		about:          "model with default region imported",
+		user:           "alice@canonical.com",
+		controllerName: "test-controller",
+		newOwner:       "",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
+		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			// info.CloudRegion is not set to test default region handling
+			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
+			info.CloudCredentialValidity = &trueValue
+			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
+			info.Life = life.Alive
+			info.Status = jujuparams.EntityStatus{
+				Status: status.Status("ok"),
+				Info:   "test-info",
+				Since:  &now,
+			}
+			info.Users = []jujuparams.ModelUserInfo{{
+				UserName: "alice@canonical.com",
+				Access:   jujuparams.ModelAdminAccess,
+			}, {
+				UserName: "bob@canonical.com",
+				Access:   jujuparams.ModelReadAccess,
+			}}
+			info.Machines = []jujuparams.ModelMachineInfo{{
+				Id:          "test-machine",
+				DisplayName: "Test machine",
+				Status:      "test-status",
+				Message:     "test-message",
+			}}
+			info.SLA = &jujuparams.ModelSLAInfo{
+				Level: "essential",
+				Owner: "alice@canonical.com",
+			}
+			info.AgentVersion = newVersion("2.1.0")
+			return nil
+		},
 		expectedModel: dbmodel.Model{
 			Name: "test-model",
 			UUID: sql.NullString{
