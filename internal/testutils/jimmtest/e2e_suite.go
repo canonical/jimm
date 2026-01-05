@@ -140,11 +140,11 @@ type WebsocketE2ESuite struct {
 	cancelFnc context.CancelFunc
 }
 
-type loginDetails struct {
-	info          *api.Info
-	username      string
-	lp            api.LoginProvider
-	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
+type LoginDetails struct {
+	Info          *api.Info
+	Username      string
+	Lp            api.LoginProvider
+	DialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
 }
 
 func (s *WebsocketE2ESuite) SetUpTest(c *gc.C) {
@@ -246,13 +246,13 @@ func (s *WebsocketE2ESuite) TearDownTest(c *gc.C) {
 	s.E2ESuite.TearDownTest(c)
 }
 
-// openNoAssert creates a new websocket connection to the test server, using the
+// OpenNoAssert creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
-func (s *WebsocketE2ESuite) openNoAssert(c *gc.C, d loginDetails, modelTag *names.ModelTag) (api.Connection, error) {
+func (s *WebsocketE2ESuite) OpenNoAssert(c *gc.C, d LoginDetails, modelTag *names.ModelTag) (api.Connection, error) {
 	var inf api.Info
-	if d.info != nil {
-		inf = *d.info
+	if d.Info != nil {
+		inf = *d.Info
 	}
 	u, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, gc.Equals, nil)
@@ -270,25 +270,25 @@ func (s *WebsocketE2ESuite) openNoAssert(c *gc.C, d loginDetails, modelTag *name
 		inf.ModelTag = *modelTag
 	}
 
-	if d.lp == nil {
-		d.lp = NewUserSessionLogin(c, d.username)
+	if d.Lp == nil {
+		d.Lp = NewUserSessionLogin(c, d.Username)
 	}
 
 	dialOpts := api.DialOpts{
 		InsecureSkipVerify: true,
-		LoginProvider:      d.lp,
+		LoginProvider:      d.Lp,
 	}
 
-	if d.dialWebsocket != nil {
-		dialOpts.DialWebsocket = d.dialWebsocket
+	if d.DialWebsocket != nil {
+		dialOpts.DialWebsocket = d.DialWebsocket
 	}
 
 	return api.Open(&inf, dialOpts)
 }
 
 func (s *WebsocketE2ESuite) Open(c *gc.C, info *api.Info, username string, modelTag *names.ModelTag) api.Connection {
-	ld := loginDetails{info: info, username: username}
-	conn, err := s.openNoAssert(c, ld, modelTag)
+	ld := LoginDetails{Info: info, Username: username}
+	conn, err := s.OpenNoAssert(c, ld, modelTag)
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }
@@ -299,8 +299,8 @@ func (s *WebsocketE2ESuite) OpenWithDialWebsocket(
 	username string,
 	dialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error),
 ) api.Connection {
-	ld := loginDetails{info: info, username: username, dialWebsocket: dialWebsocket}
-	conn, err := s.openNoAssert(c, ld, nil)
+	ld := LoginDetails{Info: info, Username: username, DialWebsocket: dialWebsocket}
+	conn, err := s.OpenNoAssert(c, ld, nil)
 	c.Assert(err, gc.Equals, nil)
 	return conn
 }
