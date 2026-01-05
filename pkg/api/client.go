@@ -36,6 +36,13 @@ func (c *Client) AddCloudToController(req *params.AddCloudToControllerRequest) e
 	return c.caller.APICall("JIMM", 4, "", "AddCloudToController", req, nil)
 }
 
+// AddModelToController adds a new model to a controller in JIMM.
+func (c *Client) AddModelToController(req *params.AddModelToControllerRequest) (jujuparams.ModelInfo, error) {
+	var info jujuparams.ModelInfo
+	err := c.caller.APICall("JIMM", 4, "", "AddModelToController", req, &info)
+	return info, err
+}
+
 // AddController adds a new controller to JIMM.
 func (c *Client) AddController(req *params.AddControllerRequest) (params.ControllerInfo, error) {
 	var info params.ControllerInfo
