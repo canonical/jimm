@@ -1,6 +1,6 @@
 // Copyright 2025 Canonical.
 
-package jujuapi_test
+package testing
 
 import (
 	"github.com/juju/description/v9"
@@ -17,13 +17,13 @@ import (
 )
 
 type migrationTargetSuite struct {
-	websocketSuite
+	jimmtest.WebsocketE2ESuite
 }
 
 var _ = gc.Suite(&migrationTargetSuite{})
 
 func (s *migrationTargetSuite) TestAbort(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
@@ -33,7 +33,7 @@ func (s *migrationTargetSuite) TestAbort(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestCheckMachines(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
@@ -43,10 +43,10 @@ func (s *migrationTargetSuite) TestCheckMachines(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
+	cct := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/alice@canonical.com/cred")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "empty",
 	})
@@ -54,15 +54,15 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	modelDescriptionArgs := description.ModelArgs{
 		Type:        description.IAAS,
 		Owner:       names.NewUserTag("alice"),
-		Cloud:       jimmtest.TestCloudName,
-		CloudRegion: jimmtest.TestCloudRegionName,
+		Cloud:       jimmtest.TestE2ECloudName,
+		CloudRegion: jimmtest.TestE2ECloudRegionName,
 	}
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	modelDescription := description.NewModel(modelDescriptionArgs)
 	modelDescription.SetStatus(description.StatusArgs{Value: "available"})
 	modelDescription.SetCloudCredential(description.CloudCredentialArgs{
 		Name:  "cred",
-		Cloud: names.NewCloudTag(jimmtest.TestCloudName),
+		Cloud: names.NewCloudTag(jimmtest.TestE2ECloudName),
 		Owner: names.NewUserTag("alice@canonical.com"),
 	})
 	model := migration.ModelInfo{
@@ -77,9 +77,11 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	err := client.Prechecks(model)
 	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
 
+	controllerName, _ := s.GetOneControllerConfig(c)
+
 	prepareModelMigration := params.PrepareModelMigrationRequest{
 		ModelTag:              names.NewModelTag(modelUUID).String(),
-		BackingControllerName: "controller-1", // Default name of the initial controller added to JIMM.
+		BackingControllerName: controllerName,
 		UserMapping:           map[string]string{"alice": "alice@canonical.com"},
 	}
 	jimmClient := api.NewClient(conn)
@@ -92,7 +94,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestCACert(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
@@ -102,7 +104,7 @@ func (s *migrationTargetSuite) TestCACert(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestAdoptResources(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
@@ -112,7 +114,7 @@ func (s *migrationTargetSuite) TestAdoptResources(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestActivate(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
@@ -127,7 +129,7 @@ func (s *migrationTargetSuite) TestActivate(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestLatestLogTime(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
@@ -136,7 +138,7 @@ func (s *migrationTargetSuite) TestLatestLogTime(c *gc.C) {
 }
 
 func (s *migrationTargetSuite) TestImport(c *gc.C) {
-	conn := s.open(c, nil, "alice")
+	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
