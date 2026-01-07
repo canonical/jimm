@@ -13,6 +13,15 @@ ARCH := $(shell dpkg --print-architecture)
 
 default: build
 
+# Run all generators that update committed artefacts.
+generate: generate-go generate-jaas-plugin-docs
+
+generate-go:
+	go generate ./...
+
+generate-jaas-plugin-docs:
+	./scripts/generate_jaas_plugin_reference.sh
+
 build: version/commit.txt version/version.txt
 	go build -tags version $(PROJECT)/...
 
@@ -177,3 +186,5 @@ help:
 	@echo 'make load-rock - Load the most recently built rock into your local docker daemon.'
 
 .PHONY: build check install release clean format server simplify sys-deps help
+
+.PHONY: generate generate-go generate-jaas-plugin-docs

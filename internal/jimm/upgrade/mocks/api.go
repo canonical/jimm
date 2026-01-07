@@ -1164,44 +1164,6 @@ func (c *MockAPIGrantJIMMModelAdminCall) DoAndReturn(f func(context.Context, nam
 	return c
 }
 
-// GrantModelAccess mocks base method.
-func (m *MockAPI) GrantModelAccess(arg0 context.Context, arg1 names.ModelTag, arg2 names.UserTag, arg3 params.UserAccessPermission) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GrantModelAccess", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// GrantModelAccess indicates an expected call of GrantModelAccess.
-func (mr *MockAPIMockRecorder) GrantModelAccess(arg0, arg1, arg2, arg3 any) *MockAPIGrantModelAccessCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GrantModelAccess", reflect.TypeOf((*MockAPI)(nil).GrantModelAccess), arg0, arg1, arg2, arg3)
-	return &MockAPIGrantModelAccessCall{Call: call}
-}
-
-// MockAPIGrantModelAccessCall wrap *gomock.Call
-type MockAPIGrantModelAccessCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIGrantModelAccessCall) Return(arg0 error) *MockAPIGrantModelAccessCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIGrantModelAccessCall) Do(f func(context.Context, names.ModelTag, names.UserTag, params.UserAccessPermission) error) *MockAPIGrantModelAccessCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIGrantModelAccessCall) DoAndReturn(f func(context.Context, names.ModelTag, names.UserTag, params.UserAccessPermission) error) *MockAPIGrantModelAccessCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // HTTPClient mocks base method.
 func (m *MockAPI) HTTPClient() (*httprequest.Client, error) {
 	m.ctrl.T.Helper()
@@ -2006,44 +1968,6 @@ func (c *MockAPIRevokeCredentialCall) Do(f func(context.Context, names.CloudCred
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAPIRevokeCredentialCall) DoAndReturn(f func(context.Context, names.CloudCredentialTag) error) *MockAPIRevokeCredentialCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// RevokeModelAccess mocks base method.
-func (m *MockAPI) RevokeModelAccess(arg0 context.Context, arg1 names.ModelTag, arg2 names.UserTag, arg3 params.UserAccessPermission) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RevokeModelAccess", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RevokeModelAccess indicates an expected call of RevokeModelAccess.
-func (mr *MockAPIMockRecorder) RevokeModelAccess(arg0, arg1, arg2, arg3 any) *MockAPIRevokeModelAccessCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeModelAccess", reflect.TypeOf((*MockAPI)(nil).RevokeModelAccess), arg0, arg1, arg2, arg3)
-	return &MockAPIRevokeModelAccessCall{Call: call}
-}
-
-// MockAPIRevokeModelAccessCall wrap *gomock.Call
-type MockAPIRevokeModelAccessCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIRevokeModelAccessCall) Return(arg0 error) *MockAPIRevokeModelAccessCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIRevokeModelAccessCall) Do(f func(context.Context, names.ModelTag, names.UserTag, params.UserAccessPermission) error) *MockAPIRevokeModelAccessCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIRevokeModelAccessCall) DoAndReturn(f func(context.Context, names.ModelTag, names.UserTag, params.UserAccessPermission) error) *MockAPIRevokeModelAccessCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

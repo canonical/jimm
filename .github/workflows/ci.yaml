@@ -40,6 +40,32 @@ jobs:
       - name: Build and Test
         run: TEST_LOGGING_CONFIG=ERROR go test -mod readonly ./... -timeout 1h -cover
 
+  verify_generated:
+    name: Verify generated artefacts are up to date
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "go.mod"
+
+      - name: Run generators
+        shell: bash
+        run: make generate
+
+      - name: Ensure working tree is clean
+        shell: bash
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Generated files are out of date. Run 'make generate' and commit the results."
+            exit 1
+          fi
+          test -z "$(git status --porcelain)" # Check for uncommitted changes
+
   verify_jaas_commands:
     name: Verify JAAS command symlinks
     runs-on: ubuntu-22.04
