@@ -1484,13 +1484,13 @@ func (s *bootstrapManagerSuite) TestDestroyControllerJob(c *qt.C) {
 	pollJob(c, s, id, dbmodel.StatusSuccessful)
 }
 
-//go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
-//go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
-//go:generate mockgen -typed -destination=./mocks/binarystore.go -package=mocks . BinaryStore
-//go:generate mockgen -typed -destination=./mocks/commandfactory.go -package=mocks . CommandFactory
-//go:generate mockgen -typed -destination=./mocks/jujucommands.go -package=mocks . JujuCommands
-//go:generate mockgen -typed -destination=./mocks/jujuclientstore.go -package=mocks github.com/juju/juju/jujuclient ClientStore
-//go:generate mockgen -typed -destination=./mocks/credentialstore.go -package=mocks . CredentialStore
+//go:generate go tool mockgen -typed -destination=./mocks/store.go -package=mocks . Store
+//go:generate go tool mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
+//go:generate go tool mockgen -typed -destination=./mocks/binarystore.go -package=mocks . BinaryStore
+//go:generate go tool mockgen -typed -destination=./mocks/commandfactory.go -package=mocks . CommandFactory
+//go:generate go tool mockgen -typed -destination=./mocks/jujucommands.go -package=mocks . JujuCommands
+//go:generate go tool mockgen -typed -destination=./mocks/jujuclientstore.go -package=mocks github.com/juju/juju/jujuclient ClientStore
+//go:generate go tool mockgen -typed -destination=./mocks/credentialstore.go -package=mocks . CredentialStore
 func TestBootstrapManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &bootstrapManagerSuite{})
 }

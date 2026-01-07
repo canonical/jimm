@@ -96,7 +96,7 @@ func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	c.Assert(b.String(), qt.Equals, "JUJU_DATA=testing-data-is-set\n")
 }
 
-//go:generate mockgen -destination=./mocks/runner.go -package=mocks . Runner
+//go:generate go tool mockgen -destination=./mocks/runner.go -package=mocks . Runner
 func TestJujucommandsSuite(t *testing.T) {
 	qtsuite.Run(qt.New(t), &jujucommandsSuite{})
 }

@@ -429,11 +429,11 @@ func (s *upgradeManagerSuite) TestUpgradeTo_Success(c *qt.C) {
 	c.Assert(time.Since(time.Unix(ts, 0)) < 2*time.Second, qt.IsTrue)
 }
 
-//go:generate mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
-//go:generate mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
-//go:generate mockgen -typed -destination=./mocks/store.go -package=mocks . Store
-//go:generate mockgen -typed -destination=./mocks/dialer.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju Dialer
-//go:generate mockgen -typed -destination=./mocks/api.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju API
+//go:generate go tool mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
+//go:generate go tool mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
+//go:generate go tool mockgen -typed -destination=./mocks/store.go -package=mocks . Store
+//go:generate go tool mockgen -typed -destination=./mocks/dialer.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju Dialer
+//go:generate go tool mockgen -typed -destination=./mocks/api.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju API
 func TestUpgradeManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &upgradeManagerSuite{})
 }
