@@ -26,14 +26,14 @@ build:
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   builder: dirhtml
-  configuration: conf.py
+  configuration: docs/conf.py
   fail_on_warning: false
 
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 formats:
-- pdf
+  - pdf
 
 # Optionally declare the Python requirements required to build your docs
 python:
   install:
-  - requirements: requirements.txt
+  - requirements: docs/requirements.txt
