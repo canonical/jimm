@@ -1,54 +1,76 @@
 #!/bin/bash
 
-# This test upgrades a single model juju controller from one version to another
+# This test upgrades a single model from one version to another
 # utilising JAAS' upgrade-to command.
+
+# This test is currently skipped due to:
+# 1. jaas add-model command not yet available.
 
 set -euo pipefail
 
-# TODO: This test is very slow, and appears to be slowing the runner down to a 
-# complete hault.
+source "local/jimm/detect-jaas.sh"
+
 # See: https://warthogs.atlassian.net/browse/JUJU-8938
-# source "local/jimm/detect-jaas.sh"
+JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
+UPGRADE_CONTROLLER="upgrade-source-controller"
+SOURCE_CONTROLLER_VERSION="3.6.11"
+# Generate a random 4-character suffix for the model name.
+RAND_SUFFIX=$(tr -dc 'a-z0-9' </dev/urandom | head -c 4 || true)
+UPGRADING_MODEL_NAME="upgrading-model-$RAND_SUFFIX"
 
-# # Reset Juju on EXIT.
-# trap 'sudo snap refresh juju --channel=3/stable' EXIT
+# Setup controller with desired agent version then add the controller to JIMM.
+echo
+controller_exists=$(juju controllers | grep -c "$UPGRADE_CONTROLLER" || true)
+if [[ "$controller_exists" -gt 0 ]]; then
+    echo "Controller $UPGRADE_CONTROLLER already exists, skipping setup."
+else
+    echo "Setting up $UPGRADE_CONTROLLER"
+    AGENT_VERSION="$SOURCE_CONTROLLER_VERSION" CONTROLLER_NAME="$UPGRADE_CONTROLLER" local/jimm/setup-controller.sh
+    CONTROLLER_NAME="$UPGRADE_CONTROLLER" local/jimm/add-controller.sh
+fi
 
-# export CONTROLLER_NAME="man-of-iron"
-# JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
+# Switch to JIMM controller
+juju switch "$JIMM_CONTROLLER_NAME"
 
-# # Switch to an older Juju temporarily, so that we can upgrade the model when migrated.
-# sudo snap refresh juju --channel=3/stable --revision=32912
+# Create the model that will be upgraded.
+echo
+echo "Creating $UPGRADING_MODEL_NAME"
+$JAAS add-model "$UPGRADING_MODEL_NAME" localhost --target-controller "$UPGRADE_CONTROLLER"
 
-# echo
-# echo "Bootstrapping lxd controller configured with login-token-refresh-url"
-# local/jimm/setup-controller.sh
+echo
+echo "Fetching current model version"
+current_model_version="$(juju show-model "$UPGRADING_MODEL_NAME" | yq -r ".${UPGRADING_MODEL_NAME}.agent-version")"
+echo "Current model version is $current_model_version"
 
-# echo
-# echo "Adding controller to jimm"
-# local/jimm/add-controller.sh
+if [ "$current_model_version" != "$SOURCE_CONTROLLER_VERSION" ]; then
+    echo "Model should be at version $SOURCE_CONTROLLER_VERSION to perform upgrade test, but is at $current_model_version"
+    exit 1
+fi
 
-# echo
-# echo "Upgrading Juju 3.6.11 model to 3.6.12"
-# $JAAS upgrade-to 3.6.12 $(juju show-model test-lxd | yq '.test-lxd.model-uuid')
+echo
+echo "Upgrading Juju $current_model_version model to 3.6.12"
+$JAAS upgrade-to 3.6.12 "$(juju show-model "$UPGRADING_MODEL_NAME" | yq -r ".${UPGRADING_MODEL_NAME}.model-uuid")"
 
-# echo 
-# echo "Verifying model has been migrated from the original controller"
-# juju switch man-of-iron
-# if jujy models --format json | jq -e '.models | (length == 1) and (.[0].name == "admin/controller")'; then
-#   echo "Success: Only the controller model remains."
-# else
-#   echo "Failure: Expected only the controller model, but found something else."
-#   juju models
-#   exit 1
-# fi
+echo
+echo "Verifying model has been upgraded from $current_model_version"
+echo "Waiting for upgrade to complete (timeout: 5 minutes)..."
+max_attempts=60  # 60 attempts = 5 minutes / 5 seconds
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    sleep 5
+    new_version="$(juju show-model "$UPGRADING_MODEL_NAME" | yq -r ".${UPGRADING_MODEL_NAME}.agent-version")"
+    if [ "$new_version" != "$current_model_version" ]; then
+        echo "Model upgrade completed to version $new_version."
+        break
+    fi
+    echo 
+    echo "Upgrade still in progress (attempt $attempt/$max_attempts)"
+    attempt=$((attempt + 1))
+done
+if [ $attempt -gt $max_attempts ]; then
+    echo "Upgrade did not complete within 5 minutes."
+    exit 1
+fi
 
-# echo
-# echo "Verifying model has been upgraded from 3.6.11"
-# juju switch $JIMM_CONTROLLER_NAME:test-lxd
-# if juju status --format json | jq -e '.model.version != "3.6.11"'; then
-#   echo "Validation successful: The model version is not 3.6.11."
-#   # Script continues...
-# else
-#   echo "Validation failed: The model version is still 3.6.11."
-#   exit 1
-# fi
+echo
+echo "Upgrade test completed successfully."

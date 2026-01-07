@@ -33,6 +33,10 @@ else
   echo "Skipping connecting the controller to JIMM"
 fi
 
+if [[ -n "${AGENT_VERSION:-}" ]]; then
+  BOOTSTRAP_ARGS+=(--agent-version "${AGENT_VERSION}")
+fi
+
 echo "Bootstrapping controller"
 JUJU_DEV_FEATURE_FLAGS=ssh-jump juju bootstrap "${BOOTSTRAP_ARGS[@]}"
 rm "$CLOUDINIT_FILE"
