@@ -4,11 +4,12 @@ name: Publish Docs
 # formatted document before converting the doc to rst and makes
 # a PR to the jaas-documentation repo to update the docs.
 
+# TODO: Now that we are moving the docs into the jimm repo,
+# this workflow needs to be removed and replaced with a check
+# that ensures auto-generated artefacts/docs are up to date.
+
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v3*'
 
 jobs:
   publish-jaas-plugin-docs:

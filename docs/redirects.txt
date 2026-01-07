@@ -1,0 +1,55 @@
+# Follow the pattern <old URL> <new URL>
+# E.g., user/reference/charm/channel/ user/reference/charm/
+# If you're renaming things, run make clean before make run.
+
+reference/relation explanation/jaas-authorization
+reference/tag reference
+howto/manage-relations/ howto/manage-permissions
+how-to/bootstrap_permissions/ howto/bootstrap_permissions/
+how-to/add_controller/ howto/add_controller/
+how-to/migrate_models/ howto/migrate_models/
+how-to/migrate_models_internal/ howto/migrate_models_internal/
+how-to/integrate_with_cos/ howto/integrate_with_cos/
+# how-to/security_hardening/ howto/security_hardening/
+how-to/setup_ingress_with_tls/ howto/setup_ingress_with_tls/
+how-to/setup_dashboard/ howto/setup_dashboard/
+how-to/setup_new_users/ howto/setup_new_users/
+tutorial/role_management/ howto/manage-roles/
+tutorial/group_management/ howto/manage-groups/
+tutorial/deploy_jaas_microk8s/ tutorial/index/
+explanation/jaas_tags/ reference/tag/
+# reference/juju_required_version/ reference/jaas/juju_required_version/
+reference/authorisation_model/ reference/jaas/authorisation_model/
+reference/authorisation_data/ reference/jaas/authorisation_data/
+reference/security/ explanation/jaas-security/
+explanation/authentication/ explanation/jaas-authentication/
+explanation/authorisation/ explanation/jaas-authorization/
+explanation/jaas_architecture/ explanation/jaas-architecture/
+explanation/jaas_security_scope/ explanation/jaas-security-scope/
+howto/integrate_with_cos/ howto/manage-jimm-controllers/
+howto/migrate_models/ howto/manage-models/
+howto/migrate_models_internal/ howto/manage-models/
+howto/add_controller/ howto/manage-juju-controllers/
+howto/setup_ingress_with_tls/ howto/manage-jimm-controllers/
+howto/setup_dashboard/ howto/manage-jimm-controllers/
+howto/bootstrap_permissions/ howto/manage-jimm-controllers/
+reference/jaas/authorisation_data/ explanation/jaas-authorization
+reference/jaas/authorisation_model/ explanation/jaas-authorization
+reference/jaas/authorisation/ reference/jaas/jaas-authorization
+explanation/jaas_overview/ explanation/jaas_architecture/
+howto/manage-jimm-controllers/ howto/manage-your-jaas-deployment/
+howto/setup_new_users/ howto/manage-users/
+reference/juju_required_version/ reference/jaas/supported-juju-versions/
+# reference/jaas/authentication/ reference/jaas/security/
+# reference/jaas/jaas_security_scope/ reference/jaas/security/
+reference/jaas/security_hardening/ reference/jaas/security/
+reference/jaas/jaas_architecture/ explanation/jaas-architecture/
+reference/jaas/security/ explanation/jaas-security/
+reference/jaas/supported-juju-versions/ reference/jaas/jaas-supported-juju-versions/
+reference/audit_logs/ reference/audit-logs
+reference/jaas/jaas-architecture explanation/jaas-architecture
+reference/jaas/jaas-authentication explanation/jaas-authentication
+reference/jaas/jaas-authorization explanation/jaas-authorization
+reference/jaas/jaas-rebac-admin-backend explanation/jaas-rebac-admin-backend
+reference/jaas/jaas-security-scope explanation/jaas-security-scope
+reference/jaas/jaas-security explanation/jaas-security

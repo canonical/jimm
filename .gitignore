@@ -29,3 +29,11 @@ __debug_bin*
 dist/
 controllers.yaml
 .vscode/settings.json
+
+# Sphinx
+docs/.sphinx/venv/
+docs/.sphinx/warnings.txt
+docs/.sphinx/.wordlist.dic
+docs/.sphinx/.doctrees/
+docs/.sphinx/update/
+docs/.sphinx/node_modules/
