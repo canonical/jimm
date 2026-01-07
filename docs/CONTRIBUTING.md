@@ -50,7 +50,7 @@ git config --global commit.gpgsign true
 
 > See more: [GitHub | Authentication > Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
 
-3. Fork canonical/jaas-documentation. This will create `https://github.com/<user>/jaas-documentation`.
+3. Fork canonical/jimm. This will create `https://github.com/<user>/jimm`.
 
 4. Clone your fork locally.
 
@@ -60,10 +60,10 @@ cd jaas-documentation
 ```
 
 5. Add a new remote with the name `upstream` and set it to point to the upstream
-`jaas-documentation` repo.
+`jimm` repo.
 
 ```
-git remote add upstream git@github.com:canonical/jaas-documentation.git
+git remote add upstream git@github.com:canonical/jimm.git
 ```
 
 6. Set your local branches to track the `upstream` remote (not your fork). E.g.,
