@@ -61,7 +61,7 @@ func (j *JujuManager) GetCloud(ctx context.Context, user *openfga.User, tag name
 // returned unchanged. The given function should not update the database.
 //
 // Additionally, if there are no controllers registered with JIMM then an
-// error with a code of CodeNoControllers will be returned.
+// error of "no controllers registered" will be returned.
 func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 
 	ctrlCount, err := j.Database.CountControllers(ctx)
