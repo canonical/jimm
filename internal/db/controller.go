@@ -180,7 +180,7 @@ func (d *Database) CountControllers(ctx context.Context) (count int, err error) 
 	const op = "db.CountControllers"
 
 	if err := d.ready(); err != nil {
-		return 0, errors.E(err)
+		return -1, errors.E(err)
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
