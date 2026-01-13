@@ -363,7 +363,7 @@ func (s *dbSuite) TestCountControllers(c *qt.C) {
 
 	count, err := s.Database.CountControllers(context.Background())
 	c.Assert(err, qt.IsNil)
-	c.Assert(count, qt.Equals, int64(0))
+	c.Assert(count, qt.Equals, 0)
 
 	cloud := dbmodel.Cloud{
 		Name: "test-cloud",
@@ -381,5 +381,5 @@ func (s *dbSuite) TestCountControllers(c *qt.C) {
 
 	count, err = s.Database.CountControllers(context.Background())
 	c.Assert(err, qt.IsNil)
-	c.Assert(count, qt.Equals, int64(1))
+	c.Assert(count, qt.Equals, 1)
 }

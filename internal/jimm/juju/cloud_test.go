@@ -175,6 +175,17 @@ func TestForEachCloud(t *testing.T) {
 	err = j.Database.AddCloud(ctx, cloud)
 	c.Assert(err, qt.IsNil)
 
+	// ForEachCloud requires controllers be registered. Simulate this by adding the database entry.
+	err = j.Database.AddController(
+		ctx,
+		&dbmodel.Controller{
+			Name:      "test-controller",
+			UUID:      "00000000-0000-0000-0000-000000000001",
+			CloudName: cloud.Name,
+		},
+	)
+	c.Assert(err, qt.IsNil)
+
 	err = alice.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 	err = bob.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation)
@@ -297,6 +308,35 @@ func TestForEachCloud(t *testing.T) {
 		Name:      "test-cloud-3",
 		Regions:   []dbmodel.CloudRegion{},
 	}})
+}
+
+func TestForEachCloud_NoControllers(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	j := newTestJujuManager(c, nil)
+
+	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+	alice := openfga.NewUser(
+		aliceIdentity,
+		j.OpenFGAClient,
+	)
+
+	cloud := &dbmodel.Cloud{
+		Name: "test-cloud-1",
+	}
+	err = j.Database.AddCloud(ctx, cloud)
+	c.Assert(err, qt.IsNil)
+
+	err = alice.SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.AdministratorRelation)
+	c.Assert(err, qt.IsNil)
+
+	err = j.ForEachUserCloud(ctx, alice, func(cld *dbmodel.Cloud) error {
+		return nil
+	})
+
+	c.Assert(err, qt.ErrorMatches, "no controllers registered")
 }
 
 const addHostedCloudTestEnv = `clouds:
