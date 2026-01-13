@@ -59,7 +59,19 @@ func (j *JujuManager) GetCloud(ctx context.Context, user *openfga.User, tag name
 // true then f will be called with all clouds known to JIMM. If f returns
 // an error then iteration will stop immediately and the error will be
 // returned unchanged. The given function should not update the database.
+//
+// Additionally, if there are no controllers registered with JIMM then an
+// error with a code of CodeNoControllers will be returned.
 func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
+
+	ctrlCount, err := j.Database.CountControllers(ctx)
+	if err != nil {
+		return errors.E(fmt.Errorf("cannot count controllers: %w", err))
+	}
+
+	if ctrlCount == 0 {
+		return errors.E("no controllers registered")
+	}
 
 	clouds, err := j.Database.GetClouds(ctx)
 	if err != nil {

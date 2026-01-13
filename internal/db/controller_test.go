@@ -356,3 +356,30 @@ func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
 		"00000002-0000-0000-0000-000000000004",
 	})
 }
+
+func (s *dbSuite) TestCountControllers(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	count, err := s.Database.CountControllers(context.Background())
+	c.Assert(err, qt.IsNil)
+	c.Assert(count, qt.Equals, int64(0))
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+	}
+	err = s.Database.AddCloud(context.Background(), &cloud)
+	c.Assert(err, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:      "test-controller",
+		UUID:      "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName: "test-cloud",
+	}
+	err = s.Database.AddController(context.Background(), &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	count, err = s.Database.CountControllers(context.Background())
+	c.Assert(err, qt.IsNil)
+	c.Assert(count, qt.Equals, int64(1))
+}
