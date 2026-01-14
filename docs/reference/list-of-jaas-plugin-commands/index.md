@@ -57,6 +57,7 @@ Add group to jimm.
 Adds a group.
 
 
+(command-jaas-add-model)=
 # jaas add-model
 
 ## Summary

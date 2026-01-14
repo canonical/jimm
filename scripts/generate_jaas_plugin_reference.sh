@@ -41,15 +41,9 @@ mkdir -p "$(dirname "${out_file}")"
 #
 # Notes:
 # - GNU sed supports `\s` and `\S` (whitespace / non-whitespace) which read a bit
-#   more naturally than POSIX `[[:space:]]`. BSD sed (macOS) does not, so we use
-#   a POSIX-compatible fallback there.
+#   more naturally than POSIX `[[:space:]]`. BSD sed (macOS) does not.
 # - The replacement uses a literal newline via a backslash at end-of-line.
-if sed --version >/dev/null 2>&1; then
-	sed -E 's/^# jaas\s+(\S+)\s*$/\(command-jaas-\1\)=\
+sed -E 's/^# jaas\s+(\S+)\s*$/\(command-jaas-\1\)=\
 # jaas \1/' "${md_in}" > "${out_file}"
-else
-	sed -E 's/^# jaas[[:space:]]+([^[:space:]]+)[[:space:]]*$/\(command-jaas-\1\)=\
-# jaas \1/' "${md_in}" > "${out_file}"
-fi
 
 echo "Updated: ${out_file}"
