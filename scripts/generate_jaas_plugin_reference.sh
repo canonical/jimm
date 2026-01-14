@@ -30,11 +30,20 @@ mkdir -p "$(dirname "${out_file}")"
 # Add MyST markdown anchors for each command heading.
 # The generated documentation uses headings of the form:
 #   # jaas <command>
-# We want an anchor immediately above each heading:
+# We want a stable anchor immediately above each heading:
 #   (command-jaas-<command>)=
 #
-# Commands are expected to be a single token (no spaces), so we can
-# transform matching lines directly without extra sanitization.
-sed -E '/^# jaas [^[:space:]]+[[:space:]]*$/{h;s/^# jaas /(command-jaas-/;s/[[:space:]]*$/)=/;G}' "${md_in}" > "${out_file}"
+# This `sed` expression looks for level-1 headings like:
+#   # jaas <command>
+# and rewrites each match into two lines:
+#   (command-jaas-<command>)=
+#   # jaas <command>
+#
+# Notes:
+# - `([^[:space:]]+)` captures the command name as a single token.
+# - `[[:space:]]*$` tolerates trailing whitespace at the end of the heading.
+# - The replacement uses a literal newline via a backslash at end-of-line.
+sed -E 's/^# jaas ([^[:space:]]+)[[:space:]]*$/\(command-jaas-\1\)=\
+# jaas \1/' "${md_in}" > "${out_file}"
 
 echo "Updated: ${out_file}"
