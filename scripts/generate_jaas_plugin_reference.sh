@@ -32,24 +32,9 @@ mkdir -p "$(dirname "${out_file}")"
 #   # jaas <command>
 # We want an anchor immediately above each heading:
 #   (command-jaas-<command>)=
-awk '
-function sanitize(s) {
-	s = tolower(s)
-	gsub(/[[:space:]]+/, "-", s)
-	gsub(/[^a-z0-9-]/, "", s)
-	gsub(/-+/, "-", s)
-	sub(/^-/, "", s)
-	sub(/-$/, "", s)
-	return s
-}
-{
-	if ($0 ~ /^# jaas[[:space:]]+/) {
-		cmd = $0
-		sub(/^# jaas[[:space:]]+/, "", cmd)
-		cmd = sanitize(cmd)
-		print "(command-jaas-" cmd ")="
-	}
-	print $0
-}' "${md_in}" > "${out_file}"
+#
+# Commands are expected to be a single token (no spaces), so we can
+# transform matching lines directly without extra sanitization.
+sed -E '/^# jaas [^[:space:]]+[[:space:]]*$/{h;s/^# jaas /(command-jaas-/;s/[[:space:]]*$/)=/;G}' "${md_in}" > "${out_file}"
 
 echo "Updated: ${out_file}"
