@@ -1,3 +1,4 @@
+(command-jaas-add-cloud)=
 # jaas add-cloud
 
 ## Summary
@@ -30,6 +31,7 @@ flag. If the flag is missing, the command will assume the cloud definition
 is already known and will error otherwise.
 
 
+(command-jaas-add-group)=
 # jaas add-group
 
 ## Summary
@@ -87,6 +89,7 @@ Adds a model to a specific controller.
 
 This command creates a new hosted model on the specified controller.
 
+(command-jaas-add-permission)=
 # jaas add-permission
 
 ## Summary
@@ -193,6 +196,7 @@ Similarly if the object is a role, a userset must be applied by adding #member a
 	role-Auditor#assignee audit_log_viewer controller-MyController
 
 
+(command-jaas-add-role)=
 # jaas add-role
 
 ## Summary
@@ -218,6 +222,7 @@ Add role to jimm.
 Adds a role.
 
 
+(command-jaas-bootstrap)=
 # jaas bootstrap
 
 ## Summary
@@ -294,6 +299,7 @@ Note that JIMM will internally do the following:
 - register the controller with JIMM
 
 
+(command-jaas-check-permission)=
 # jaas check-permission
 
 ## Summary
@@ -319,6 +325,7 @@ Check access to a resource.
 Verifies access to a resource.
 
 
+(command-jaas-controllers)=
 # jaas controllers
 
 **Aliases:** list-controllers
@@ -347,6 +354,7 @@ Lists all controllers known to JIMM.
 Displays controller information for all controllers known to JIMM.
 
 
+(command-jaas-destroy-controller)=
 # jaas destroy-controller
 
 ## Summary
@@ -397,6 +405,7 @@ As a workaround, you can first unregister the controller and then destroy
 it separately.
 
 
+(command-jaas-documentation)=
 # jaas documentation
 
 ## Summary
@@ -444,6 +453,7 @@ in the file above.
 This command generates a markdown formatted document with all the commands, their descriptions, arguments, and examples.
 
 
+(command-jaas-grant-audit-log)=
 # jaas grant-audit-log
 
 ## Summary
@@ -467,6 +477,7 @@ Grants access to audit logs.
 Grants a user access to read audit logs.
 
 
+(command-jaas-help)=
 # jaas help
 
 ## Summary
@@ -480,6 +491,7 @@ Show help on a command or other topic.
 See also: topics
 
 
+(command-jaas-import-model)=
 # jaas import-model
 
 **Aliases:** register-model
@@ -513,6 +525,7 @@ The --owner command is necessary when importing a model created by a
 local user and it will switch the model owner to the desired external user.
 
 
+(command-jaas-job-status)=
 # jaas job-status
 
 ## Summary
@@ -537,6 +550,7 @@ Displays logs for a job
 Displays logs for a job.
 
 
+(command-jaas-job-stop)=
 # jaas job-stop
 
 ## Summary
@@ -560,6 +574,7 @@ Stop a job
 Stop a job.
 
 
+(command-jaas-list-audit-events)=
 # jaas list-audit-events
 
 **Aliases:** audit-events
@@ -597,6 +612,7 @@ Displays audit events
 Returns audit log events.
 
 
+(command-jaas-list-groups)=
 # jaas list-groups
 
 **Aliases:** groups
@@ -626,6 +642,7 @@ List all groups.
 Lists all groups.
 
 
+(command-jaas-list-migration-targets)=
 # jaas list-migration-targets
 
 ## Summary
@@ -659,6 +676,7 @@ criteria:
   the current controller.
 
 
+(command-jaas-list-permissions)=
 # jaas list-permissions
 
 **Aliases:** permissions
@@ -701,6 +719,7 @@ List permissions known to JIMM. Using the "target", "relation" and "object" flag
 only those permissions matching the filter will be returned.
 
 
+(command-jaas-list-roles)=
 # jaas list-roles
 
 **Aliases:** roles
@@ -730,6 +749,7 @@ List all roles.
 Lists all roles.
 
 
+(command-jaas-migrate)=
 # jaas migrate
 
 ## Summary
@@ -801,6 +821,7 @@ Any tools/scripts that refer to models by their full name (owner/name) will need
 updated after migration to use the new external username or refer to models by their UUID.
 
 
+(command-jaas-migrate-internal)=
 # jaas migrate-internal
 
 ## Summary
@@ -835,6 +856,7 @@ You may specify a model name (of the form owner/name) or model UUID.
 
 
 
+(command-jaas-model-status)=
 # jaas model-status
 
 ## Summary
@@ -861,6 +883,7 @@ Displays full model status
 Displays full model status.
 
 
+(command-jaas-purge-audit-logs)=
 # jaas purge-audit-logs
 
 ## Summary
@@ -890,6 +913,7 @@ Purges logs from the database before the given date.
 The provided date must be formatted as an ISO8601 date string.
 
 
+(command-jaas-query-models)=
 # jaas query-models
 
 ## Summary
@@ -922,6 +946,7 @@ as such you can format your query against an output like this.
 The queries expect a JQ query string.
 
 
+(command-jaas-register-controller)=
 # jaas register-controller
 
 ## Summary
@@ -972,6 +997,7 @@ Use the --dry-run flag to generate a sample file without registering the control
 This can be used later as input to register-controller.
 
 
+(command-jaas-remove-cloud)=
 # jaas remove-cloud
 
 ## Summary
@@ -997,6 +1023,7 @@ Remove cloud from specific controller in jimm
 Removes the specified cloud from the specified controller in JIMM.
 
 
+(command-jaas-remove-group)=
 # jaas remove-group
 
 ## Summary
@@ -1023,6 +1050,7 @@ Remove a group.
 Removes a group.
 
 
+(command-jaas-remove-permission)=
 # jaas remove-permission
 
 ## Summary
@@ -1129,6 +1157,7 @@ Similarly if the object is a role, a userset must be applied by adding #member a
 	role-Auditor#assignee audit_log_viewer controller-MyController
 
 
+(command-jaas-remove-role)=
 # jaas remove-role
 
 ## Summary
@@ -1155,6 +1184,7 @@ Remove a role.
 Removes a role.
 
 
+(command-jaas-rename-group)=
 # jaas rename-group
 
 ## Summary
@@ -1178,6 +1208,7 @@ Rename a group.
 Renames a group.
 
 
+(command-jaas-rename-role)=
 # jaas rename-role
 
 ## Summary
@@ -1201,6 +1232,7 @@ Rename a role.
 Renames a role.
 
 
+(command-jaas-revoke-audit-log)=
 # jaas revoke-audit-log
 
 ## Summary
@@ -1224,6 +1256,7 @@ revokes access to audit logs.
 Revokes user access to audit logs.
 
 
+(command-jaas-set-controller-deprecated)=
 # jaas set-controller-deprecated
 
 ## Summary
@@ -1249,6 +1282,7 @@ Sets controller deprecated status.
 Sets the deprecated status of a controller.
 
 
+(command-jaas-unregister-controller)=
 # jaas unregister-controller
 
 ## Summary
@@ -1276,6 +1310,7 @@ Remove controller from jimm
 Deregisters a controller from JIMM.
 
 
+(command-jaas-update-migrated-model)=
 # jaas update-migrated-model
 
 ## Summary
@@ -1300,6 +1335,7 @@ Updates a model known to JIMM that has been migrated
 externally to a different JAAS controller.
 
 
+(command-jaas-upgrade-to)=
 # jaas upgrade-to
 
 ## Summary

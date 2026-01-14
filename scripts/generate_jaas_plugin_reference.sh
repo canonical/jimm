@@ -26,6 +26,30 @@ echo "Generating markdown reference..."
 md_in="${tmp_dir}/documentation.md"
 
 mkdir -p "$(dirname "${out_file}")"
-cp "${md_in}" "${out_file}"
+
+# Add MyST markdown anchors for each command heading.
+# The generated documentation uses headings of the form:
+#   # jaas <command>
+# We want an anchor immediately above each heading:
+#   (command-jaas-<command>)=
+awk '
+function sanitize(s) {
+	s = tolower(s)
+	gsub(/[[:space:]]+/, "-", s)
+	gsub(/[^a-z0-9-]/, "", s)
+	gsub(/-+/, "-", s)
+	sub(/^-/, "", s)
+	sub(/-$/, "", s)
+	return s
+}
+{
+	if ($0 ~ /^# jaas[[:space:]]+/) {
+		cmd = $0
+		sub(/^# jaas[[:space:]]+/, "", cmd)
+		cmd = sanitize(cmd)
+		print "(command-jaas-" cmd ")="
+	}
+	print $0
+}' "${md_in}" > "${out_file}"
 
 echo "Updated: ${out_file}"
