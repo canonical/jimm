@@ -456,7 +456,7 @@ func (b *bootstrapManager) runBootstrap(
 			CloudNameAndRegion:   p.CloudNameAndRegion,
 			ControllerName:       p.ControllerName,
 			AgentVersion:         p.AgentVersion,
-			LoginTokenRefreshURL: p.LoginTokenRefreshURL,
+			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			PersonalCloud:        p.PersonalCloud,
 			CloudCred:            p.CloudCred,
 			UserConfig:           p.UserConfig,

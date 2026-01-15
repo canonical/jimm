@@ -28,7 +28,7 @@ type BootstrapCmdParams struct {
 	CloudNameAndRegion   string
 	ControllerName       string
 	AgentVersion         string
-	LoginTokenRefreshURL string
+	DefaultLoginTokenURL string
 
 	// Additional args required (like adding credential, cloud, etc.) but JIMM will handle.
 
@@ -59,11 +59,7 @@ func (b BootstrapCmdParams) Validate() error {
 		}
 	}
 
-	if _, ok := b.UserConfig[loginTokenRefreshURLKey]; ok {
-		return fmt.Errorf("%q is a reserved config key and cannot be set in user config", loginTokenRefreshURLKey)
-	}
-
-	if b.LoginTokenRefreshURL == "" {
+	if b.DefaultLoginTokenURL == "" {
 		return errors.New("missing login token refresh URL, this value should be automatically set by JIMM")
 	}
 
@@ -76,7 +72,14 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	args = append(args, "bootstrap")
 
 	args = append(args, "--config")
-	args = append(args, fmt.Sprintf("login-token-refresh-url=%s", b.LoginTokenRefreshURL))
+
+	// Allow the user to override the login token refresh URL.
+	// Skip adding it later to avoid duplication.
+	loginTokenRefreshURL := b.DefaultLoginTokenURL
+	if v, ok := b.UserConfig[loginTokenRefreshURLKey]; ok {
+		loginTokenRefreshURL = v
+	}
+	args = append(args, fmt.Sprintf("login-token-refresh-url=%s", loginTokenRefreshURL))
 
 	// Conditionally add --agent-version if set
 	if b.AgentVersion != "" {
@@ -84,6 +87,9 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	}
 
 	for k, v := range b.UserConfig {
+		if k == loginTokenRefreshURLKey {
+			continue
+		}
 		args = append(args, "--config")
 		args = append(args, fmt.Sprintf("%s=%s", k, fmt.Sprint(v)))
 	}
