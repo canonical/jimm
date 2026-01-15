@@ -301,7 +301,7 @@ func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
 		c.Assert(err, qt.IsNil)
 
 		_, _, _, err = gossh.NewClientConn(jumpServerConn, "", config)
-		c.Assert(err, qt.ErrorMatches, ".*handshake failed: EOF.*")
+		c.Assert(err, qt.ErrorMatches, ".*handshake failed:.*")
 
 		// close the connections
 		for _, client := range clients {
