@@ -6,6 +6,10 @@ grade: stable
 base: bare
 build-base: core20
 confinement: strict
+architectures:
+  - build-on: [amd64]
+    run-on: [amd64, arm64]
+
 
 slots:
   jaas-plugin:
