@@ -2,6 +2,7 @@
 # E.g., user/reference/charm/channel/ user/reference/charm/
 # If you're renaming things, run make clean before make run.
 
+explanation/jaas-security-scope/ explanation/jaas-security
 explanation/jaas-plugin/ reference/jaas-plugin/
 reference/relation explanation/jaas-authorization
 reference/tag reference
