@@ -9,7 +9,9 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/names/v5"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/db"
@@ -108,6 +110,7 @@ func (j *loginManager) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthRespo
 	resp, err := j.oAuthAuthenticator.Device(ctx)
 
 	if err != nil {
+		zapctx.Error(ctx, "oauth device login failed", zap.Error(err))
 		return nil, errors.E(errors.CodeFatalLoginError, "oauth device login failed, check JIMM's log.")
 	}
 	return resp, nil
