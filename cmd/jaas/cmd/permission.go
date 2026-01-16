@@ -24,7 +24,7 @@ import (
 const (
 	// accessMessageFormat is an informative message sent back to the user denoting the access for a particular resource.
 	// The final format string holds either an AccessResultAllowed or AccessResultDenied.
-	accessMessageFormat = "access check for %s on resource %s with role %s is %s"
+	accessMessageFormat = "access check for %s on resource %s with permission %s is %s"
 	accessResultAllowed = "allowed"
 	accessResultDenied  = "not allowed"
 	defaultPageSize     = 50
