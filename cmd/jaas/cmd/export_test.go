@@ -5,7 +5,6 @@ package cmd
 import (
 	"github.com/juju/cmd/v3"
 	jujuapi "github.com/juju/juju/api"
-	"github.com/juju/juju/cloud"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 
@@ -62,16 +61,6 @@ func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, lp jujuap
 	cmd := &listAuditEventsCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewAddCloudToControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider, cloudByNameFunc func(string) (*cloud.Cloud, error)) cmd.Command {
-	cmd := &addCloudToControllerCommand{
-		store:           store,
-		cloudByNameFunc: cloudByNameFunc,
-		dialOpts:        cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)

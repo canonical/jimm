@@ -25,6 +25,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 		Name: "jaas",
 		Doc:  jaasDoc,
 	})
+
 	// Register commands here:
 	jaasCmd.Register(cmd.NewAddCloudToControllerCommand())
 	jaasCmd.Register(cmd.NewAddGroupCommand())
