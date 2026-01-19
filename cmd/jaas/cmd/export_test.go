@@ -250,6 +250,7 @@ func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, lp jujuap
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
+	cmd.crossModelQueryAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }

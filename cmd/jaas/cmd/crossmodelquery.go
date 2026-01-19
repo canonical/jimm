@@ -45,6 +45,8 @@ type crossModelQueryCommand struct {
 	store    jujuclient.ClientStore
 	dialOpts *jujuapi.DialOpts
 	file     cmd.FileVar
+
+	crossModelQueryAPIFunc func() (JIMMAPI, error)
 }
 
 // NewCrossModelQueryCommand returns a command to query all of the models
@@ -53,6 +55,7 @@ func NewCrossModelQueryCommand() cmd.Command {
 	cmd := &crossModelQueryCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.crossModelQueryAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -90,22 +93,20 @@ func (c *crossModelQueryCommand) Info() *cmd.Info {
 
 // Run implements modelcmd.Command.
 func (c *crossModelQueryCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.Annotate(err, "could not determine controller")
+	if c.crossModelQueryAPIFunc == nil {
+		c.crossModelQueryAPIFunc = c.newClient
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	client, err := c.crossModelQueryAPIFunc()
 	if err != nil {
-		return err
+		return errors.Annotate(err, "could not create JIMM client")
 	}
+	defer client.Close()
 
 	req := apiparams.CrossModelQueryRequest{
 		Type:  c.queryType,
 		Query: c.query,
 	}
-
-	client := api.NewClient(apiCaller)
 	resp, err := client.CrossModelQuery(&req)
 	if err != nil {
 		return errors.Mask(err)
@@ -116,4 +117,18 @@ func (c *crossModelQueryCommand) Run(ctxt *cmd.Context) error {
 		return errors.Mask(err)
 	}
 	return nil
+}
+
+func (c *crossModelQueryCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, errors.Annotate(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

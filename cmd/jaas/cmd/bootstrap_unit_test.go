@@ -18,27 +18,8 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"go.uber.org/mock/gomock"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd/mocks"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
-
-type bootstrapCmdMocks struct {
-	client *mocks.MockJIMMAPI
-	writer *mocks.MockWriter
-	store  *mocks.MockClientStore
-}
-
-func setupBootstrapMocks(t *testing.T) *bootstrapCmdMocks {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	h := &bootstrapCmdMocks{
-		client: mocks.NewMockJIMMAPI(ctrl),
-		writer: mocks.NewMockWriter(ctrl),
-		store:  mocks.NewMockClientStore(ctrl),
-	}
-	t.Cleanup(ctrl.Finish)
-	return h
-}
 
 func TestBootstrapArgParsing(t *testing.T) {
 	tests := []struct {
@@ -101,7 +82,7 @@ func TestBootstrapArgParsing(t *testing.T) {
 
 func TestBootstrapRunDetached(t *testing.T) {
 	c := qt.New(t)
-	s := setupBootstrapMocks(t)
+	s := setupCmdMocks(t)
 
 	cloudName := "aws"
 
@@ -176,7 +157,7 @@ func TestBootstrapRunDetached(t *testing.T) {
 
 func TestBootstrapWatchLogs(t *testing.T) {
 	c := qt.New(t)
-	s := setupBootstrapMocks(t)
+	s := setupCmdMocks(t)
 
 	s.store.EXPECT().CredentialForCloud("aws").Return(&jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
@@ -226,7 +207,7 @@ func TestBootstrapWatchLogs(t *testing.T) {
 
 func TestBootstrapFailsToGetCredential(t *testing.T) {
 	c := qt.New(t)
-	s := setupBootstrapMocks(t)
+	s := setupCmdMocks(t)
 
 	s.store.EXPECT().CredentialForCloud("aws").Return(nil, errors.New("credential not found"))
 
@@ -255,7 +236,7 @@ func TestBootstrapFailsToGetCredential(t *testing.T) {
 
 func TestBootstrapMultipleCredentials(t *testing.T) {
 	c := qt.New(t)
-	s := setupBootstrapMocks(t)
+	s := setupCmdMocks(t)
 
 	s.store.EXPECT().CredentialForCloud("aws").Return(&jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
@@ -316,7 +297,7 @@ func TestBootstrapMultipleCredentials(t *testing.T) {
 
 func TestBootstrapWithDefaultCredential(t *testing.T) {
 	c := qt.New(t)
-	s := setupBootstrapMocks(t)
+	s := setupCmdMocks(t)
 
 	cloudName := "aws"
 
@@ -357,7 +338,7 @@ func TestBootstrapWithDefaultCredential(t *testing.T) {
 
 func TestBootstrapSpecifiedCredentialWithDefault(t *testing.T) {
 	c := qt.New(t)
-	s := setupBootstrapMocks(t)
+	s := setupCmdMocks(t)
 
 	cloudName := "aws"
 

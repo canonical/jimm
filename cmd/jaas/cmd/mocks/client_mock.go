@@ -81,6 +81,45 @@ func (c *MockJIMMAPICloseCall) DoAndReturn(f func() error) *MockJIMMAPICloseCall
 	return c
 }
 
+// CrossModelQuery mocks base method.
+func (m *MockJIMMAPI) CrossModelQuery(req *params.CrossModelQueryRequest) (*params.CrossModelQueryResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CrossModelQuery", req)
+	ret0, _ := ret[0].(*params.CrossModelQueryResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CrossModelQuery indicates an expected call of CrossModelQuery.
+func (mr *MockJIMMAPIMockRecorder) CrossModelQuery(req any) *MockJIMMAPICrossModelQueryCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CrossModelQuery", reflect.TypeOf((*MockJIMMAPI)(nil).CrossModelQuery), req)
+	return &MockJIMMAPICrossModelQueryCall{Call: call}
+}
+
+// MockJIMMAPICrossModelQueryCall wrap *gomock.Call
+type MockJIMMAPICrossModelQueryCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPICrossModelQueryCall) Return(arg0 *params.CrossModelQueryResponse, arg1 error) *MockJIMMAPICrossModelQueryCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPICrossModelQueryCall) Do(f func(*params.CrossModelQueryRequest) (*params.CrossModelQueryResponse, error)) *MockJIMMAPICrossModelQueryCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPICrossModelQueryCall) DoAndReturn(f func(*params.CrossModelQueryRequest) (*params.CrossModelQueryResponse, error)) *MockJIMMAPICrossModelQueryCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetJobInfo mocks base method.
 func (m *MockJIMMAPI) GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error) {
 	m.ctrl.T.Helper()
