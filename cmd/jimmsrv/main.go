@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
 	"github.com/canonical/jimm/v3/internal/logger"
+	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/ssh"
 	"github.com/canonical/jimm/v3/version"
 )
@@ -274,6 +275,15 @@ func start(ctx context.Context, s *service.Service) error {
 
 		jimmsvc.Cleanup()
 	})
+	err = river.MigrateRiver(ctx, jimmsvc.JIMM().Database)
+	if err != nil {
+		return err
+	}
+	err = river.StartWorkers(ctx, jimmsvc.JIMM().Database, jimmsvc.JIMM().UpgradeManager())
+	if err != nil {
+		return err
+	}
+	zapctx.Info(ctx, "Registered all River workers")
 	s.Go(httpsrv.ListenAndServe)
 	zapctx.Info(ctx, "Started JIMM HTTP server")
 	s.Go(sshServer.ListenAndServe)

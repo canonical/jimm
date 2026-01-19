@@ -44,6 +44,15 @@ type Database struct {
 	migrated uint32
 }
 
+// SqlDB returns the underlying sql.DB object used by gorm.
+func (d *Database) SqlDB() (*sql.DB, error) {
+	sqlDB, err := d.DB.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the internal DB object: %w", err)
+	}
+	return sqlDB, nil
+}
+
 // Transaction starts a new transaction using the database. This allows
 // a set of changes to be performed as a single atomic unit. All of the
 // transaction steps should be performed in the given function, if this
