@@ -35,7 +35,7 @@ type JIMMAPI interface {
 	// Model operations
 	FullModelStatus(req *params.FullModelStatusRequest) (jujuparams.FullStatus, error)
 
-	// Audit operations
+	// Audit log operations
 	FindAuditEvents(req *params.FindAuditEventsRequest) (params.AuditEvents, error)
 	GrantAuditLogAccess(req *params.AuditLogAccessRequest) error
 	RevokeAuditLogAccess(req *params.AuditLogAccessRequest) error
