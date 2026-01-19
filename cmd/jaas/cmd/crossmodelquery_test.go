@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -25,16 +24,6 @@ func initCrossModelQueryCommand(c *qt.C, command jujucmd.Command, args ...string
 	c.Assert(err, qt.IsNil)
 	err = command.Init(f.Args())
 	c.Assert(err, qt.IsNil)
-}
-
-func newTestContext(t *testing.T) *jujucmd.Context {
-	return &jujucmd.Context{
-		Context: context.Background(),
-		Dir:     t.TempDir(),
-		Stdin:   &bytes.Buffer{},
-		Stdout:  &bytes.Buffer{},
-		Stderr:  &bytes.Buffer{},
-	}
 }
 
 func TestCrossModelQueryRun(t *testing.T) {
