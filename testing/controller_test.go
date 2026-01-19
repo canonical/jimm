@@ -13,7 +13,6 @@ import (
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
-	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
@@ -117,7 +116,7 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	err := conn.APICall("Controller", 11, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   jujuversion.Current.String(),
+		Version:   "3.6.13",
 		GitCommit: jimmversion.VersionInfo.GitCommit,
 	})
 }
