@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -49,6 +50,7 @@ type JujuManager interface {
 // Store defines the store methods required by the upgrade manager.
 type Store interface {
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
+	GetModel(ctx context.Context, model *dbmodel.Model) (err error)
 }
 
 // upgradeManager provides a means to manage controller upgrades within JIMM.
@@ -293,6 +295,69 @@ func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openf
 		zap.String("controller-chosen-version", controllerChosenVersion.String()),
 	)
 	return controllerChosenVersion, nil
+}
+
+// UpgradeModel upgrades the model to the provided agent version.
+func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error {
+	// Forbid a zero target version as this complicates checking for whether
+	// the upgrade was successful.
+	if targetVersion == version.Zero {
+		return errors.E(errors.CodeBadRequest, "target version cannot be zero")
+	}
+
+	model := &dbmodel.Model{UUID: sql.NullString{Valid: true, String: modelUUID}}
+	if err := u.store.GetModel(ctx, model); err != nil {
+		return errors.E(errors.CodeNotFound, err, "model not found")
+	}
+
+	api, err := u.dialer.Dial(ctx, &model.Controller, names.ModelTag{}, nil, nil)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to dial target controller: %w", err))
+	}
+
+	if err := retry.Call(
+		retry.CallArgs{
+			Attempts: 6,
+			Delay:    10 * time.Second,
+			Func: func() error {
+				mi := jujuparams.ModelInfo{}
+				err := api.ModelInfo(ctx, &mi)
+				if err != nil {
+					return fmt.Errorf("failed to get model info before upgrade: %w", err)
+				}
+				if mi.AgentVersion == nil {
+					return fmt.Errorf("model agent version is nil before upgrade")
+				}
+				if mi.AgentVersion.Compare(targetVersion) >= 0 {
+					// Already at target version or newer.
+					zapctx.Info(ctx, "model upgrade done - agent version at or newer than target", zap.String("current_version", mi.AgentVersion.String()))
+					return nil
+				}
+
+				// UpgradeModel is safe to call multiple times.
+				_, err = api.UpgradeModel(modelUUID, targetVersion, "", false, false)
+				if jujuparams.IsCodeUpgradeInProgress(err) {
+					err = errors.E("upgrade in progress")
+				}
+				if jujuerrors.Is(err, jujuerrors.AlreadyExists) {
+					// Model is already upgraded
+					return nil
+				}
+				if err != nil {
+					return errors.E(fmt.Errorf("failed to upgrade model: %w", err))
+				}
+
+				return errors.E(fmt.Errorf("model upgrade started/in-progress"))
+			},
+			NotifyFunc: func(lastError error, attempt int) {
+				zapctx.Debug(ctx, "model upgrade attempt", zap.Error(lastError), zap.Int("attempt", attempt))
+			},
+			Clock: clock.WallClock,
+		},
+	); err != nil {
+		return errors.E(fmt.Errorf("failed to complete upgrade: %w", err))
+	}
+	return nil
 }
 
 // UpgradeTo upgrades a model.

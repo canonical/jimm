@@ -321,6 +321,7 @@ type BootstrapManager interface {
 type UpgradeManager interface {
 	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error)
 	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
+	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.

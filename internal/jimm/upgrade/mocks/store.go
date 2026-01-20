@@ -78,3 +78,41 @@ func (c *MockStoreGetControllerCall) DoAndReturn(f func(context.Context, *dbmode
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// GetModel mocks base method.
+func (m *MockStore) GetModel(ctx context.Context, model *dbmodel.Model) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetModel", ctx, model)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GetModel indicates an expected call of GetModel.
+func (mr *MockStoreMockRecorder) GetModel(ctx, model any) *MockStoreGetModelCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetModel", reflect.TypeOf((*MockStore)(nil).GetModel), ctx, model)
+	return &MockStoreGetModelCall{Call: call}
+}
+
+// MockStoreGetModelCall wrap *gomock.Call
+type MockStoreGetModelCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockStoreGetModelCall) Return(err error) *MockStoreGetModelCall {
+	c.Call = c.Call.Return(err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockStoreGetModelCall) Do(f func(context.Context, *dbmodel.Model) error) *MockStoreGetModelCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockStoreGetModelCall) DoAndReturn(f func(context.Context, *dbmodel.Model) error) *MockStoreGetModelCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
