@@ -9,7 +9,6 @@ import (
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cloud"
-	jujucloud "github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
 	jujucmdcommon "github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
@@ -161,7 +160,7 @@ func (c *addCloudToControllerCommand) readCloudFromFile() (*cloud.Cloud, error) 
 	if err != nil {
 		return nil, errors.E(err)
 	}
-	specifiedClouds, err := jujucloud.ParseCloudMetadata(cloudDefinitionData)
+	specifiedClouds, err := cloud.ParseCloudMetadata(cloudDefinitionData)
 	if err != nil {
 		return nil, errors.E(err)
 	}
