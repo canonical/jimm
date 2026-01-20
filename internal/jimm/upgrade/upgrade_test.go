@@ -429,6 +429,54 @@ func (s *upgradeManagerSuite) TestUpgradeTo_Success(c *qt.C) {
 	c.Assert(time.Since(time.Unix(ts, 0)) < 2*time.Second, qt.IsTrue)
 }
 
+func (s *upgradeManagerSuite) TestMigrateModel_Success(c *qt.C) {
+	ctrl := s.setupTest(c)
+	defer ctrl.Finish()
+
+	ctx := c.Context()
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	c.Assert(err, qt.IsNil)
+
+	mt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetController := "4.0controller"
+	c.Assert(err, qt.IsNil)
+
+	s.jujuManager.EXPECT().
+		InitiateInternalMigration(ctx, gomock.Any(), mt.Id(), targetController).
+		Return(
+			jujuparams.InitiateMigrationResult{
+				ModelTag:    mt.String(),
+				MigrationId: "1",
+			},
+			nil,
+		)
+
+	s.jujuManager.EXPECT().
+		ModelInfo(
+			gomock.Any(),
+			gomock.Any(),
+			mt,
+		).
+		Return(&jujuparams.ModelInfo{
+			UUID: mt.Id(),
+		}, nil)
+
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), mt.Id()).
+		Return(
+			dbmodel.Model{
+				Controller: dbmodel.Controller{
+					Name: targetController,
+				},
+			},
+			nil,
+		)
+
+	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, mt.Id(), targetController)
+	c.Assert(err, qt.IsNil)
+}
+
 //go:generate go tool mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
 //go:generate go tool mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
 //go:generate go tool mockgen -typed -destination=./mocks/store.go -package=mocks . Store
