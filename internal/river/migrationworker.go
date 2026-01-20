@@ -9,8 +9,8 @@ import (
 	"github.com/riverqueue/river"
 )
 
-// newUpgradeMigrationWorker creates a new upgradeMigrationWorker.
-func newUpgradeMigrationWorker(openfgaClient *openfga.OFGAClient, store Store, upgradeManager UpgradeManager) (*upgradeMigrationWorker, error) {
+// newMigrationWorker creates a new upgradeMigrationWorker.
+func newMigrationWorker(openfgaClient *openfga.OFGAClient, store Store, upgradeManager UpgradeManager) (*migrationWorker, error) {
 	if openfgaClient == nil {
 		return nil, errors.E("openfgaClient is required")
 	}
@@ -21,27 +21,27 @@ func newUpgradeMigrationWorker(openfgaClient *openfga.OFGAClient, store Store, u
 		return nil, errors.E("upgradeManager is required")
 	}
 
-	return &upgradeMigrationWorker{
+	return &migrationWorker{
 		openfgaClient:  openfgaClient,
 		store:          store,
 		upgradeManager: upgradeManager,
 	}, nil
 }
 
-// UpgradeMigrationWorker defines the arguments for the upgradeMigrationWorker job.
-type UpgradeMigrationWorker struct {
+// migrationWorkerArgs defines the arguments for the migrationWorker job.
+type migrationWorkerArgs struct {
 	Username             string `json:"username"`
 	UUID                 string `json:"uuid"`
 	TargetControllerName string `json:"target_controller_name"`
 }
 
 // Kind implements the [river.JobArgs] interface.
-func (UpgradeMigrationWorker) Kind() string { return "upgrade-migration" }
+func (migrationWorkerArgs) Kind() string { return "upgrade-migration" }
 
-type upgradeMigrationWorker struct {
+type migrationWorker struct {
 	// An embedded WorkerDefaults sets up default methods to fulfill the rest of
 	// the Worker interface:
-	river.WorkerDefaults[UpgradeMigrationWorker]
+	river.WorkerDefaults[migrationWorkerArgs]
 
 	openfgaClient  *openfga.OFGAClient
 	store          Store
@@ -49,7 +49,7 @@ type upgradeMigrationWorker struct {
 }
 
 // Work implements the [river.Worker] interface.
-func (w *upgradeMigrationWorker) Work(ctx context.Context, job *river.Job[UpgradeMigrationWorker]) error {
+func (w *migrationWorker) Work(ctx context.Context, job *river.Job[migrationWorkerArgs]) error {
 	u := &dbmodel.Identity{Name: job.Args.Username}
 	if err := w.store.FetchIdentity(ctx, u); err != nil {
 		return err

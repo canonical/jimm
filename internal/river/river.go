@@ -7,6 +7,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivermigrate"
@@ -16,6 +17,8 @@ import (
 type UpgradeManager interface {
 	// MigrateModel migrates a model to a new controller without upgrading the model's agent.
 	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
+	// UpgradeModel upgrades a model to the target version.
+	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
 }
 
 // Store defines a method to retrieve a user from the database for the purpose
@@ -33,14 +36,25 @@ func StartWorkers(
 	upgradeManager UpgradeManager,
 ) error {
 	workers := river.NewWorkers()
-	w, err := newUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
+
+	migrationWorker, err := newMigrationWorker(openfgaClient, db, upgradeManager)
 	if err != nil {
 		return err
 	}
-	err = river.AddWorkerSafely(workers, w)
+	err = river.AddWorkerSafely(workers, migrationWorker)
 	if err != nil {
 		return err
 	}
+
+	upgradeWorker, err := newUpgradeWorker(upgradeManager)
+	if err != nil {
+		return err
+	}
+	err = river.AddWorkerSafely(workers, upgradeWorker)
+	if err != nil {
+		return err
+	}
+
 	sqlDb, err := db.SqlDB()
 	if err != nil {
 		return err

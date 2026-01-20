@@ -3,12 +3,9 @@ package river
 import (
 	"errors"
 	"testing"
-	"time"
 
-	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	qt "github.com/frankban/quicktest"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
@@ -16,18 +13,6 @@ import (
 	"github.com/riverqueue/river/rivertype"
 	gomock "go.uber.org/mock/gomock"
 )
-
-func setupTestDB(c *qt.C) *db.Database {
-	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
-	}
-	err := db.Migrate(c.Context())
-	c.Assert(err, qt.IsNil)
-
-	err = MigrateRiver(c.Context(), db)
-	c.Assert(err, qt.IsNil)
-	return db
-}
 
 func TestMigrationWorker(t *testing.T) {
 	c := qt.New(t)
@@ -42,7 +27,7 @@ func TestMigrationWorker(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	openfgaClient := &openfga.OFGAClient{}
-	w, err := newUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
+	w, err := newMigrationWorker(openfgaClient, db, upgradeManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
@@ -64,7 +49,7 @@ func TestMigrationWorker(t *testing.T) {
 		c.Context(),
 		c.TB,
 		tx,
-		UpgradeMigrationWorker{
+		migrationWorkerArgs{
 			Username:             u.Name,
 			UUID:                 "test-uuid",
 			TargetControllerName: "target-controller",
@@ -90,7 +75,7 @@ func TestMigrationWorker_Error(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	openfgaClient := &openfga.OFGAClient{}
-	w, err := newUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
+	w, err := newMigrationWorker(openfgaClient, db, upgradeManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
@@ -112,7 +97,7 @@ func TestMigrationWorker_Error(t *testing.T) {
 		c.Context(),
 		c.TB,
 		tx,
-		UpgradeMigrationWorker{
+		migrationWorkerArgs{
 			Username:             u.Name,
 			UUID:                 "test-uuid",
 			TargetControllerName: "target-controller",

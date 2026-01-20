@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	openfga "github.com/canonical/jimm/v3/internal/openfga"
+	version "github.com/juju/version/v2"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -75,6 +76,44 @@ func (c *MockUpgradeManagerMigrateModelCall) Do(f func(context.Context, *openfga
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUpgradeManagerMigrateModelCall) DoAndReturn(f func(context.Context, *openfga.User, string, string) error) *MockUpgradeManagerMigrateModelCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpgradeModel mocks base method.
+func (m *MockUpgradeManager) UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpgradeModel", ctx, modelUUID, targetVersion)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpgradeModel indicates an expected call of UpgradeModel.
+func (mr *MockUpgradeManagerMockRecorder) UpgradeModel(ctx, modelUUID, targetVersion any) *MockUpgradeManagerUpgradeModelCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpgradeModel", reflect.TypeOf((*MockUpgradeManager)(nil).UpgradeModel), ctx, modelUUID, targetVersion)
+	return &MockUpgradeManagerUpgradeModelCall{Call: call}
+}
+
+// MockUpgradeManagerUpgradeModelCall wrap *gomock.Call
+type MockUpgradeManagerUpgradeModelCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUpgradeManagerUpgradeModelCall) Return(arg0 error) *MockUpgradeManagerUpgradeModelCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUpgradeManagerUpgradeModelCall) Do(f func(context.Context, string, version.Number) error) *MockUpgradeManagerUpgradeModelCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUpgradeManagerUpgradeModelCall) DoAndReturn(f func(context.Context, string, version.Number) error) *MockUpgradeManagerUpgradeModelCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
