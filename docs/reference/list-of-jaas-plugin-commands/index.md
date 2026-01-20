@@ -11,7 +11,7 @@ Add cloud to specific controller in jimm
 | Flag | Default | Usage |
 | --- | --- | --- |
 | `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--cloud` |  | The path to the cloud's definition file. |
+| `--cloud` |  | The path to the cloud's definition file. The cloud name must be present in the file. |
 | `--force` | false | Forces the cloud to be added to the controller |
 | `--format` | yaml | Specify output format (json&#x7c;yaml) |
 | `-o`, `--output` |  | Specify an output file |
