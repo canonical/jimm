@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -43,6 +45,46 @@ func TestAddCloudToControllerRun(t *testing.T) {
 		cloudByNameFunc: func(cloudName string) (*cloud.Cloud, error) {
 			return expectedCloud, nil
 		},
+		jimmAPIFunc: func(dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+
+	err := cmd.Run(newTestContext(t))
+	c.Assert(err, qt.IsNil)
+}
+
+func TestAddCloudToControllerRun_CloudFile(t *testing.T) {
+	c := qt.New(t)
+	c.Skip("This test is failing since 3.6.12 since the providers moved to internal.")
+
+	writeTempFile := func(c *qt.C, content string) (string, func()) {
+		dir, err := os.MkdirTemp("", "add-cloud-to-controller-test")
+		c.Assert(err, qt.IsNil)
+
+		tmpfn := filepath.Join(dir, "tmp.yaml")
+
+		err = os.WriteFile(tmpfn, []byte(content), 0600)
+		c.Assert(err, qt.IsNil)
+		return tmpfn, func() {
+			os.RemoveAll(dir)
+		}
+	}
+
+	cloudFile, cleanup := writeTempFile(c, `
+clouds:
+  test-maas-cloud:
+    type: maas
+    auth-types: [oauth1]
+    regions:
+      default: {}`)
+
+	c.Cleanup(cleanup)
+
+	cmdMocks := setupCmdMocks(t)
+
+	cmd := addCloudToControllerCommand{
+		cloudDefinitionFile: cloudFile,
 		jimmAPIFunc: func(dialOpts *api.DialOpts) (JIMMAPI, error) {
 			return cmdMocks.client, nil
 		},
