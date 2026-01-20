@@ -8,19 +8,16 @@ import (
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
 	jujucmdcloud "github.com/juju/juju/cmd/juju/cloud"
 	jujucmdcommon "github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/juju/jujuclient"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	jimmjujuapi "github.com/canonical/jimm/v3/internal/jujuapi"
-	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -42,7 +39,6 @@ is already known and will error otherwise.
 // controller in JIMM.
 func NewAddCloudToControllerCommand() cmd.Command {
 	cmd := &addCloudToControllerCommand{
-		store:           jujuclient.NewFileClientStore(), // Can be removed alongside all "newClient" calls if we like the new newClient approach.
 		cloudByNameFunc: jujucmdcommon.CloudByName,
 		jimmAPIFunc:     NewClient,
 	}
@@ -71,8 +67,6 @@ type addCloudToControllerCommand struct {
 
 	jimmAPIFunc     APIClientFunc
 	cloudByNameFunc func(string) (*cloud.Cloud, error)
-	store           jujuclient.ClientStore // Both of these can be removed if we like new way. We don't touch store as JIMM and use it for dialing only I think?
-	dialOpts        *jujuapi.DialOpts
 }
 
 // Info implements Command.Info.
@@ -159,41 +153,6 @@ func (c *addCloudToControllerCommand) Run(ctxt *cmd.Context) error {
 	}
 	ctxt.Infof("Cloud %q added to controller %q.", c.cloudName, c.dstControllerName)
 
-	// Old:
-	// err = c.addCloudToController(ctxt, newCloud)
-	// if err != nil {
-	// 	return errors.E(err, fmt.Sprintf("error adding cloud to controller: %v", err))
-	// }
-
-	return nil
-}
-
-func (c *addCloudToControllerCommand) addCloudToController(ctxt *cmd.Context, cloud *cloud.Cloud) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine the current controller")
-	}
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
-	if err != nil {
-		return err
-	}
-	client := api.NewClient(apiCaller)
-
-	params := &apiparams.AddCloudToControllerRequest{
-		ControllerName: c.dstControllerName,
-		AddCloudArgs: params.AddCloudArgs{
-			Name:  c.cloudName,
-			Cloud: jimmjujuapi.CloudToParams(*cloud),
-			Force: &c.force,
-		},
-	}
-
-	err = client.AddCloudToController(params)
-	if err != nil {
-		return errors.E(err)
-	}
-
-	ctxt.Infof("Cloud %q added to controller %q.", c.cloudName, c.dstControllerName)
 	return nil
 }
 
