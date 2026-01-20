@@ -570,7 +570,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(
-		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
+		cmdtesting.Stdout(cmdCtx),
 		gc.Equals,
 		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "reader", cmd.AccessResultAllowed),
 	)
@@ -586,7 +586,7 @@ func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	c.Assert(
-		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
+		cmdtesting.Stdout(cmdCtx),
 		gc.Equals,
 		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "writer", cmd.AccessResultDenied),
 	)
