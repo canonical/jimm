@@ -9,8 +9,8 @@ import (
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	"github.com/juju/juju/cloud"
+	jujucloud "github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
-	jujucmdcloud "github.com/juju/juju/cmd/juju/cloud"
 	jujucmdcommon "github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/rpc/params"
@@ -89,7 +89,7 @@ func (c *addCloudToControllerCommand) SetFlags(f *gnuflag.FlagSet) {
 	})
 
 	f.BoolVar(&c.force, "force", false, "Forces the cloud to be added to the controller")
-	f.StringVar(&c.cloudDefinitionFile, "cloud", "", "The path to the cloud's definition file.")
+	f.StringVar(&c.cloudDefinitionFile, "cloud", "", "The path to the cloud's definition file. The cloud name must be present in the file.")
 }
 
 // Init implements the cmd.Command interface.
@@ -117,7 +117,7 @@ func (c *addCloudToControllerCommand) Run(ctxt *cmd.Context) error {
 	var newCloud *cloud.Cloud
 	var err error
 	if c.cloudDefinitionFile != "" {
-		newCloud, err = c.readCloudFromFile(ctxt)
+		newCloud, err = c.readCloudFromFile()
 		if err != nil {
 			return errors.E(err, fmt.Sprintf("error reading cloud from file: %v", err))
 		}
@@ -156,43 +156,23 @@ func (c *addCloudToControllerCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func (c *addCloudToControllerCommand) readCloudFromFile(ctxt *cmd.Context) (*cloud.Cloud, error) {
-	r := &jujucmdcloud.CloudFileReader{
-		CloudMetadataStore: &cloudToCommandAdapter{},
-		CloudName:          c.cloudName,
-	}
-	newCloud, err := r.ReadCloudFromFile(c.cloudDefinitionFile, ctxt)
+func (c *addCloudToControllerCommand) readCloudFromFile() (*cloud.Cloud, error) {
+	cloudDefinitionData, err := os.ReadFile(c.cloudDefinitionFile)
 	if err != nil {
 		return nil, errors.E(err)
 	}
-	return newCloud, nil
-}
+	specifiedClouds, err := jujucloud.ParseCloudMetadata(cloudDefinitionData)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	if len(specifiedClouds) == 0 {
+		return nil, errors.E("no clouds found in parsed yaml, please validate yaml keys")
+	}
+	var ok bool
+	foundCloud, ok := specifiedClouds[c.cloudName]
+	if !ok {
+		return nil, errors.E(fmt.Sprintf("cloud %q not found in file %q", c.cloudName, c.cloudDefinitionFile))
+	}
 
-type cloudToCommandAdapter struct {
-	jujucmdcloud.CloudMetadataStore
-}
-
-// ReadCloudData implements CloudMetadataStore.ReadCloudData.
-func (cloudToCommandAdapter) ReadCloudData(path string) ([]byte, error) {
-	return os.ReadFile(path)
-}
-
-// ParseOneCloud implements CloudMetadataStore.ParseOneCloud.
-func (cloudToCommandAdapter) ParseOneCloud(data []byte) (cloud.Cloud, error) {
-	return cloud.ParseOneCloud(data)
-}
-
-// PublicCloudMetadata implements CloudMetadataStore.PublicCloudMetadata.
-func (cloudToCommandAdapter) PublicCloudMetadata(searchPaths ...string) (map[string]cloud.Cloud, bool, error) {
-	return cloud.PublicCloudMetadata(searchPaths...)
-}
-
-// PersonalCloudMetadata implements CloudMetadataStore.PersonalCloudMetadata.
-func (cloudToCommandAdapter) PersonalCloudMetadata() (map[string]cloud.Cloud, error) {
-	return cloud.PersonalCloudMetadata()
-}
-
-// WritePersonalCloudMetadata implements CloudMetadataStore.WritePersonalCloudMetadata.
-func (cloudToCommandAdapter) WritePersonalCloudMetadata(cloudsMap map[string]cloud.Cloud) error {
-	return cloud.WritePersonalCloudMetadata(cloudsMap)
+	return &foundCloud, nil
 }

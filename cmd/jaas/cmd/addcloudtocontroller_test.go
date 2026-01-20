@@ -54,9 +54,8 @@ func TestAddCloudToControllerRun(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 }
 
-func TestAddCloudToControllerRun_CloudFile(t *testing.T) {
+func TestAddCloudToControllerRun_Run_CloudFromFile(t *testing.T) {
 	c := qt.New(t)
-	c.Skip("This test is failing since 3.6.12 since the providers moved to internal.")
 
 	writeTempFile := func(c *qt.C, content string) (string, func()) {
 		dir, err := os.MkdirTemp("", "add-cloud-to-controller-test")
@@ -83,7 +82,29 @@ clouds:
 
 	cmdMocks := setupCmdMocks(t)
 
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	// Expect args to be the cloud read from file.
+	expectedCloud := &cloud.Cloud{
+		Name:      "test-maas-cloud",
+		Type:      "maas",
+		AuthTypes: []cloud.AuthType{"oauth1"},
+		Regions:   []cloud.Region{{Name: "default"}},
+	}
+
+	force := false
+
+	cmdMocks.client.EXPECT().AddCloudToController(&apiparams.AddCloudToControllerRequest{
+		ControllerName: "",
+		AddCloudArgs: params.AddCloudArgs{
+			Name:  "test-maas-cloud",
+			Cloud: jimmjujuapi.CloudToParams(*expectedCloud),
+			Force: &force,
+		},
+	}).Return(nil).Times(1)
+
 	cmd := addCloudToControllerCommand{
+		cloudName:           "test-maas-cloud",
 		cloudDefinitionFile: cloudFile,
 		jimmAPIFunc: func(dialOpts *api.DialOpts) (JIMMAPI, error) {
 			return cmdMocks.client, nil
