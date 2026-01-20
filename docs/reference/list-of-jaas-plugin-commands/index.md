@@ -1037,9 +1037,9 @@ Remove a group.
 | Flag | Default | Usage |
 | --- | --- | --- |
 | `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--force` | false | delete group without prompt |
 | `--format` | smart | Specify output format (smart) |
 | `-o`, `--output` |  | Specify an output file |
-| `-y` | false | delete group without prompt |
 
 ## Examples
 

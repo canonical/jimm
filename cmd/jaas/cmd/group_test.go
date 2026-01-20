@@ -1,149 +1,175 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"context"
-	"fmt"
-	"strings"
+	"bytes"
+	"errors"
+	"testing"
 
-	"github.com/juju/cmd/v3/cmdtesting"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/api"
+	"github.com/juju/juju/jujuclient"
+	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v3"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type groupSuite struct {
-	cmdtest.JimmCmdSuite
-}
+func TestAddGroup(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(t)
 
-var _ = gc.Suite(&groupSuite{})
+	// Setup expectations
+	expectedGroup := params.Group{
+		UUID: "group-uuid",
+		Name: "test-group",
+	}
+	s.client.EXPECT().AddGroup(gomock.Any()).DoAndReturn(func(agr *params.AddGroupRequest) (params.AddGroupResponse, error) {
+		c.Check(agr.Name, qt.Equals, "test-group")
+		return params.AddGroupResponse{Group: expectedGroup}, nil
+	})
+	s.client.EXPECT().Close().Return(nil)
 
-func (s *groupSuite) TestAddGroupSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
-	c.Assert(err, gc.IsNil)
-
-	group := &dbmodel.GroupEntry{Name: "test-group"}
-	err = s.JIMM.Database.GetGroup(context.TODO(), group)
-	c.Assert(err, gc.IsNil)
-	c.Assert(group.ID, gc.Equals, uint(1))
-	c.Assert(group.Name, gc.Equals, "test-group")
-
-	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, fmt.Sprintf(`(?s).*uuid: %s\n.*`, group.UUID))
-}
-
-func (s *groupSuite) TestAddGroup(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
-	c.Assert(err, gc.ErrorMatches, `failed to add group: unauthorized \(unauthorized access\)`)
-}
-
-func (s *groupSuite) TestRenameGroupSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	groupEntry, err := s.JIMM.Database.AddGroup(context.TODO(), "test-group")
-	c.Assert(err, gc.IsNil)
-	c.Assert(groupEntry.UUID, gc.Not(gc.Equals), "")
-
-	_, err = cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
-	c.Assert(err, gc.IsNil)
-
-	group := &dbmodel.GroupEntry{Name: "renamed-group"}
-	err = s.JIMM.Database.GetGroup(context.TODO(), group)
-	c.Assert(err, gc.IsNil)
-	c.Assert(group.ID, gc.Equals, uint(1))
-	c.Assert(group.Name, gc.Equals, "renamed-group")
-}
-
-func (s *groupSuite) TestRenameGroup(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRenameGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "renamed-group")
-	c.Assert(err, gc.ErrorMatches, `failed to rename group: unauthorized \(unauthorized access\)`)
-}
-
-func (s *groupSuite) TestRemoveGroupSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	_, err := s.JIMM.Database.AddGroup(context.TODO(), "test-group")
-	c.Assert(err, gc.IsNil)
-
-	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
-	c.Assert(err, gc.IsNil)
-
-	group := &dbmodel.GroupEntry{Name: "test-group"}
-	err = s.JIMM.Database.GetGroup(context.TODO(), group)
-	c.Assert(err, gc.ErrorMatches, "record not found")
-}
-
-func (s *groupSuite) TestRemoveGroupWithoutFlag(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group")
-	c.Assert(err.Error(), gc.Matches, "Failed to read from input.")
-}
-
-func (s *groupSuite) TestRemoveGroup(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveGroupCommandForTesting(s.ClientStore(), bClient), "test-group", "-y")
-	c.Assert(err, gc.ErrorMatches, `failed to remove group: unauthorized \(unauthorized access\)`)
-}
-
-func (s *groupSuite) TestListGroupsSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	for i := 0; i < 3; i++ {
-		_, err := s.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
-		c.Assert(err, gc.IsNil)
+	// Create command with mocked dependencies
+	command := &addGroupCommand{
+		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return s.client, nil
+		},
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.IsNil)
-	output := cmdtesting.Stdout(ctx)
-	groups := []params.Group{}
-	err = yaml.Unmarshal([]byte(output), &groups)
-	c.Assert(err, gc.IsNil)
-	c.Log(groups)
-	c.Assert(strings.Contains(output, "test-group0"), gc.Equals, true)
-	c.Assert(strings.Contains(output, "test-group1"), gc.Equals, true)
-	c.Assert(strings.Contains(output, "test-group2"), gc.Equals, true)
+	command.SetClientStore(s.store)
+	initCommand(c, command, "test-group")
+
+	ctx := newTestContext(t)
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	yamlResp := ctx.Stdout.(*bytes.Buffer).String()
+	resp := params.AddGroupResponse{}
+	yamlErr := yaml.Unmarshal([]byte(yamlResp), &resp)
+	c.Assert(yamlErr, qt.IsNil)
+	c.Assert(resp.Group, qt.DeepEquals, expectedGroup)
 }
 
-func (s *groupSuite) TestListGroupsLimitSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
+func TestAddGroupAPIError(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(t)
 
-	for i := 0; i < 3; i++ {
-		_, err := s.JIMM.Database.AddGroup(context.TODO(), fmt.Sprint("test-group", i))
-		c.Assert(err, gc.IsNil)
+	expectedErr := errors.New("failed to connect")
+
+	command := &addGroupCommand{
+		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return nil, expectedErr
+		},
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient), "--limit", "1", "--offset", "1")
-	c.Assert(err, gc.IsNil)
-	output := cmdtesting.Stdout(ctx)
-	groups := []params.Group{}
-	err = yaml.Unmarshal([]byte(output), &groups)
-	c.Assert(err, gc.IsNil)
-	c.Assert(groups, gc.HasLen, 1)
-	c.Assert(groups[0].Name, gc.Equals, "test-group1")
-	c.Assert(groups[0].UUID, gc.Not(gc.Equals), "")
+	command.SetClientStore(s.store)
+	initCommand(c, command, "test-group")
+
+	ctx := newTestContext(t)
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNotNil)
 }
 
-func (s *groupSuite) TestListGroups(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewListGroupsCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, `failed to list groups: unauthorized \(unauthorized access\)`)
+func TestRenameGroup(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(t)
+
+	// Setup expectations
+	s.client.EXPECT().RenameGroup(gomock.Any()).DoAndReturn(func(rgr *params.RenameGroupRequest) error {
+		c.Check(rgr.Name, qt.Equals, "old-group")
+		c.Check(rgr.NewName, qt.Equals, "new-group")
+		return nil
+	})
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &renameGroupCommand{
+		name:    "old-group",
+		newName: "new-group",
+		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+
+	command.SetClientStore(s.store)
+	initCommand(c, command, "old-group", "new-group")
+
+	ctx := newTestContext(t)
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestRemoveGroup(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(t)
+
+	// Setup expectations
+	s.client.EXPECT().RemoveGroup(gomock.Any()).DoAndReturn(func(rgr *params.RemoveGroupRequest) error {
+		c.Check(rgr.Name, qt.Equals, "test-group")
+		return nil
+	})
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &removeGroupCommand{
+		name: "test-group",
+		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+
+	initCommand(c, command, "test-group")
+	ctx := newTestContext(t)
+	ctx.Stdin = bytes.NewBufferString("y\n")
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestRemoveGroupForce(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(t)
+
+	// Setup expectations
+	s.client.EXPECT().RemoveGroup(gomock.Any()).DoAndReturn(func(rgr *params.RemoveGroupRequest) error {
+		c.Check(rgr.Name, qt.Equals, "test-group")
+		return nil
+	})
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &removeGroupCommand{
+		name: "test-group",
+		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+
+	initCommand(c, command, "test-group", "--force")
+
+	ctx := newTestContext(t)
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestListGroups(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(t)
+
+	// Setup expectations
+	s.client.EXPECT().ListGroups(gomock.Any()).Return([]params.Group{
+		{Name: "group-1", UUID: "uuid-1"},
+	}, nil)
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &listGroupsCommand{
+		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+
+	command.SetClientStore(s.store)
+	initCommand(c, command)
+
+	ctx := newTestContext(t)
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }

@@ -9,11 +9,13 @@ import (
 )
 
 // APIClientFunc is a function that returns a JIMMAPI client.
-type APIClientFunc func(dialOpts *jujuapi.DialOpts) (JIMMAPI, error)
+type APIClientFunc func(store jujuclient.ClientStore, dialOpts *jujuapi.DialOpts) (JIMMAPI, error)
 
 // NewClient creates a new JIMMAPI client using the provided dial options.
-func NewClient(dialOpts *jujuapi.DialOpts) (JIMMAPI, error) {
-	store := jujuclient.NewFileClientStore()
+func NewClient(store jujuclient.ClientStore, dialOpts *jujuapi.DialOpts) (JIMMAPI, error) {
+	if store == nil {
+		store = jujuclient.NewFileClientStore()
+	}
 	currentController, err := store.CurrentController()
 	if err != nil {
 		return nil, errors.E(err, "could not determine the current controller")

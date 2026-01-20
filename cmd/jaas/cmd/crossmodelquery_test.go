@@ -6,25 +6,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	jujucmd "github.com/juju/cmd/v3"
-	"github.com/juju/gnuflag"
 
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
-
-func initCrossModelQueryCommand(c *qt.C, command jujucmd.Command, args ...string) {
-	f := gnuflag.NewFlagSetWithFlagKnownAs(command.Info().Name, gnuflag.ContinueOnError, jujucmd.FlagAlias(command, "flag"))
-	f.SetOutput(io.Discard)
-	command.SetFlags(f)
-	err := f.Parse(command.AllowInterspersedFlags(), args)
-	c.Assert(err, qt.IsNil)
-	err = command.Init(f.Args())
-	c.Assert(err, qt.IsNil)
-}
 
 func TestCrossModelQueryRun(t *testing.T) {
 	c := qt.New(t)
@@ -52,7 +39,7 @@ func TestCrossModelQueryRun(t *testing.T) {
 		},
 	}
 
-	initCrossModelQueryCommand(c, command, ".applications")
+	initCommand(c, command, ".applications")
 
 	ctx := newTestContext(t)
 	err := command.Run(ctx)
@@ -75,7 +62,7 @@ func TestCrossModelQueryRunClientError(t *testing.T) {
 		},
 	}
 
-	initCrossModelQueryCommand(c, command, ".applications")
+	initCommand(c, command, ".applications")
 
 	ctx := newTestContext(t)
 	err := command.Run(ctx)

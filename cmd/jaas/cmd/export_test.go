@@ -164,35 +164,9 @@ func NewListRolesCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Logi
 
 func NewAddGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addGroupCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewRenameGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &renameGroupCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewRemoveGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &removeGroupCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewListGroupsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &listGroupsCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
+		store:       store,
+		dialOpts:    cmdtest.TestDialOpts(lp),
+		jimmAPIFunc: NewClient,
 	}
 
 	return modelcmd.WrapBase(cmd)
