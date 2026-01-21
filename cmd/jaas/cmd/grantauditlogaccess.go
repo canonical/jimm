@@ -3,9 +3,10 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -32,6 +33,7 @@ func NewGrantAuditLogAccessCommand() cmd.Command {
 	cmd := &grantAuditLogAccessCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.jimmAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -41,9 +43,10 @@ func NewGrantAuditLogAccessCommand() cmd.Command {
 type grantAuditLogAccessCommand struct {
 	modelcmd.ControllerCommandBase
 
-	store    jujuclient.ClientStore
-	dialOpts *jujuapi.DialOpts
 	username string
+
+	store       jujuclient.ClientStore
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 func (c *grantAuditLogAccessCommand) Info() *cmd.Info {
@@ -66,33 +69,49 @@ func (c *grantAuditLogAccessCommand) Init(args []string) error {
 	if len(args) == 0 {
 		return errors.E("missing username")
 	}
+
 	c.username, args = args[0], args[1:]
 	if len(args) > 0 {
 		return errors.E("unknown arguments")
+	}
+
+	if !names.IsValidUser(c.username) {
+		return errors.E("invalid username")
 	}
 	return nil
 }
 
 // Run implements Command.Run.
 func (c *grantAuditLogAccessCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine controller")
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	userTag := names.NewUserTag(c.username)
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	api, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(apiCaller)
-	err = client.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
-		UserTag: userTag.String(),
+	err = api.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag(c.username).String(),
 	})
 	if err != nil {
 		return errors.E(err)
 	}
 
 	return nil
+}
+
+func (c *grantAuditLogAccessCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

@@ -38,15 +38,6 @@ func NewModelStatusCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &grantAuditLogAccessCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &revokeAuditLogAccessCommand{
 		store:    store,
