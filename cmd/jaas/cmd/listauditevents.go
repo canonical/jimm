@@ -12,8 +12,10 @@ import (
 	"github.com/juju/gnuflag"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/jujuclient"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -32,8 +34,9 @@ Returns audit log events.
 // specified criteria.
 func NewListAuditEventsCommand() cmd.Command {
 	cmd := &listAuditEventsCommand{
-		jimmAPIFunc: NewClient,
+		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.jimmAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -46,7 +49,8 @@ type listAuditEventsCommand struct {
 
 	args apiparams.FindAuditEventsRequest
 
-	jimmAPIFunc APIClientFunc
+	store       jujuclient.ClientStore
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 func (c *listAuditEventsCommand) Info() *cmd.Info {
@@ -88,7 +92,11 @@ func (c *listAuditEventsCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
-	api, err := c.jimmAPIFunc(nil)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
+	}
+
+	api, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
@@ -103,6 +111,20 @@ func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
 		return errors.E(err)
 	}
 	return nil
+}
+
+func (c *listAuditEventsCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }
 
 func formatTabular(writer io.Writer, value interface{}) error {

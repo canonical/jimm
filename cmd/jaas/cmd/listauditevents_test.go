@@ -12,7 +12,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	"go.uber.org/mock/gomock"
 
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
@@ -34,7 +33,7 @@ func TestListAuditEventsRun_Success(t *testing.T) {
 		Times(1)
 
 	command := &listAuditEventsCommand{
-		jimmAPIFunc: func(_ *jujuapi.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return cmdMocks.client, nil
 		},
 	}
@@ -61,7 +60,7 @@ func TestListAuditEventsRun_APICallFails(t *testing.T) {
 		Times(1)
 
 	command := &listAuditEventsCommand{
-		jimmAPIFunc: func(_ *jujuapi.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return cmdMocks.client, nil
 		},
 	}
@@ -102,7 +101,7 @@ func TestListAuditEventsRun_FlagsArePassedToAPICorrectly(t *testing.T) {
 		Times(1)
 
 	command := &listAuditEventsCommand{
-		jimmAPIFunc: func(_ *jujuapi.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return cmdMocks.client, nil
 		},
 	}
@@ -150,7 +149,7 @@ func TestListAuditEventsRun_TabularFormat(t *testing.T) {
 		Times(1)
 
 	command := &listAuditEventsCommand{
-		jimmAPIFunc: func(_ *jujuapi.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return cmdMocks.client, nil
 		},
 	}
