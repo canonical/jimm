@@ -3,9 +3,10 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -39,6 +40,8 @@ func NewMigrateInternalModelCommand() cmd.Command {
 		store: jujuclient.NewFileClientStore(),
 	}
 
+	cmd.jimmAPIFunc = cmd.newClient
+
 	return modelcmd.WrapBase(cmd)
 }
 
@@ -48,9 +51,10 @@ type migrateInternalModelCommand struct {
 	out cmd.Output
 
 	store            jujuclient.ClientStore
-	dialOpts         *jujuapi.DialOpts
 	targetController string
 	modelTargets     []string
+
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 // Info implements Command.Info.
@@ -90,23 +94,22 @@ func (c *migrateInternalModelCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine controller")
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	jimmAPI, err := c.jimmAPIFunc()
 	if err != nil {
-		return err
+		return errors.E(err, "could not create JIMM API client")
 	}
+	defer jimmAPI.Close()
 
-	client := api.NewClient(apiCaller)
 	specs := []apiparams.MigrateModelInfo{}
 	for _, model := range c.modelTargets {
 		specs = append(specs, apiparams.MigrateModelInfo{TargetModelNameOrUUID: model, TargetController: c.targetController})
 	}
 	req := apiparams.MigrateModelRequest{Specs: specs}
-	events, err := client.MigrateModel(&req)
+	events, err := jimmAPI.MigrateModel(&req)
 	if err != nil {
 		return err
 	}
@@ -116,4 +119,18 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (c *migrateInternalModelCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }
