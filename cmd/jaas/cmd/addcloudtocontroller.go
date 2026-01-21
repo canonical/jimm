@@ -8,15 +8,18 @@ import (
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
+	jujuapi "github.com/juju/juju/api"
 	"github.com/juju/juju/cloud"
 	jujucmd "github.com/juju/juju/cmd"
 	jujucmdcommon "github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/jujuclient"
 	"github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	jimmjujuapi "github.com/canonical/jimm/v3/internal/jujuapi"
+	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -39,8 +42,9 @@ is already known and will error otherwise.
 func NewAddCloudToControllerCommand() cmd.Command {
 	cmd := &addCloudToControllerCommand{
 		cloudByNameFunc: jujucmdcommon.CloudByName,
-		jimmAPIFunc:     NewClient,
+		store:           jujuclient.NewFileClientStore(),
 	}
+	cmd.jimmAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -64,7 +68,9 @@ type addCloudToControllerCommand struct {
 	// compatible with the cloud on which the controller is running.
 	force bool
 
-	jimmAPIFunc     APIClientFunc
+	store           jujuclient.ClientStore
+	dialOpts        *jujuapi.DialOpts
+	jimmAPIFunc     func() (JIMMAPI, error)
 	cloudByNameFunc func(string) (*cloud.Cloud, error)
 }
 
@@ -134,7 +140,11 @@ func (c *addCloudToControllerCommand) Run(ctxt *cmd.Context) error {
 		newCloud.Regions = []cloud.Region{{Name: cloud.DefaultCloudRegion}}
 	}
 
-	jimmAPI, err := c.jimmAPIFunc(nil, nil)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
+	}
+
+	jimmAPI, err := c.jimmAPIFunc()
 	if err != nil {
 		return errors.E(err, "could not create JIMM API client")
 	}
@@ -174,4 +184,18 @@ func (c *addCloudToControllerCommand) readCloudFromFile() (*cloud.Cloud, error) 
 	}
 
 	return &foundCloud, nil
+}
+
+func (c *addCloudToControllerCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

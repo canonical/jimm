@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/juju/api"
-	"github.com/juju/juju/jujuclient"
 	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v3"
 
@@ -33,7 +31,7 @@ func TestAddGroup(t *testing.T) {
 
 	// Create command with mocked dependencies
 	command := &addGroupCommand{
-		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}
@@ -59,7 +57,7 @@ func TestAddGroupAPIError(t *testing.T) {
 	expectedErr := errors.New("failed to connect")
 
 	command := &addGroupCommand{
-		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return nil, expectedErr
 		},
 	}
@@ -87,7 +85,7 @@ func TestRenameGroup(t *testing.T) {
 	command := &renameGroupCommand{
 		name:    "old-group",
 		newName: "new-group",
-		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}
@@ -113,7 +111,7 @@ func TestRemoveGroup(t *testing.T) {
 
 	command := &removeGroupCommand{
 		name: "test-group",
-		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}
@@ -138,7 +136,7 @@ func TestRemoveGroupForce(t *testing.T) {
 
 	command := &removeGroupCommand{
 		name: "test-group",
-		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}
@@ -161,7 +159,7 @@ func TestListGroups(t *testing.T) {
 	s.client.EXPECT().Close().Return(nil)
 
 	command := &listGroupsCommand{
-		jimmAPIFunc: func(store jujuclient.ClientStore, dialOpts *api.DialOpts) (JIMMAPI, error) {
+		jimmAPIFunc: func() (JIMMAPI, error) {
 			return s.client, nil
 		},
 	}

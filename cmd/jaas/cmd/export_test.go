@@ -164,9 +164,8 @@ func NewListRolesCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Logi
 
 func NewAddGroupCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addGroupCommand{
-		store:       store,
-		dialOpts:    cmdtest.TestDialOpts(lp),
-		jimmAPIFunc: NewClient,
+		store:    store,
+		dialOpts: cmdtest.TestDialOpts(lp),
 	}
 
 	return modelcmd.WrapBase(cmd)
