@@ -10,13 +10,10 @@ import (
 	"github.com/gosuri/uitable"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
-	"github.com/juju/juju/jujuclient"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -35,7 +32,7 @@ Returns audit log events.
 // specified criteria.
 func NewListAuditEventsCommand() cmd.Command {
 	cmd := &listAuditEventsCommand{
-		store: jujuclient.NewFileClientStore(),
+		jimmAPIFunc: NewClient,
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -47,9 +44,9 @@ type listAuditEventsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	store    jujuclient.ClientStore
-	dialOpts *jujuapi.DialOpts
-	args     apiparams.FindAuditEventsRequest
+	args apiparams.FindAuditEventsRequest
+
+	jimmAPIFunc APIClientFunc
 }
 
 func (c *listAuditEventsCommand) Info() *cmd.Info {
@@ -91,18 +88,12 @@ func (c *listAuditEventsCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine controller")
-	}
-
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	api, err := c.jimmAPIFunc(nil)
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(apiCaller)
-	events, err := client.FindAuditEvents(&c.args)
+	events, err := api.FindAuditEvents(&c.args)
 	if err != nil {
 		return errors.E(err)
 	}
