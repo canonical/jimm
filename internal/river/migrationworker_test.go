@@ -1,4 +1,4 @@
-package river_test
+package river
 
 import (
 	"errors"
@@ -8,7 +8,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	jimmriver "github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	qt "github.com/frankban/quicktest"
 	"github.com/riverqueue/river"
@@ -25,7 +24,7 @@ func setupTestDB(c *qt.C) *db.Database {
 	err := db.Migrate(c.Context())
 	c.Assert(err, qt.IsNil)
 
-	err = jimmriver.MigrateRiver(c.Context(), db)
+	err = MigrateRiver(c.Context(), db)
 	c.Assert(err, qt.IsNil)
 	return db
 }
@@ -36,14 +35,14 @@ func TestMigrationWorker(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	upgradeManager := NewMockMigrationWorkerUpgradeManager(ctrl)
+	upgradeManager := NewMockUpgradeManager(ctrl)
 
 	db := setupTestDB(c)
 	sqlDb, err := db.SqlDB()
 	c.Assert(err, qt.IsNil)
 
 	openfgaClient := &openfga.OFGAClient{}
-	w, err := jimmriver.NewUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
+	w, err := newUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
@@ -65,7 +64,7 @@ func TestMigrationWorker(t *testing.T) {
 		c.Context(),
 		c.TB,
 		tx,
-		jimmriver.UpgradeMigrationWorker{
+		UpgradeMigrationWorker{
 			Username:             u.Name,
 			UUID:                 "test-uuid",
 			TargetControllerName: "target-controller",
@@ -84,14 +83,14 @@ func TestMigrationWorker_Error(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	upgradeManager := NewMockMigrationWorkerUpgradeManager(ctrl)
+	upgradeManager := NewMockUpgradeManager(ctrl)
 
 	db := setupTestDB(c)
 	sqlDb, err := db.SqlDB()
 	c.Assert(err, qt.IsNil)
 
 	openfgaClient := &openfga.OFGAClient{}
-	w, err := jimmriver.NewUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
+	w, err := newUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
@@ -113,7 +112,7 @@ func TestMigrationWorker_Error(t *testing.T) {
 		c.Context(),
 		c.TB,
 		tx,
-		jimmriver.UpgradeMigrationWorker{
+		UpgradeMigrationWorker{
 			Username:             u.Name,
 			UUID:                 "test-uuid",
 			TargetControllerName: "target-controller",
