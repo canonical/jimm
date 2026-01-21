@@ -320,6 +320,7 @@ type BootstrapManager interface {
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.
 type UpgradeManager interface {
 	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error)
+	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
 }
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.

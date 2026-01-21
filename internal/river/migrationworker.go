@@ -3,48 +3,61 @@ package river
 import (
 	"context"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
 )
 
-// UpgradeToManager defines the interface for managing upgrade operations.
-type UpgradeToManager interface {
-	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error)
-}
-
-func newUpgradeToWorker(migrationManager UpgradeToManager) (*upgradeToWorker, error) {
-	if migrationManager == nil {
-		return nil, errors.E("migrationManager is required")
+// newUpgradeMigrationWorker creates a new upgradeMigrationWorker.
+func newUpgradeMigrationWorker(openfgaClient *openfga.OFGAClient, store Store, upgradeManager UpgradeManager) (*upgradeMigrationWorker, error) {
+	if openfgaClient == nil {
+		return nil, errors.E("openfgaClient is required")
+	}
+	if store == nil {
+		return nil, errors.E("store is required")
+	}
+	if upgradeManager == nil {
+		return nil, errors.E("upgradeManager is required")
 	}
 
-	return &upgradeToWorker{
-		migrationManager: migrationManager,
+	return &upgradeMigrationWorker{
+		openfgaClient:  openfgaClient,
+		store:          store,
+		upgradeManager: upgradeManager,
 	}, nil
 }
 
-// UpgradeToArgs defines the arguments for the upgradeToWorker job.
-type UpgradeToArgs struct {
-	UUID string `json:"uuid"`
+// UpgradeMigrationWorker defines the arguments for the upgradeMigrationWorker job.
+type UpgradeMigrationWorker struct {
+	Username             string `json:"username"`
+	UUID                 string `json:"uuid"`
+	TargetControllerName string `json:"target_controller_name"`
 }
 
-// Kind returns the kind of the job.
-func (UpgradeToArgs) Kind() string { return "migration" }
+// Kind implements the [river.JobArgs] interface.
+func (UpgradeMigrationWorker) Kind() string { return "upgrade-migration" }
 
-type upgradeToWorker struct {
+type upgradeMigrationWorker struct {
 	// An embedded WorkerDefaults sets up default methods to fulfill the rest of
 	// the Worker interface:
-	river.WorkerDefaults[UpgradeToArgs]
+	river.WorkerDefaults[UpgradeMigrationWorker]
 
-	migrationManager UpgradeToManager
+	openfgaClient  *openfga.OFGAClient
+	store          Store
+	upgradeManager UpgradeManager
 }
 
-// Work performs the upgrade operation receiving the job with UpgradeToArgs.
-func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
-	_, err := w.migrationManager.UpgradeTo(ctx, nil, job.Args.UUID, version.Number{})
-	if err != nil {
+// Work implements the [river.Worker] interface.
+func (w *upgradeMigrationWorker) Work(ctx context.Context, job *river.Job[UpgradeMigrationWorker]) error {
+	u := &dbmodel.Identity{Name: job.Args.Username}
+	if err := w.store.FetchIdentity(ctx, u); err != nil {
 		return err
 	}
+
+	if err := w.upgradeManager.MigrateModel(ctx, openfga.NewUser(u, w.openfgaClient), job.Args.UUID, job.Args.TargetControllerName); err != nil {
+		return err
+	}
+
 	return nil
 }

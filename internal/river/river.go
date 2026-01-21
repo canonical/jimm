@@ -5,16 +5,35 @@ import (
 	"database/sql"
 
 	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivermigrate"
 )
 
+// UpgradeManager defines the methods required from this manager for the workers.
+type UpgradeManager interface {
+	// MigrateModel migrates a model to a new controller without upgrading the model's agent.
+	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
+}
+
+// Store defines a method to retrieve a user from the database for the purpose
+// of authenticating river jobs.
+type Store interface {
+	FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err error)
+}
+
 // StartWorkers sets up and starts the river workers.
 // Start() is a non-blocking call; it starts a background goroutine to process jobs, and maintainance tasks.
-func StartWorkers(ctx context.Context, db *db.Database, upgradeToManager UpgradeToManager) error {
+func StartWorkers(
+	ctx context.Context,
+	db *db.Database,
+	openfgaClient *openfga.OFGAClient,
+	upgradeManager UpgradeManager,
+) error {
 	workers := river.NewWorkers()
-	w, err := newUpgradeToWorker(upgradeToManager)
+	w, err := newUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
 	if err != nil {
 		return err
 	}

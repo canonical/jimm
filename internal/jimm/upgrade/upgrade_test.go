@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -427,6 +428,145 @@ func (s *upgradeManagerSuite) TestUpgradeTo_Success(c *qt.C) {
 	ts, convErr := strconv.ParseInt(parts[1], 10, 64)
 	c.Assert(convErr, qt.IsNil)
 	c.Assert(time.Since(time.Unix(ts, 0)) < 2*time.Second, qt.IsTrue)
+}
+
+func (s *upgradeManagerSuite) TestMigrateModel_Success(c *qt.C) {
+	ctrl := s.setupTest(c)
+	defer ctrl.Finish()
+
+	ctx := c.Context()
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	c.Assert(err, qt.IsNil)
+
+	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetController := "4.0controller"
+	c.Assert(err, qt.IsNil)
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		Return(
+			dbmodel.Model{
+				Controller: dbmodel.Controller{
+					Name: "source controller",
+				},
+			},
+			nil,
+		)
+
+	s.jujuManager.EXPECT().
+		InitiateInternalMigration(ctx, gomock.Any(), targetMt.Id(), targetController).
+		Return(
+			jujuparams.InitiateMigrationResult{
+				ModelTag:    targetMt.String(),
+				MigrationId: "1",
+			},
+			nil,
+		)
+
+	s.jujuManager.EXPECT().
+		ModelInfo(
+			gomock.Any(),
+			gomock.Any(),
+			targetMt,
+		).
+		Return(&jujuparams.ModelInfo{
+			UUID: targetMt.Id(),
+		}, nil)
+
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		Return(
+			dbmodel.Model{
+				Controller: dbmodel.Controller{
+					Name: targetController,
+				},
+			},
+			nil,
+		)
+
+	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, targetMt.Id(), targetController)
+	c.Assert(err, qt.IsNil)
+}
+
+func (s *upgradeManagerSuite) TestMigrateModel_Retries2Times(c *qt.C) {
+	ctrl := s.setupTest(c)
+	defer ctrl.Finish()
+
+	ctx := c.Context()
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	c.Assert(err, qt.IsNil)
+
+	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetController := "4.0controller"
+
+	// Model is a different controller, so continues.
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		Return(
+			dbmodel.Model{Controller: dbmodel.Controller{Name: "source controller"}},
+			nil,
+		)
+
+	s.jujuManager.EXPECT().
+		InitiateInternalMigration(ctx, gomock.Any(), targetMt.Id(), targetController).
+		Return(
+			jujuparams.InitiateMigrationResult{ModelTag: targetMt.String(), MigrationId: "1"},
+			nil,
+		)
+
+	// Expect 3 because we're going to retry twice before succeeding.
+	s.jujuManager.EXPECT().
+		ModelInfo(gomock.Any(), gomock.Any(), targetMt).
+		Return(&jujuparams.ModelInfo{UUID: targetMt.Id()}, nil).
+		Times(3)
+
+	// Retry 3 times.
+	getModelCalls := 0
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		DoAndReturn(func(ctx context.Context, uuid string) (dbmodel.Model, error) {
+			getModelCalls++
+			if getModelCalls < 3 {
+				return dbmodel.Model{Controller: dbmodel.Controller{Name: "still-source"}}, nil
+			}
+			return dbmodel.Model{Controller: dbmodel.Controller{Name: targetController}}, nil
+		}).
+		Times(3)
+
+	tt, ok := (c.TB).(*testing.T)
+	c.Assert(ok, qt.Equals, true)
+
+	synctest.Test(tt, func(t *testing.T) {
+		err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, targetMt.Id(), targetController)
+		c.Assert(err, qt.IsNil)
+	})
+
+	// 3 suggests we succeed on the third try.
+	c.Assert(getModelCalls, qt.Equals, 3)
+}
+
+func (s *upgradeManagerSuite) TestMigrateModel_IdempotencyWhenModelHasAlreadyBeenMigrated(c *qt.C) {
+	ctrl := s.setupTest(c)
+	defer ctrl.Finish()
+
+	ctx := c.Context()
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	c.Assert(err, qt.IsNil)
+
+	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetController := "4.0controller"
+
+	// Model is already on the target controller, so migration is a no-op.
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		Return(
+			dbmodel.Model{Controller: dbmodel.Controller{Name: targetController}},
+			nil,
+		)
+
+	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, targetMt.Id(), targetController)
+	c.Assert(err, qt.IsNil)
 }
 
 //go:generate go tool mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager

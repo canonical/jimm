@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"time"
 
+	stderrors "errors"
+
 	"github.com/google/uuid"
 	"github.com/juju/clock"
 	jujuerrors "github.com/juju/errors"
@@ -365,4 +367,69 @@ func (u *upgradeManager) upgradeModel(ctx context.Context, api juju.API, modelUU
 	}
 
 	return controllerChosenVersion, nil
+}
+
+// Phase 2 of automated upgrades is from here onwards.
+
+// MigrateModel migrates a model to a new controller without upgrading the model's agent.
+// This is Phase 2 of automated upgrades and to be called from a river worker.
+//
+// If the model is already on the target controller, no action is taken and nil is returned.
+func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error {
+	m, err := u.jujuManager.GetModel(ctx, modelUUID)
+	if err != nil {
+		return errors.E(err)
+	}
+	if m.Controller.Name == targetControllerName {
+		zapctx.Info(ctx, "model is already on target controller, skipping migration", zap.String("model-uuid", modelUUID), zap.String("controller-name", targetControllerName))
+		return nil
+	}
+
+	zapctx.Debug(ctx, "Attempting to initiate internal migration")
+	iimResult, err := u.jujuManager.InitiateInternalMigration(ctx, user, modelUUID, targetControllerName)
+	if err != nil {
+		zapctx.Error(ctx, "Failed to initiate internal migration", zap.Error(err))
+		return errors.E(fmt.Errorf("failed to initiate internal migration: %w", err))
+	}
+
+	mt, err := names.ParseModelTag(iimResult.ModelTag)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to parse model tag from initiate internal migration result: %w", err))
+	}
+
+	modelNotMigratedErr := errors.E("model has not yet migrated to target controller")
+
+	var mi *jujuparams.ModelInfo
+	if err := retry.Call(
+		retry.CallArgs{
+			IsFatalError: func(err error) bool {
+				return !stderrors.Is(err, modelNotMigratedErr)
+			},
+			Attempts: 30,
+			Delay:    10 * time.Second,
+			Func: func() error {
+				mi, err = u.jujuManager.ModelInfo(ctx, user, mt)
+				if err != nil {
+					return err
+				}
+
+				m, err := u.jujuManager.GetModel(ctx, mi.UUID)
+				if err != nil {
+					return err
+				}
+
+				// It hasn't migrated yet, so error out.
+				if m.Controller.Name != targetControllerName {
+					return modelNotMigratedErr
+				}
+
+				return nil
+			},
+			Clock: clock.WallClock,
+		},
+	); err != nil {
+		return errors.E(fmt.Errorf("failed to confirm internal migration completed: %w", err))
+	}
+
+	return nil
 }
