@@ -61,6 +61,7 @@ func TestImportModelRun_PassesRequestToAPI(t *testing.T) {
 			return nil
 		}).
 		Times(1)
+
 	cmdMocks.client.EXPECT().Close().Times(1)
 
 	command := &importModelCommand{
@@ -95,6 +96,7 @@ func TestImportModelRun_WithoutOwnerFlag(t *testing.T) {
 			return nil
 		}).
 		Times(1)
+
 	cmdMocks.client.EXPECT().Close().Times(1)
 
 	command := &importModelCommand{
