@@ -91,6 +91,7 @@ func (c *grantAuditLogAccessCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
+	defer api.Close()
 
 	err = api.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
 		UserTag: names.NewUserTag(c.username).String(),
