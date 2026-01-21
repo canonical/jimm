@@ -279,7 +279,12 @@ func start(ctx context.Context, s *service.Service) error {
 	if err != nil {
 		return err
 	}
-	err = river.StartWorkers(ctx, jimmsvc.JIMM().Database, jimmsvc.JIMM().UpgradeManager())
+	err = river.StartWorkers(
+		ctx,
+		jimmsvc.JIMM().Database,
+		jimmsvc.JIMM().OpenFGAClient,
+		jimmsvc.JIMM().UpgradeManager(),
+	)
 	if err != nil {
 		return err
 	}
