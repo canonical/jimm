@@ -22,6 +22,8 @@ func TestGrantAuditLogAccessRun_Success(t *testing.T) {
 		Return(nil).
 		Times(1)
 
+	cmdMocks.client.EXPECT().Close()
+
 	command := &grantAuditLogAccessCommand{
 		username: "bob@canonical.com",
 		jimmAPIFunc: func() (JIMMAPI, error) {
@@ -42,6 +44,8 @@ func TestGrantAuditLogAccessRun_APIError(t *testing.T) {
 		GrantAuditLogAccess(gomock.Any()).
 		Return(errors.E("unauthorised access")).
 		Times(1)
+
+	cmdMocks.client.EXPECT().Close()
 
 	command := &grantAuditLogAccessCommand{
 		username: "bob@canonical.com",
