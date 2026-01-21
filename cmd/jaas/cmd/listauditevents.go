@@ -100,6 +100,7 @@ func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
+	defer api.Close()
 
 	events, err := api.FindAuditEvents(&c.args)
 	if err != nil {
