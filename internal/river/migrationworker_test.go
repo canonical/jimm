@@ -22,7 +22,10 @@ func setupTestDB(c *qt.C) *db.Database {
 	db := &db.Database{
 		DB: jimmtest.PostgresDB(c, time.Now),
 	}
-	err := jimmriver.MigrateRiver(c.Context(), db)
+	err := db.Migrate(c.Context())
+	c.Assert(err, qt.IsNil)
+
+	err = jimmriver.MigrateRiver(c.Context(), db)
 	c.Assert(err, qt.IsNil)
 	return db
 }
@@ -39,16 +42,19 @@ func TestMigrationWorker(t *testing.T) {
 	sqlDb, err := db.SqlDB()
 	c.Assert(err, qt.IsNil)
 
-	w, err := jimmriver.NewUpgradeMigrationWorker(upgradeManager)
+	openfgaClient := &openfga.OFGAClient{}
+	w, err := jimmriver.NewUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
 
 	u, err := dbmodel.NewIdentity("ash@catchum.com")
-	ofgaUser := openfga.NewUser(u, nil)
+	c.Assert(err, qt.IsNil)
+	err = db.GetIdentity(c.Context(), u)
+	c.Assert(err, qt.IsNil)
 
 	upgradeManager.EXPECT().
-		MigrateModel(gomock.Any(), ofgaUser, "test-uuid", "target-controller").
+		MigrateModel(gomock.Any(), gomock.Any(), "test-uuid", "target-controller").
 		Return(nil)
 
 	tx, err := sqlDb.Begin()
@@ -60,7 +66,7 @@ func TestMigrationWorker(t *testing.T) {
 		c.TB,
 		tx,
 		jimmriver.UpgradeMigrationWorker{
-			User:                 ofgaUser,
+			Username:             u.Name,
 			UUID:                 "test-uuid",
 			TargetControllerName: "target-controller",
 		},
@@ -84,16 +90,19 @@ func TestMigrationWorker_Error(t *testing.T) {
 	sqlDb, err := db.SqlDB()
 	c.Assert(err, qt.IsNil)
 
-	w, err := jimmriver.NewUpgradeMigrationWorker(upgradeManager)
+	openfgaClient := &openfga.OFGAClient{}
+	w, err := jimmriver.NewUpgradeMigrationWorker(openfgaClient, db, upgradeManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
 
 	u, err := dbmodel.NewIdentity("ash@catchum.com")
-	ofgaUser := openfga.NewUser(u, nil)
+	c.Assert(err, qt.IsNil)
+	err = db.GetIdentity(c.Context(), u)
+	c.Assert(err, qt.IsNil)
 
 	upgradeManager.EXPECT().
-		MigrateModel(gomock.Any(), ofgaUser, "test-uuid", "target-controller").
+		MigrateModel(gomock.Any(), gomock.Any(), "test-uuid", "target-controller").
 		Return(errors.New("oh noes"))
 
 	tx, err := sqlDb.Begin()
@@ -105,7 +114,7 @@ func TestMigrationWorker_Error(t *testing.T) {
 		c.TB,
 		tx,
 		jimmriver.UpgradeMigrationWorker{
-			User:                 ofgaUser,
+			Username:             u.Name,
 			UUID:                 "test-uuid",
 			TargetControllerName: "target-controller",
 		},

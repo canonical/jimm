@@ -438,15 +438,25 @@ func (s *upgradeManagerSuite) TestMigrateModel_Success(c *qt.C) {
 	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
 	c.Assert(err, qt.IsNil)
 
-	mt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
 	targetController := "4.0controller"
 	c.Assert(err, qt.IsNil)
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		Return(
+			dbmodel.Model{
+				Controller: dbmodel.Controller{
+					Name: "source controller",
+				},
+			},
+			nil,
+		)
 
 	s.jujuManager.EXPECT().
-		InitiateInternalMigration(ctx, gomock.Any(), mt.Id(), targetController).
+		InitiateInternalMigration(ctx, gomock.Any(), targetMt.Id(), targetController).
 		Return(
 			jujuparams.InitiateMigrationResult{
-				ModelTag:    mt.String(),
+				ModelTag:    targetMt.String(),
 				MigrationId: "1",
 			},
 			nil,
@@ -456,14 +466,14 @@ func (s *upgradeManagerSuite) TestMigrateModel_Success(c *qt.C) {
 		ModelInfo(
 			gomock.Any(),
 			gomock.Any(),
-			mt,
+			targetMt,
 		).
 		Return(&jujuparams.ModelInfo{
-			UUID: mt.Id(),
+			UUID: targetMt.Id(),
 		}, nil)
 
 	s.jujuManager.EXPECT().
-		GetModel(gomock.Any(), mt.Id()).
+		GetModel(gomock.Any(), targetMt.Id()).
 		Return(
 			dbmodel.Model{
 				Controller: dbmodel.Controller{
@@ -473,7 +483,7 @@ func (s *upgradeManagerSuite) TestMigrateModel_Success(c *qt.C) {
 			nil,
 		)
 
-	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, mt.Id(), targetController)
+	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, targetMt.Id(), targetController)
 	c.Assert(err, qt.IsNil)
 }
 
