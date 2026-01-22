@@ -64,7 +64,7 @@ func TestGrantAuditLogAccessInit(t *testing.T) {
 	var command grantAuditLogAccessCommand
 
 	c.Assert(command.Init(nil), qt.ErrorMatches, "missing username")
-	c.Assert(command.Init([]string{"@@"}), qt.ErrorMatches, "invalid username")
+	c.Assert(command.Init([]string{"@@"}), qt.ErrorMatches, `invalid username "@@"`)
 	c.Assert(command.Init([]string{"bob@canonical.com", "extra"}), qt.ErrorMatches, "unknown arguments")
 
 	c.Assert(command.Init([]string{"bob@canonical.com"}), qt.IsNil)

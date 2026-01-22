@@ -76,7 +76,7 @@ func (c *grantAuditLogAccessCommand) Init(args []string) error {
 	}
 
 	if !names.IsValidUser(c.username) {
-		return errors.New("invalid username")
+		return fmt.Errorf("invalid username %q", c.username)
 	}
 	return nil
 }
