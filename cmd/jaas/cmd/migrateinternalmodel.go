@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/juju/cmd/v3"
@@ -11,7 +12,6 @@ import (
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -80,7 +80,7 @@ func (c *migrateInternalModelCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *migrateInternalModelCommand) Init(args []string) error {
 	if len(args) < 2 {
-		return errors.E("missing controller name and model target arguments")
+		return errors.New("missing controller name and model target arguments")
 	}
 	for i, arg := range args {
 		if i == 0 {
@@ -100,7 +100,7 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 
 	jimmAPI, err := c.jimmAPIFunc()
 	if err != nil {
-		return errors.E(err, "could not create JIMM API client")
+		return fmt.Errorf("could not create JIMM API client: %v", err)
 	}
 	defer jimmAPI.Close()
 
@@ -111,12 +111,12 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 	req := apiparams.MigrateModelRequest{Specs: specs}
 	events, err := jimmAPI.MigrateModel(&req)
 	if err != nil {
-		return errors.E(fmt.Errorf("could not migrate models: %v", err))
+		return fmt.Errorf("could not migrate models: %v", err)
 	}
 
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return errors.E(fmt.Errorf("could not write output: %v", err))
+		return fmt.Errorf("could not write output: %v", err)
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 func (c *migrateInternalModelCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+		return nil, fmt.Errorf("could not determine controller: %v", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
