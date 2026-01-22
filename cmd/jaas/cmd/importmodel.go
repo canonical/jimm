@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/juju/cmd/v3"
@@ -12,7 +13,6 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -83,7 +83,7 @@ func (c *importModelCommand) Init(args []string) error {
 
 	c.req.Controller = args[0]
 	if !names.IsValidModel(args[1]) {
-		return fmt.Errorf("invalid model uuid")
+		return errors.New("invalid model uuid")
 	}
 	c.req.ModelTag = names.NewModelTag(args[1]).String()
 	return nil
@@ -97,12 +97,12 @@ func (c *importModelCommand) Run(ctxt *cmd.Context) error {
 
 	jimmAPI, err := c.jimmAPIFunc()
 	if err != nil {
-		return errors.E(err, "could not create JIMM API client")
+		return fmt.Errorf("could not create JIMM API client: %w", err)
 	}
 	defer jimmAPI.Close()
 
 	if err := jimmAPI.ImportModel(&c.req); err != nil {
-		return errors.E(err)
+		return fmt.Errorf("could not import model: %w", err)
 	}
 	return nil
 }
@@ -110,7 +110,7 @@ func (c *importModelCommand) Run(ctxt *cmd.Context) error {
 func (c *importModelCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.ClientStore().CurrentController()
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+		return nil, fmt.Errorf("could not determine controller: %v", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
