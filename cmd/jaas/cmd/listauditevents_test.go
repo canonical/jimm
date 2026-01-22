@@ -27,7 +27,7 @@ func TestListAuditEventsRun_Success(t *testing.T) {
 	cmdMocks.client.EXPECT().
 		FindAuditEvents(gomock.Any()).
 		DoAndReturn(func(req *apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
-			c.Assert(req, qt.Not(qt.IsNil))
+			c.Check(req, qt.Not(qt.IsNil))
 			return expected, nil
 		}).
 		Times(1)
@@ -92,14 +92,14 @@ func TestListAuditEventsRun_FlagsArePassedToAPICorrectly(t *testing.T) {
 	cmdMocks.client.EXPECT().
 		FindAuditEvents(gomock.Any()).
 		DoAndReturn(func(req *apiparams.FindAuditEventsRequest) (apiparams.AuditEvents, error) {
-			c.Assert(req.After, qt.Equals, "2020-01-01T15:00:00Z")
-			c.Assert(req.Before, qt.Equals, "2020-01-02T15:00:00Z")
-			c.Assert(req.UserTag, qt.Equals, "user-alice@canonical.com")
-			c.Assert(req.Method, qt.Equals, "CreateModel")
-			c.Assert(req.Model, qt.Equals, "controller/model")
-			c.Assert(req.Offset, qt.Equals, 7)
-			c.Assert(req.Limit, qt.Equals, 50)
-			c.Assert(req.SortTime, qt.Equals, true)
+			c.Check(req.After, qt.Equals, "2020-01-01T15:00:00Z")
+			c.Check(req.Before, qt.Equals, "2020-01-02T15:00:00Z")
+			c.Check(req.UserTag, qt.Equals, "user-alice@canonical.com")
+			c.Check(req.Method, qt.Equals, "CreateModel")
+			c.Check(req.Model, qt.Equals, "controller/model")
+			c.Check(req.Offset, qt.Equals, 7)
+			c.Check(req.Limit, qt.Equals, 50)
+			c.Check(req.SortTime, qt.Equals, true)
 			return apiparams.AuditEvents{Events: []apiparams.AuditEvent{}}, nil
 		}).
 		Times(1)

@@ -117,7 +117,7 @@ func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
 func (c *listAuditEventsCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine controller: %v", err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
