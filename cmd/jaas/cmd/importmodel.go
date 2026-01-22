@@ -110,7 +110,7 @@ func (c *importModelCommand) Run(ctxt *cmd.Context) error {
 func (c *importModelCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.ClientStore().CurrentController()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine controller: %v", err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
