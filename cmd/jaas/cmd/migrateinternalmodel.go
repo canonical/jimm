@@ -111,12 +111,12 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 	req := apiparams.MigrateModelRequest{Specs: specs}
 	events, err := jimmAPI.MigrateModel(&req)
 	if err != nil {
-		return err
+		return errors.E(fmt.Errorf("could not migrate models: %v", err))
 	}
 
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return err
+		return errors.E(fmt.Errorf("could not write output: %v", err))
 	}
 	return nil
 }
