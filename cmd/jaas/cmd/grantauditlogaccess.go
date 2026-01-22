@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/juju/cmd/v3"
@@ -12,7 +13,6 @@ import (
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -67,16 +67,16 @@ func (c *grantAuditLogAccessCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *grantAuditLogAccessCommand) Init(args []string) error {
 	if len(args) == 0 {
-		return errors.E("missing username")
+		return errors.New("missing username")
 	}
 
 	c.username, args = args[0], args[1:]
 	if len(args) > 0 {
-		return errors.E("unknown arguments")
+		return errors.New("unknown arguments")
 	}
 
 	if !names.IsValidUser(c.username) {
-		return errors.E("invalid username")
+		return errors.New("invalid username")
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (c *grantAuditLogAccessCommand) Run(ctxt *cmd.Context) error {
 		UserTag: names.NewUserTag(c.username).String(),
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -106,7 +106,7 @@ func (c *grantAuditLogAccessCommand) Run(ctxt *cmd.Context) error {
 func (c *grantAuditLogAccessCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("could not determine controller: %v", err))
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
