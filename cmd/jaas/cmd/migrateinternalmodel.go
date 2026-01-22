@@ -100,7 +100,7 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 
 	jimmAPI, err := c.jimmAPIFunc()
 	if err != nil {
-		return fmt.Errorf("could not create JIMM API client: %v", err)
+		return fmt.Errorf("could not create JIMM API client: %w", err)
 	}
 	defer jimmAPI.Close()
 
@@ -111,12 +111,12 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 	req := apiparams.MigrateModelRequest{Specs: specs}
 	events, err := jimmAPI.MigrateModel(&req)
 	if err != nil {
-		return fmt.Errorf("could not migrate models: %v", err)
+		return fmt.Errorf("could not migrate models: %w", err)
 	}
 
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return fmt.Errorf("could not write output: %v", err)
+		return fmt.Errorf("could not write output: %w", err)
 	}
 	return nil
 }
@@ -124,7 +124,7 @@ func (c *migrateInternalModelCommand) Run(ctxt *cmd.Context) error {
 func (c *migrateInternalModelCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine controller: %v", err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
