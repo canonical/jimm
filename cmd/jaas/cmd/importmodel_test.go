@@ -70,9 +70,6 @@ func TestImportModelRun_PassesRequestToAPI(t *testing.T) {
 		},
 	}
 
-	fs := gnuflag.NewFlagSet("test", gnuflag.ContinueOnError)
-	command.SetFlags(fs)
-
 	err := cmdtesting.InitCommand(command, []string{"controller-1", modelUUID, "--owner", "alice@canonical.com"})
 	c.Assert(err, qt.IsNil)
 
