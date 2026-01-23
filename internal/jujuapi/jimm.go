@@ -662,7 +662,7 @@ func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.Bo
 		CloudNameAndRegion: cloudNameAndRegion,
 		ControllerName:     req.ControllerName,
 
-		PersonalCloud: cloudFromParams(req.CloudName, req.Cloud),
+		Cloud: cloudFromParams(req.CloudName, req.Cloud),
 		CloudCred: cloud.NewNamedCredential(
 			"bootstrap-credential",
 			cloud.AuthType(req.Credential.AuthType),

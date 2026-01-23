@@ -363,7 +363,7 @@ func TestUpgradeTo_Success(t *testing.T) {
 			c.Assert(params.CLIVersion, qt.Equals, targetVersion.String())
 			c.Assert(params.CloudNameAndRegion, qt.Equals, "aws/us-east-1")
 			c.Assert(regexp.MustCompile(`^controller-\d+$`).MatchString(newControllerName), qt.IsTrue)
-			c.Assert(params.PersonalCloud.Name, qt.Equals, "aws")
+			c.Assert(params.Cloud.Name, qt.Equals, "aws")
 			return "550e8400-e29b-41d4-a716-446655440000", nil
 		})
 

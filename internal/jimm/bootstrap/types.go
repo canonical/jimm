@@ -20,8 +20,7 @@ type BootstrapParams struct {
 	ControllerName     string
 
 	CloudCred jujucloud.Credential
-	// PersonalCloud is the cloud-definition for a non-public cloud.
-	PersonalCloud jujucloud.Cloud
+	Cloud     jujucloud.Cloud
 
 	UserConfig map[string]string
 }

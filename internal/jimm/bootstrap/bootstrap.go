@@ -261,7 +261,7 @@ func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 				CloudNameAndRegion: params.CloudNameAndRegion,
 				ControllerName:     params.ControllerName,
 				CloudCred:          params.CloudCred,
-				PersonalCloud:      params.PersonalCloud,
+				Cloud:              params.Cloud,
 				// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
 				LoginTokenRefreshURL: b.jimmWellknownJWKSEndpoint,
 				// User defined config
@@ -340,9 +340,9 @@ type JobParams struct {
 	ControllerName     string
 	AgentVersion       string
 	CloudCred          jujucloud.Credential
-	// PersonalCloud is the personally defined cloud. Only necessary if the cloud is not a public
-	// cloud.
-	PersonalCloud jujucloud.Cloud
+	// Cloud contains the definition of the cloud e.g. endpoints, regions, TLS config.
+	// It only needs to be set if the cloud is not a public cloud (e.g. not AWS, Azure, etc).
+	Cloud jujucloud.Cloud
 
 	// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
 
@@ -457,7 +457,7 @@ func (b *bootstrapManager) runBootstrap(
 			ControllerName:       p.ControllerName,
 			AgentVersion:         p.AgentVersion,
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
-			PersonalCloud:        p.PersonalCloud,
+			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
 			UserConfig:           p.UserConfig,
 		},

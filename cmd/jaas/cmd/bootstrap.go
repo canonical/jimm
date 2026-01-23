@@ -135,8 +135,6 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.Var(&c.config, "config",
 		"Specify a configuration file, or one or more configuration options.\n    (`--config config.yaml [--config key=value ...])`")
 	f.BoolVar(&c.detach, "detach", false, "If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete.")
-	// TODO(ale8k): Support passing cloud & cloudcredential files, for now we're looking up clouds and credentials added to the store.
-	// See cmd/juju/cloud/add.go L311 on a nice way to do this and credential will be somewhere in there too.
 }
 
 // Info implements modelcmd.Command.
@@ -157,6 +155,20 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	bootstrapCloud, err := jujucloud.CloudByName(c.cloud)
 	if err != nil {
 		return fmt.Errorf("failed to get cloud %q: %w", c.cloud, err)
+	}
+
+	// If the cloud is a public cloud (AWS, Azure, etc), we clear bootstrapCloud to avoid sending
+	// unnecessary info, letting the server decide the cloud endpoints, etc.
+	// Regardless, the server uses its own cloud definition if it identifies the cloud is a public cloud.
+	publicClouds, _, err := jujucloud.PublicCloudMetadata(jujucloud.JujuPublicCloudsPath())
+	if err != nil {
+		return fmt.Errorf("failed to get public cloud metadata: %w", err)
+	}
+	for name := range publicClouds {
+		if name == c.cloud {
+			bootstrapCloud = nil
+			break
+		}
 	}
 
 	cloudCreds, err := c.ClientStore().CredentialForCloud(c.cloud)
@@ -210,7 +222,7 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		RegionName:        c.region,
 		ControllerName:    c.controllerName,
 		ControllerVersion: c.controllerVersion,
-		Cloud:             cloudToParams(*bootstrapCloud),
+		Cloud:             cloudToParams(bootstrapCloud),
 		Credential: jujuparams.CloudCredential{
 			Attributes: bootstrapCred.Attributes(),
 			AuthType:   string(bootstrapCred.AuthType()),
@@ -284,7 +296,10 @@ func (c *bootstrapCommand) newClient() (JIMMAPI, error) {
 
 // CloudToParams converts a jujucloud.Cloud to a jujuparams.Cloud.
 // Copied from api/client/cloud/cloud.go.
-func cloudToParams(cloud jujucloud.Cloud) jujuparams.Cloud {
+func cloudToParams(cloud *jujucloud.Cloud) jujuparams.Cloud {
+	if cloud == nil {
+		return jujuparams.Cloud{}
+	}
 	authTypes := make([]string, len(cloud.AuthTypes))
 	for i, authType := range cloud.AuthTypes {
 		authTypes[i] = string(authType)

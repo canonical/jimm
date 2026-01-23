@@ -5,14 +5,14 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/gnuflag"
 	jujucloud "github.com/juju/juju/cloud"
-	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/juju/osenv"
 	"github.com/juju/juju/jujuclient/jujuclienttesting"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"go.uber.org/mock/gomock"
@@ -79,11 +79,70 @@ func TestBootstrapArgParsing(t *testing.T) {
 	}
 }
 
-func TestBootstrapRunDetached(t *testing.T) {
+func TestBootstrapWithPublicCloud(t *testing.T) {
 	c := qt.New(t)
 	s := setupCmdMocks(c)
 
 	cloudName := "aws"
+
+	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
+	}, nil)
+
+	s.client.EXPECT().StartBootstrapJob(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartJobResponse, error) {
+		// If the cloud is public, the Cloud field should be empty.
+		c.Check(bsp.Cloud, qt.DeepEquals, jujuparams.Cloud{})
+		return &params.StartJobResponse{JobID: "test-job-id"}, nil
+	})
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &bootstrapCommand{
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	command.SetClientStore(s.store)
+
+	initCommand(c, command,
+		fmt.Sprintf("%s/region", cloudName),
+		"controller-name",
+		"controller-version",
+		"--detach",
+	)
+
+	ctx := newTestContext(c)
+	mcmd := modelcmd.WrapBase(command)
+	err := mcmd.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+// TestBootstrapApiParams verifies that the parameters passed to the
+// Bootstrap API are correctly constructed from the command line arguments.
+// It also uses a personal cloud to verify that the cloud params are set correctly.
+func TestBootstrapApiParams(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(c)
+
+	// Override the Juju data dir to a temp dir. The cloud-related operations
+	// are not available on the store interface.
+	tmpJujuDir := t.TempDir()
+	defer os.RemoveAll(tmpJujuDir)
+	oldJujuDir := osenv.SetJujuXDGDataHome(tmpJujuDir)
+	defer osenv.SetJujuXDGDataHome(oldJujuDir)
+
+	cloudName := "my-cloud"
+	personalCloud := jujucloud.Cloud{
+		Name:      cloudName,
+		Type:      "openstack",
+		AuthTypes: jujucloud.AuthTypes{jujucloud.UserPassAuthType},
+		Endpoint:  "some-endpoint",
+	}
+	err := jujucloud.WritePersonalCloudMetadata(map[string]jujucloud.Cloud{
+		cloudName: personalCloud,
+	})
+	c.Assert(err, qt.IsNil)
 
 	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
@@ -95,7 +154,12 @@ func TestBootstrapRunDetached(t *testing.T) {
 			ControllerName: "controller-name",
 			CloudName:      cloudName,
 			RegionName:     "region",
-			Cloud:          jujuparams.Cloud{},
+			Cloud: jujuparams.Cloud{
+				Type:      "openstack",
+				AuthTypes: []string{string(jujucloud.UserPassAuthType)},
+				Endpoint:  "some-endpoint",
+				Regions:   []jujuparams.CloudRegion{},
+			},
 			Credential: jujuparams.CloudCredential{
 				AuthType:   string(jujucloud.UserPassAuthType),
 				Attributes: map[string]string{},
@@ -106,15 +170,13 @@ func TestBootstrapRunDetached(t *testing.T) {
 			},
 			ControllerVersion: "controller-version",
 		}
-		c.Assert(bsp.ControllerName, qt.Equals, expected.ControllerName)
-		c.Assert(bsp.CloudName, qt.Equals, expected.CloudName)
-		c.Assert(bsp.RegionName, qt.Equals, expected.RegionName)
-		// AWS is dynamically populated, i.e., 32 regions.
-		// So we expect just ec2 and it should be ok.
-		c.Assert(bsp.Cloud.Type, qt.Equals, "ec2")
-		c.Assert(bsp.Credential, qt.DeepEquals, expected.Credential)
-		c.Assert(bsp.Config, qt.DeepEquals, expected.Config)
-		c.Assert(bsp.ControllerVersion, qt.Equals, expected.ControllerVersion)
+		c.Check(bsp.ControllerName, qt.Equals, expected.ControllerName)
+		c.Check(bsp.CloudName, qt.Equals, expected.CloudName)
+		c.Check(bsp.RegionName, qt.Equals, expected.RegionName)
+		c.Check(bsp.Cloud, qt.DeepEquals, expected.Cloud)
+		c.Check(bsp.Credential, qt.DeepEquals, expected.Credential)
+		c.Check(bsp.Config, qt.DeepEquals, expected.Config)
+		c.Check(bsp.ControllerVersion, qt.Equals, expected.ControllerVersion)
 
 		return &params.StartJobResponse{
 			JobID: "test-job-id",
@@ -129,24 +191,56 @@ func TestBootstrapRunDetached(t *testing.T) {
 	}
 	command.SetClientStore(s.store)
 
-	configOpts := common.ConfigFlag{}
-	err := configOpts.Set("bootstrap-timeout=60")
-	c.Assert(err, qt.IsNil)
-	err = configOpts.Set("string-option=value")
-	c.Assert(err, qt.IsNil)
-
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	command.SetFlags(f)
-	command.controllerName = "controller-name"
-	command.cloud = cloudName
-	command.region = "region"
-	command.controllerVersion = "controller-version"
-	command.config = configOpts
-	command.detach = true
+	initCommand(c, command,
+		fmt.Sprintf("%s/region", cloudName),
+		"controller-name",
+		"controller-version",
+		"--detach",
+		"--config", "bootstrap-timeout=60",
+		"--config", "string-option=value",
+	)
 
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)
 	err = mcmd.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestBootstrapRunDetached(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(c)
+
+	cloudName := "aws"
+
+	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
+	}, nil)
+	s.client.EXPECT().StartBootstrapJob(gomock.Any()).Return(&params.StartJobResponse{
+		JobID: "test-job-id",
+	}, nil)
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &bootstrapCommand{
+		bootstrapAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	command.SetClientStore(s.store)
+
+	initCommand(c, command,
+		fmt.Sprintf("%s/region", cloudName),
+		"controller-name",
+		"controller-version",
+		"--detach",
+		"--config", "bootstrap-timeout=60",
+		"--config", "string-option=value",
+	)
+
+	ctx := newTestContext(c)
+	mcmd := modelcmd.WrapBase(command)
+	err := mcmd.Run(ctx)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -176,9 +270,12 @@ func TestBootstrapWatchLogs(t *testing.T) {
 		},
 	}
 	command.SetClientStore(s.store)
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	command.SetFlags(f)
-	command.cloud = "aws"
+
+	initCommand(c, command,
+		"aws",
+		"controller-name",
+		"controller-version",
+	)
 
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)
@@ -198,12 +295,12 @@ func TestBootstrapFailsToGetCredential(t *testing.T) {
 		},
 	}
 	command.SetClientStore(s.store)
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	command.SetFlags(f)
-	command.controllerName = "controller-name"
-	command.cloud = "aws" // Need a valid cloud to reach credential error.
-	command.region = "region"
-	command.controllerVersion = "controller-version"
+
+	initCommand(c, command,
+		"aws/region",
+		"controller-name",
+		"controller-version",
+	)
 
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)
@@ -228,12 +325,12 @@ func TestBootstrapMultipleCredentials(t *testing.T) {
 		},
 	}
 	command.SetClientStore(s.store)
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	command.SetFlags(f)
-	command.controllerName = "controller-name"
-	command.cloud = "aws" // Need a valid cloud to reach credential error.
-	command.region = "region"
-	command.controllerVersion = "controller-version"
+
+	initCommand(c, command,
+		"aws/region",
+		"controller-name",
+		"controller-version",
+	)
 
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)
@@ -241,7 +338,12 @@ func TestBootstrapMultipleCredentials(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `multiple credentials found for cloud "aws", please set a default or specify one using --credential`)
 
 	// Now specify a credential and verify the command works.
-	command.credentialName = "cred-2"
+	initCommand(c, command,
+		"aws/region",
+		"controller-name",
+		"controller-version",
+		"--credential", "cred-2",
+	)
 
 	s.client.EXPECT().StartBootstrapJob(gomock.Any()).Return(&params.StartJobResponse{
 		JobID: "test-job-id",
@@ -281,13 +383,13 @@ func TestBootstrapWithDefaultCredential(t *testing.T) {
 		},
 	}
 	command.SetClientStore(s.store)
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	command.SetFlags(f)
-	command.controllerName = "controller-name"
-	command.cloud = cloudName
-	command.region = "region"
-	command.controllerVersion = "controller-version"
-	command.detach = true
+
+	initCommand(c, command,
+		fmt.Sprintf("%s/region", cloudName),
+		"controller-name",
+		"controller-version",
+		"--detach",
+	)
 
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)
@@ -315,14 +417,14 @@ func TestBootstrapSpecifiedCredentialWithDefault(t *testing.T) {
 		},
 	}
 	command.SetClientStore(s.store)
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	command.SetFlags(f)
-	command.controllerName = "controller-name"
-	command.cloud = cloudName
-	command.region = "region"
-	command.controllerVersion = "controller-version"
-	command.detach = true
-	command.credentialName = "cred-3" // Use a different credential than the default.
+
+	initCommand(c, command,
+		fmt.Sprintf("%s/region", cloudName),
+		"controller-name",
+		"controller-version",
+		"--detach",
+		"--credential", "cred-3",
+	)
 
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)

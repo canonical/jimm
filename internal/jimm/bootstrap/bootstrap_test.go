@@ -48,8 +48,8 @@ var (
 		ControllerName:     "a",
 		AgentVersion:       "3.6.3",
 
-		CloudCred:     jujucloud.Credential{},
-		PersonalCloud: jujucloud.Cloud{},
+		CloudCred: jujucloud.Credential{},
+		Cloud:     jujucloud.Cloud{},
 
 		LoginTokenRefreshURL: loginTokenRefreshURLParam,
 	}
@@ -403,7 +403,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -671,7 +671,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorFails(c *qt.C) {
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -744,7 +744,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -824,7 +824,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -942,7 +942,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -1060,7 +1060,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -1198,7 +1198,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).Return(
@@ -1332,7 +1332,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 			ControllerName:       jobParams.ControllerName,
 			AgentVersion:         jobParams.AgentVersion,
 			DefaultLoginTokenURL: jobParams.LoginTokenRefreshURL,
-			PersonalCloud:        jobParams.PersonalCloud,
+			Cloud:                jobParams.Cloud,
 			CloudCred:            jobParams.CloudCred,
 		},
 	).DoAndReturn(func(ctx context.Context, bcp jujucommands.BootstrapCmdParams) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error) {

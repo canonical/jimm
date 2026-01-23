@@ -186,7 +186,7 @@ func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User
 		CloudNameAndRegion: params.CloudNameAndRegion,
 		ControllerName:     params.ControllerName,
 		CloudCred:          params.CloudCred,
-		PersonalCloud:      params.PersonalCloud,
+		Cloud:              params.Cloud,
 		UserConfig:         params.UserConfig,
 	})
 	if err != nil {
@@ -383,9 +383,7 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 		CloudCred:          bsCredential,
 	}
 
-	// TODO: Check if it is public cloud here and set PersonalCloud accordingly.
-	// For now, we're always setting it.
-	cloneParams.PersonalCloud = bsCloud
+	cloneParams.Cloud = bsCloud
 
 	// TODO: If K8S, override CloudNameAndRegion with HostCloudRegion from controller model summary.
 

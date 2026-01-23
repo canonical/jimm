@@ -168,7 +168,7 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_RunBootstrapCmd_PersonalCloud
 		AgentVersion:         "1.1.1",
 		DefaultLoginTokenURL: "myurl.com",
 
-		PersonalCloud: jujucloud.Cloud{
+		Cloud: jujucloud.Cloud{
 			Type: "lxd",
 			AuthTypes: jujucloud.AuthTypes{
 				jujucloud.CertificateAuthType,

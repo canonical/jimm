@@ -32,8 +32,9 @@ type BootstrapCmdParams struct {
 
 	// Additional args required (like adding credential, cloud, etc.) but JIMM will handle.
 
-	// May be left unset, if set, a personal cloud will be created and used for bootstrap.
-	PersonalCloud jujucloud.Cloud
+	// Cloud contains the details for the cloud.
+	// Only expected to be set if the cloud is not a public cloud (i.e. not AWS, Azure, etc).
+	Cloud jujucloud.Cloud
 	// The credential to use for the cloud.
 	CloudCred jujucloud.Credential
 
@@ -133,7 +134,6 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	osenv.SetJujuXDGDataHome(dataDir)
 
 	// Update public clouds
-	// TODO: Move this command to it's own file.
 	outputCh, err := c.runner.RunJujuCmd(ctx, []string{"update-public-clouds", "--client"})
 	if err != nil {
 		return nil, nil, nil, err
@@ -147,16 +147,17 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 
 	store := jujuclient.NewFileClientStore()
 
-	// Check if we can get the cloud as a public cloud.
+	// If a cloud is not known to Juju i.e. clouds besides AWS, Azure, GCP, etc.,
+	// then we need to create a cloud entry on disk with information on how
+	// to reach the cloud, its regions, etc.
 	cloudName, regionName := splitCloudNameAndRegion(p.CloudNameAndRegion)
 	isAPublicCloud, err := isAValidPublicCloud(cloudName, regionName)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	if !isAPublicCloud {
-		// We presume it is a personal cloud
 		if err := jujucloud.WritePersonalCloudMetadata(map[string]jujucloud.Cloud{
-			cloudName: p.PersonalCloud,
+			cloudName: p.Cloud,
 		}); err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to write personal cloud: %w", err)
 		}
@@ -167,9 +168,6 @@ func (c *bootstrapCmd) Run(ctx context.Context, p BootstrapCmdParams) (<-chan Ou
 	// We only accept a single credential for bootstrapping.
 	cloudCred := jujucloud.CloudCredential{
 		AuthCredentials: map[string]jujucloud.Credential{
-			// TODO: Keying the credential by name is one means to ensure the
-			// credential is correctly passed and as we're using a single credential,
-			// this is OK. Ideally we should key it on name.
 			cloudName: p.CloudCred,
 		},
 	}
