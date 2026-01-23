@@ -1,20 +1,103 @@
 (jaas-security-overview)=
-# Security overview
+# JAAS security
 
 This document provides an overview of JAAS security measures, focusing on areas related to
 sensitive data storage, transmission, and cryptographic technologies.
 
-## Cloud Credentials
+## Authentication
 
-Cloud credentials are API keys used by Juju/JAAS to provision cloud infrastructure.
-These credentials are securely uploaded to and stored by JAAS.
-When a model is created, the key is passed to the Juju controller to manage cloud resources.
+### OIDC
 
-User-provided cloud credentials are stored securely in a [Vault](https://www.vaultproject.io/),
-a tool for managing secrets. Ensuring the secure handling of these credentials is essential
-to prevent unauthorised access or data breaches.
+In the case of a user authenticating with a JIMM controller, JAAS supports [OAuth 2.0 and OpenID Connect (OIDC)](https://developer.okta.com/docs/concepts/oauth-openid/) through an external identity provider. The recommended external identity provier is the [Canonical identity platform](https://charmhub.io/topics/canonical-identity-platform).
 
-Vault encrypts credentials at rest and provides mechanisms to prevent unauthorised access.
+The following Go packages are used:
+
+- `golang.org/x/oauth2`
+- `golang.org/x/oauth2/clientcredentials`
+- `github.com/coreos/go-oidc/v3/oidc`
+
+> See more: {ref}`jaas-authentication`
+
+### CORS
+For user authentication with a JIMM controller via the Juju dashboard, JAAS uses Cross-Origin Resource Sharing (CORS).
+
+CORS is a browser security feature designed to prevent
+malicious use of your online credentials. Read more about CORS
+[here](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#what_requests_use_cors).
+
+JAAS supports the use of CORS headers specifically for the Juju dashboard. The dashboard
+requires the ability to send cross-origin requests from the domain where it is hosted to
+the domain where JAAS is hosted. More information on how to set up CORS to securely handle
+these requests will be available in a future how-to guide.
+
+<!-- TODO(Kian): update the above paragraph after we have a deploy dashboard how-to.-->
+
+The following Go package is used to validate CORS requests:
+
+- `github.com/rs/cors`
+
+### Macaroons
+
+In the case of a controller authenticating with another controller on behalf of a user for the purpose of reading or consuming an offer, JAAS uses macaroons.
+
+Macaroons are a tool for decentralised authentication similar to JSON Web Tokens.
+The [Go Macaroon package](https://pkg.go.dev/gopkg.in/macaroon.v2@v2.1.0) is used by JAAS and has more
+details on the low-level operations that Macaroons are capable of.
+
+Macaroons are used by Juju for various purposes but in JAAS their primary purpose is for authorising
+cross-model relations between controllers. When two Juju controllers (that are connected to JAAS)
+communicate for the purposes of sharing an application offer, JAAS acts as the source of truth for
+authorisation data. These checks are handled using macaroons.
+
+Macaroons use a combination of HMAC for cryptographic signatures and symmetric encryption to encode
+the scope (or caveats) of what a macaroon is entitled to.
+
+These operations are performed using `HMAC-SHA256` and `XSalsa20-Poly1305`. The following Go
+packages are used by the underlying macaroon package for these operations:
+
+```{tip}
+For those new to Go, the `crypto/hmac` and `crypto/sha256` packages below are included in the Go standard library.
+```
+
+- `crypto/hmac`
+- `crypto/sha256`
+- `golang.org/x/crypto/nacl/secretbox`
+
+Additionally, the higher-level [Macaroon Bakery package](https://github.com/go-macaroon-bakery/macaroon-bakery)
+is used to interface with macaroons and introduces public key cryptography to perform similar operations
+as mentioned above. This allows services to trust macaroons generated externally.
+
+These operations are performed using `Ed25519` and `XSalsa20-Poly1305`. The following Go packages are
+used by the underlying macaroon bakery package for these operations:
+
+- `golang.org/x/crypto/nacl/box`
+- `golang.org/x/crypto/curve25519`
+
+When a Juju controller is connected to JAAS, the `login-token-refresh-url` is used to determine where
+the JAAS macaroon public key is located. This public key is used when Juju controllers issue macaroons
+and enforces that the macaroon can only be  discharged by JAAS, who holds the private key. Discharging
+a macaroon refers to the process of verifying its claims.
+
+Specific details are below:
+
+- **Macaroon Public Key endpoint:** `<jimm-url>/macaroons/publickey`
+- **Key Type:** Ed25519 (256-bit key)
+- **Signing algorithm:** Ed25519
+
+### JWTs
+
+Trust between Juju controllers and JAAS is established through asymmetric cryptography
+and [JSON Web Tokens (JWTs)](https://jwt.io/introduction).
+
+## Authorisation
+
+For authorisation, JAAS supports Relation-Based Access Control (ReBAC) with [OpenFGA](https://openfga.dev/).
+
+> See more: {ref}`jaas-authorization`
+
+## Secure secret storage
+
+For secure storage of cloud credentials, credentials for authentication with a uju controller, and JWKS, JAAS supports [Vault](https://www.vaultproject.io/).
 
 ## JAAS - Juju Communication
 
@@ -105,17 +188,6 @@ The following Go packages are used:
 - `github.com/gorilla/sessions`
 - `github.com/antonlindstrom/pgstore`
 
-## OIDC Authentication
-
-JAAS uses OAuth 2.0 and OpenID Connect (OIDC) for user authentication.
-You can learn more from this [overview](https://developer.okta.com/docs/concepts/oauth-openid/).
-
-The following Go packages are used:
-
-- `golang.org/x/oauth2`
-- `golang.org/x/oauth2/clientcredentials`
-- `github.com/coreos/go-oidc/v3/oidc`
-
 ### Authorisation Code Flow
 
 In a browser-based login, users follow the [authorisation code flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow).
@@ -142,52 +214,6 @@ A good example of this includes the Juju Terraform Provider where the client-cre
 
 This scheme simplifies authentication for client applications but is only possible since JAAS is a trusted
 application in the system.
-
-## Macaroons & Offer Authentication
-
-Macaroons are a tool for decentralised authentication similar to JSON Web Tokens.
-The [Go Macaroon package](https://pkg.go.dev/gopkg.in/macaroon.v2@v2.1.0) is used by JAAS and has more
-details on the low-level operations that Macaroons are capable of.
-
-Macaroons are used by Juju for various purposes but in JAAS their primary purpose is for authorising
-cross-model relations between controllers. When two Juju controllers (that are connected to JAAS)
-communicate for the purposes of sharing an application offer, JAAS acts as the source of truth for
-authorisation data. These checks are handled using macaroons.
-
-Macaroons use a combination of HMAC for cryptographic signatures and symmetric encryption to encode
-the scope (or caveats) of what a macaroon is entitled to.
-
-These operations are performed using `HMAC-SHA256` and `XSalsa20-Poly1305`. The following Go
-packages are used by the underlying macaroon package for these operations:
-
-```{tip}
-For those new to Go, the `crypto/hmac` and `crypto/sha256` packages below are included in the Go standard library.
-```
-
-- `crypto/hmac`
-- `crypto/sha256`
-- `golang.org/x/crypto/nacl/secretbox`
-
-Additionally, the higher-level [Macaroon Bakery package](https://github.com/go-macaroon-bakery/macaroon-bakery)
-is used to interface with macaroons and introduces public key cryptography to perform similar operations
-as mentioned above. This allows services to trust macaroons generated externally.
-
-These operations are performed using `Ed25519` and `XSalsa20-Poly1305`. The following Go packages are
-used by the underlying macaroon bakery package for these operations:
-
-- `golang.org/x/crypto/nacl/box`
-- `golang.org/x/crypto/curve25519`
-
-When a Juju controller is connected to JAAS, the `login-token-refresh-url` is used to determine where
-the JAAS macaroon public key is located. This public key is used when Juju controllers issue macaroons
-and enforces that the macaroon can only be  discharged by JAAS, who holds the private key. Discharging
-a macaroon refers to the process of verifying its claims.
-
-Specific details are below:
-
-- **Macaroon Public Key endpoint:** `<jimm-url>/macaroons/publickey`
-- **Key Type:** Ed25519 (256-bit key)
-- **Signing algorithm:** Ed25519
 
 ## TLS Communication
 
@@ -218,19 +244,7 @@ JAAS does not enforce TLS when communicating with PostgreSQL, but
 it can be enabled when using the PostgreSQL charm.
 TLS is not enabled by default.
 
-## CORS
+## Auditing and logging
 
-CORS or Cross-Origin Resource Sharing is a browser security feature designed to prevent
-malicious use of your online credentials. Read more about CORS
-[here](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#what_requests_use_cors).
-
-JAAS supports the use of CORS headers specifically for the Juju dashboard. The dashboard
-requires the ability to send cross-origin requests from the domain where it is hosted to
-the domain where JAAS is hosted. More information on how to set up CORS to securely handle
-these requests will be available in a future how-to guide.
-
-<!-- TODO(Kian): update the above paragraph after we have a deploy dashboard how-to.-->
-
-The following Go package is used to validate CORS requests:
-
-- `github.com/rs/cors`
+JAAS provides audit logs of all access to each model managed by JAAS, including information on which user
+performed the action. Currently, JAAS does not provide a way to view the logs of applications within models.
