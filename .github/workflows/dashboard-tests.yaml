@@ -71,7 +71,7 @@ jobs:
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run integration tests
-        uses: canonical/juju-dashboard/.github/actions/run-playwright@5fdd04eb8129d2602d326c322ef2ad918393c858
+        uses: canonical/juju-dashboard/.github/actions/run-playwright@d0c450599a13854d72cbfc4609d906d27800f38b
         with:
           test-identifier: e2e-jimm-docker-keycloak
         env:

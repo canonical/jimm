@@ -3,15 +3,16 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -32,6 +33,7 @@ func NewGrantAuditLogAccessCommand() cmd.Command {
 	cmd := &grantAuditLogAccessCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.jimmAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -41,9 +43,10 @@ func NewGrantAuditLogAccessCommand() cmd.Command {
 type grantAuditLogAccessCommand struct {
 	modelcmd.ControllerCommandBase
 
-	store    jujuclient.ClientStore
-	dialOpts *jujuapi.DialOpts
 	username string
+
+	store       jujuclient.ClientStore
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 func (c *grantAuditLogAccessCommand) Info() *cmd.Info {
@@ -64,35 +67,52 @@ func (c *grantAuditLogAccessCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *grantAuditLogAccessCommand) Init(args []string) error {
 	if len(args) == 0 {
-		return errors.E("missing username")
+		return errors.New("missing username")
 	}
+
 	c.username, args = args[0], args[1:]
 	if len(args) > 0 {
-		return errors.E("unknown arguments")
+		return errors.New("unknown arguments")
+	}
+
+	if !names.IsValidUser(c.username) {
+		return fmt.Errorf("invalid username %q", c.username)
 	}
 	return nil
 }
 
 // Run implements Command.Run.
 func (c *grantAuditLogAccessCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine controller")
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	userTag := names.NewUserTag(c.username)
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	api, err := c.jimmAPIFunc()
+	if err != nil {
+		return err
+	}
+	defer api.Close()
+
+	err = api.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag(c.username).String(),
+	})
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(apiCaller)
-	err = client.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
-		UserTag: userTag.String(),
-	})
+	return nil
+}
+
+func (c *grantAuditLogAccessCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
 	if err != nil {
-		return errors.E(err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
-	return nil
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

@@ -23,8 +23,7 @@ type AccessResult = accessResult
 
 func NewListControllersCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &listControllersCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
+		store: store,
 	}
 
 	return modelcmd.WrapBase(cmd)
@@ -39,26 +38,8 @@ func NewModelStatusCommandForTesting(store jujuclient.ClientStore, lp jujuapi.Lo
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewGrantAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &grantAuditLogAccessCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &revokeAuditLogAccessCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewListAuditEventsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &listAuditEventsCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}
@@ -219,15 +200,6 @@ func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, lp jujuap
 
 func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &purgeLogsCommand{
-		store:    store,
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
-func NewMigrateInternalModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &migrateInternalModelCommand{
 		store:    store,
 		dialOpts: cmdtest.TestDialOpts(lp),
 	}

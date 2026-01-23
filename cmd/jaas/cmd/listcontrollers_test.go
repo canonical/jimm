@@ -1,76 +1,103 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"github.com/juju/cmd/v3/cmdtesting"
-	gc "gopkg.in/check.v1"
+	"bytes"
+	"testing"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	qt "github.com/frankban/quicktest"
+	jujuparams "github.com/juju/juju/rpc/params"
+	"gopkg.in/yaml.v2"
+
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-var (
-	expectedSuperuserOutput = `- name: controller-1
-  uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
-  publicaddress: ""
-  apiaddresses:
-  - localhost:.*
-  cacertificate: |
-    -----BEGIN CERTIFICATE-----
-    .*
-    -----END CERTIFICATE-----
-  cloudtag: cloud-` + jimmtest.TestCloudName + `
-  cloudregion: ` + jimmtest.TestCloudRegionName + `
-  agentversion: .*
-  status:
-    status: available
-    info: ""
-    data: {}
-    since: null
-- name: controller-1
-  uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
-  publicaddress: ""
-  apiaddresses:
-  - localhost:46539
-  cacertificate: |
-    -----BEGIN CERTIFICATE-----
-    .*
-    -----END CERTIFICATE-----
-  cloudtag: cloud-` + jimmtest.TestCloudName + `
-  cloudregion: ` + jimmtest.TestCloudRegionName + `
-  agentversion: .*
-  status:
-    status: available
-    info: ""
-    data: {}
-    since: null
-`
-)
+func TestListControllersSuperuser(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(t)
 
-type listControllersSuite struct {
-	cmdtest.JimmCmdSuite
+	expectedControllers := []params.ControllerInfo{
+		{
+			Name:          "controller-1",
+			UUID:          "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			PublicAddress: "",
+			APIAddresses:  []string{"localhost:17070"},
+			CACertificate: "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
+			CloudTag:      "cloud-test-cloud",
+			CloudRegion:   "test-region",
+			AgentVersion:  "3.0.0",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+				Info:   "",
+				Data:   map[string]interface{}{},
+			},
+		},
+		{
+			Name:          "controller-2",
+			UUID:          "deadbeef-1bad-500d-9000-4b1d0d06f00d",
+			PublicAddress: "",
+			APIAddresses:  []string{"localhost:46539"},
+			CACertificate: "-----BEGIN CERTIFICATE-----\ntest-cert-2\n-----END CERTIFICATE-----",
+			CloudTag:      "cloud-test-cloud",
+			CloudRegion:   "test-region",
+			AgentVersion:  "3.0.0",
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+				Info:   "",
+				Data:   map[string]interface{}{},
+			},
+		},
+	}
+
+	cmdMocks.client.EXPECT().ListControllers().Return(expectedControllers, nil)
+	cmdMocks.client.EXPECT().Close().Return(nil)
+
+	command := &listControllersCommand{
+		store: cmdMocks.store,
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+
+	initCommand(c, command)
+
+	ctx := newTestContext(t)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	output := ctx.Stdout.(*bytes.Buffer).String()
+	var actual []params.ControllerInfo
+	err = yaml.Unmarshal([]byte(output), &actual)
+	c.Assert(err, qt.IsNil)
+	c.Assert(actual, qt.DeepEquals, expectedControllers)
 }
 
-var _ = gc.Suite(&listControllersSuite{})
+func TestListControllersEmpty(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(t)
 
-func (s *listControllersSuite) TestListControllersSuperuser(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	cmdMocks.client.EXPECT().ListControllers().Return([]params.ControllerInfo{}, nil)
+	cmdMocks.client.EXPECT().Close().Return(nil)
 
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedSuperuserOutput)
-}
+	command := &listControllersCommand{
+		store: cmdMocks.store,
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
 
-func (s *listControllersSuite) TestListControllers(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	initCommand(c, command)
 
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	context, err := cmdtesting.RunCommand(c, cmd.NewListControllersCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, `\[\]\n?`)
+	ctx := newTestContext(t)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	output := ctx.Stdout.(*bytes.Buffer).String()
+	var actual []params.ControllerInfo
+	err = yaml.Unmarshal([]byte(output), &actual)
+	c.Assert(err, qt.IsNil)
+	c.Assert(actual, qt.DeepEquals, []params.ControllerInfo{})
 }

@@ -4,18 +4,17 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/gosuri/uitable"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -37,6 +36,7 @@ func NewListAuditEventsCommand() cmd.Command {
 	cmd := &listAuditEventsCommand{
 		store: jujuclient.NewFileClientStore(),
 	}
+	cmd.jimmAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -47,9 +47,10 @@ type listAuditEventsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	store    jujuclient.ClientStore
-	dialOpts *jujuapi.DialOpts
-	args     apiparams.FindAuditEventsRequest
+	args apiparams.FindAuditEventsRequest
+
+	store       jujuclient.ClientStore
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 func (c *listAuditEventsCommand) Info() *cmd.Info {
@@ -84,40 +85,53 @@ func (c *listAuditEventsCommand) SetFlags(f *gnuflag.FlagSet) {
 // Init implements the cmd.Command interface.
 func (c *listAuditEventsCommand) Init(args []string) error {
 	if len(args) > 0 {
-		return errors.E("unknown arguments")
+		return errors.New("unknown arguments")
 	}
 	return nil
 }
 
 // Run implements Command.Run.
 func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.store.CurrentController()
-	if err != nil {
-		return errors.E(err, "could not determine controller")
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", c.dialOpts)
+	api, err := c.jimmAPIFunc()
+	if err != nil {
+		return err
+	}
+	defer api.Close()
+
+	events, err := api.FindAuditEvents(&c.args)
 	if err != nil {
 		return err
 	}
 
-	client := api.NewClient(apiCaller)
-	events, err := client.FindAuditEvents(&c.args)
-	if err != nil {
-		return errors.E(err)
-	}
-
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
+}
+
+func (c *listAuditEventsCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.store.CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.store, currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }
 
 func formatTabular(writer io.Writer, value interface{}) error {
 	e, ok := value.(apiparams.AuditEvents)
 	if !ok {
-		return errors.E(fmt.Sprintf("expected value of type %T, got %T", e, value))
+		return fmt.Errorf("expected value of type %T, got %T", e, value)
 	}
 
 	table := uitable.New()
@@ -128,11 +142,11 @@ func formatTabular(writer io.Writer, value interface{}) error {
 	for _, event := range e.Events {
 		errorJSON, err := json.Marshal(event.Errors)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		paramsJSON, err := json.Marshal(event.Params)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		table.AddRow(event.Time, event.UserTag, event.Model, event.ConversationId, event.MessageId, event.FacadeMethod, event.IsResponse, string(paramsJSON), string(errorJSON))
 	}
