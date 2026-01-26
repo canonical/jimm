@@ -1,83 +1,61 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"github.com/juju/cmd/v3/cmdtesting"
-	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
+	"bytes"
+	"testing"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
+	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/rpc/params"
+	"go.uber.org/mock/gomock"
+	"gopkg.in/yaml.v3"
+
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-var (
-	expectedModelStatusOutput = `model:
-  name: model-2
-  type: iaas
-  cloudtag: cloud-` + jimmtest.TestCloudName + `
-  cloudregion: ` + jimmtest.TestCloudRegionName + `
-  version: .*
-  availableversion: ""
-  modelstatus:
-    status: available
-    info: ""
-    data: {}
-    since: .*
-    kind: ""
-    version: ""
-    life: ""
-    err: null
-  meterstatus:
-    color: ""
-    message: ""
-  sla: unsupported
-machines: {}
-applications: {}
-remoteapplications: {}
-offers: {}
-relations: \[\]
-controllertimestamp: .*
-branches: {}
-storage: \[\]
-filesystems: \[\]
-volumes: \[\]
-`
-)
+func TestModelStatusSuperuser(t *testing.T) {
+	s := setupCmdMocks(t)
+	c := qt.New(t)
 
-type modelStatusSuite struct {
-	cmdtest.JimmCmdSuite
-}
+	fullStatus := params.FullStatus{
+		Model: params.ModelStatusInfo{
+			CloudTag:    "cloud-" + jimmtest.TestCloudName,
+			CloudRegion: jimmtest.TestCloudRegionName,
+			ModelStatus: params.DetailedStatus{
+				Data: map[string]any{},
+			},
+		},
+		Machines:           map[string]params.MachineStatus{},
+		Applications:       map[string]params.ApplicationStatus{},
+		RemoteApplications: map[string]params.RemoteApplicationStatus{},
+		Offers:             map[string]params.ApplicationOfferStatus{},
+		Branches:           map[string]params.BranchStatus{},
+		Storage:            []params.StorageDetails{},
+		Filesystems:        []params.FilesystemDetails{},
+		Volumes:            []params.VolumeDetails{},
+		Relations:          []params.RelationStatus{},
+	}
 
-var _ = gc.Suite(&modelStatusSuite{})
+	s.client.EXPECT().FullModelStatus(gomock.Any()).
+		Return(fullStatus, nil)
+	s.client.EXPECT().Close()
 
-func (s *modelStatusSuite) TestModelStatusSuperuser(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	statusCmd := &modelStatusCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	initCommand(c, statusCmd, "2cb433a6-04eb-4ec4-9567-90426d20a004")
 
-	s.AddAdminUser(c, "charlie@canonical.com")
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
-	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	ctx := newTestContext(t)
+	err := statusCmd.Run(ctx)
+	c.Assert(err, qt.IsNil)
 
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	context, err := cmdtesting.RunCommand(c, cmd.NewModelStatusCommandForTesting(s.ClientStore(), bClient), mt.Id())
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Matches, expectedModelStatusOutput)
-}
+	res := ctx.Stdout.(*bytes.Buffer).String()
+	gotStatus := params.FullStatus{}
+	err = yaml.Unmarshal([]byte(res), &gotStatus)
+	c.Assert(err, qt.IsNil)
 
-func (s *modelStatusSuite) TestModelStatus(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
-
-	s.AddAdminUser(c, "charlie@canonical.com")
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
-	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewModelStatusCommandForTesting(s.ClientStore(), bClient), mt.Id())
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(gotStatus, qt.DeepEquals, fullStatus)
 }
