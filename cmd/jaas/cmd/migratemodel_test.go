@@ -7,11 +7,13 @@
 package cmd
 
 import (
-	"context"
+	"bytes"
+	"io"
 	"os"
+	"testing"
 
-	"github.com/juju/cmd/v3"
-	"github.com/juju/cmd/v3/cmdtesting"
+	qt "github.com/frankban/quicktest"
+	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	controllerapi "github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/core/crossmodel"
@@ -19,40 +21,24 @@ import (
 	jjclient "github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"go.uber.org/mock/gomock"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/cmd/jaas/cmd/mocks"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-// migrateModelSuite is a test suite for the migrate model command.
-// It does not perform integration tests like other suites because
-// our test suite doesn't support spinning up multiple controllers
-// so this behaviour is tested elsewhere instead.
-type migrateModelSuite struct {
-	jimmClient    *mocks.MockJIMMAPI
-	migrateClient *mocks.MockMigrateAPI
-	writer        *mocks.MockWriter
-	store         *mocks.MockClientStore
+func setupMigrateAPIMock(t *testing.T) *mocks.MockMigrateAPI {
+	ctrl := gomock.NewController(t)
+	t.Cleanup(ctrl.Finish)
+	return mocks.NewMockMigrateAPI(ctrl)
 }
 
-var _ = gc.Suite(&migrateModelSuite{})
+func TestMigrate(t *testing.T) {
+	s := setupCmdMocks(t)
+	migrateClient := setupMigrateAPIMock(t)
+	c := qt.New(t)
 
-func (s *migrateModelSuite) SetupMocks(c *gc.C) *gomock.Controller {
-	ctrl := gomock.NewController(c)
-	s.jimmClient = mocks.NewMockJIMMAPI(ctrl)
-	s.migrateClient = mocks.NewMockMigrateAPI(ctrl)
-	s.writer = mocks.NewMockWriter(ctrl)
-	s.store = mocks.NewMockClientStore(ctrl)
-
-	return ctrl
-}
-
-func (s *migrateModelSuite) TestMigrate(c *gc.C) {
-	defer s.SetupMocks(c).Finish()
-
-	userMappingFile, err := os.CreateTemp(c.MkDir(), "")
-	c.Assert(err, gc.IsNil)
+	userMappingFile, err := os.CreateTemp(c.TempDir(), "")
+	c.Assert(err, qt.IsNil)
 
 	userMapping := `
 # This is a comment
@@ -60,7 +46,7 @@ alice: alice@canonical.com
 bob: bob@canonical.com
 `
 	_, err = userMappingFile.WriteString(userMapping)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 
@@ -69,31 +55,31 @@ bob: bob@canonical.com
 		ModelUUID: testUUID,
 	}, nil)
 
-	s.migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
+	migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Users: []jujuparams.ModelUserInfo{{
 				UserName: "alice",
 			}},
 		}},
 	}, nil)
-	s.migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{{
+	migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{{
 		Users: []crossmodel.OfferUserDetails{
 			{
 				UserName: "bob",
 			},
 		}},
 	}, nil)
-	s.migrateClient.EXPECT().Close().Return(nil)
+	migrateClient.EXPECT().Close().Return(nil)
 
 	prepareMigrateParams := &apiparams.PrepareModelMigrationRequest{
 		BackingControllerName: "backing-controller",
 		UserMapping:           map[string]string{"alice": "alice@canonical.com", "bob": "bob@canonical.com"},
 		ModelTag:              "model-" + testUUID,
 	}
-	s.jimmClient.EXPECT().PrepareModelMigration(prepareMigrateParams).Return(apiparams.PrepareModelMigrationResponse{
+	s.client.EXPECT().PrepareModelMigration(prepareMigrateParams).Return(apiparams.PrepareModelMigrationResponse{
 		Token: "migration-token",
 	}, nil)
-	s.jimmClient.EXPECT().Close().Return(nil)
+	s.client.EXPECT().Close().Return(nil)
 
 	s.store.EXPECT().AccountDetails("target-controller").Return(&jjclient.AccountDetails{
 		User: "test-user",
@@ -114,69 +100,64 @@ bob: bob@canonical.com
 		TargetToken:           "migration-token",
 		TargetUser:            "test-user",
 	}
-	s.migrateClient.EXPECT().InitiateMigration(migrationSpec).Return("migration-id", nil)
-
-	s.writer.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
-		c.Check(string(b), gc.Equals, "migration-id\n")
-		return len(b), nil
-	})
+	migrateClient.EXPECT().InitiateMigration(migrationSpec).Return("migration-id", nil)
 
 	migrateCmd := &migrateModelCommand{
 		jimmAPIFunc: func() (JIMMAPI, error) {
-			return s.jimmClient, nil
+			return s.client, nil
 		},
 		jujuApiFunc: func() (MigrateAPI, error) {
-			return s.migrateClient, nil
+			return migrateClient, nil
 		},
 		store: s.store,
 	}
-	f := gnuflag.NewFlagSet("test", gnuflag.ExitOnError)
-	f.SetOutput(s.writer)
-	migrateCmd.SetFlags(f)
 
-	// Set args after settings flags to avoid resetting them.
-	migrateCmd.targetController = "target-controller"
-	migrateCmd.modelName = "owner/test-model"
-	migrateCmd.backingController = "backing-controller"
-	migrateCmd.userMappingFile = userMappingFile.Name()
+	initCommand(c, migrateCmd, "owner/test-model",
+		"target-controller",
+		"--backing-controller", "backing-controller",
+		"--user-mapping", userMappingFile.Name(),
+	)
 
-	ctx := &cmd.Context{
-		Context: context.Background(),
-		Stdout:  s.writer,
-	}
+	ctx := newTestContext(t)
 	err = migrateCmd.Run(ctx)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
+
+	res := ctx.Stdout.(*bytes.Buffer).String()
+	c.Assert(res, qt.Equals, "migration-id\n")
 }
 
-func (s *migrateModelSuite) TestMigrate_ReadUserMappingFileWithNull(c *gc.C) {
-	userMappingFile, err := os.CreateTemp(c.MkDir(), "")
-	c.Assert(err, gc.IsNil)
+func TestMigrate_ReadUserMappingFileWithNull(t *testing.T) {
+	c := qt.New(t)
+
+	userMappingFile, err := os.CreateTemp(c.TempDir(), "")
+	c.Assert(err, qt.IsNil)
 
 	userMappingContent := `
 alice: alice@canonical.com
 bob: null
 `
 	_, err = userMappingFile.WriteString(userMappingContent)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	migrateCmd := &migrateModelCommand{
 		userMappingFile: userMappingFile.Name(),
 	}
 	userMapping, err := migrateCmd.parseUserMappingFile()
-	c.Assert(err, gc.IsNil)
-	c.Assert(userMapping, gc.HasLen, 2)
-	c.Assert(userMapping["alice"], gc.Equals, "alice@canonical.com")
-	c.Assert(userMapping["bob"], gc.Equals, "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(userMapping, qt.HasLen, 2)
+	c.Assert(userMapping["alice"], qt.Equals, "alice@canonical.com")
+	c.Assert(userMapping["bob"], qt.Equals, "")
 }
 
-func (s *migrateModelSuite) TestValidateUserMapping_SkipUsers(c *gc.C) {
-	defer s.SetupMocks(c).Finish()
+func TestValidateUserMapping_SkipUsers(t *testing.T) {
+	migrateClient := setupMigrateAPIMock(t)
+	c := qt.New(t)
 
 	userMapping := map[string]string{
 		"alice": "alice@canonical.com",
 		"bob":   "",
 	}
-	s.migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
+	migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Users: []jujuparams.ModelUserInfo{
 				{UserName: "alice"},
@@ -184,24 +165,25 @@ func (s *migrateModelSuite) TestValidateUserMapping_SkipUsers(c *gc.C) {
 			},
 		}},
 	}, nil)
-	s.migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{
+	migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{
 		{
 			Users: nil,
 		},
 	}, nil)
 	migrateCmd := &migrateModelCommand{}
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", s.migrateClient)
-	c.Assert(err, gc.IsNil)
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", migrateClient)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *migrateModelSuite) TestValidateUserMapping_HandleEveryoneUser(c *gc.C) {
-	defer s.SetupMocks(c).Finish()
+func TestValidateUserMapping_HandleEveryoneUser(t *testing.T) {
+	migrateClient := setupMigrateAPIMock(t)
+	c := qt.New(t)
 
 	userMapping := map[string]string{
 		"alice": "alice@canonical.com",
 	}
-	s.migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
+	migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Users: []jujuparams.ModelUserInfo{
 				{UserName: "alice"},
@@ -209,7 +191,7 @@ func (s *migrateModelSuite) TestValidateUserMapping_HandleEveryoneUser(c *gc.C) 
 			},
 		}},
 	}, nil)
-	s.migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{{
+	migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{{
 		Users: []crossmodel.OfferUserDetails{
 			{
 				UserName: "everyone@external",
@@ -218,15 +200,16 @@ func (s *migrateModelSuite) TestValidateUserMapping_HandleEveryoneUser(c *gc.C) 
 	}, nil)
 	migrateCmd := &migrateModelCommand{}
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", s.migrateClient)
-	c.Assert(err, gc.IsNil)
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", migrateClient)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *migrateModelSuite) TestValidateUserMapping_MissingUsers(c *gc.C) {
-	defer s.SetupMocks(c).Finish()
+func TestValidateUserMapping_MissingUsers(t *testing.T) {
+	migrateClient := setupMigrateAPIMock(t)
+	c := qt.New(t)
 
 	userMapping := map[string]string{}
-	s.migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
+	migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
 		Result: &jujuparams.ModelInfo{
 			Users: []jujuparams.ModelUserInfo{{
 				UserName: "alice",
@@ -234,7 +217,7 @@ func (s *migrateModelSuite) TestValidateUserMapping_MissingUsers(c *gc.C) {
 			}},
 		}},
 	}, nil)
-	s.migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{
+	migrateClient.EXPECT().ListOffers(gomock.Any()).Return([]*crossmodel.ApplicationOfferDetails{
 		{
 			OfferName: "test-offer",
 			Users: []crossmodel.OfferUserDetails{{
@@ -245,14 +228,15 @@ func (s *migrateModelSuite) TestValidateUserMapping_MissingUsers(c *gc.C) {
 	}, nil)
 	migrateCmd := &migrateModelCommand{}
 	testUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", s.migrateClient)
-	c.Assert(err, gc.ErrorMatches, `(?ms).*^expected user "alice" who has admin access to the model$.*`)
-	c.Assert(err, gc.ErrorMatches, `(?ms).*^expected user "bob" who has consume access to offer "test-offer"$.*`)
+	err := migrateCmd.validateUserMapping(userMapping, testUUID, "user/foo", migrateClient)
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user "alice" who has admin access to the model$.*`)
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user "bob" who has consume access to offer "test-offer"$.*`)
 }
 
-func (s *migrateModelSuite) TestReadUserMapping(c *gc.C) {
-	userMappingFile, err := os.CreateTemp(c.MkDir(), "")
-	c.Assert(err, gc.IsNil)
+func TestReadUserMapping(t *testing.T) {
+	c := qt.New(t)
+	userMappingFile, err := os.CreateTemp(c.TempDir(), "")
+	c.Assert(err, qt.IsNil)
 
 	userMapping := `
 # This is a comment
@@ -260,35 +244,47 @@ alice: alice@canonical.com
 bob: bob@canonical.com
 `
 	_, err = userMappingFile.WriteString(userMapping)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	migrateCmd := &migrateModelCommand{
 		userMappingFile: userMappingFile.Name(),
 	}
 	mapping, err := migrateCmd.parseUserMappingFile()
-	c.Assert(err, gc.IsNil)
-	c.Assert(mapping, gc.DeepEquals, map[string]string{
+	c.Assert(err, qt.IsNil)
+	c.Assert(mapping, qt.DeepEquals, map[string]string{
 		"alice": "alice@canonical.com",
 		"bob":   "bob@canonical.com",
 	})
 }
 
-func (s *migrateModelSuite) TestReadUserMappingFailsWithEmptyYaml(c *gc.C) {
-	userMappingFile, err := os.CreateTemp(c.MkDir(), "")
-	c.Assert(err, gc.IsNil)
+func TestReadUserMappingFailsWithEmptyYaml(t *testing.T) {
+	c := qt.New(t)
+
+	userMappingFile, err := os.CreateTemp(c.TempDir(), "")
+	c.Assert(err, qt.IsNil)
 
 	// Invalid YAML content
 	_, err = userMappingFile.WriteString("")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	migrateCmd := &migrateModelCommand{
 		userMappingFile: userMappingFile.Name(),
 	}
 	_, err = migrateCmd.parseUserMappingFile()
-	c.Assert(err, gc.ErrorMatches, "user mapping file is empty or not properly formatted")
+	c.Assert(err, qt.ErrorMatches, "user mapping file is empty or not properly formatted")
 }
 
-func (s *migrateModelSuite) TestCommandsFailsWithMissingArgs(c *gc.C) {
-	_, err := cmdtesting.RunCommand(c, NewMigrateModelCommandForTesting(jjclient.NewMemStore(), nil), "myController")
-	c.Assert(err, gc.ErrorMatches, "missing controller name and model target arguments")
+func TestCommandsFailsWithMissingArgs(t *testing.T) {
+	c := qt.New(t)
+
+	migrateCmd := &migrateModelCommand{}
+
+	f := gnuflag.NewFlagSetWithFlagKnownAs(migrateCmd.Info().Name, gnuflag.ContinueOnError, jujucmd.FlagAlias(migrateCmd, "flag"))
+	f.SetOutput(io.Discard)
+	migrateCmd.SetFlags(f)
+	err := f.Parse(migrateCmd.AllowInterspersedFlags(), nil)
+	c.Assert(err, qt.IsNil)
+
+	err = migrateCmd.Init(f.Args())
+	c.Assert(err, qt.ErrorMatches, "missing controller name and model target arguments")
 }
