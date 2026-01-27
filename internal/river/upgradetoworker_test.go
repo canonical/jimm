@@ -252,7 +252,10 @@ func setupWorkers(
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(riverClient.Start(ctx), qt.IsNil)
-	c.Cleanup(func() { _ = riverClient.Stop(ctx) })
+	c.Cleanup(func() {
+		err := riverClient.Stop(context.Background())
+		c.Check(err, qt.IsNil)
+	})
 
 	return riverClient, u.Name
 }
