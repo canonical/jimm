@@ -210,3 +210,13 @@ func setupFacades(root *controllerRoot) []jujuparams.FacadeVersions {
 	return facades
 
 }
+
+// SupportedFacades returns a map of all supported facades and their versions.
+func SupportedFacades() map[string][]int {
+	r := &controllerRoot{}
+	supported := make(map[string][]int)
+	for name, f := range facadeInit {
+		supported[name] = f(r)
+	}
+	return supported
+}
