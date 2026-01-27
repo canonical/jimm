@@ -79,7 +79,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	if err := w.waitForJobToFinalise(migRes, eventCh); err != nil {
+	if err := w.waitForJobToFinalise(ctx, migRes, eventCh); err != nil {
 		return err
 	}
 
@@ -100,7 +100,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	if err := w.waitForJobToFinalise(upgradeRes, eventCh); err != nil {
+	if err := w.waitForJobToFinalise(ctx, upgradeRes, eventCh); err != nil {
 		return err
 	}
 
@@ -108,7 +108,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 	return nil
 }
 
-func (w *upgradeToWorker) waitForJobToFinalise(result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
+func (w *upgradeToWorker) waitForJobToFinalise(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
 	// It may be a duplicate, so check if it has finalised. If not, wait for it to do so.
 	if result.Job.FinalizedAt != nil {
 		// It has finalised, check it's state, if it failed return error.
@@ -120,21 +120,29 @@ func (w *upgradeToWorker) waitForJobToFinalise(result *rivertype.JobInsertResult
 			return errors.New(result.Job.Errors[len(result.Job.Errors)-1].Error)
 		}
 	} else {
-		for event := range eventCh {
-			if event.Job.ID == result.Job.ID {
-				if event.Job.FinalizedAt != nil {
-					switch event.Kind {
-					// Because we've finalised, this isn't an attempt failure, but the final state.
-					case river.EventKindJobFailed:
-						// Job failed, return the last error.
-						if len(event.Job.Errors) != 0 {
-							return errors.New(event.Job.Errors[len(event.Job.Errors)-1].Error)
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case event, ok := <-eventCh:
+				if !ok {
+					return nil
+				}
+				if event.Job.ID == result.Job.ID {
+					if event.Job.FinalizedAt != nil {
+						switch event.Kind {
+						// Because we've finalised, this isn't an attempt failure, but the final state.
+						case river.EventKindJobFailed:
+							// Job failed, return the last error.
+							if len(event.Job.Errors) != 0 {
+								return errors.New(event.Job.Errors[len(event.Job.Errors)-1].Error)
+							}
+						case river.EventKindJobCancelled:
+							return errors.New("job was cancelled")
+						case river.EventKindJobCompleted:
+							// Completed successfully.
+							return nil
 						}
-					case river.EventKindJobCancelled:
-						return errors.New("job was cancelled")
-					case river.EventKindJobCompleted:
-						// Completed successfully.
-						return nil
 					}
 				}
 			}
