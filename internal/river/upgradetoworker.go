@@ -35,11 +35,6 @@ type upgradeToWorker struct {
 	upgradeRetries int
 }
 
-// Migrate the model
-// Wait for job - handle crash
-// Upgrade the model
-// Wait for job
-// Done
 func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
 

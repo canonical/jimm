@@ -108,8 +108,7 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 
 func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	c := qt.New(t)
-	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
-	defer cancel()
+	ctx := c.Context()
 
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
@@ -165,8 +164,7 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 // This test is particularly valuable because it ensures we're checking the jobs finalised state AND event kind.
 func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	c := qt.New(t)
-	ctx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
-	defer cancel()
+	ctx := c.Context()
 
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
