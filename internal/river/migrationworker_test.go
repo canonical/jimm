@@ -44,7 +44,6 @@ func TestMigrationWorker(t *testing.T) {
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
 
-	c.Assert(err, qt.IsNil)
 	result, err := testWorker.Work(
 		c.Context(),
 		c.TB,

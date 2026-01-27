@@ -30,8 +30,10 @@ func newMigrationWorker(openfgaClient *openfga.OFGAClient, store Store, upgradeM
 
 // migrationWorkerArgs defines the arguments for the migrationWorker job.
 type migrationWorkerArgs struct {
-	Username             string `json:"username"`
-	UUID                 string `json:"uuid"`
+	Username string `json:"username"`
+	// UUID is the model UUID to migrate. We treat this as unique to prevent
+	// multiple concurrent migrations of the same model to many controllers.
+	UUID                 string `json:"uuid" river:"unique"`
 	TargetControllerName string `json:"target_controller_name"`
 }
 

@@ -36,7 +36,7 @@ func TestUpgradeWorker(t *testing.T) {
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
 
-	result, err := testWorker.Work(c.Context(), c.TB, tx, UpgradeArgs{
+	result, err := testWorker.Work(c.Context(), c.TB, tx, upgradeArgs{
 		ModelUUID: "test-string", TargetVersion: version.MustParse("2.0.0")}, nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(result.EventKind, qt.Equals, river.EventKindJobCompleted)
@@ -66,7 +66,7 @@ func TestUpgradeWorker_Error(t *testing.T) {
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
 
-	result, err := testWorker.Work(c.Context(), c.TB, tx, UpgradeArgs{
+	result, err := testWorker.Work(c.Context(), c.TB, tx, upgradeArgs{
 		ModelUUID: "test-string", TargetVersion: version.MustParse("2.0.0")}, nil)
 	c.Assert(err, qt.ErrorMatches, "some-error")
 	c.Assert(result.EventKind, qt.Equals, river.EventKindJobFailed)
