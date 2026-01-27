@@ -18,7 +18,7 @@ func newUpgradeToWorker(migrateRetries int, upgradeRetries int) *upgradeToWorker
 }
 
 type UpgradeToArgs struct {
-	ModelUUID            string         `json:"model-uuid"`
+	ModelUUID            string         `json:"model-uuid" river:"unique"`
 	TargetVersion        version.Number `json:"target-version"`
 	Username             string         `json:"username"`
 	TargetControllerName string         `json:"target_controller_name"`
@@ -119,34 +119,37 @@ func (w *upgradeToWorker) waitForJobToFinalise(ctx context.Context, result *rive
 		if len(result.Job.Errors) != 0 {
 			return errors.New(result.Job.Errors[len(result.Job.Errors)-1].Error)
 		}
-	} else {
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case event, ok := <-eventCh:
-				if !ok {
-					return nil
-				}
-				if event.Job.ID == result.Job.ID {
-					if event.Job.FinalizedAt != nil {
-						switch event.Kind {
-						// Because we've finalised, this isn't an attempt failure, but the final state.
-						case river.EventKindJobFailed:
-							// Job failed, return the last error.
-							if len(event.Job.Errors) != 0 {
-								return errors.New(event.Job.Errors[len(event.Job.Errors)-1].Error)
-							}
-						case river.EventKindJobCancelled:
-							return errors.New("job was cancelled")
-						case river.EventKindJobCompleted:
-							// Completed successfully.
-							return nil
+		return nil
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-eventCh:
+			if !ok {
+				return errors.New("event channel closed unexpectedly")
+			}
+			if event.Job.ID == result.Job.ID {
+				if event.Job.FinalizedAt != nil {
+					switch event.Kind {
+					// Because we've finalised, this isn't an attempt failure, but the final state.
+					case river.EventKindJobFailed:
+						// Job failed, return the last error.
+						if len(event.Job.Errors) != 0 {
+							return errors.New(event.Job.Errors[len(event.Job.Errors)-1].Error)
 						}
+						return errors.New("job failed without error details")
+					case river.EventKindJobCancelled:
+						return errors.New("job was cancelled")
+					case river.EventKindJobCompleted:
+						// Completed successfully.
+						return nil
 					}
 				}
 			}
 		}
 	}
+
 	return nil
 }

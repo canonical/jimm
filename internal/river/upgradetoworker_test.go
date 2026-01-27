@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -40,6 +40,9 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
 		Return(nil)
 
+	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
 	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
@@ -48,7 +51,7 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	}, &river.InsertOpts{MaxAttempts: 1})
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, riverClient, insRes.Job.ID)
+	row := waitForFinalisedJob(c, ctx, sub, insRes)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(row.Errors, qt.HasLen, 0)
 }
@@ -74,18 +77,12 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
 		DoAndReturn(func(context.Context, *openfga.User, string, string) error {
 			attempt++
-			switch attempt {
-			case 1:
-				return errors.New("unexpected-error")
-			case 2:
-				return errors.New("unexpected-error")
-			case 3:
-				return errors.New("migration-failed3")
-			default:
-				return errors.New("unexpected-error")
-			}
+			return fmt.Errorf("unexpected-error-%d", attempt)
 		}).
 		MinTimes(3)
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed)
+	c.Cleanup(cancel)
 
 	insRes, err := riverClient.Insert(
 		ctx,
@@ -97,13 +94,11 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 		}, &river.InsertOpts{MaxAttempts: 1})
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, riverClient, insRes.Job.ID)
+	row := waitForFinalisedJob(c, ctx, sub, insRes)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateDiscarded)
-	c.Assert(len(row.Errors) > 0, qt.IsTrue)
-
 	// Ensure we capture the last error only from the migrate job, and that it is surfaced to the upgrade to job.
 	upgradeToJobFinalError := row.Errors[len(row.Errors)-1].Error
-	c.Assert(upgradeToJobFinalError, qt.Equals, "migration-failed3")
+	c.Assert(upgradeToJobFinalError, qt.Equals, "unexpected-error-3")
 }
 
 func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
@@ -131,18 +126,12 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
 		DoAndReturn(func(context.Context, string, version.Number) error {
 			attempt++
-			switch attempt {
-			case 1:
-				return errors.New("unexpected-error")
-			case 2:
-				return errors.New("unexpected-error")
-			case 3:
-				return errors.New("upgrade-failed3")
-			default:
-				return errors.New("unexpected-error")
-			}
+			return fmt.Errorf("unexpected-error-%d", attempt)
 		}).
 		MinTimes(3)
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed)
+	c.Cleanup(cancel)
 
 	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
 		ModelUUID:            "model-uuid",
@@ -152,13 +141,11 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	}, &river.InsertOpts{MaxAttempts: 1})
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, riverClient, insRes.Job.ID)
+	row := waitForFinalisedJob(c, ctx, sub, insRes)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateDiscarded)
-	c.Assert(len(row.Errors) > 0, qt.IsTrue)
-
-	// Ensure we capture the last error only from the upgrade job, and that it is surfaced to the upgrade to job.
+	// Ensure we capture the last error only from the migrate job, and that it is surfaced to the upgrade to job.
 	upgradeToJobFinalError := row.Errors[len(row.Errors)-1].Error
-	c.Assert(upgradeToJobFinalError, qt.Equals, "upgrade-failed3")
+	c.Assert(upgradeToJobFinalError, qt.Equals, "unexpected-error-3")
 }
 
 // This test is particularly valuable because it ensures we're checking the jobs finalised state AND event kind.
@@ -203,6 +190,9 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 		}).
 		Times(2)
 
+	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
 	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
@@ -211,9 +201,97 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	}, &river.InsertOpts{MaxAttempts: 1})
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, riverClient, insRes.Job.ID)
+	row := waitForFinalisedJob(c, ctx, sub, insRes)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(row.Errors, qt.HasLen, 0)
+}
+
+// This test simulates a crash of the supervisor between the migration and upgrade steps.
+// And ensures that when retried, the migration job picks up where it left off uniquely
+// resulting in 2 attempts.
+//
+// It relies on the fact that jobs are inserted in an ascending postgres sequence
+// as we don't know the job id of the supervisor ahead of time otherwise. So,
+// as we know it'll be the first job inserted, it's job id should always be 1.
+func TestUpgradeToWorker_SupervisorResumesSuccessfullyAfterCrash(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	ctrl := gomock.NewController(c)
+	defer ctrl.Finish()
+
+	database := setupTestDB(c)
+	sqlDB, err := database.SqlDB()
+	c.Assert(err, qt.IsNil)
+
+	upgradeManager := NewMockUpgradeManager(ctrl)
+
+	supervisingJobId := int64(1)
+
+	// Setup migrate job to retry up to 3 times, we're expecting 2 after the supervising job crash.
+	riverClient, username := setupWorkers(c, ctx, database, upgradeManager, sqlDB, 3, 1)
+
+	attempt := 0
+	upgradeManager.EXPECT().
+		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
+		DoAndReturn(func(context.Context, *openfga.User, string, string) error {
+			attempt++
+			if attempt == 1 {
+				// We sneakily cancel the supervisor (lol) to simulate a crash.
+				// As it's context has cancelled now, when it attempts to wait
+				// for the migrate job to finish it is going to error out.
+				_, err := riverClient.JobCancel(ctx, supervisingJobId)
+				if err != nil {
+					return err
+				}
+			}
+			// We'll be returning nil on restart, and expect the job to complete successfully.
+			return nil
+		})
+
+	upgradeManager.EXPECT().
+		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
+		Return(nil)
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed, river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
+	_, err = riverClient.Insert(ctx, UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("2.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{MaxAttempts: 1})
+	c.Assert(err, qt.IsNil)
+
+	var supervisingJobFailureUpdate *rivertype.JobRow
+
+loop:
+	for {
+		select {
+		case event := <-sub:
+			if event.Job.ID != supervisingJobId {
+				continue loop
+			}
+			// We've caught the suppervising job entering "some state".
+			// Capture it, and break out.
+			supervisingJobFailureUpdate = event.Job
+			break loop
+		case <-ctx.Done():
+			c.Fatal("timed out waiting for job failed event")
+		}
+	}
+
+	// At this point, our job is cancelled and we'll see it as "completed".
+	c.Assert(supervisingJobFailureUpdate.State, qt.Equals, rivertype.JobStateCompleted)
+	// We're expecting to capture this specific singular job, and upon restarting the supervisor
+	// we should see the supervisor succeeds and the attempts increase for this job.
+	// We're pureposefully asking for more than we expect to ensure no other jobs are lurking.
+	params := river.NewJobListParams().Kinds(migrationWorkerArgs{}.Kind()).First(10)
+	listRes, err := riverClient.JobList(ctx, params)
+	c.Assert(err, qt.IsNil)
+	c.Assert(listRes.Jobs, qt.HasLen, 1)
+	// WIP
 }
 
 func setupWorkers(
@@ -260,21 +338,20 @@ func setupWorkers(
 	return riverClient, u.Name
 }
 
-func waitForFinalisedJob(c *qt.C, ctx context.Context, client *river.Client[*sql.Tx], jobID int64) *rivertype.JobRow {
-	for i := 0; i < 20; i++ {
-		row, err := client.JobGet(ctx, jobID)
-		c.Assert(err, qt.IsNil)
-		if row.FinalizedAt != nil {
-			return row
-		}
-
+func waitForFinalisedJob(c *qt.C, ctx context.Context, sub <-chan *river.Event, insRes *rivertype.JobInsertResult) *rivertype.JobRow {
+loop:
+	for {
 		select {
+		case event := <-sub:
+			c.Logf("received job failed event for job ID %d", event.Job.ID)
+			if event.Job.ID != insRes.Job.ID {
+				continue loop
+			}
+			if event.Job.FinalizedAt != nil {
+				return event.Job
+			}
 		case <-ctx.Done():
-			c.Fatalf("context done while waiting for job %d to finalize: %v", jobID, ctx.Err())
-		case <-time.After(1 * time.Second):
+			c.Fatal("timed out waiting for job failed event")
 		}
 	}
-
-	c.Fatalf("timed out waiting for job %d to finalize", jobID)
-	return nil
 }
