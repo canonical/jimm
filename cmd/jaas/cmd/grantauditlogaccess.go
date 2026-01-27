@@ -23,7 +23,7 @@ Grants a user access to read audit logs.
 `
 
 	grantAuditLogAccessExamples = `
-    juju grant-audit-log <username> 
+    juju grant-audit-log <username>
 `
 )
 

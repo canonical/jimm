@@ -37,7 +37,7 @@ Use the --local flag if the server is not configured with a public address or to
 ignore the controller's public-hostname and use the custom CA of the controller.
 
 A yaml formatted file can also be used as input for cases where the controller
-is not available on the client. Using the --file will validate that the provided 
+is not available on the client. Using the --file will validate that the provided
 controller name matches the name in the yaml file.
 Using --file will ignore other flags like --public-address and --local.
 

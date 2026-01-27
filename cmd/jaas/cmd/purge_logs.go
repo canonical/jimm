@@ -26,7 +26,7 @@ The provided date must be formatted as an ISO8601 date string.
 	purgeLogsExample = `
     juju purge-audit-logs 2021-02-03
     juju purge-audit-logs 2021-02-03T00
-    juju purge-audit-logs 2021-02-03T15:04:05Z	
+    juju purge-audit-logs 2021-02-03T15:04:05Z
 `
 )
 

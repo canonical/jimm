@@ -24,10 +24,10 @@ const (
 	bootstrapDoc = `
 Requests the JIMM server to bootstrap a Juju controller.
 The controller will be created asychronously on the specificed
-cloud and region. 
+cloud and region.
 
 By default the command will wait for the bootstrap job to complete
-while printing the job logs. Note that the logs will not follow the 
+while printing the job logs. Note that the logs will not follow the
 --output flag and will always be printed to stdout. This can allow
 you to send the initial output with the job ID to a file, while the
 logs are streamed to stdout.

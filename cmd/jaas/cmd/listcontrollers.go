@@ -20,7 +20,7 @@ const (
 Displays controller information for all controllers known to JIMM.
 `
 	listControllersCommandExample = `
-    juju controllers 
+    juju controllers
     juju controllers --format json
 `
 )

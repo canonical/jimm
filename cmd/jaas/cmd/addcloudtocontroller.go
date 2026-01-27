@@ -27,7 +27,7 @@ const (
 	addCloudToControllerCommandDoc = `
 Adds the specified cloud to a specific controller on JIMM.
 
-One can specify a cloud definition via a yaml file passed with the --cloud 
+One can specify a cloud definition via a yaml file passed with the --cloud
 flag. If the flag is missing, the command will assume the cloud definition
 is already known and will error otherwise.
 `

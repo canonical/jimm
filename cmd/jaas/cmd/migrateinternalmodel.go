@@ -21,7 +21,7 @@ const (
 The migrate-internal command migrates a model(s) between two controllers
 in your JAAS system. This performs a model migration, but is named
 "migrate-internal" to avoid confusion with the "migrate" command which migrates
-a model to JAAS. 
+a model to JAAS.
 
 You may specify a model name (of the form owner/name) or model UUID.
 

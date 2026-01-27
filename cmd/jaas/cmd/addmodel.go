@@ -83,7 +83,7 @@ This command creates a new hosted model on the specified controller.
 
 const addModelHelpExamples = `
     juju [jaas] add-model mymodel mycloud --target-controller jaas-controller-1
-    juju [jaas] add-model mymodel us-east-1 --target-controller jaas-controller-1 
+    juju [jaas] add-model mymodel us-east-1 --target-controller jaas-controller-1
 	juju [jaas] add-model mymodel aws/us-east-1 --target-controller jaas-controller-2 --credential mycred
     juju [jaas] add-model mymodel --target-controller jaas-controller-3 --config key=value
 `

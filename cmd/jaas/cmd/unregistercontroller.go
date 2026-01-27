@@ -21,7 +21,7 @@ Deregisters a controller from JIMM.
 `
 
 	unregisterControllerCommandExample = `
-    juju unregister-controller mycontroller 
+    juju unregister-controller mycontroller
     juju unregister-controller mycontroller --force
 `
 )

@@ -25,7 +25,7 @@ Adds a role.
 `
 
 	addRoleExample = `
-    juju add-role myrole 
+    juju add-role myrole
 `
 
 	renameRoleDoc = `

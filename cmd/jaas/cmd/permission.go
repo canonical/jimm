@@ -139,7 +139,7 @@ Verifies access to a resource.
 `
 
 	listPermissionsDoc = `
-List permissions known to JIMM. Using the "target", "relation" and "object" flags, 
+List permissions known to JIMM. Using the "target", "relation" and "object" flags,
 only those permissions matching the filter will be returned.
 `
 

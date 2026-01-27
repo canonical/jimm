@@ -23,7 +23,7 @@ const (
 Displays full model status.
 `
 	modelStatusCommandExample = `
-    juju model-status 2cb433a6-04eb-4ec4-9567-90426d20a004 
+    juju model-status 2cb433a6-04eb-4ec4-9567-90426d20a004
     juju model-status 2cb433a6-04eb-4ec4-9567-90426d20a004 --format yaml
 `
 )

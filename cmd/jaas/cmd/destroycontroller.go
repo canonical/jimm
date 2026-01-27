@@ -21,7 +21,7 @@ Requests the JIMM server to destroy a Juju controller.
 The controller will be destroyed asynchronously.
 
 By default the command will wait for the destroy-controller job to complete
-while printing the job logs. Note that the logs will not follow the 
+while printing the job logs. Note that the logs will not follow the
 --output flag and will always be printed to stdout. This can allow
 you to send the initial output with the job ID to a file, while the
 logs are streamed to stdout.
@@ -37,7 +37,7 @@ Note that JIMM will internally do the following:
 - unregister the controller from JIMM
 
 Destroying controllers on k8s clouds will only work on uju 3.6.10 or newer.
-As a workaround, you can first unregister the controller and then destroy 
+As a workaround, you can first unregister the controller and then destroy
 it separately.
 `
 	destroyControllerExamples = `

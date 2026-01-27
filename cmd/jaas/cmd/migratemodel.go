@@ -36,9 +36,9 @@ and migrate it to JIMM. During this process JIMM will modify the details of the 
 to remove any local users with access to the model and replace the model owner with
 an external user i.e. from alice -> alice@canonical.com.
 
-In order to determine the new model owner and to handle any existing application-offers 
+In order to determine the new model owner and to handle any existing application-offers
 that have already been consumed with local users, you must specify a user mapping file
-with the --user-mapping flag. This should point to a yaml file with a mapping of local 
+with the --user-mapping flag. This should point to a yaml file with a mapping of local
 users to external users.
 For example:
 
@@ -49,10 +49,10 @@ bob: bob@canonical.com
 '''
 
 The mapping must contain entries for all users that have access to the model and any offers
-hosted within that model. 
+hosted within that model.
 You can use the "juju show-model <model-name>" command to see the users that have access to
 the model.
-You can also use the "juju list-offers" command alongside "juju show-offer <offer-name>" 
+You can also use the "juju list-offers" command alongside "juju show-offer <offer-name>"
 to see the users that have access to each offer.
 
 Any users that you do not wish to be mapped must still be included with a null value or empty
@@ -70,9 +70,9 @@ Revoking access from "alice@canonical.com" will result in the relation encounter
 
 It may not be possible to know all users that have have consumed offers from a model, but using
 "juju show-offer <offer-name> --format yaml" you can see all users that have access to the
-offer. This list should help determine which users to map in the user mapping file. 
+offer. This list should help determine which users to map in the user mapping file.
 
-Any tools/scripts that refer to models by their full name (owner/name) will need to be 
+Any tools/scripts that refer to models by their full name (owner/name) will need to be
 updated after migration to use the new external username or refer to models by their UUID.
 `
 	migrateModelCommandExample = `

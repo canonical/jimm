@@ -21,9 +21,9 @@ const (
 Imports a model running on a controller into JIMM's state.
 
 When importing, it is necessary for JIMM to contain a set of cloud credentials
-that represent a user's access to the incoming model's cloud. 
+that represent a user's access to the incoming model's cloud.
 
-The --owner command is necessary when importing a model created by a 
+The --owner command is necessary when importing a model created by a
 local user and it will switch the model owner to the desired external user.
 `
 	importModelCommandExample = `

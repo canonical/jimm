@@ -24,7 +24,7 @@ const (
 Displays logs for a job.
 `
 	jobStatusCommandExample = `
-    juju job-status 2cb433a6-04eb-4ec4-9567-90426d20a004 
+    juju job-status 2cb433a6-04eb-4ec4-9567-90426d20a004
 `
 )
 
