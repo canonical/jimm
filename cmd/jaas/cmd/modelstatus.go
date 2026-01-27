@@ -34,8 +34,6 @@ func NewModelStatusCommand() cmd.Command {
 		store: jujuclient.NewFileClientStore(),
 	}
 
-	cmd.jimmAPIFunc = cmd.newClient
-
 	return modelcmd.WrapBase(cmd)
 }
 

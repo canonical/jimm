@@ -3,10 +3,10 @@
 package cmd
 
 import (
-	"bytes"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/juju/rpc/params"
 	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v3"
@@ -15,8 +15,8 @@ import (
 )
 
 func TestModelStatusSuperuser(t *testing.T) {
-	s := setupCmdMocks(t)
 	c := qt.New(t)
+	s := setupCmdMocks(c)
 
 	fullStatus := params.FullStatus{
 		Model: params.ModelStatusInfo{
@@ -48,12 +48,12 @@ func TestModelStatusSuperuser(t *testing.T) {
 	}
 	initCommand(c, statusCmd, "2cb433a6-04eb-4ec4-9567-90426d20a004")
 
-	ctx := newTestContext(t)
+	ctx := newTestContext(c)
 	err := statusCmd.Run(ctx)
 	c.Assert(err, qt.IsNil)
 
-	res := ctx.Stdout.(*bytes.Buffer).String()
-	gotStatus := params.FullStatus{}
+	res := cmdtesting.Stdout(ctx)
+	var gotStatus params.FullStatus
 	err = yaml.Unmarshal([]byte(res), &gotStatus)
 	c.Assert(err, qt.IsNil)
 
