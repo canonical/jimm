@@ -7,13 +7,13 @@
 package cmd
 
 import (
-	"bytes"
 	"io"
 	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	jujucmd "github.com/juju/cmd/v3"
+	"github.com/juju/cmd/v3/cmdtesting"
 	"github.com/juju/gnuflag"
 	controllerapi "github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/core/crossmodel"
@@ -26,16 +26,16 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-func setupMigrateAPIMock(t *testing.T) *mocks.MockMigrateAPI {
-	ctrl := gomock.NewController(t)
-	t.Cleanup(ctrl.Finish)
+func setupMigrateAPIMock(c *qt.C) *mocks.MockMigrateAPI {
+	ctrl := gomock.NewController(c)
+	c.Cleanup(ctrl.Finish)
 	return mocks.NewMockMigrateAPI(ctrl)
 }
 
 func TestMigrate(t *testing.T) {
-	s := setupCmdMocks(t)
-	migrateClient := setupMigrateAPIMock(t)
 	c := qt.New(t)
+	s := setupCmdMocks(c)
+	migrateClient := setupMigrateAPIMock(c)
 
 	userMappingFile, err := os.CreateTemp(c.TempDir(), "")
 	c.Assert(err, qt.IsNil)
@@ -118,11 +118,11 @@ bob: bob@canonical.com
 		"--user-mapping", userMappingFile.Name(),
 	)
 
-	ctx := newTestContext(t)
+	ctx := newTestContext(c)
 	err = migrateCmd.Run(ctx)
 	c.Assert(err, qt.IsNil)
 
-	res := ctx.Stdout.(*bytes.Buffer).String()
+	res := cmdtesting.Stdout(ctx)
 	c.Assert(res, qt.Equals, "migration-id\n")
 }
 
@@ -150,8 +150,8 @@ bob: null
 }
 
 func TestValidateUserMapping_SkipUsers(t *testing.T) {
-	migrateClient := setupMigrateAPIMock(t)
 	c := qt.New(t)
+	migrateClient := setupMigrateAPIMock(c)
 
 	userMapping := map[string]string{
 		"alice": "alice@canonical.com",
@@ -177,8 +177,8 @@ func TestValidateUserMapping_SkipUsers(t *testing.T) {
 }
 
 func TestValidateUserMapping_HandleEveryoneUser(t *testing.T) {
-	migrateClient := setupMigrateAPIMock(t)
 	c := qt.New(t)
+	migrateClient := setupMigrateAPIMock(c)
 
 	userMapping := map[string]string{
 		"alice": "alice@canonical.com",
@@ -205,8 +205,8 @@ func TestValidateUserMapping_HandleEveryoneUser(t *testing.T) {
 }
 
 func TestValidateUserMapping_MissingUsers(t *testing.T) {
-	migrateClient := setupMigrateAPIMock(t)
 	c := qt.New(t)
+	migrateClient := setupMigrateAPIMock(c)
 
 	userMapping := map[string]string{}
 	migrateClient.EXPECT().ModelInfo(gomock.Any()).Return([]jujuparams.ModelInfoResult{{
