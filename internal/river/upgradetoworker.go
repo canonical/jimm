@@ -147,24 +147,26 @@ func waitForJobToFinalise(ctx context.Context, result *rivertype.JobInsertResult
 			if !ok {
 				return errors.New("event channel closed unexpectedly")
 			}
-			if event.Job.ID == result.Job.ID {
-				if event.Job.FinalizedAt != nil {
-					switch event.Kind {
-					// Because we've finalised, this isn't an attempt failure, but the final state.
-					case river.EventKindJobFailed:
-						// Job failed, return the last error.
-						if len(event.Job.Errors) != 0 {
-							return errors.New(event.Job.Errors[len(event.Job.Errors)-1].Error)
-						}
-						return errors.New("job failed without error details")
-					case river.EventKindJobCancelled:
-						return errors.New("job was cancelled")
-					case river.EventKindJobCompleted:
-						// Completed successfully.
-						return nil
-					}
-				}
+
+			if event.Job.ID != result.Job.ID || event.Job.FinalizedAt == nil {
+				continue
 			}
+
+			switch event.Kind {
+			// Because we've finalised, this isn't an attempt failure, but the final state.
+			case river.EventKindJobFailed:
+				// Job failed, return the last error.
+				if len(event.Job.Errors) != 0 {
+					return errors.New(event.Job.Errors[len(event.Job.Errors)-1].Error)
+				}
+				return errors.New("job failed without error details")
+			case river.EventKindJobCancelled:
+				return errors.New("job was cancelled")
+			case river.EventKindJobCompleted:
+				// Completed successfully.
+				return nil
+			}
+
 		}
 	}
 }
