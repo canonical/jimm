@@ -1,3 +1,5 @@
+// Copyright 2026 Canonical.
+
 package river
 
 import (
@@ -10,13 +12,18 @@ import (
 	"github.com/riverqueue/river/rivertype"
 )
 
-func newUpgradeToWorker(migrateRetries int, upgradeRetries int) *upgradeToWorker {
+// waitForJobFinalisationFunc is a function that waits for a job to finalise.
+type waitForJobFinalisationFunc func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error
+
+func newUpgradeToWorker(migrateRetries int, upgradeRetries int, finaliser waitForJobFinalisationFunc) *upgradeToWorker {
 	return &upgradeToWorker{
 		migrateRetries: migrateRetries,
 		upgradeRetries: upgradeRetries,
+		finaliser:      finaliser,
 	}
 }
 
+// UpgradeToArgs are the arguments for the upgrade-to worker.
 type UpgradeToArgs struct {
 	ModelUUID            string         `json:"model-uuid" river:"unique"`
 	TargetVersion        version.Number `json:"target-version"`
@@ -24,6 +31,7 @@ type UpgradeToArgs struct {
 	TargetControllerName string         `json:"target_controller_name"`
 }
 
+// Kind implements the [river.JobArgs] interface.
 func (UpgradeToArgs) Kind() string { return "upgrade-to" }
 
 type upgradeToWorker struct {
@@ -33,8 +41,11 @@ type upgradeToWorker struct {
 	migrateRetries int
 	// upgradeRetries is the number of times to retry the upgrade step.
 	upgradeRetries int
+	// finaliser is a function that waits for a job to finalise.
+	finaliser waitForJobFinalisationFunc
 }
 
+// Work implements the [river.Worker] interface.
 func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
 
@@ -79,7 +90,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	if err := w.waitForJobToFinalise(ctx, migRes, eventCh); err != nil {
+	if err := w.finaliser(ctx, migRes, eventCh); err != nil {
 		return err
 	}
 
@@ -100,7 +111,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	if err := w.waitForJobToFinalise(ctx, upgradeRes, eventCh); err != nil {
+	if err := w.finaliser(ctx, upgradeRes, eventCh); err != nil {
 		return err
 	}
 
@@ -108,7 +119,13 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 	return nil
 }
 
-func (w *upgradeToWorker) waitForJobToFinalise(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
+// waitForJobToFinalise waits for the job to finalise, that is, a job that will no longer
+// be retried but could have succeeded or failed after all attempts. It does so by checking
+// the event channel for updates.
+//
+// If the job has been inserted already on a previous attempt, it checks if it's finalised already,
+// and if not, waits for it to do so.
+func waitForJobToFinalise(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
 	// It may be a duplicate, so check if it has finalised. If not, wait for it to do so.
 	if result.Job.FinalizedAt != nil {
 		// It has finalised, check it's state, if it failed return error.
@@ -150,6 +167,4 @@ func (w *upgradeToWorker) waitForJobToFinalise(ctx context.Context, result *rive
 			}
 		}
 	}
-
-	return nil
 }

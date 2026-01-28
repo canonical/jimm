@@ -1,3 +1,5 @@
+// Copyright 2026 Canonical.
+
 package river
 
 import (
