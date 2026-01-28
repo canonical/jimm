@@ -60,6 +60,97 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	c.Assert(row.Errors, qt.HasLen, 0)
 }
 
+func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	ctrl := gomock.NewController(c)
+	defer ctrl.Finish()
+
+	database := setupTestDB(c)
+	sqlDB, err := database.SqlDB()
+	c.Assert(err, qt.IsNil)
+
+	upgradeManager := NewMockUpgradeManager(ctrl)
+
+	riverClient, username := setupWorkers(c, ctx, database, upgradeManager, sqlDB, 1, 1, waitForJobToFinalise)
+
+	upgradeManager.EXPECT().
+		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
+		Return(nil)
+	upgradeManager.EXPECT().
+		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
+		Return(nil)
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
+	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("2.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller",
+	},
+		&river.InsertOpts{
+			MaxAttempts: 1,
+			UniqueOpts: river.UniqueOpts{
+				ByArgs:  true,
+				ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable, rivertype.JobStateScheduled},
+			},
+		},
+	)
+	c.Assert(err, qt.IsNil)
+
+	row := waitForFinalisedJob(c, ctx, sub, insRes)
+	c.Assert(row.ID, qt.Equals, int64(1))
+	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
+	c.Assert(row.Errors, qt.HasLen, 0)
+
+	// Now we'll upgrade again to a new controller and new version, but the same model.
+	upgradeManager.EXPECT().
+		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller2").
+		Return(nil)
+	upgradeManager.EXPECT().
+		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("3.0.0")).
+		Return(nil)
+
+	insRes, err = riverClient.Insert(ctx, UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("3.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller2",
+	},
+		&river.InsertOpts{
+			MaxAttempts: 1,
+			UniqueOpts: river.UniqueOpts{
+				ByArgs:  true,
+				ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable, rivertype.JobStateScheduled},
+			},
+		},
+	)
+	c.Assert(err, qt.IsNil)
+
+	row = waitForFinalisedJob(c, ctx, sub, insRes)
+	c.Assert(row.ID, qt.Equals, int64(4))
+	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
+	c.Assert(row.Errors, qt.HasLen, 0)
+
+	// We can see two distinct jobs now because the first one entered a completed state.
+	c.Assert(insRes.UniqueSkippedAsDuplicate, qt.IsFalse)
+
+	// Finally, verify further that there's two migrate and two upgrade jobs now, so we know
+	// it re-created them for the second run of UpgradeTo.
+	listRes, err := riverClient.JobList(ctx, river.NewJobListParams().Kinds(migrationWorkerArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(listRes.Jobs[0].State, qt.Equals, rivertype.JobStateCompleted)
+	c.Assert(listRes.Jobs, qt.HasLen, 2)
+
+	listRes, err = riverClient.JobList(ctx, river.NewJobListParams().Kinds(upgradeArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(listRes.Jobs[0].State, qt.Equals, rivertype.JobStateCompleted)
+	c.Assert(listRes.Jobs, qt.HasLen, 2)
+}
+
 func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()

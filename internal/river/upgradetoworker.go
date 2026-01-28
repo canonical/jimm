@@ -49,26 +49,6 @@ type upgradeToWorker struct {
 func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
 
-	// PR Note:
-	// Subscribe to job events immediately to prevent duplicate completion race as we'll catch it when inserting it
-	// in a moment.
-	//
-	// River's initial buffer size for the subscription channel is 1000 [river.subscribeChanSizeDefault].
-	// River does the following when pushing events:
-	// select {
-	// case sub.Chan <- event:
-	// default:
-	// }
-	// Which can lead to dropped events. However, since we check the job state after insertion, we will not miss
-	// any completions and process it in a timely manner.
-	//
-	// We could poll the job, as well as use subscriptions for quick wake ups between polls, but that adds complexity for
-	// what might be an impossible scenario for us.
-	//
-	// It would look something like: tick on X seconds, and pull from ticker & sub channel together, whichever is first determines
-	// if the job has completed. This covers us for dropped subscriptions.
-	//
-	// Open for discussion within the PR.
 	eventCh, cancel := client.Subscribe(river.EventKindJobCompleted, river.EventKindJobCancelled, river.EventKindJobFailed)
 	defer cancel()
 
@@ -83,6 +63,13 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 			MaxAttempts: w.migrateRetries,
 			UniqueOpts: river.UniqueOpts{
 				ByArgs: true,
+				ByState: []rivertype.JobState{
+					rivertype.JobStateAvailable,
+					rivertype.JobStatePending,
+					rivertype.JobStateRunning,
+					rivertype.JobStateRetryable,
+					rivertype.JobStateScheduled,
+				},
 			},
 		},
 	)
@@ -104,6 +91,13 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 			MaxAttempts: w.upgradeRetries,
 			UniqueOpts: river.UniqueOpts{
 				ByArgs: true,
+				ByState: []rivertype.JobState{
+					rivertype.JobStateAvailable,
+					rivertype.JobStatePending,
+					rivertype.JobStateRunning,
+					rivertype.JobStateRetryable,
+					rivertype.JobStateScheduled,
+				},
 			},
 		},
 	)
