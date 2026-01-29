@@ -9,6 +9,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // newMigrationWorker creates a new upgradeMigrationWorker.
@@ -41,6 +42,22 @@ type migrationWorkerArgs struct {
 
 // Kind implements the [river.JobArgs] interface.
 func (migrationWorkerArgs) Kind() string { return "upgrade-migration" }
+
+// InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
+func (migrationWorkerArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRunning,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
+}
 
 type migrationWorker struct {
 	// An embedded WorkerDefaults sets up default methods to fulfill the rest of

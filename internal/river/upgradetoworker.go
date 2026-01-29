@@ -82,16 +82,6 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		},
 		&river.InsertOpts{
 			MaxAttempts: w.migrateRetries,
-			UniqueOpts: river.UniqueOpts{
-				ByArgs: true,
-				ByState: []rivertype.JobState{
-					rivertype.JobStateAvailable,
-					rivertype.JobStatePending,
-					rivertype.JobStateRunning,
-					rivertype.JobStateRetryable,
-					rivertype.JobStateScheduled,
-				},
-			},
 		},
 	)
 	if err != nil {
@@ -107,22 +97,12 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 
 	upgradeInsertResponse, err := client.Insert(
 		ctx,
-		upgradeArgs{
+		upgradeWorkerArgs{
 			ModelUUID:     job.Args.ModelUUID,
 			TargetVersion: job.Args.TargetVersion,
 		},
 		&river.InsertOpts{
 			MaxAttempts: w.upgradeRetries,
-			UniqueOpts: river.UniqueOpts{
-				ByArgs: true,
-				ByState: []rivertype.JobState{
-					rivertype.JobStateAvailable,
-					rivertype.JobStatePending,
-					rivertype.JobStateRunning,
-					rivertype.JobStateRetryable,
-					rivertype.JobStateScheduled,
-				},
-			},
 		},
 	)
 	if err != nil {
@@ -147,10 +127,6 @@ func waitForJobToFinalise(ctx context.Context, result *rivertype.JobInsertResult
 	// It may be a duplicate, so check if it has finalised. If not, wait for it to do so.
 	if result.Job.FinalizedAt != nil {
 		// It has finalised, check it's state, if it failed return error.
-		//
-		// TODO: We should report all errors from all attempts and their details (i.e., timestamps)
-		// For now, simply take the last failure attempt.
-		// This should be completed in Phase 3.
 		if len(result.Job.Errors) != 0 {
 			return errors.New(result.Job.Errors[len(result.Job.Errors)-1].Error)
 		}

@@ -151,7 +151,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	c.Assert(listRes.Jobs[0].State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(listRes.Jobs, qt.HasLen, 2)
 
-	listRes, err = riverClient.JobList(ctx, river.NewJobListParams().Kinds(upgradeArgs{}.Kind()).First(10))
+	listRes, err = riverClient.JobList(ctx, river.NewJobListParams().Kinds(upgradeWorkerArgs{}.Kind()).First(10))
 	c.Assert(err, qt.IsNil)
 	c.Assert(listRes.Jobs[0].State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(listRes.Jobs, qt.HasLen, 2)
