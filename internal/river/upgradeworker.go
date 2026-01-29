@@ -33,6 +33,9 @@ type upgradeWorkerArgs struct {
 func (upgradeWorkerArgs) Kind() string { return "upgrade" }
 
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
+//
+// A job is considered unique by it's model uuid argument, and if it hasn't reached a completed state.
+// Once it reaches completed, this job may be launched for the same model uuid again.
 func (upgradeWorkerArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
 		UniqueOpts: river.UniqueOpts{

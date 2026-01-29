@@ -63,6 +63,16 @@ type upgradeToWorker struct {
 }
 
 // Work implements the [river.Worker] interface.
+//
+// Each upgradeTo job acts as a orchestrator of two child jobs, starting them and waiting for their
+// completion sequentially.
+//
+// River's unique-job args and states are setup to ensure that in-progress jobs are not re-inserted,
+// keyed by the model UUID and job state.
+//
+// Each child job is expected to be idempotent so that in certain edge cases where an orchestrator
+// restart would cause re-insertion of a completed job, no changes are made. (Like between the completion
+// of the migration job and the insertion of the upgrade job).
 func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
 

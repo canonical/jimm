@@ -396,23 +396,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	var supervisingJobFailureUpdate *rivertype.JobRow
-
-loop:
-	for {
-		select {
-		case event := <-sub:
-			if event.Job.ID != supervisingJobId {
-				continue loop
-			}
-			// We've caught the suppervising job entering "some state".
-			// Capture it, and break out.
-			supervisingJobFailureUpdate = event.Job
-			break loop
-		case <-ctx.Done():
-			c.Fatal("timed out waiting for job failed event")
-		}
-	}
+	supervisingJobFailureUpdate := waitForSupervisingJob(c, ctx, sub, supervisingJobId)
 
 	// At this point, our job is cancelled and we'll see it as "completed".
 	c.Assert(supervisingJobFailureUpdate.State, qt.Equals, rivertype.JobStateCompleted)
@@ -578,6 +562,22 @@ loop:
 			if event.Job.FinalizedAt != nil {
 				return event.Job
 			}
+		case <-ctx.Done():
+			c.Fatal("timed out waiting for job failed event")
+		}
+	}
+}
+
+func waitForSupervisingJob(c *qt.C, ctx context.Context, sub <-chan *river.Event, supervisingJobId int64) *rivertype.JobRow {
+	for {
+		select {
+		case event := <-sub:
+			if event.Job.ID != supervisingJobId {
+				continue
+			}
+			// We've caught the suppervising job entering "some state".
+			// Capture it, and break out.
+			return event.Job
 		case <-ctx.Done():
 			c.Fatal("timed out waiting for job failed event")
 		}

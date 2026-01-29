@@ -44,6 +44,9 @@ type migrationWorkerArgs struct {
 func (migrationWorkerArgs) Kind() string { return "upgrade-migration" }
 
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
+//
+// A job is considered unique by it's model uuid argument, and if it hasn't reached a completed state.
+// Once it reaches completed, this job may be launched for the same model uuid again.
 func (migrationWorkerArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
 		UniqueOpts: river.UniqueOpts{
