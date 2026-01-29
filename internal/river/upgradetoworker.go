@@ -12,14 +12,14 @@ import (
 	"github.com/riverqueue/river/rivertype"
 )
 
-// waitForJobFinalisationFunc is a function that waits for a job to finalise.
-type waitForJobFinalisationFunc func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error
+// awaitCompletionFunc is a function that waits for a job to finalise.
+type awaitCompletionFunc func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error
 
-func newUpgradeToWorker(migrateRetries int, upgradeRetries int, finaliser waitForJobFinalisationFunc) *upgradeToWorker {
+func newUpgradeToWorker(migrateRetries int, upgradeRetries int, awaitFunc awaitCompletionFunc) *upgradeToWorker {
 	return &upgradeToWorker{
-		migrateRetries: migrateRetries,
-		upgradeRetries: upgradeRetries,
-		finaliser:      finaliser,
+		migrateRetries:  migrateRetries,
+		upgradeRetries:  upgradeRetries,
+		awaitCompletion: awaitFunc,
 	}
 }
 
@@ -34,6 +34,23 @@ type UpgradeToArgs struct {
 // Kind implements the [river.JobArgs] interface.
 func (UpgradeToArgs) Kind() string { return "upgrade-to" }
 
+// InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
+func (UpgradeToArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		MaxAttempts: 3,
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRunning,
+				rivertype.JobStateRetryable,
+				rivertype.JobStateScheduled,
+			},
+		},
+	}
+}
+
 type upgradeToWorker struct {
 	river.WorkerDefaults[UpgradeToArgs]
 
@@ -41,8 +58,8 @@ type upgradeToWorker struct {
 	migrateRetries int
 	// upgradeRetries is the number of times to retry the upgrade step.
 	upgradeRetries int
-	// finaliser is a function that waits for a job to finalise.
-	finaliser waitForJobFinalisationFunc
+	// awaitCompletion is a function that waits for a job to finalise.
+	awaitCompletion awaitCompletionFunc
 }
 
 // Work implements the [river.Worker] interface.
@@ -56,7 +73,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 	)
 	defer cancel()
 
-	migRes, err := client.Insert(
+	migrateInsertResponse, err := client.Insert(
 		ctx,
 		migrationWorkerArgs{
 			Username:             job.Args.Username,
@@ -81,14 +98,14 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	if err := w.finaliser(ctx, migRes, eventCh); err != nil {
+	if err := w.awaitCompletion(ctx, migrateInsertResponse, eventCh); err != nil {
 		return err
 	}
 
 	// We need not worry about a crash here and the migrate completing, as a new job will be inserted, sure,
 	// but our idempotency of the migrate service will ensure it is a no-op.
 
-	upgradeRes, err := client.Insert(
+	upgradeInsertResponse, err := client.Insert(
 		ctx,
 		upgradeArgs{
 			ModelUUID:     job.Args.ModelUUID,
@@ -112,7 +129,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	if err := w.finaliser(ctx, upgradeRes, eventCh); err != nil {
+	if err := w.awaitCompletion(ctx, upgradeInsertResponse, eventCh); err != nil {
 		return err
 	}
 
