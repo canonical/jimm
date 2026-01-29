@@ -116,7 +116,7 @@ func (s *controllerSuite) TestControllerVersion(c *gc.C) {
 	err := conn.APICall("Controller", 12, "", "ControllerVersion", nil, &result)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, jc.DeepEquals, jujuparams.ControllerVersionResults{
-		Version:   "3.6.13",
+		Version:   "3.6.14",
 		GitCommit: jimmversion.VersionInfo.GitCommit,
 	})
 }
