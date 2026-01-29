@@ -49,7 +49,11 @@ type upgradeToWorker struct {
 func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
 
-	eventCh, cancel := client.Subscribe(river.EventKindJobCompleted, river.EventKindJobCancelled, river.EventKindJobFailed)
+	eventCh, cancel := client.Subscribe(
+		river.EventKindJobCompleted,
+		river.EventKindJobCancelled,
+		river.EventKindJobFailed,
+	)
 	defer cancel()
 
 	migRes, err := client.Insert(
@@ -80,6 +84,9 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 	if err := w.finaliser(ctx, migRes, eventCh); err != nil {
 		return err
 	}
+
+	// We need not worry about a crash here and the migrate completing, as a new job will be inserted, sure,
+	// but our idempotency of the migrate service will ensure it is a no-op.
 
 	upgradeRes, err := client.Insert(
 		ctx,

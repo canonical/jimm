@@ -381,6 +381,7 @@ loop:
 // The aim of this test is to ensure that only 1 migrate job is inserted, even after a crash.
 func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	c := qt.New(t)
+
 	ctx := c.Context()
 
 	ctrl := gomock.NewController(c)
@@ -408,12 +409,12 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 		1,
 		1,
 		func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
-			defer once.Do(func() { close(migrateWaitToComplete) })
-
 			if crash {
 				crash = false
-				panic("simulated crash")
+				return errors.New("simulated crash")
 			}
+
+			once.Do(func() { close(migrateWaitToComplete) })
 
 			return waitForJobToFinalise(ctx, result, eventCh)
 		},
@@ -438,14 +439,22 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
-		ModelUUID:            "model-uuid",
-		TargetVersion:        version.MustParse("2.0.0"),
-		Username:             username,
-		TargetControllerName: "target-controller",
-	},
+	insRes, err := riverClient.Insert(
+		ctx,
+		UpgradeToArgs{
+			ModelUUID:            "model-uuid",
+			TargetVersion:        version.MustParse("2.0.0"),
+			Username:             username,
+			TargetControllerName: "target-controller",
+		},
 		// Set max attempts to 2 so it can retry once after the crash.
-		&river.InsertOpts{MaxAttempts: 2},
+		&river.InsertOpts{
+			MaxAttempts: 2,
+			UniqueOpts: river.UniqueOpts{
+				ByArgs:  true,
+				ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning, rivertype.JobStateRetryable, rivertype.JobStateScheduled},
+			},
+		},
 	)
 	c.Assert(err, qt.IsNil)
 
