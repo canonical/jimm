@@ -25,12 +25,14 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
 type upgradeManagerDeps struct {
 	bootstrapManager *mocks.MockBootstrapManager
 	jujuManager      *mocks.MockJujuManager
 	store            *mocks.MockStore
+	enqueuer         *mocks.MockUpgradeEnqueuer
 	dialer           *mocks.MockDialer
 	api              *mocks.MockAPI
 }
@@ -43,6 +45,7 @@ func setupTest(t *testing.T) upgradeManagerDeps {
 	s.bootstrapManager = mocks.NewMockBootstrapManager(ctrl)
 	s.jujuManager = mocks.NewMockJujuManager(ctrl)
 	s.store = mocks.NewMockStore(ctrl)
+	s.enqueuer = mocks.NewMockUpgradeEnqueuer(ctrl)
 	s.dialer = mocks.NewMockDialer(ctrl)
 	s.api = mocks.NewMockAPI(ctrl)
 
@@ -53,14 +56,14 @@ func TestNewUpgradeManager(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
-	_, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	_, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 }
 
 func TestNewUpgradeManager_InvalidParams(t *testing.T) {
 	c := qt.New(t)
 
-	_, err := upgrade.NewUpgradeManager(nil, nil, nil, nil)
+	_, err := upgrade.NewUpgradeManager(nil, nil, nil, nil, nil)
 	c.Assert(err, qt.ErrorMatches, "bootstrap manager cannot be nil")
 }
 
@@ -70,7 +73,7 @@ func TestPrepareUpgradeTo_RejectsCurrentVersionNewerThanTarget(t *testing.T) {
 
 	ctx := c.Context()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
@@ -95,7 +98,7 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 
 	ctx := c.Context()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
@@ -167,7 +170,7 @@ func TestCloneController_Success(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	jobId := "550e8400-e29b-41d4-a716-446655440000"
@@ -188,7 +191,7 @@ func TestCloneController_Error(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	errorToReturn := errors.New("bootstrap error")
@@ -204,7 +207,7 @@ func TestCloneController_WaitForJobCompletionError(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	jobId := "550e8400-e29b-41d4-a716-446655440000"
@@ -222,83 +225,21 @@ func TestCloneController_WaitForJobCompletionError(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".*bootstrap job failed.*job failed.*")
 }
 
-func TestMigrateAndUpgradeModel_Success(t *testing.T) {
-	s := setupTest(t)
-	c := qt.New(t)
-
-	ctx := c.Context()
-
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
-	c.Assert(err, qt.IsNil)
-
-	mt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
-	targetController := "4.0controller"
-	targetModelVersion, err := version.Parse("4.1.0")
-	c.Assert(err, qt.IsNil)
-
-	s.jujuManager.EXPECT().
-		InitiateInternalMigration(ctx, gomock.Any(), mt.Id(), targetController).
-		Return(
-			jujuparams.InitiateMigrationResult{
-				ModelTag:    mt.String(),
-				MigrationId: "1",
-			},
-			nil,
-		)
-
-	s.jujuManager.EXPECT().
-		ModelInfo(
-			gomock.Any(),
-			gomock.Any(),
-			mt,
-		).
-		Return(&jujuparams.ModelInfo{
-			UUID: mt.Id(),
-		}, nil)
-
-	s.jujuManager.EXPECT().
-		GetModel(gomock.Any(), mt.Id()).
-		Return(
-			dbmodel.Model{
-				Controller: dbmodel.Controller{
-					Name: targetController,
-				},
-			},
-			nil,
-		)
-
-	s.store.EXPECT().
-		GetController(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, ctrl *dbmodel.Controller) error {
-			*ctrl = dbmodel.Controller{
-				Name:         targetController,
-				AgentVersion: "4.1.0",
-			}
-			return nil
-		})
-
-	s.dialer.EXPECT().Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(s.api, nil)
-
-	s.api.EXPECT().
-		UpgradeModel(mt.Id(), targetModelVersion, "", false, false).
-		Return(targetModelVersion, nil)
-
-	controllerChosenVersion, err := upgradeMgr.MigrateAndUpgradeModel(ctx, &openfga.User{}, mt.Id(), targetController, targetModelVersion)
-	c.Assert(err, qt.IsNil)
-	c.Assert(controllerChosenVersion, qt.Equals, targetModelVersion)
-}
-
 func TestUpgradeTo_Success(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
 	ctx := c.Context()
-	user := &openfga.User{}
+	user := &openfga.User{
+		Identity: &dbmodel.Identity{
+			Name: "alice@canonical.com",
+		},
+	}
 	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 	targetVersion, err := version.Parse("4.2.0")
 	c.Assert(err, qt.IsNil)
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	// PrepareUpgradeTo expectations.
@@ -372,58 +313,17 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(nil)
 
 	// Migration expectations.
-	s.jujuManager.EXPECT().
-		InitiateInternalMigration(ctx, user, modelUUID, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, u *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
-			c.Assert(targetController, qt.Equals, newControllerName)
-			mt := names.NewModelTag(modelUUID)
-			return jujuparams.InitiateMigrationResult{
-				ModelTag:    mt.String(),
-				MigrationId: "1",
-			}, nil
-		})
+	s.enqueuer.EXPECT().EnqueueUpgradeTo(gomock.Any()).DoAndReturn(func(uta rivertypes.UpgradeToArgs) (int64, error) {
+		c.Check(uta.ModelUUID, qt.Equals, modelUUID)
+		c.Check(uta.TargetVersion, qt.Equals, targetVersion)
+		c.Check(uta.Username, qt.Equals, user.Name)
+		// Don't check target controller name since that is currently generated based on the current time.
+		return 1, nil
+	})
 
-	s.jujuManager.EXPECT().
-		ModelInfo(gomock.Any(), gomock.Any(), gomock.Any()).
-		AnyTimes().
-		DoAndReturn(func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
-			c.Assert(mt.Id(), qt.Equals, modelUUID)
-			return &jujuparams.ModelInfo{UUID: modelUUID}, nil
-		})
-
-	s.jujuManager.EXPECT().
-		GetModel(gomock.Any(), modelUUID).
-		AnyTimes().
-		DoAndReturn(func(ctx context.Context, uuid string) (dbmodel.Model, error) {
-			// Return the current value of newControllerName so that once it is set
-			// by the StartBootstrapJob expectation, subsequent migration retry
-			// loop iterations see the migrated controller name and succeed.
-			return dbmodel.Model{
-				Controller: dbmodel.Controller{
-					Name: newControllerName,
-				},
-			}, nil
-		})
-
-	s.store.EXPECT().
-		GetController(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, ctrl *dbmodel.Controller) error {
-			c.Assert(ctrl.Name, qt.Equals, newControllerName)
-			ctrl.AgentVersion = targetVersion.String()
-			return nil
-		})
-
-	s.dialer.EXPECT().
-		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(s.api, nil)
-
-	s.api.EXPECT().
-		UpgradeModel(modelUUID, targetVersion, "", false, false).
-		Return(targetVersion, nil)
-
-	chosenVersion, err := upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetVersion)
+	jobID, err := upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetVersion)
 	c.Assert(err, qt.IsNil)
-	c.Assert(chosenVersion, qt.Equals, targetVersion)
+	c.Assert(jobID, qt.Equals, int64(1))
 
 	parts := strings.Split(newControllerName, "-")
 	c.Assert(len(parts), qt.Equals, 2)
@@ -432,13 +332,30 @@ func TestUpgradeTo_Success(t *testing.T) {
 	c.Assert(time.Since(time.Unix(ts, 0)) < 2*time.Second, qt.IsTrue)
 }
 
+func TestUpgradeTo_ValidatesTargetVersion(t *testing.T) {
+	s := setupTest(t)
+	c := qt.New(t)
+
+	ctx := c.Context()
+	user := &openfga.User{}
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+	targetVersion, err := version.Parse("0.0.0")
+	c.Assert(err, qt.IsNil)
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
+	c.Assert(err, qt.IsNil)
+
+	_, err = upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetVersion)
+	c.Assert(err, qt.ErrorMatches, ".*target version cannot be zero*")
+}
+
 func TestMigrateModel_Success(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
 	ctx := c.Context()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
@@ -496,7 +413,7 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 
 	ctx := c.Context()
 
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
@@ -550,7 +467,7 @@ func TestMigrateModel_IdempotencyWhenModelHasAlreadyBeenMigrated(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := c.Context()
-	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer)
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
 	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
@@ -577,6 +494,7 @@ func TestUpgradeModel_RejectsZeroTargetVersion(t *testing.T) {
 		s.jujuManager,
 		s.store,
 		s.dialer,
+		s.enqueuer,
 	)
 	c.Assert(err, qt.IsNil)
 
@@ -598,6 +516,7 @@ func TestUpgradeModel_ModelNotFound(t *testing.T) {
 		s.jujuManager,
 		s.store,
 		s.dialer,
+		s.enqueuer,
 	)
 	c.Assert(err, qt.IsNil)
 
@@ -621,6 +540,7 @@ func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {
 		s.jujuManager,
 		s.store,
 		s.dialer,
+		s.enqueuer,
 	)
 	c.Assert(err, qt.IsNil)
 
@@ -659,6 +579,7 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 		s.jujuManager,
 		s.store,
 		s.dialer,
+		s.enqueuer,
 	)
 	c.Assert(err, qt.IsNil)
 
@@ -712,6 +633,7 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 		s.jujuManager,
 		s.store,
 		s.dialer,
+		s.enqueuer,
 	)
 	c.Assert(err, qt.IsNil)
 
@@ -739,5 +661,6 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 //go:generate go tool mockgen -typed -destination=./mocks/bootstrapmanager.go -package=mocks . BootstrapManager
 //go:generate go tool mockgen -typed -destination=./mocks/jujumanager.go -package=mocks . JujuManager
 //go:generate go tool mockgen -typed -destination=./mocks/store.go -package=mocks . Store
+//go:generate go tool mockgen -typed -destination=./mocks/enqueuer.go -package=mocks . UpgradeEnqueuer
 //go:generate go tool mockgen -typed -destination=./mocks/dialer.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju Dialer
 //go:generate go tool mockgen -typed -destination=./mocks/api.go -package=mocks github.com/canonical/jimm/v3/internal/jimm/juju API

@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
 func TestUpgradeToWorker_Success(t *testing.T) {
@@ -56,7 +57,7 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -103,7 +104,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -124,7 +125,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("3.0.0")).
 		Return(nil)
 
-	insRes, err = riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err = riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("3.0.0"),
 		Username:             username,
@@ -190,7 +191,7 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -246,7 +247,7 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -315,7 +316,7 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -376,7 +377,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed, river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	_, err := riverClient.Insert(ctx, UpgradeToArgs{
+	_, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -459,7 +460,7 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	insRes, err := riverClient.Insert(ctx, UpgradeToArgs{
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,

@@ -4,10 +4,10 @@ package river
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	_ "github.com/canonical/jimm/v3/internal/jimm/upgrade" // Dummy import to prevent future circular dependency
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
@@ -15,7 +15,13 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 )
 
-// UpgradeManager defines the methods required from this manager for the workers.
+const (
+	defaultQueueMaxWorkers = 5
+	defaultMigrateRetries  = 3
+	defaultUpgradeRetries  = 3
+)
+
+// UpgradeManager defines the methods for the domain logic of upgrades.
 type UpgradeManager interface {
 	// MigrateModel migrates a model to a new controller without upgrading the model's agent.
 	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
@@ -37,22 +43,7 @@ func StartWorkers(
 	openfgaClient *openfga.OFGAClient,
 	upgradeManager UpgradeManager,
 ) error {
-	workers := river.NewWorkers()
-
-	migrationWorker, err := newMigrationWorker(openfgaClient, db, upgradeManager)
-	if err != nil {
-		return err
-	}
-	err = river.AddWorkerSafely(workers, migrationWorker)
-	if err != nil {
-		return err
-	}
-
-	upgradeWorker, err := newUpgradeWorker(upgradeManager)
-	if err != nil {
-		return err
-	}
-	err = river.AddWorkerSafely(workers, upgradeWorker)
+	workers, err := newWorkers(openfgaClient, db, upgradeManager)
 	if err != nil {
 		return err
 	}
@@ -61,9 +52,10 @@ func StartWorkers(
 	if err != nil {
 		return err
 	}
+
 	riverClient, err := river.NewClient(riverdatabasesql.New(sqlDb), &river.Config{
 		Queues: map[string]river.QueueConfig{
-			river.QueueDefault: {MaxWorkers: 5},
+			river.QueueDefault: {MaxWorkers: defaultQueueMaxWorkers},
 		},
 		Workers: workers,
 	})
@@ -71,6 +63,33 @@ func StartWorkers(
 		return err
 	}
 	return riverClient.Start(ctx)
+}
+
+func newWorkers(openfgaClient *openfga.OFGAClient, store *db.Database, upgradeManager UpgradeManager) (*river.Workers, error) {
+	workers := river.NewWorkers()
+
+	migrationWorker, err := newMigrationWorker(openfgaClient, store, upgradeManager)
+	if err != nil {
+		return nil, err
+	}
+	if err := river.AddWorkerSafely(workers, migrationWorker); err != nil {
+		return nil, err
+	}
+
+	upgradeWorker, err := newUpgradeWorker(upgradeManager)
+	if err != nil {
+		return nil, err
+	}
+	if err := river.AddWorkerSafely(workers, upgradeWorker); err != nil {
+		return nil, err
+	}
+
+	upgradeToWorker := newUpgradeToWorker(defaultMigrateRetries, defaultUpgradeRetries, waitForJobToFinalise)
+	if err := river.AddWorkerSafely(workers, upgradeToWorker); err != nil {
+		return nil, err
+	}
+
+	return workers, nil
 }
 
 // MigrateRiver performs the necessary migrations for the River job queue.
@@ -88,17 +107,4 @@ func MigrateRiver(ctx context.Context, db *db.Database) error {
 		return err
 	}
 	return nil
-}
-
-// NewRiverClient creates a new RiverClient instance.
-func NewRiverClient(db *db.Database, cfg river.Config) (*river.Client[*sql.Tx], error) {
-	sqlDb, err := db.SqlDB()
-	if err != nil {
-		return nil, err
-	}
-	client, err := river.NewClient(riverdatabasesql.New(sqlDb), &cfg)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
 }

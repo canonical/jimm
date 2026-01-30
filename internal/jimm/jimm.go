@@ -46,6 +46,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -320,7 +321,7 @@ type BootstrapManager interface {
 
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.
 type UpgradeManager interface {
-	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error)
+	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error)
 	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
 	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
 }
@@ -367,6 +368,9 @@ type Parameters struct {
 	// MigrationTokenGenerator is used to generate migration tokens for
 	// authentication between Juju and JIMM during model migration.
 	MigrationTokenGenerator juju.MigrationTokenGenerator
+
+	// RiverClient is the client used to enqueue long-running jobs.
+	RiverClient *river.Client
 
 	// AuditLogRetentionDays is the number of days to keep audit logs.
 	// The default value of 0 indicates that logs will never be deleted.
@@ -555,7 +559,7 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.bootstrapManager = bootstrapManager
 
-	upgradeManager, err := upgrade.NewUpgradeManager(j.bootstrapManager, j.jujuManager, j.Database, j.Dialer)
+	upgradeManager, err := upgrade.NewUpgradeManager(j.bootstrapManager, j.jujuManager, j.Database, j.Dialer, j.RiverClient)
 	if err != nil {
 		return nil, err
 	}

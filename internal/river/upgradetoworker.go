@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/juju/version/v2"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
@@ -23,36 +23,8 @@ func newUpgradeToWorker(migrateRetries int, upgradeRetries int, awaitFunc awaitC
 	}
 }
 
-// UpgradeToArgs are the arguments for the upgrade-to worker.
-type UpgradeToArgs struct {
-	ModelUUID            string         `json:"model-uuid" river:"unique"`
-	TargetVersion        version.Number `json:"target-version"`
-	Username             string         `json:"username"`
-	TargetControllerName string         `json:"target_controller_name"`
-}
-
-// Kind implements the [river.JobArgs] interface.
-func (UpgradeToArgs) Kind() string { return "upgrade-to" }
-
-// InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
-func (UpgradeToArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{
-		MaxAttempts: 3,
-		UniqueOpts: river.UniqueOpts{
-			ByArgs: true,
-			ByState: []rivertype.JobState{
-				rivertype.JobStateAvailable,
-				rivertype.JobStatePending,
-				rivertype.JobStateRunning,
-				rivertype.JobStateRetryable,
-				rivertype.JobStateScheduled,
-			},
-		},
-	}
-}
-
 type upgradeToWorker struct {
-	river.WorkerDefaults[UpgradeToArgs]
+	river.WorkerDefaults[rivertypes.UpgradeToArgs]
 
 	// migrateRetries is the number of times to retry the migration step.
 	migrateRetries int
@@ -73,7 +45,7 @@ type upgradeToWorker struct {
 // Each child job is expected to be idempotent so that in certain edge cases where an orchestrator
 // restart would cause re-insertion of a completed job, no changes are made. (Like between the completion
 // of the migration job and the insertion of the upgrade job).
-func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs]) error {
+func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
 
 	eventCh, cancel := client.Subscribe(

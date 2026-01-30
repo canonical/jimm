@@ -47,6 +47,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/vault"
 )
 
@@ -373,6 +374,13 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		DB: database,
 	}
 	jimmParameters.Database = db
+
+	riverClient, err := river.NewRiverClient(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create river client: %w", err)
+	}
+
+	jimmParameters.RiverClient = riverClient
 
 	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {

@@ -28,6 +28,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
 var (
@@ -53,12 +54,18 @@ type Store interface {
 	GetModel(ctx context.Context, model *dbmodel.Model) (err error)
 }
 
+// UpgradeEnqueuer defines the method to enqueue an upgrade job.
+type UpgradeEnqueuer interface {
+	EnqueueUpgradeTo(args rivertypes.UpgradeToArgs) (int64, error)
+}
+
 // upgradeManager provides a means to manage controller upgrades within JIMM.
 type upgradeManager struct {
 	bootstrapManager BootstrapManager
 	jujuManager      JujuManager
 	store            Store
 	dialer           juju.Dialer
+	enqueuer         UpgradeEnqueuer
 }
 
 // NewUpgradeManager creates a new UpgradeManager instance.
@@ -67,6 +74,7 @@ func NewUpgradeManager(
 	jujumanager JujuManager,
 	store Store,
 	dialer juju.Dialer,
+	enqueuer UpgradeEnqueuer,
 ) (*upgradeManager, error) {
 	if bootstrapManager == nil {
 		return nil, errors.E("bootstrap manager cannot be nil")
@@ -80,11 +88,15 @@ func NewUpgradeManager(
 	if dialer == nil {
 		return nil, errors.E("dialer cannot be nil")
 	}
+	if enqueuer == nil {
+		return nil, errors.E("enqueuer cannot be nil")
+	}
 	return &upgradeManager{
 		bootstrapManager: bootstrapManager,
 		jujuManager:      jujumanager,
 		store:            store,
 		dialer:           dialer,
+		enqueuer:         enqueuer,
 	}, nil
 }
 
@@ -204,99 +216,6 @@ func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User
 	return nil
 }
 
-// MigrateAndUpgradeModel migrates a model to a new controller and upgrades the model's agent to the controller's agent version.
-func (u *upgradeManager) MigrateAndUpgradeModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, targetVersion version.Number) (version.Number, error) {
-	var controllerChosenVersion version.Number
-
-	// TODO: Once precheck PR merged, run precheck.
-
-	// As the controller has just been bootstrapped, the controller machine can still be in a pending state.
-	// Unfortunately Juju doesn't return a typed error for us to examine, and the best we've got is the error message string.
-	// So we retry a few times here to allow the controller machine to come up.
-	var iimResult jujuparams.InitiateMigrationResult
-	if err := retry.Call(
-		retry.CallArgs{
-			Attempts: 30,
-			Delay:    10 * time.Second,
-			// We could consider all errors fatal, bar: target prechecks failed: machine 0 not running (pending)
-			// IsFatalError:
-			Func: func() error {
-				zapctx.Debug(ctx, "Attempting to initiate internal migration")
-				r, err := u.jujuManager.InitiateInternalMigration(ctx, user, modelUUID, targetControllerName)
-				if err != nil {
-					zapctx.Error(ctx, "Failed to initiate internal migration", zap.Error(err))
-					return err
-				}
-
-				iimResult = r
-				return nil
-			},
-			Clock: clock.WallClock,
-		},
-	); err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to initiate internal migration: %w", err))
-	}
-
-	mt, err := names.ParseModelTag(iimResult.ModelTag)
-	if err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to parse model tag from initiate internal migration result: %w", err))
-	}
-
-	var mi *jujuparams.ModelInfo
-	if err := retry.Call(
-		retry.CallArgs{
-			Attempts: 30,
-			Delay:    10 * time.Second,
-			Func: func() error {
-				mi, err = u.jujuManager.ModelInfo(ctx, user, mt)
-				if err != nil {
-					return err
-				}
-
-				m, err := u.jujuManager.GetModel(ctx, mi.UUID)
-				if err != nil {
-					return err
-				}
-
-				// It hasn't migrated yet, so error out.
-				if m.Controller.Name != targetControllerName {
-					return errors.E("model has not yet migrated to target controller")
-				}
-
-				return nil
-			},
-			Clock: clock.WallClock,
-		},
-	); err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to confirm internal migration completed: %w", err))
-	}
-
-	dbCtrl := &dbmodel.Controller{Name: targetControllerName}
-	if err := u.store.GetController(ctx, dbCtrl); err != nil {
-		return controllerChosenVersion, errors.E(errors.CodeNotFound, err, "controller not found")
-	}
-
-	api, err := u.dialer.Dial(ctx, dbCtrl, names.ModelTag{}, nil, nil)
-	if err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to dial target controller: %w", err))
-	}
-
-	zapctx.Debug(ctx, "upgrading model agent after migration", zap.String("model-uuid", mi.Name))
-
-	controllerChosenVersion, err = u.upgradeModel(ctx, api, modelUUID, targetVersion, false)
-	if err != nil {
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to upgrade model after migration: %w", err))
-	}
-
-	zapctx.Info(ctx, "model migrate and upgrade complete",
-		zap.String("model-uuid", modelUUID),
-		zap.String("target-controller", targetControllerName),
-		zap.String("target-version", targetVersion.String()),
-		zap.String("controller-chosen-version", controllerChosenVersion.String()),
-	)
-	return controllerChosenVersion, nil
-}
-
 // UpgradeModel upgrades the model to the provided agent version.
 func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error {
 	// Forbid a zero target version as this complicates checking for whether
@@ -362,18 +281,20 @@ func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 
 // UpgradeTo upgrades a model.
 // That is, it bootstraps a new controller with the target version
-// and migrates the model to that controller. This is "Phase 1" of the
-// automated upgrade process.
+// and inserts a River job to migrate and upgrade the model to the new controller.
+// It returns the River job ID.
 //
-// This currently only works with personal, non-kubernetes clouds.
-// Further work in Phase 2 is expected to be done here: https://warthogs.atlassian.net/browse/JUJU-8918
-func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (version.Number, error) {
-	var chosenVersion version.Number
+// This currently only works with non-kubernetes clouds.
+func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error) {
 	var newControllerName = fmt.Sprintf("controller-%d", time.Now().Unix())
+
+	if targetVersion == version.Zero {
+		return 0, errors.E(errors.CodeBadRequest, "target version cannot be zero")
+	}
 
 	bsCloud, bsCloudRegion, bsCredential, err := u.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
 	if err != nil {
-		return chosenVersion, errors.E(fmt.Errorf("failed to prepare for upgrade: %w", err))
+		return 0, errors.E(fmt.Errorf("failed to prepare for upgrade: %w", err))
 	}
 
 	cloneParams := CloneControllerParams{
@@ -390,52 +311,23 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 	// TODO: Map user config from source controller here.
 
 	if err := u.CloneController(ctx, user, cloneParams); err != nil {
-		return chosenVersion, errors.E(fmt.Errorf("failed to clone controller: %w", err))
+		return 0, errors.E(fmt.Errorf("failed to clone controller: %w", err))
 	}
 
-	chosenVersion, err = u.MigrateAndUpgradeModel(
-		ctx,
-		user,
-		modelUUID,
-		cloneParams.ControllerName,
-		targetVersion,
-	)
+	id, err := u.enqueuer.EnqueueUpgradeTo(rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		TargetVersion:        targetVersion,
+		Username:             user.Name,
+		TargetControllerName: newControllerName,
+	})
 	if err != nil {
-		return chosenVersion, errors.E(fmt.Errorf("failed to migrate and upgrade model: %w", err))
+		return 0, errors.E(fmt.Errorf("failed to enqueue model migration and upgrade job: %w", err))
 	}
 
-	return chosenVersion, nil
+	return id, nil
 }
-
-func (u *upgradeManager) upgradeModel(ctx context.Context, api juju.API, modelUUID string, targetVersion version.Number, dryRun bool) (version.Number, error) {
-	var upgradeErr error
-	var controllerChosenVersion version.Number
-
-	controllerChosenVersion, upgradeErr = api.UpgradeModel(modelUUID, targetVersion, "", false, dryRun)
-	//nolint:staticcheck // Has a description to highlight this possibility.
-	if jujuparams.IsCodeUpgradeInProgress(upgradeErr) {
-		zapctx.Error(ctx, "model upgrade already in progress")
-		// Apparently upgrades can have issues, that can be manually resolved, then you can run
-		// the upgrade-model command with the --reset-previous-upgrade option.
-		// We can't do that here, so we just return an error. We could possible indicate to the user here
-		// that manual intervention is required.
-	}
-	if jujuerrors.Is(upgradeErr, jujuerrors.AlreadyExists) {
-		upgradeErr = AlreadyUpgradedError
-	}
-
-	if upgradeErr != nil {
-		zapctx.Error(ctx, "failed to upgrade model after migration", zap.Error(upgradeErr))
-		return controllerChosenVersion, errors.E(fmt.Errorf("failed to upgrade model after migration: %w", upgradeErr))
-	}
-
-	return controllerChosenVersion, nil
-}
-
-// Phase 2 of automated upgrades is from here onwards.
 
 // MigrateModel migrates a model to a new controller without upgrading the model's agent.
-// This is Phase 2 of automated upgrades and to be called from a river worker.
 //
 // If the model is already on the target controller, no action is taken and nil is returned.
 func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error {
