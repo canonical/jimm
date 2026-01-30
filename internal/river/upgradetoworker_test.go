@@ -64,7 +64,7 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, sub, insRes)
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(row.Errors, qt.HasLen, 0)
 }
@@ -111,7 +111,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, sub, insRes)
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.ID, qt.Equals, int64(1))
 	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(row.Errors, qt.HasLen, 0)
@@ -132,7 +132,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	row = waitForFinalisedJob(c, ctx, sub, insRes)
+	row = waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.ID, qt.Equals, int64(4))
 	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(row.Errors, qt.HasLen, 0)
@@ -198,7 +198,7 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 	}, &river.InsertOpts{MaxAttempts: 1})
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, sub, insRes)
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateDiscarded)
 	// Ensure we capture the last error only from the migrate job, and that it is surfaced to the upgrade to job.
 	upgradeToJobFinalError := row.Errors[len(row.Errors)-1].Error
@@ -254,7 +254,7 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	}, &river.InsertOpts{MaxAttempts: 1})
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, sub, insRes)
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateDiscarded)
 	// Ensure we capture the last error only from the migrate job, and that it is surfaced to the upgrade to job.
 	upgradeToJobFinalError := row.Errors[len(row.Errors)-1].Error
@@ -323,7 +323,7 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	row := waitForFinalisedJob(c, ctx, sub, insRes)
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(row.Errors, qt.HasLen, 0)
 }
@@ -384,7 +384,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	supervisingJobFailureUpdate := waitForSupervisingJob(c, ctx, sub, supervisingJobId)
+	supervisingJobFailureUpdate := waitForFinalisedJob(c, ctx, sub, supervisingJobId)
 
 	// At this point, our job is cancelled and we'll see it as "completed".
 	c.Assert(supervisingJobFailureUpdate.State, qt.Equals, rivertype.JobStateCompleted)
@@ -475,7 +475,7 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	// 5. Waits for the migrate to finalise, but this time, unblocks the migrate job just before waiting.
 	// 6. 2nd try of supervisor finally completes.
 	// And we expect to see the supervisor attempted twice, but migrate once.
-	supervisorRow := waitForFinalisedJob(c, ctx, sub, insRes)
+	supervisorRow := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(supervisorRow.State, qt.Equals, rivertype.JobStateCompleted)
 	c.Assert(supervisorRow.Attempt, qt.Equals, 2)
 
@@ -537,33 +537,16 @@ func setupWorkers(
 	return riverClient, u.Name
 }
 
-func waitForFinalisedJob(c *qt.C, ctx context.Context, sub <-chan *river.Event, insRes *rivertype.JobInsertResult) *rivertype.JobRow {
-loop:
+func waitForFinalisedJob(c *qt.C, ctx context.Context, sub <-chan *river.Event, jobID int64) *rivertype.JobRow {
 	for {
 		select {
 		case event := <-sub:
-			c.Logf("received job failed event for job ID %d", event.Job.ID)
-			if event.Job.ID != insRes.Job.ID {
-				continue loop
-			}
-			if event.Job.FinalizedAt != nil {
+			c.Logf("received job event for job ID %d", event.Job.ID)
+			if event.Job.ID == jobID && event.Job.FinalizedAt != nil {
 				return event.Job
 			}
 		case <-ctx.Done():
-			c.Fatal("timed out waiting for job failed event")
-		}
-	}
-}
-
-func waitForSupervisingJob(c *qt.C, ctx context.Context, sub <-chan *river.Event, supervisingJobId int64) *rivertype.JobRow {
-	for {
-		select {
-		case event := <-sub:
-			if event.Job.ID == supervisingJobId {
-				return event.Job
-			}
-		case <-ctx.Done():
-			c.Fatal("timed out waiting for job failed event")
+			c.Fatal("timed out waiting for job event")
 		}
 	}
 }

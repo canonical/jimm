@@ -22,6 +22,9 @@ func setupTestDB(c *qt.C) (*db.Database, *sql.DB) {
 	c.Assert(err, qt.IsNil)
 	sqlDB, err := db.SqlDB()
 	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		c.Check(sqlDB.Close(), qt.IsNil)
+	})
 	return db, sqlDB
 }
 
