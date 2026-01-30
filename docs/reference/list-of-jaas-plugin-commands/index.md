@@ -498,7 +498,7 @@ See also: topics
 **Aliases:** register-model
 
 ## Summary
-Import a model to jimm
+Import a model to jimm.
 
 ## Usage
 ```jaas import-model [options] <controller name> <model uuid>```

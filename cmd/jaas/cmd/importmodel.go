@@ -3,11 +3,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -37,6 +37,7 @@ local user and it will switch the model owner to the desired external user.
 func NewImportModelCommand() cmd.Command {
 	cmd := &importModelCommand{}
 	cmd.SetClientStore(jujuclient.NewFileClientStore())
+	cmd.jimmAPIFunc = cmd.newClient
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -44,9 +45,10 @@ func NewImportModelCommand() cmd.Command {
 // importModelCommand imports a model.
 type importModelCommand struct {
 	modelcmd.ControllerCommandBase
-	dialOpts *jujuapi.DialOpts
 
 	req apiparams.ImportModelRequest
+
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 // Info implements the cmd.Command interface.
@@ -54,7 +56,7 @@ func (c *importModelCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "import-model",
 		Args:     "<controller name> <model uuid>",
-		Purpose:  "Import a model to jimm",
+		Purpose:  "Import a model to jimm.",
 		Doc:      importModelCommandDoc,
 		Examples: importModelCommandExample,
 		Aliases:  []string{"register-model"},
@@ -81,7 +83,7 @@ func (c *importModelCommand) Init(args []string) error {
 
 	c.req.Controller = args[0]
 	if !names.IsValidModel(args[1]) {
-		return fmt.Errorf("invalid model uuid")
+		return errors.New("invalid model uuid")
 	}
 	c.req.ModelTag = names.NewModelTag(args[1]).String()
 	return nil
@@ -89,19 +91,32 @@ func (c *importModelCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *importModelCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	jimmAPI, err := c.jimmAPIFunc()
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create JIMM API client: %w", err)
 	}
+	defer jimmAPI.Close()
 
-	client := api.NewClient(apiCaller)
-	if err := client.ImportModel(&c.req); err != nil {
-		return err
+	if err := jimmAPI.ImportModel(&c.req); err != nil {
+		return fmt.Errorf("could not import model: %w", err)
 	}
 	return nil
+}
+
+func (c *importModelCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

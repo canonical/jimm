@@ -1,134 +1,113 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"context"
+	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/cmd/v3/cmdtesting"
-	jjcloud "github.com/juju/juju/cloud"
-	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/juju/testing/factory"
-	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
+	"github.com/juju/gnuflag"
+	"go.uber.org/mock/gomock"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type importModelSuite struct {
-	cmdtest.JimmCmdSuite
+func TestImportModelInit_ArgValidation(t *testing.T) {
+	c := qt.New(t)
+
+	validModelUUID := "ac30d6ae-0bed-4398-bba7-75d49e39f189"
+
+	cases := []struct {
+		about    string
+		args     []string
+		errMatch string
+	}{
+		{about: "0 args", args: nil, errMatch: "controller not specified"},
+		{about: "1 arg", args: []string{"controller-1"}, errMatch: "model uuid not specified"},
+		{about: "too many args", args: []string{"controller-1", validModelUUID, "extra"}, errMatch: "too many args"},
+		{about: "invalid uuid", args: []string{"controller-1", "not-a-uuid"}, errMatch: "invalid model uuid"},
+		{about: "valid uuid", args: []string{"controller-1", validModelUUID}, errMatch: ""},
+	}
+
+	for _, tc := range cases {
+		c.Run(tc.about, func(c *qt.C) {
+			cmd := &importModelCommand{}
+			err := cmd.Init(tc.args)
+			if tc.errMatch != "" {
+				c.Assert(err, qt.ErrorMatches, tc.errMatch)
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Assert(cmd.req.Controller, qt.Equals, "controller-1")
+			c.Assert(cmd.req.ModelTag, qt.Equals, "model-"+validModelUUID)
+		})
+	}
 }
 
-var _ = gc.Suite(&importModelSuite{})
+func TestImportModelRun_PassesRequestToAPI(t *testing.T) {
+	c := qt.New(t)
 
-func (s *importModelSuite) TestImportModelSuperuser(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	cmdMocks := setupCmdMocks(c)
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty", Attributes: map[string]string{"key": "value"}})
+	modelUUID := "ac30d6ae-0bed-4398-bba7-75d49e39f189"
 
-	err := s.BackingState.UpdateCloudCredential(cct, jjcloud.NewCredential(jjcloud.EmptyAuthType, map[string]string{"key": "value"}))
-	c.Assert(err, gc.Equals, nil)
+	cmdMocks.client.EXPECT().
+		ImportModel(gomock.Any()).
+		DoAndReturn(func(req *apiparams.ImportModelRequest) error {
+			c.Assert(req.Controller, qt.Equals, "controller-1")
+			c.Assert(req.ModelTag, qt.Equals, "model-"+modelUUID)
+			c.Assert(req.Owner, qt.Equals, "alice@canonical.com")
+			return nil
+		}).
+		Times(1)
 
-	m := s.Factory.MakeModel(c, &factory.ModelParams{
-		Name:            "model-2",
-		Owner:           names.NewUserTag("charlie@canonical.com"),
-		CloudName:       jimmtest.TestCloudName,
-		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: cct,
-	})
-	defer m.Close()
+	cmdMocks.client.EXPECT().Close().Times(1)
 
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
-	c.Assert(err, gc.IsNil)
+	command := &importModelCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
 
-	var model2 dbmodel.Model
-	model2.SetTag(names.NewModelTag(m.ModelUUID()))
-	err = s.JIMM.Database.GetModel(context.Background(), &model2)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.OwnerIdentityName, gc.Equals, "charlie@canonical.com")
+	err := cmdtesting.InitCommand(command, []string{"controller-1", modelUUID, "--owner", "alice@canonical.com"})
+	c.Assert(err, qt.IsNil)
+
+	err = command.Run(newTestContext(c))
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *importModelSuite) TestImportModelFromLocalUser(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
-	s.AddAdminUser(c, "charlie@canonical.com")
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	// Add credentials for Alice on the test cloud, they are needed for the Alice user to become the new model owner
-	cctAlice := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
-	s.UpdateCloudCredential(c, cctAlice, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-	var model dbmodel.Model
-	model.SetTag(mt)
-	err := s.JIMM.Database.GetModel(context.Background(), &model)
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), model.Controller.ResourceTag(), model.ResourceTag())
-	c.Assert(err, gc.Equals, nil)
-	err = s.JIMM.Database.DeleteModel(context.Background(), &model)
-	c.Assert(err, gc.Equals, nil)
+func TestImportModelRun_WithoutOwnerFlag(t *testing.T) {
+	c := qt.New(t)
 
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id(), "--owner", "alice@canonical.com")
-	c.Assert(err, gc.IsNil)
+	cmdMocks := setupCmdMocks(c)
 
-	var model2 dbmodel.Model
-	model2.SetTag(mt)
-	err = s.JIMM.Database.GetModel(context.Background(), &model2)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.CreatedAt.After(model.CreatedAt), gc.Equals, true)
-	c.Check(model2.OwnerIdentityName, gc.Equals, "alice@canonical.com")
-}
+	modelUUID := "ac30d6ae-0bed-4398-bba7-75d49e39f189"
 
-func (s *importModelSuite) TestImportModelUnauthorized(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	cmdMocks.client.EXPECT().
+		ImportModel(gomock.Any()).
+		DoAndReturn(func(req *apiparams.ImportModelRequest) error {
+			c.Assert(req.Controller, qt.Equals, "controller-1")
+			c.Assert(req.ModelTag, qt.Equals, "model-"+modelUUID)
+			c.Assert(req.Owner, qt.Equals, "")
+			return nil
+		}).
+		Times(1)
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/charlie@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
+	cmdMocks.client.EXPECT().Close().Times(1)
 
-	err := s.BackingState.UpdateCloudCredential(cct, jjcloud.NewCredential(jjcloud.EmptyAuthType, map[string]string{"key": "value"}))
-	c.Assert(err, gc.Equals, nil)
+	command := &importModelCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
 
-	m := s.Factory.MakeModel(c, &factory.ModelParams{
-		Name:            "model-2",
-		Owner:           names.NewUserTag("charlie@canonical.com"),
-		CloudName:       jimmtest.TestCloudName,
-		CloudRegion:     jimmtest.TestCloudRegionName,
-		CloudCredential: cct,
-	})
-	defer m.Close()
+	fs := gnuflag.NewFlagSet("test", gnuflag.ContinueOnError)
+	command.SetFlags(fs)
 
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err = cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-1", m.ModelUUID())
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-}
+	err := cmdtesting.InitCommand(command, []string{"controller-1", modelUUID})
+	c.Assert(err, qt.IsNil)
 
-func (s *importModelSuite) TestImportModelNoController(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, `controller not specified`)
-}
-
-func (s *importModelSuite) TestImportModelNoModelUUID(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
-	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
-}
-
-func (s *importModelSuite) TestImportModelInvalidModelUUID(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
-	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
-}
-
-func (s *importModelSuite) TestImportModelTooManyArgs(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewImportModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
-	c.Assert(err, gc.ErrorMatches, `too many args`)
+	err = command.Run(newTestContext(c))
+	c.Assert(err, qt.IsNil)
 }
