@@ -21,9 +21,7 @@ func TestUpgradeWorker(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	db := setupTestDB(c)
-	sqlDb, err := db.SqlDB()
-	c.Assert(err, qt.IsNil)
+	_, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 	w, err := newUpgradeWorker(upgradeManager)
@@ -37,6 +35,7 @@ func TestUpgradeWorker(t *testing.T) {
 
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
+	defer func() { _ = tx.Rollback() }()
 
 	result, err := testWorker.Work(c.Context(), c.TB, tx, upgradeWorkerArgs{
 		ModelUUID: "test-string", TargetVersion: version.MustParse("2.0.0")}, nil)
@@ -51,9 +50,7 @@ func TestUpgradeWorker_Error(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	db := setupTestDB(c)
-	sqlDb, err := db.SqlDB()
-	c.Assert(err, qt.IsNil)
+	_, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 	w, err := newUpgradeWorker(upgradeManager)
@@ -67,6 +64,7 @@ func TestUpgradeWorker_Error(t *testing.T) {
 
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
+	defer func() { _ = tx.Rollback() }()
 
 	result, err := testWorker.Work(c.Context(), c.TB, tx, upgradeWorkerArgs{
 		ModelUUID: "test-string", TargetVersion: version.MustParse("2.0.0")}, nil)

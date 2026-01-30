@@ -29,9 +29,7 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -41,7 +39,7 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
@@ -78,9 +76,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -90,7 +86,7 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
@@ -164,9 +160,7 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -177,7 +171,7 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 3,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
@@ -218,9 +212,7 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -231,7 +223,7 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 3,
 			awaitFunc:         waitForJobToFinalise,
@@ -277,9 +269,7 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -290,7 +280,7 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 2,
 			upgradeRetryCount: 2,
 			awaitFunc:         waitForJobToFinalise,
@@ -345,9 +335,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -359,7 +347,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 3,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
@@ -388,7 +376,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	sub, cancel := riverClient.Subscribe(river.EventKindJobFailed, river.EventKindJobCompleted)
 	c.Cleanup(cancel)
 
-	_, err = riverClient.Insert(ctx, UpgradeToArgs{
+	_, err := riverClient.Insert(ctx, UpgradeToArgs{
 		ModelUUID:            "model-uuid",
 		TargetVersion:        version.MustParse("2.0.0"),
 		Username:             username,
@@ -419,9 +407,7 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	ctrl := gomock.NewController(c)
 	defer ctrl.Finish()
 
-	database := setupTestDB(c)
-	sqlDB, err := database.SqlDB()
-	c.Assert(err, qt.IsNil)
+	database, sqlDb := setupTestDB(c)
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
@@ -438,7 +424,7 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 		setupWorkerParams{
 			database:          database,
 			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDB,
+			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 1,
 			awaitFunc: func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
@@ -537,7 +523,8 @@ func setupWorkers(
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 5},
 		},
-		Workers: workers,
+		Workers:     workers,
+		RetryPolicy: &testRetryPolicy{},
 	})
 	c.Assert(err, qt.IsNil)
 

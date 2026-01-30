@@ -24,9 +24,7 @@ func TestMigrationWorker(t *testing.T) {
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
-	db := setupTestDB(c)
-	sqlDb, err := db.SqlDB()
-	c.Assert(err, qt.IsNil)
+	db, sqlDb := setupTestDB(c)
 
 	openfgaClient := &openfga.OFGAClient{}
 	w, err := newMigrationWorker(openfgaClient, db, upgradeManager)
@@ -45,6 +43,7 @@ func TestMigrationWorker(t *testing.T) {
 
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
+	defer func() { _ = tx.Rollback() }()
 
 	result, err := testWorker.Work(
 		c.Context(),
@@ -71,9 +70,7 @@ func TestMigrationWorker_Error(t *testing.T) {
 
 	upgradeManager := NewMockUpgradeManager(ctrl)
 
-	db := setupTestDB(c)
-	sqlDb, err := db.SqlDB()
-	c.Assert(err, qt.IsNil)
+	db, sqlDb := setupTestDB(c)
 
 	openfgaClient := &openfga.OFGAClient{}
 	w, err := newMigrationWorker(openfgaClient, db, upgradeManager)
@@ -92,8 +89,7 @@ func TestMigrationWorker_Error(t *testing.T) {
 
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
-
-	c.Assert(err, qt.IsNil)
+	defer func() { _ = tx.Rollback() }()
 	result, err := testWorker.Work(
 		c.Context(),
 		c.TB,

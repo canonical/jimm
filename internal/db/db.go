@@ -119,10 +119,6 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 	logger := logger.MigrationLogger{Logger: zapctx.Logger(ctx)}
 	m.Log = logger
 
-	if err := d.handleDeprecatedMigrations(ctx, m); err != nil {
-		return fmt.Errorf("failed to handle deprecated migrations: %w", err)
-	}
-
 	v, dirty, err := m.Version()
 	if err != nil {
 		if !stderr.Is(err, migrate.ErrNilVersion) {
@@ -146,30 +142,6 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 	}
 
 	atomic.StoreUint32(&d.migrated, 1)
-	return nil
-}
-
-// This method is used for handling deployments that are live when we made the
-// switch from a home-grown migration library to golang-migrate. To avoid running
-// migrations twice, we check if the old "versions" table exists and make golang-migrate
-// aware of which migrations have been run using the Force() method.
-func (d *Database) handleDeprecatedMigrations(ctx context.Context, m *migrate.Migrate) error {
-	var version int
-	err := d.DB.Raw("SELECT minor FROM versions;").Row().Scan(&version)
-	if err != nil {
-		// The versions table may already be deleted. Other errors are ignored intentionally.
-		zapctx.Debug(ctx, "no minor version from deprecated migrations table", zap.Error(err))
-		//nolint:nilerr
-		return nil
-	}
-	if version == 0 {
-		return nil
-	}
-	zapctx.Debug(ctx, "forcing db version", zap.Int("version", version))
-	err = m.Force(version)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
