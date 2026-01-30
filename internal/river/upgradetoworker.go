@@ -102,9 +102,6 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[UpgradeToArgs
 		return err
 	}
 
-	// We need not worry about a crash here and the migrate completing, as a new job will be inserted, sure,
-	// but our idempotency of the migrate service will ensure it is a no-op.
-
 	upgradeInsertResponse, err := client.Insert(
 		ctx,
 		upgradeWorkerArgs{
