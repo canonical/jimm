@@ -20,6 +20,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -606,7 +607,7 @@ func TestFillMigrationTarget(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			db := &db.Database{
-				DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+				DB: testdb.PostgresDB(c, func() time.Time { return now }),
 			}
 			err := db.Migrate(ctx)
 			c.Assert(err, qt.IsNil)

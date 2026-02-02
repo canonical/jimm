@@ -19,8 +19,8 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/discharger"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type dischargerSuite struct {
@@ -33,7 +33,7 @@ var _ = gc.Suite(&dischargerSuite{})
 
 func (s *dischargerSuite) Init(c *qt.C) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

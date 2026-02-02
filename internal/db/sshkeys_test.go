@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type sshKeysSuite struct {
@@ -30,7 +31,7 @@ type sshKeysSuite struct {
 func (s *sshKeysSuite) Init(c *qt.C) {
 	ctx := context.Background()
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	s.Database = db
 	err := s.Database.Migrate(context.Background())

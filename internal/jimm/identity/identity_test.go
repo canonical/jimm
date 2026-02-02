@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type identityManagerSuite struct {
@@ -28,7 +29,7 @@ type identityManagerSuite struct {
 func (s *identityManagerSuite) Init(c *qt.C) {
 	// Setup DB
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 const testWatcherEnv = `clouds:
@@ -141,7 +142,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 			w := &juju.Watcher{
 				Pubsub: publisher,
 				Database: &db.Database{
-					DB: jimmtest.PostgresDB(c, nil),
+					DB: testdb.PostgresDB(c, nil),
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
@@ -224,7 +225,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	controllerUnavailableChannel := make(chan error, 1)
 	w := juju.NewWatcherWithControllerUnavailableChan(
 		&db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
+			DB: testdb.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
 			Err: errors.E("test error"),
@@ -270,7 +271,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 
 	w := juju.Watcher{
 		Database: &db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
+			DB: testdb.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
@@ -342,7 +343,7 @@ func TestWatcherUpdatesControllerVersion(t *testing.T) {
 
 	w := juju.NewWatcherWithControllerUnavailableChan(
 		&db.Database{
-			DB: jimmtest.PostgresDB(c, nil),
+			DB: testdb.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
 			API: &jimmtest.API{

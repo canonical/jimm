@@ -39,6 +39,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 //go:embed testdata/jwks_private_key.pem
@@ -110,7 +111,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		},
 	}
 
-	pgdb, databaseName := PostgresDBWithDbName(gct, nil)
+	pgdb, databaseName := testdb.PostgresDBWithDbName(gct, nil)
 	s.databaseName = databaseName
 
 	database := &db.Database{
@@ -256,7 +257,7 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	// Only delete the DB after closing connections to it.
 	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
 	if !skipCleanup {
-		err := DeleteDatabase(s.databaseName)
+		err := testdb.DeleteDatabase(s.databaseName)
 		if err != nil {
 			c.Logf("failed to delete database (%s): %s", s.databaseName, err)
 		}

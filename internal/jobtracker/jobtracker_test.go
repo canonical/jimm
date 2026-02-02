@@ -14,7 +14,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jobtracker"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type jobTrackerSuite struct {
@@ -24,7 +24,7 @@ type jobTrackerSuite struct {
 
 func (s *jobTrackerSuite) Init(c *qt.C) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

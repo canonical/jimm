@@ -31,6 +31,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type sshManagerSuite struct {
@@ -86,7 +87,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	// Setup DB
 
 	s.database = &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	err := s.database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

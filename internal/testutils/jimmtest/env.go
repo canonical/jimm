@@ -40,6 +40,11 @@ type Environment struct {
 	IncomingMigrations []IncomingMigration `json:"incoming-migrations"`
 }
 
+// A Tester is the test interface required by this package.
+type Tester interface {
+	Fatalf(format string, args ...interface{})
+}
+
 func ParseEnvironment(c Tester, env string) *Environment {
 	var e Environment
 

@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type parameters struct {
@@ -36,7 +37,7 @@ func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 		p.CrossModelQueryTimeout = time.Second * 5
 	}
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, func() time.Time { return now }),
+		DB: testdb.PostgresDB(c, func() time.Time { return now }),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

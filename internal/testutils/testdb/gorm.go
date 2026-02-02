@@ -1,7 +1,7 @@
 // Copyright 2025 Canonical.
 
-// Package jimmtest contains useful helpers for testing JIMM.
-package jimmtest
+// Package testdb contains useful helpers for creating and managing test databases.
+package testdb
 
 import (
 	"context"

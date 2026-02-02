@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 // gormDB creates a new *gorm.DB for use in tests. The newly created DB
@@ -17,7 +17,7 @@ import (
 // If any objects are specified the database automatically performs the
 // migrations for those objects.
 func gormDB(t testing.TB) *gorm.DB {
-	database := db.Database{DB: jimmtest.PostgresDB(t, nil)}
+	database := db.Database{DB: testdb.PostgresDB(t, nil)}
 	err := database.Migrate(context.Background())
 	if err != nil {
 		t.Fail()

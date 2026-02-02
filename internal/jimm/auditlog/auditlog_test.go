@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type auditLogManagerSuite struct {
@@ -31,7 +32,7 @@ type auditLogManagerSuite struct {
 
 func (s *auditLogManagerSuite) Init(c *qt.C) {
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

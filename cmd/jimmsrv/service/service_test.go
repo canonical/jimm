@@ -30,6 +30,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 	"github.com/canonical/jimm/v3/internal/vault"
 )
 
@@ -41,9 +42,9 @@ func TestMain(m *testing.M) {
 // newTestServiceParameters returns a set of JIMM params with sensible defaults
 // for tests. A test can override any parameter that it needs.
 // Note that newTestServiceParameters will create an empty test database.
-func newTestServiceParameters(t jimmtest.Tester) jimmsvc.Params {
+func newTestServiceParameters(c *qt.C) jimmsvc.Params {
 	return jimmsvc.Params{
-		DSN:            jimmtest.CreateEmptyDatabase(t),
+		DSN:            testdb.CreateEmptyDatabase(c),
 		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		PrivateKey:     "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
 		PublicKey:      "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",

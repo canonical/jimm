@@ -31,6 +31,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type JimmCmdSuite struct {
@@ -70,7 +71,7 @@ func (s *JimmCmdSuite) SetUpTest(c *gc.C) {
 	s.COFGAParams = cofgaParams
 
 	s.Params = service.Params{
-		DSN:            jimmtest.CreateEmptyDatabase(&jimmtest.GocheckTester{C: c}),
+		DSN:            testdb.CreateEmptyDatabase(&jimmtest.GocheckTester{C: c}),
 		ControllerUUID: "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
 		PrivateKey:     "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
 		PublicKey:      "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
@@ -158,7 +159,7 @@ func (s *JimmCmdSuite) TearDownTest(c *gc.C) {
 	// Only delete the DB after closing connections to it.
 	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
 	if !skipCleanup {
-		err := jimmtest.DeleteDatabase(s.databaseName)
+		err := testdb.DeleteDatabase(s.databaseName)
 		if err != nil {
 			c.Logf("failed to delete database (%s): %s", s.databaseName, err)
 		}

@@ -29,6 +29,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/ssh"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 type sshSuite struct {
@@ -49,7 +50,7 @@ func (s *sshSuite) Init(c *qt.C) {
 	ctx := context.Background()
 	// Setup DB
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	err := db.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)

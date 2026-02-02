@@ -19,13 +19,14 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func setupDbAndSessionStore(c *qt.C) (*db.Database, sessions.Store) {
 	// Setup db ahead of time so we have access to session store
 	db := &db.Database{
-		DB: jimmtest.PostgresDB(c, time.Now),
+		DB: testdb.PostgresDB(c, time.Now),
 	}
 	c.Assert(db.Migrate(context.Background()), qt.IsNil)
 
