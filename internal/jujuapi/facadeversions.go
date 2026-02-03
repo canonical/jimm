@@ -10,11 +10,11 @@ package jujuapi
 var SupportedFacadeVersions = map[string][]int{
 	"ApplicationOffers":   []int{5},
 	"Cloud":               []int{7},
-	"Controller":          []int{12},
+	"Controller":          []int{11, 12},
 	"JIMM":                []int{4},
 	"MigrationTarget":     []int{6},
 	"ModelConfig":         []int{3},
-	"ModelManager":        []int{10},
+	"ModelManager":        []int{9, 10},
 	"ModelSummaryWatcher": []int{1},
 	"Pinger":              []int{1},
 	"UserManager":         []int{3},
