@@ -7,14 +7,11 @@
 package cmd
 
 import (
-	"io"
 	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	jujucmd "github.com/juju/cmd/v3"
 	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/gnuflag"
 	controllerapi "github.com/juju/juju/api/controller/controller"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/core/crossmodel"
@@ -283,12 +280,6 @@ func TestCommandsFailsWithMissingArgs(t *testing.T) {
 
 	migrateCmd := &migrateModelCommand{}
 
-	f := gnuflag.NewFlagSetWithFlagKnownAs(migrateCmd.Info().Name, gnuflag.ContinueOnError, jujucmd.FlagAlias(migrateCmd, "flag"))
-	f.SetOutput(io.Discard)
-	migrateCmd.SetFlags(f)
-	err := f.Parse(migrateCmd.AllowInterspersedFlags(), nil)
-	c.Assert(err, qt.IsNil)
-
-	err = migrateCmd.Init(f.Args())
+	err := initCommandWithError(migrateCmd)
 	c.Assert(err, qt.ErrorMatches, "missing controller name and model target arguments")
 }

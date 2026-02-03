@@ -1203,3 +1203,55 @@ func (s *jimmSuite) TestModelControllerInfo(c *gc.C) {
 		ControllerUUID: s.Model.Controller.UUID,
 	})
 }
+
+func (s *jimmSuite) TestPurgeLogs(c *gc.C) {
+	ctx := context.Background()
+	relativeNow := time.Now().AddDate(-1, 0, 0)
+	ale := dbmodel.AuditLogEntry{
+		Time:        relativeNow.UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
+	}
+	ale_past := dbmodel.AuditLogEntry{
+		Time:        relativeNow.AddDate(0, 0, -1).UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
+	}
+	ale_future := dbmodel.AuditLogEntry{
+		Time:        relativeNow.AddDate(0, 0, 5).UTC().Round(time.Millisecond),
+		IdentityTag: names.NewUserTag("alice@canonical.com").String(),
+	}
+
+	err := s.JIMM.Database.Migrate(context.Background())
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale_past)
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale_future)
+	c.Assert(err, gc.IsNil)
+
+	tomorrow := relativeNow.AddDate(0, 0, 1)
+
+	// alice is superuser
+	conn := s.Open(c, nil, "alice", nil)
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	resp, err := client.PurgeLogs(&apiparams.PurgeLogsRequest{
+		Date: tomorrow,
+	})
+	// check that logs have been deleted
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp.DeletedCount, gc.Equals, int64(2))
+}
+
+func (s *jimmSuite) TestPurgeLogs_NotAdmin(c *gc.C) {
+	// bob is not a superuser
+	conn := s.Open(c, nil, "bob", nil)
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+	_, err := client.PurgeLogs(&apiparams.PurgeLogsRequest{
+		Date: time.Now(),
+	})
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+}

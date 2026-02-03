@@ -54,3 +54,16 @@ func initCommand(c *qt.C, command jujucmd.Command, args ...string) {
 	err = command.Init(f.Args())
 	c.Assert(err, qt.IsNil)
 }
+
+// initCommandWithError initializes the command with the given args
+// and returns any error encountered.
+func initCommandWithError(command jujucmd.Command, args ...string) error {
+	f := gnuflag.NewFlagSetWithFlagKnownAs(command.Info().Name, gnuflag.ContinueOnError, jujucmd.FlagAlias(command, "flag"))
+	f.SetOutput(io.Discard)
+	command.SetFlags(f)
+	err := f.Parse(command.AllowInterspersedFlags(), args)
+	if err != nil {
+		return err
+	}
+	return command.Init(f.Args())
+}

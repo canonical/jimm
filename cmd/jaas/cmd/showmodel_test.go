@@ -4,14 +4,11 @@ package cmd
 
 import (
 	"errors"
-	"io"
 	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/cmd/v3"
 	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/gnuflag"
 
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -23,13 +20,7 @@ func runShowModelCommand(c *qt.C, mocks *cmdMocks, args ...string) (string, erro
 	showCmd.SetClientStore(mocks.store)
 
 	ctx := newTestContext(c)
-	f := gnuflag.NewFlagSetWithFlagKnownAs(showCmd.Info().Name, gnuflag.ContinueOnError, cmd.FlagAlias(&showCmd, "flag"))
-	f.SetOutput(io.Discard)
-	showCmd.SetFlags(f)
-	err := f.Parse(showCmd.AllowInterspersedFlags(), args)
-	c.Assert(err, qt.IsNil)
-
-	err = showCmd.Init(f.Args())
+	err := initCommandWithError(&showCmd, args...)
 	if err != nil {
 		return "", err
 	}

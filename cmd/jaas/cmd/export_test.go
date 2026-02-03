@@ -188,15 +188,6 @@ func NewCrossModelQueryCommandForTesting(store jujuclient.ClientStore, lp jujuap
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewPurgeLogsCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &purgeLogsCommand{
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-	cmd.SetClientStore(store)
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewMigrateModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) *migrateModelCommand {
 	cmd := &migrateModelCommand{
 		dialOpts: cmdtest.TestDialOpts(lp),

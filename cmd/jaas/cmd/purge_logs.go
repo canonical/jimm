@@ -8,7 +8,6 @@ import (
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -40,10 +39,11 @@ func NewPurgeLogsCommand() cmd.Command {
 // purgeLogsCommand purges logs.
 type purgeLogsCommand struct {
 	modelcmd.ControllerCommandBase
-	dialOpts *jujuapi.DialOpts
-	out      cmd.Output
+	out cmd.Output
 
 	date time.Time
+
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 // Info implements Command.Info. It returns the command information.
@@ -84,17 +84,16 @@ func (c *purgeLogsCommand) SetFlags(f *gnuflag.FlagSet) {
 // Run implements Command.Run. It purges logs from the database before the given
 // date.
 func (c *purgeLogsCommand) Run(ctx *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
-	client := api.NewClient(apiCaller)
 	response, err := client.PurgeLogs(&apiparams.PurgeLogsRequest{
 		Date: c.date,
 	})
@@ -132,4 +131,18 @@ func parseDate(date string) (time.Time, error) {
 
 	// If none of the layouts match, the date is not in the correct format
 	return time.Time{}, fmt.Errorf("invalid date. Expected ISO8601 date")
+}
+
+func (c *purgeLogsCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }
