@@ -361,6 +361,17 @@ func TestMigrateModel_Success(t *testing.T) {
 	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
 	targetController := "4.0controller"
 	c.Assert(err, qt.IsNil)
+
+	s.jujuManager.EXPECT().
+		ModelInfo(
+			gomock.Any(),
+			gomock.Any(),
+			targetMt,
+		).
+		Return(&jujuparams.ModelInfo{
+			UUID: targetMt.Id(),
+		}, nil)
+
 	s.jujuManager.EXPECT().
 		GetModel(gomock.Any(), targetMt.Id()).
 		Return(
@@ -373,7 +384,7 @@ func TestMigrateModel_Success(t *testing.T) {
 		)
 
 	s.jujuManager.EXPECT().
-		InitiateInternalMigration(ctx, gomock.Any(), targetMt.Id(), targetController).
+		InitiateInternalMigration(gomock.Any(), gomock.Any(), targetMt.Id(), targetController).
 		Return(
 			jujuparams.InitiateMigrationResult{
 				ModelTag:    targetMt.String(),
@@ -419,6 +430,16 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
 	targetController := "4.0controller"
 
+	s.jujuManager.EXPECT().
+		ModelInfo(
+			gomock.Any(),
+			gomock.Any(),
+			targetMt,
+		).
+		Return(&jujuparams.ModelInfo{
+			UUID: targetMt.Id(),
+		}, nil)
+
 	// Model is a different controller, so continues.
 	s.jujuManager.EXPECT().
 		GetModel(gomock.Any(), targetMt.Id()).
@@ -428,7 +449,7 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 		)
 
 	s.jujuManager.EXPECT().
-		InitiateInternalMigration(ctx, gomock.Any(), targetMt.Id(), targetController).
+		InitiateInternalMigration(gomock.Any(), gomock.Any(), targetMt.Id(), targetController).
 		Return(
 			jujuparams.InitiateMigrationResult{ModelTag: targetMt.String(), MigrationId: "1"},
 			nil,
@@ -472,6 +493,16 @@ func TestMigrateModel_IdempotencyWhenModelHasAlreadyBeenMigrated(t *testing.T) {
 
 	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
 	targetController := "4.0controller"
+
+	s.jujuManager.EXPECT().
+		ModelInfo(
+			gomock.Any(),
+			gomock.Any(),
+			targetMt,
+		).
+		Return(&jujuparams.ModelInfo{
+			UUID: targetMt.Id(),
+		}, nil)
 
 	// Model is already on the target controller, so migration is a no-op.
 	s.jujuManager.EXPECT().
@@ -520,7 +551,7 @@ func TestUpgradeModel_ModelNotFound(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	s.store.EXPECT().GetModel(ctx, gomock.Any()).Return(errors.New("db error"))
+	s.store.EXPECT().GetModel(gomock.Any(), gomock.Any()).Return(errors.New("db error"))
 
 	err = upgradeMgr.UpgradeModel(ctx, modelUUID, targetVersion)
 	c.Assert(err, qt.ErrorMatches, ".*model not found.*")
@@ -544,16 +575,16 @@ func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	s.store.EXPECT().GetModel(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, model *dbmodel.Model) error {
+	s.store.EXPECT().GetModel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, model *dbmodel.Model) error {
 		model.Controller = dbmodel.Controller{Name: "ctrl"}
 		return nil
 	})
 
 	s.dialer.EXPECT().
-		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
 		v := targetVersion
 		mi.AgentVersion = &v
 		return nil
@@ -583,17 +614,17 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	s.store.EXPECT().GetModel(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, model *dbmodel.Model) error {
+	s.store.EXPECT().GetModel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, model *dbmodel.Model) error {
 		model.Controller = dbmodel.Controller{Name: "ctrl"}
 		return nil
 	})
 
 	s.dialer.EXPECT().
-		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
 	modelInfoCalls := 0
-	s.api.EXPECT().ModelInfo(ctx, gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
 		c.Check(mi.UUID, qt.Equals, modelUUID)
 		modelInfoCalls++
 		if modelInfoCalls == 1 {
@@ -638,16 +669,16 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	s.store.EXPECT().GetModel(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, model *dbmodel.Model) error {
+	s.store.EXPECT().GetModel(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, model *dbmodel.Model) error {
 		model.Controller = dbmodel.Controller{Name: "ctrl"}
 		return nil
 	})
 
 	s.dialer.EXPECT().
-		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(ctx, gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
 		v := oldVersion
 		mi.AgentVersion = &v
 		return nil
