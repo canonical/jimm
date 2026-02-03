@@ -353,7 +353,7 @@ func (j jujuMigrateAPI) Close() error {
 // InitiateMigration implements the MigrateAPI interface.
 func (j jujuMigrateAPI) InitiateMigration(spec controllerapi.MigrationSpec) (string, error) {
 	client := controllerapi.NewClient(j.apiCaller)
-	return client.InitiateMigration(spec)
+	return client.InitiateMigration(spec, false)
 }
 
 // ModelInfo implements the MigrateAPI interface.

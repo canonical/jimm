@@ -1535,7 +1535,7 @@ type testControllerClient struct {
 	initiateMigrationResults []result
 }
 
-func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec) (string, error) {
+func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec, dryRun bool) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.initiateMigrationResults) == 0 {

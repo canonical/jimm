@@ -225,8 +225,8 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
 }
 
-func toJimmMigratingInfo(c *qt.C, modelInfo migration.ModelInfo) juju.MigratingModelInfo {
-	rawDescription, err := descriptionv9.Serialize(modelInfo.ModelDescription)
+func toJimmMigratingInfo(c *qt.C, modelInfo migration.ModelInfo, desc descriptionv9.Model) juju.MigratingModelInfo {
+	rawDescription, err := descriptionv9.Serialize(desc)
 	c.Assert(err, qt.IsNil)
 	return juju.MigratingModelInfo{
 		UUID:                   modelInfo.UUID,
@@ -384,7 +384,7 @@ func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model",
 		CloudName:           "test",
@@ -395,12 +395,12 @@ func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
 		Name:   names.NewUserTag("everyone@external"),
 		Access: "read",
 	}
-	model.ModelDescription.AddUser(everyoneUserArgs)
+	desc.AddUser(everyoneUserArgs)
 
 	appArgs := descriptionv9.ApplicationArgs{
 		Tag: names.NewApplicationTag("foo"),
 	}
-	app := model.ModelDescription.AddApplication(appArgs)
+	app := desc.AddApplication(appArgs)
 	app.SetStatus(descriptionv9.StatusArgs{
 		Value: "available",
 	})
@@ -416,7 +416,7 @@ func TestPreChecks_SkipsEveryoneUser(t *testing.T) {
 	}
 	app.AddOffer(offerArgs)
 
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -454,14 +454,14 @@ func TestPrechecks_ModifiesModelDescription(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model",
 		CloudName:           "test",
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.IsNil)
 }
 
@@ -483,7 +483,7 @@ func TestPrechecks_MissingCloudRegion(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model-2",
 		CloudName:           "test",
@@ -491,7 +491,7 @@ func TestPrechecks_MissingCloudRegion(t *testing.T) {
 		CloudRegionName:     "test-region-not-found",
 	})
 
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test".*`)
 }
 
@@ -513,7 +513,7 @@ func TestPrechecks_MissingCloud(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model-2",
 		CloudName:           "test-not-found",
@@ -521,7 +521,7 @@ func TestPrechecks_MissingCloud(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test-not-found".*`)
 }
 
@@ -543,7 +543,7 @@ func TestPrechecks_MissingCloudCredential(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model-2",
 		CloudName:           "test",
@@ -551,7 +551,7 @@ func TestPrechecks_MissingCloudCredential(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `^cloudcredential "test/alice@canonical.com/test-cred-not-found" not found$`)
 }
 
@@ -577,14 +577,14 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model",
 		CloudName:           "test",
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `.*controller unreachable`)
 }
 
@@ -600,14 +600,14 @@ func TestPrechecks_MissingUserMapping(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "not-found-user",
 		ModelName:           "test-model",
 		CloudName:           "test",
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `(?s).*user mapping is missing the following users.*`)
 }
 
@@ -628,14 +628,14 @@ func TestPrechecks_InvalidOwner(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model",
 		CloudName:           "test",
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err = j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err = j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `.*invalid external user mapping "" for local user "bob"`)
 }
 
@@ -651,14 +651,14 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	model := newMigrationInfo(modelDescriptionArgs{
+	model, desc := newMigrationInfo(modelDescriptionArgs{
 		Owner:               "bob",
 		ModelName:           "test-model",
 		CloudName:           "test",
 		CloudCredentialName: "test-cred",
 		CloudRegionName:     "test-region",
 	})
-	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model))
+	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
 	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
@@ -916,16 +916,16 @@ func newModelDescription(args modelDescriptionArgs) descriptionv9.Model {
 	return modelDescription
 }
 
-func newMigrationInfo(args modelDescriptionArgs) migration.ModelInfo {
+func newMigrationInfo(args modelDescriptionArgs) (migration.ModelInfo, descriptionv9.Model) {
 	modelInfo := migration.ModelInfo{
 		UUID:                   migratingModelUUID,
 		Owner:                  names.NewUserTag(args.Owner),
 		Name:                   "test-model",
 		AgentVersion:           version.MustParse("3.6.9"),
 		ControllerAgentVersion: version.MustParse("3.6.9"),
-		ModelDescription:       newModelDescription(args),
 	}
-	return modelInfo
+
+	return modelInfo, newModelDescription(args)
 }
 
 const migratedModelEnv = `clouds:

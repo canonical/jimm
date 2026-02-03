@@ -32,7 +32,7 @@ import (
 type ControllerClient interface {
 	// InitiateMigration attempts to begin the migration of one or
 	// more models to other controllers.
-	InitiateMigration(controller.MigrationSpec) (string, error)
+	InitiateMigration(controller.MigrationSpec, bool) (string, error)
 	// Close closes the connection to the API server.
 	Close() error
 }
@@ -756,7 +756,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 		TargetUser:            targetUserTag.Id(),
 		TargetPassword:        spec.TargetInfo.Password,
 		TargetMacaroons:       targetMacaroons,
-	})
+	}, false)
 	if err != nil {
 		rollbackMigrationMode()
 		return result, errors.E(err)
