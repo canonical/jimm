@@ -586,6 +586,10 @@ func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-
 // writeJobLog writes logs to the store to eventually be displayed to users.
 // Errors are masked but logged to avoid failing the bootstrap process.
 func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId uuid.UUID, logLine string) {
+	// Avoid storing empty log lines.
+	if logLine == "" {
+		return
+	}
 	if err := b.store.AddJobLog(ctx, jobId, logLine); err != nil {
 		zapctx.Error(ctx, "failed to write bootstrap log", zap.Error(err), zap.String("jobId", jobId.String()))
 	}

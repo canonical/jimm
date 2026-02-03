@@ -41,7 +41,7 @@ type migrationWorkerArgs struct {
 }
 
 // Kind implements the [river.JobArgs] interface.
-func (migrationWorkerArgs) Kind() string { return "upgrade-migration" }
+func (migrationWorkerArgs) Kind() string { return "migrate-model" }
 
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
 //

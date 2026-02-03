@@ -218,6 +218,8 @@ func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User
 
 // UpgradeModel upgrades the model to the provided agent version.
 func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error {
+	ctx = zapctx.WithFields(ctx, zap.String("model_uuid", modelUUID), zap.String("target_version", targetVersion.String()))
+
 	// Forbid a zero target version as this complicates checking for whether
 	// the upgrade was successful.
 	if targetVersion == version.Zero {
@@ -239,7 +241,7 @@ func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 			Attempts: 6,
 			Delay:    10 * time.Second,
 			Func: func() error {
-				mi := jujuparams.ModelInfo{}
+				mi := jujuparams.ModelInfo{UUID: modelUUID}
 				err := api.ModelInfo(ctx, &mi)
 				if err != nil {
 					return fmt.Errorf("failed to get model info before upgrade: %w", err)
@@ -331,6 +333,19 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 //
 // If the model is already on the target controller, no action is taken and nil is returned.
 func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error {
+	ctx = zapctx.WithFields(ctx, zap.String("model_uuid", modelUUID), zap.String("target_controller_name", targetControllerName))
+
+	if !names.IsValidModel(modelUUID) {
+		return errors.E(errors.CodeBadRequest, "invalid model UUID")
+	}
+
+	// Fetch the model info to refresh current controller.
+	mt := names.NewModelTag(modelUUID)
+	_, err := u.jujuManager.ModelInfo(ctx, user, mt)
+	if err != nil {
+		return err
+	}
+
 	m, err := u.jujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
 		return errors.E(err)
@@ -341,20 +356,13 @@ func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 	}
 
 	zapctx.Debug(ctx, "Attempting to initiate internal migration")
-	iimResult, err := u.jujuManager.InitiateInternalMigration(ctx, user, modelUUID, targetControllerName)
+	_, err = u.jujuManager.InitiateInternalMigration(ctx, user, modelUUID, targetControllerName)
 	if err != nil {
-		zapctx.Error(ctx, "Failed to initiate internal migration", zap.Error(err))
 		return errors.E(fmt.Errorf("failed to initiate internal migration: %w", err))
-	}
-
-	mt, err := names.ParseModelTag(iimResult.ModelTag)
-	if err != nil {
-		return errors.E(fmt.Errorf("failed to parse model tag from initiate internal migration result: %w", err))
 	}
 
 	modelNotMigratedErr := errors.E("model has not yet migrated to target controller")
 
-	var mi *jujuparams.ModelInfo
 	if err := retry.Call(
 		retry.CallArgs{
 			IsFatalError: func(err error) bool {
@@ -363,12 +371,12 @@ func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 			Attempts: 30,
 			Delay:    10 * time.Second,
 			Func: func() error {
-				mi, err = u.jujuManager.ModelInfo(ctx, user, mt)
+				_, err = u.jujuManager.ModelInfo(ctx, user, mt)
 				if err != nil {
 					return err
 				}
 
-				m, err := u.jujuManager.GetModel(ctx, mi.UUID)
+				m, err := u.jujuManager.GetModel(ctx, modelUUID)
 				if err != nil {
 					return err
 				}
@@ -379,6 +387,9 @@ func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 				}
 
 				return nil
+			},
+			NotifyFunc: func(lastError error, attempt int) {
+				zapctx.Debug(ctx, "model migrate attempt", zap.Error(lastError), zap.Int("attempt", attempt))
 			},
 			Clock: clock.WallClock,
 		},

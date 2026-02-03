@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -50,7 +51,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine strin
 
 		log, err := dbmodel.NewJobLog(jobId, nextLineNumber, logLine)
 		if err != nil {
-			return errors.E("failed to construct job log", err)
+			return fmt.Errorf("failed to construct job log: %v", err)
 		}
 
 		if err := d.DB.WithContext(ctx).Create(log).Error; err != nil {

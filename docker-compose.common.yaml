@@ -91,7 +91,7 @@ services:
       JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL:  "${JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL:-https://jimm.localhost/.well-known/jwks.json}"
       GOTOOLCHAIN: auto
     healthcheck:
-      test: [ "CMD", "curl", "http://jimm.localhost:80" ]
+      test: [ "CMD", "curl", "http://jimm.localhost:80/debug/info" ]
       interval: 5s
       timeout: 5s
       retries: 50 # Should fail after approximately (interval*retry) seconds

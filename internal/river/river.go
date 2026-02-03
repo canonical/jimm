@@ -10,9 +10,12 @@ import (
 	_ "github.com/canonical/jimm/v3/internal/jimm/upgrade" // Dummy import to prevent future circular dependency
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/juju/version/v2"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivermigrate"
+	"github.com/riverqueue/river/rivertype"
+	"go.uber.org/zap"
 )
 
 const (
@@ -57,7 +60,8 @@ func StartWorkers(
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: defaultQueueMaxWorkers},
 		},
-		Workers: workers,
+		Workers:      workers,
+		ErrorHandler: &errorHandler{},
 	})
 	if err != nil {
 		return err
@@ -107,4 +111,31 @@ func MigrateRiver(ctx context.Context, db *db.Database) error {
 		return err
 	}
 	return nil
+}
+
+type errorHandler struct{}
+
+// HandleError implements the [river.ErrorHandler] interface.
+// We use this to log errors that occur in River jobs.
+func (h *errorHandler) HandleError(ctx context.Context, job *rivertype.JobRow, err error) *river.ErrorHandlerResult {
+	zapctx.Error(ctx, "river job encountered an error",
+		zap.Int("attempt", job.Attempt),
+		zap.String("job_kind", job.Kind),
+		zap.Int64("job_id", job.ID),
+		zap.Error(err))
+	// No custom behavior; use default retry logic.
+	return &river.ErrorHandlerResult{}
+}
+
+// HandlePanic implements the [river.ErrorHandler] interface.
+// We use this to log panics that occur in River jobs.
+func (h *errorHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, panicVal any, trace string) *river.ErrorHandlerResult {
+	zapctx.Error(ctx, "river job encountered a panic",
+		zap.Int("attempt", job.Attempt),
+		zap.String("job_kind", job.Kind),
+		zap.Int64("job_id", job.ID),
+		zap.Any("panic value", panicVal),
+		zap.String("trace", trace))
+	// No custom behavior; use default retry logic.
+	return &river.ErrorHandlerResult{}
 }

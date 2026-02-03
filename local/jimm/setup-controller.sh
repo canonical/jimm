@@ -4,6 +4,8 @@
 # It will bootstrap a Juju controller and configure the necessary config to enable the controller
 # to communicate with the docker compose
 
+set -euo pipefail
+
 CLOUDINIT_FILE=${CLOUDINIT_FILE:-"cloudinit.temp.yaml"}
 CONTROLLER_NAME="${CONTROLLER_NAME:-qa-lxd}"
 SKIP_CONNECT_JIMM="${SKIP_CONNECT_JIMM:-false}"

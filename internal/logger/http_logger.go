@@ -33,10 +33,10 @@ func (l *httpLogEntry) Write(status, bytes int, header http.Header, elapsed time
 		zap.String("elapsed", elapsed.String()),
 	)
 
-	if status != 200 {
-		zapctx.Debug(l.request.Context(), "request", fields...)
-	} else {
+	if status >= 400 {
 		zapctx.Warn(l.request.Context(), "request", fields...)
+	} else {
+		zapctx.Debug(l.request.Context(), "request", fields...)
 	}
 
 }

@@ -32,7 +32,7 @@ const (
 	timeoutRequestDuration = 5 * time.Minute
 
 	// githubReleaseURL is the base URL for the Juju binary downloads.
-	githubReleaseURL = "https://github.com/juju/juju/releases/download/"
+	githubReleaseURL = "https://github.com/juju/juju/releases/download"
 
 	// binaryURLTemplate is the template for constructing the download URL for Juju binaries.
 	binaryURLTemplate = "{{.BaseURL}}/v{{.VersionWithPatch}}/juju-{{.VersionWithPatch}}-{{.Os}}-{{.Arch}}.tar.xz"

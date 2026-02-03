@@ -594,6 +594,7 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 
 	modelInfoCalls := 0
 	s.api.EXPECT().ModelInfo(ctx, gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+		c.Check(mi.UUID, qt.Equals, modelUUID)
 		modelInfoCalls++
 		if modelInfoCalls == 1 {
 			v := oldVersion

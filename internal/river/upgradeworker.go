@@ -30,7 +30,7 @@ type upgradeWorkerArgs struct {
 }
 
 // Kind returns the kind of the job.
-func (upgradeWorkerArgs) Kind() string { return "upgrade" }
+func (upgradeWorkerArgs) Kind() string { return "upgrade-model" }
 
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
 //
