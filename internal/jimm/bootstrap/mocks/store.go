@@ -15,7 +15,6 @@ import (
 	time "time"
 
 	dbmodel "github.com/canonical/jimm/v3/internal/dbmodel"
-	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -44,7 +43,7 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 }
 
 // AddJobLog mocks base method.
-func (m *MockStore) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine string) error {
+func (m *MockStore) AddJobLog(ctx context.Context, jobId int64, logLine string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddJobLog", ctx, jobId, logLine)
 	ret0, _ := ret[0].(error)
@@ -70,13 +69,13 @@ func (c *MockStoreAddJobLogCall) Return(err error) *MockStoreAddJobLogCall {
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockStoreAddJobLogCall) Do(f func(context.Context, uuid.UUID, string) error) *MockStoreAddJobLogCall {
+func (c *MockStoreAddJobLogCall) Do(f func(context.Context, int64, string) error) *MockStoreAddJobLogCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreAddJobLogCall) DoAndReturn(f func(context.Context, uuid.UUID, string) error) *MockStoreAddJobLogCall {
+func (c *MockStoreAddJobLogCall) DoAndReturn(f func(context.Context, int64, string) error) *MockStoreAddJobLogCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -158,7 +157,7 @@ func (c *MockStoreLockBootstrapCall) DoAndReturn(f func(context.Context, time.Du
 }
 
 // QueryJobLog mocks base method.
-func (m *MockStore) QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int) ([]string, int, error) {
+func (m *MockStore) QueryJobLog(ctx context.Context, jobId int64, offset int) ([]string, int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "QueryJobLog", ctx, jobId, offset)
 	ret0, _ := ret[0].([]string)
@@ -186,13 +185,13 @@ func (c *MockStoreQueryJobLogCall) Return(loggies []string, nextOffsetValue int,
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockStoreQueryJobLogCall) Do(f func(context.Context, uuid.UUID, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
+func (c *MockStoreQueryJobLogCall) Do(f func(context.Context, int64, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreQueryJobLogCall) DoAndReturn(f func(context.Context, uuid.UUID, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
+func (c *MockStoreQueryJobLogCall) DoAndReturn(f func(context.Context, int64, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

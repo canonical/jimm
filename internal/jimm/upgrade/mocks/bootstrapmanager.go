@@ -15,7 +15,6 @@ import (
 
 	bootstrap "github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	openfga "github.com/canonical/jimm/v3/internal/openfga"
-	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -44,10 +43,10 @@ func (m *MockBootstrapManager) EXPECT() *MockBootstrapManagerMockRecorder {
 }
 
 // StartBootstrapJob mocks base method.
-func (m *MockBootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
+func (m *MockBootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "StartBootstrapJob", ctx, user, params)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -65,25 +64,25 @@ type MockBootstrapManagerStartBootstrapJobCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockBootstrapManagerStartBootstrapJobCall) Return(arg0 string, arg1 error) *MockBootstrapManagerStartBootstrapJobCall {
+func (c *MockBootstrapManagerStartBootstrapJobCall) Return(arg0 int64, arg1 error) *MockBootstrapManagerStartBootstrapJobCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockBootstrapManagerStartBootstrapJobCall) Do(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (string, error)) *MockBootstrapManagerStartBootstrapJobCall {
+func (c *MockBootstrapManagerStartBootstrapJobCall) Do(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (int64, error)) *MockBootstrapManagerStartBootstrapJobCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockBootstrapManagerStartBootstrapJobCall) DoAndReturn(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (string, error)) *MockBootstrapManagerStartBootstrapJobCall {
+func (c *MockBootstrapManagerStartBootstrapJobCall) DoAndReturn(f func(context.Context, *openfga.User, bootstrap.BootstrapParams) (int64, error)) *MockBootstrapManagerStartBootstrapJobCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // WaitForJobCompletion mocks base method.
-func (m *MockBootstrapManager) WaitForJobCompletion(ctx context.Context, jobId uuid.UUID, config bootstrap.WaitConfig) error {
+func (m *MockBootstrapManager) WaitForJobCompletion(ctx context.Context, jobId int64, config bootstrap.WaitConfig) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitForJobCompletion", ctx, jobId, config)
 	ret0, _ := ret[0].(error)
@@ -109,13 +108,13 @@ func (c *MockBootstrapManagerWaitForJobCompletionCall) Return(arg0 error) *MockB
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockBootstrapManagerWaitForJobCompletionCall) Do(f func(context.Context, uuid.UUID, bootstrap.WaitConfig) error) *MockBootstrapManagerWaitForJobCompletionCall {
+func (c *MockBootstrapManagerWaitForJobCompletionCall) Do(f func(context.Context, int64, bootstrap.WaitConfig) error) *MockBootstrapManagerWaitForJobCompletionCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockBootstrapManagerWaitForJobCompletionCall) DoAndReturn(f func(context.Context, uuid.UUID, bootstrap.WaitConfig) error) *MockBootstrapManagerWaitForJobCompletionCall {
+func (c *MockBootstrapManagerWaitForJobCompletionCall) DoAndReturn(f func(context.Context, int64, bootstrap.WaitConfig) error) *MockBootstrapManagerWaitForJobCompletionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

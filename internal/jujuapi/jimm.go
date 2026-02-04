@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,6 +124,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "StopJob", stopJob)
 		// JIMM Upgrades
 		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
+		// River Jobs
+		// r.AddMethod("JIMM", 4, "GetJobDetails", getJobDetails)
 
 		return []int{4}
 	}
@@ -605,12 +608,12 @@ func (r *controllerRoot) GetJobInfo(ctx context.Context, req apiparams.GetJobInf
 		return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	jobId, err := uuid.Parse(req.JobID)
+	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
 	if err != nil {
-		return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeBadRequest, "invalid job ID", err)
+		return apiparams.GetJobInfoResponse{}, errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
 	}
 
-	return r.jimm.BootstrapManager().GetJobInfo(ctx, r.user, jobId, req.Watermark)
+	return r.jimm.BootstrapManager().GetJobInfo(ctx, r.user, jobID, req.Watermark)
 }
 
 // StopJob stops a job.
@@ -620,9 +623,9 @@ func (r *controllerRoot) StopJob(ctx context.Context, req apiparams.StopJobReque
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	jobID, err := uuid.Parse(req.JobID)
+	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
 	if err != nil {
-		return errors.E(errors.CodeBadRequest, "invalid job ID", err)
+		return errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
 	}
 
 	err = r.jimm.BootstrapManager().StopJob(ctx, r.user, jobID)
@@ -678,7 +681,7 @@ func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.Bo
 		return apiparams.StartJobResponse{}, errors.E(fmt.Errorf("failed to start bootstrap job: %v", err))
 	}
 	return apiparams.StartJobResponse{
-		JobID: jobID,
+		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
 }
 
@@ -713,7 +716,7 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 	}
 
 	return apiparams.StartJobResponse{
-		JobID: jobID,
+		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
 }
 

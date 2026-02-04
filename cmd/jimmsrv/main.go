@@ -284,6 +284,7 @@ func start(ctx context.Context, s *service.Service) error {
 		jimmsvc.JIMM().Database,
 		jimmsvc.JIMM().OpenFGAClient,
 		jimmsvc.JIMM().UpgradeManager(),
+		jimmsvc.JIMM().BootstrapManager(),
 	)
 	if err != nil {
 		return err

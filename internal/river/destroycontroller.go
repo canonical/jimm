@@ -1,0 +1,73 @@
+// Copyright 2026 Canonical.
+
+package river
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
+	"github.com/riverqueue/river"
+)
+
+// newDestroyControllerWorker creates a new destroyControllerWorker.
+func newDestroyControllerWorker(openfgaClient *openfga.OFGAClient, store Store, bootstrapManager BootstrapManager) (*destroyControllerWorker, error) {
+	if openfgaClient == nil {
+		return nil, errors.E("openfgaClient is required")
+	}
+	if bootstrapManager == nil {
+		return nil, errors.E("bootstrapManager is required")
+	}
+	if store == nil {
+		return nil, errors.E("store is required")
+	}
+
+	return &destroyControllerWorker{
+		openfgaClient:    openfgaClient,
+		bootstrapManager: bootstrapManager,
+		store:            store,
+	}, nil
+}
+
+type destroyControllerWorker struct {
+	// An embedded WorkerDefaults sets up default methods to fulfill the rest of
+	// the Worker interface:
+	river.WorkerDefaults[rivertypes.DestroyControllerArgs]
+
+	openfgaClient    *openfga.OFGAClient
+	store            Store
+	bootstrapManager BootstrapManager
+}
+
+// Work implements the [river.Worker] interface.
+func (w *destroyControllerWorker) Work(ctx context.Context, job *river.Job[rivertypes.DestroyControllerArgs]) error {
+	u := &dbmodel.Identity{Name: job.Args.Username}
+	if err := w.store.FetchIdentity(ctx, u); err != nil {
+		return err
+	}
+	user := openfga.NewUser(u, w.openfgaClient)
+
+	temp, err := os.MkdirTemp("", "juju-data-dir")
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
+	}
+
+	destroyArgs := bootstrap.RunDestroyControllerArgs{
+		DestroyControllerArgs: job.Args,
+		RunnerArgs: bootstrap.RunnerArgs{
+			JujuDataDir: temp,
+			JobID:       job.ID,
+		},
+	}
+
+	if err := w.bootstrapManager.DestroyController(ctx, destroyArgs, &bootstrap.JujuCLI{}, user); err != nil {
+		return err
+	}
+
+	return nil
+}

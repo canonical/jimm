@@ -4,6 +4,7 @@ package jujuapi_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -139,12 +140,12 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C
 
 func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	ctx := context.Background()
-	uuidGenerated := uuid.New()
+	expectedJobID := int64(1)
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (apiparams.GetJobInfoResponse, error) {
-					if jobId != uuidGenerated {
+				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId int64, offset int) (apiparams.GetJobInfoResponse, error) {
+					if jobId != expectedJobID {
 						return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeNotFound, "job not found")
 					}
 					return apiparams.GetJobInfoResponse{
@@ -158,7 +159,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	response, err := root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
-		JobID:     uuidGenerated.String(),
+		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
 
@@ -176,7 +177,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	// Test unauthorized user
 	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
 	_, err = root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
-		JobID:     uuidGenerated.String(),
+		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
@@ -203,11 +204,11 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				StartBootstrapJob_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
+				StartBootstrapJob_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
 					if startBootstrapErr != nil {
-						return "", startBootstrapErr
+						return 0, startBootstrapErr
 					}
-					return uuid.New().String(), nil
+					return 1, nil
 				},
 			}
 		},
@@ -243,13 +244,13 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 
 func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	ctx := context.Background()
-	uuidGenerated := uuid.New()
+	expectedJobID := int64(1)
 
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				StopJob_: func(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
-					if jobId != uuidGenerated {
+				StopJob_: func(ctx context.Context, user *openfga.User, jobId int64) error {
+					if jobId != expectedJobID {
 						return errors.E(errors.CodeNotFound, "job not found")
 					}
 					return nil
@@ -260,14 +261,14 @@ func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
 	// Test stop bootstrap job unauthorized user
 	err := root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: uuidGenerated.String(),
+		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 
 	// Test stop bootstrap job
 	root = newTestControllerRoot(jimm, "alice@canonical.com", true)
 	err = root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: uuidGenerated.String(),
+		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
 	c.Assert(err, gc.IsNil)
 
@@ -302,8 +303,8 @@ func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				StartDestroyControllerJob_: func(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (string, error) {
-					return uuid.New().String(), nil
+				StartDestroyControllerJob_: func(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error) {
+					return 1, nil
 				},
 			}
 		},
