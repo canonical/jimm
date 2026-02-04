@@ -108,7 +108,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetails(c *gc.C) {
 	details.Macaroon = nil
 	c.Check(details.Offer.OfferUUID, gc.Matches, `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
 	details.Offer.OfferUUID = ""
-	_, info := s.GetOneControllerConfig(c)
+	info := s.GetControllerConfig(c, s.Model.Controller.Name)
 
 	sort.Slice(details.Offer.Users, func(i, j int) bool {
 		return details.Offer.Users[i].UserName < details.Offer.Users[j].UserName
@@ -208,7 +208,7 @@ func (s *applicationOffersSuite) TestGetConsumeDetailsWithConsumeAccess(c *gc.C)
 	err = client.GrantOffer(user, string(jujuparams.OfferConsumeAccess), ourl.String())
 	c.Assert(err, gc.Equals, nil)
 
-	_, info := s.GetOneControllerConfig(c)
+	info := s.GetControllerConfig(c, s.Model.Controller.Name)
 
 	conn1 := s.Open(c, nil, user, nil)
 	defer conn.Close()

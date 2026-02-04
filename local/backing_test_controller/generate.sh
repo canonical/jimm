@@ -10,15 +10,21 @@ set -e
 # running E2E tests that require a backing Juju controller.
 #
 # Usage:
-#   ./generate.sh [--controller=<name>]
+#   ./generate.sh [--controller=<name>] [--controllers=<name1,name2,...>]
 #
 # If --controller is not provided, it uses the current active controller.
+# If --controllers is provided, it generates config for those comma-separated controllers.
 
 CONTROLLER=""
+CONTROLLERS=""
 for arg in "$@"; do
     case $arg in
         --controller=*)
             CONTROLLER="${arg#*=}"
+            shift
+            ;;
+        --controllers=*)
+            CONTROLLERS="${arg#*=}"
             shift
             ;;
         *)
@@ -29,34 +35,49 @@ done
 # Output path (project root - script should be run from there)
 CONFIG_FILE="controllers.yaml"
 
-# Get current controller if not specified
-if [ -z "$CONTROLLER" ]; then
-    CONTROLLER=$(juju whoami | yq -r '.Controller')
+# Determine which controllers to process
+if [ -n "$CONTROLLERS" ]; then
+    # Use comma-separated list
+    IFS=',' read -ra CONTROLLER_ARRAY <<< "$CONTROLLERS"
+else
+    # Use single controller (current or specified)
+    if [ -z "$CONTROLLER" ]; then
+        CONTROLLER=$(juju whoami | yq -r '.Controller')
+    fi
+    CONTROLLER_ARRAY=("$CONTROLLER")
 fi
 
-echo "Extracting controller configuration for: ${CONTROLLER}"
+echo "Extracting controller configuration for ${#CONTROLLER_ARRAY[@]} controller(s)" >&2
 
-# Get controller UUID
-CONTROLLER_UUID=$(juju show-controller "${CONTROLLER}" | yq -r ".${CONTROLLER}.details.controller-uuid")
+# Initialize empty YAML
+yq -n '.controllers = {}' | tee "$CONFIG_FILE" > /dev/null
 
-# Get all controller API addresses as a JSON array
-CONTROLLER_ADDRS=$(juju show-controller "${CONTROLLER}" | yq -r ".${CONTROLLER}.details.\"api-endpoints\" | @json")
+# Loop through and generate configurations for each controller
+for CURRENT_CONTROLLER in "${CONTROLLER_ARRAY[@]}"; do
+    echo "Processing controller: ${CURRENT_CONTROLLER}" >&2
+    
+    # Get controller UUID
+    CONTROLLER_UUID=$(juju show-controller "${CURRENT_CONTROLLER}" | yq -r ".${CURRENT_CONTROLLER}.details.controller-uuid")
 
-# Get username and password from accounts.yaml
-CONTROLLER_USERNAME=$(cat ~/.local/share/juju/accounts.yaml | yq -r ".controllers.${CONTROLLER}.user")
-CONTROLLER_PASSWORD=$(cat ~/.local/share/juju/accounts.yaml | yq -r ".controllers.${CONTROLLER}.password")
+    # Get all controller API addresses as a JSON array
+    CONTROLLER_ADDRS=$(juju show-controller "${CURRENT_CONTROLLER}" | yq -r ".${CURRENT_CONTROLLER}.details.\"api-endpoints\" | @json")
 
-# Get CA certificate
-CONTROLLER_CACERT=$(juju show-controller "${CONTROLLER}" | yq -r ".${CONTROLLER}.details.\"ca-cert\"")
+    # Get username and password from accounts.yaml
+    CONTROLLER_USERNAME=$(cat ~/.local/share/juju/accounts.yaml | yq -r ".controllers.${CURRENT_CONTROLLER}.user")
+    CONTROLLER_PASSWORD=$(cat ~/.local/share/juju/accounts.yaml | yq -r ".controllers.${CURRENT_CONTROLLER}.password")
 
-# Build the YAML using yq to ensure proper formatting
-export CONTROLLER CONTROLLER_UUID CONTROLLER_ADDRS CONTROLLER_USERNAME CONTROLLER_PASSWORD CONTROLLER_CACERT
-yq -n '
-  .controllers.[strenv(CONTROLLER)].uuid = strenv(CONTROLLER_UUID) |
-  .controllers.[strenv(CONTROLLER)].addrs = (strenv(CONTROLLER_ADDRS) | fromjson) |
-  .controllers.[strenv(CONTROLLER)].username = strenv(CONTROLLER_USERNAME) |
-  .controllers.[strenv(CONTROLLER)].password = strenv(CONTROLLER_PASSWORD) |
-  .controllers.[strenv(CONTROLLER)]."ca-cert" = strenv(CONTROLLER_CACERT)
-' | tee "$CONFIG_FILE" > /dev/null
+    # Get CA certificate
+    CONTROLLER_CACERT=$(juju show-controller "${CURRENT_CONTROLLER}" | yq -r ".${CURRENT_CONTROLLER}.details.\"ca-cert\"")
 
-echo "Controller configuration written to ${CONFIG_FILE}"
+    # Build the YAML using yq to ensure proper formatting
+    export CURRENT_CONTROLLER CONTROLLER_UUID CONTROLLER_ADDRS CONTROLLER_USERNAME CONTROLLER_PASSWORD CONTROLLER_CACERT
+    yq -i '
+      .controllers.[strenv(CURRENT_CONTROLLER)].uuid = strenv(CONTROLLER_UUID) |
+      .controllers.[strenv(CURRENT_CONTROLLER)].addrs = (strenv(CONTROLLER_ADDRS) | fromjson) |
+      .controllers.[strenv(CURRENT_CONTROLLER)].username = strenv(CONTROLLER_USERNAME) |
+      .controllers.[strenv(CURRENT_CONTROLLER)].password = strenv(CONTROLLER_PASSWORD) |
+      .controllers.[strenv(CURRENT_CONTROLLER)]."ca-cert" = strenv(CONTROLLER_CACERT)
+    ' "$CONFIG_FILE" > /dev/null
+done
+
+echo "Controller configuration written to ${CONFIG_FILE}" >&2

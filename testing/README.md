@@ -28,6 +28,15 @@ This guide outlines the steps to set up and run the e2e test suite.
    CONTROLLER=test-e2e make generate-test-env
    ```
 
+   or to run tests against multiple backing controllers you can bootstrap another controller:
+   ```bash
+   JWKS_DNS=jwks.localhost CONTROLLER_NAME=test-e2e-2 ./local/jimm/setup-controller.sh
+   ```
+   and generate the file with multiple controllers.
+   ```bash
+   CONTROLLERS=test-e2e,test-e2e2  make generate-test-env-multiple
+   ```
+
 
 ## Setup microk8s cloud
 

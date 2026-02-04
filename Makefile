@@ -136,6 +136,9 @@ test-auth-model:
 generate-test-env:
 	@./local/backing_test_controller/generate.sh --controller=$(CONTROLLER)
 
+## generate-test-env: Populate test.env with current juju controller details. Usage: CONTROLLERS=<controller-name>,<controller-name2>,... make generate-test-env-multiple
+generate-test-env-multiple:
+	@./local/backing_test_controller/generate.sh --controllers=$(CONTROLLERS)
 
 define check_dep
     if ! which $(1) > /dev/null; then\

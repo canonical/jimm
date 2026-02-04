@@ -64,21 +64,26 @@ jobs:
       - name: Start test environment
         run: docker compose up -d --wait
 
-      - name: Bootstrap controller with JWKS endpoint
+      - name: Bootstrap controller with JWKS endpoint 1
         run: |
-          JWKS_DNS=jwks.localhost CONTROLLER_NAME=test-e2e ./local/jimm/setup-controller.sh
+          JWKS_DNS=jwks.localhost CONTROLLER_NAME=test-e2e-1 ./local/jimm/setup-controller.sh
+      
+      - name: Bootstrap controller with JWKS endpoint 2
+        run: |
+          JWKS_DNS=jwks.localhost CONTROLLER_NAME=test-e2e-2 ./local/jimm/setup-controller.sh
 
       - name: Generate controller config
-        run: CONTROLLER=test-e2e make generate-test-env
+        run: CONTROLLERS=test-e2e-1,test-e2e-2 make generate-test-env-multiple
       
       - name: Proxy traffic from lxd to host for k8s api server
         run: |
           host_ip_addr=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
-          lxc_name=$(lxc list --format json | jq -r '.[].name')
-          lxc config device add $lxc_name k8sproxy proxy \
-            listen=tcp:127.0.0.1:16443 \
-            connect=tcp:$host_ip_addr:16443 \
-            bind=container
+          lxc list --format json | jq -r '.[].name' | while read lxc_name; do
+            lxc config device add $lxc_name k8sproxy-$lxc_name proxy \
+              listen=tcp:127.0.0.1:16443 \
+              connect=tcp:$host_ip_addr:16443 \
+              bind=container
+          done
       
       - name: Run E2E tests
         run: go test -v ./testing/... -timeout 30m

@@ -33,6 +33,18 @@ func init() {
 		watchAllModelSummariesMethod := rpc.Method(r.WatchAllModelSummaries)
 		initiateMigrationMethod := rpc.Method(r.InitiateMigration)
 
+		r.AddMethod("Controller", 11, "AllModels", allModelsMethod)
+		r.AddMethod("Controller", 11, "ConfigSet", configSetMethod)
+		r.AddMethod("Controller", 11, "ControllerConfig", controllerConfigMethod)
+		r.AddMethod("Controller", 11, "ControllerVersion", controllerVersionMethod)
+		r.AddMethod("Controller", 11, "GetControllerAccess", getControllerAccessMethod)
+		r.AddMethod("Controller", 11, "IdentityProviderURL", identityProviderURLMethod)
+		r.AddMethod("Controller", 11, "ModelStatus", modelStatusMethod)
+		r.AddMethod("Controller", 11, "MongoVersion", mongoVersionMethod)
+		r.AddMethod("Controller", 11, "WatchModelSummaries", watchModelSummariesMethod)
+		r.AddMethod("Controller", 11, "WatchAllModelSummaries", watchAllModelSummariesMethod)
+		r.AddMethod("Controller", 11, "InitiateMigration", initiateMigrationMethod)
+
 		r.AddMethod("Controller", 12, "AllModels", allModelsMethod)
 		r.AddMethod("Controller", 12, "ConfigSet", configSetMethod)
 		r.AddMethod("Controller", 12, "ControllerConfig", controllerConfigMethod)
@@ -45,7 +57,7 @@ func init() {
 		r.AddMethod("Controller", 12, "WatchAllModelSummaries", watchAllModelSummariesMethod)
 		r.AddMethod("Controller", 12, "InitiateMigration", initiateMigrationMethod)
 
-		return []int{12}
+		return []int{11, 12}
 	}
 }
 

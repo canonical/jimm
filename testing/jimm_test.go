@@ -14,7 +14,6 @@ import (
 	"github.com/juju/juju/api/client/modelconfig"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	jc "github.com/juju/testing/checkers"
@@ -22,7 +21,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -371,7 +369,7 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	ciExpected := apiparams.ControllerInfo{
 		Name:          name,
-		UUID:          s.Model.Controller.UUID,
+		UUID:          conf.UUID,
 		APIAddresses:  conf.ToAPIInfo().Addrs,
 		CACertificate: conf.ToAPIInfo().CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
@@ -397,7 +395,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	ciExpected := apiparams.ControllerInfo{
 		Name:          name,
-		UUID:          s.Model.Controller.UUID,
+		UUID:          conf.UUID,
 		APIAddresses:  conf.ToAPIInfo().Addrs,
 		CACertificate: conf.ToAPIInfo().CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
@@ -415,7 +413,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	ciExpected = apiparams.ControllerInfo{
 		Name:          name,
-		UUID:          s.Model.Controller.UUID,
+		UUID:          conf.UUID,
 		APIAddresses:  conf.ToAPIInfo().Addrs,
 		CACertificate: conf.ToAPIInfo().CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
@@ -606,17 +604,13 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 }
 
 func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
-	name, conf := s.GetOneControllerConfig(c)
-
-	s.AddController(c, "controller-2", conf.ToAPIInfo())
-
 	// Open the API connection as user "bob".
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	req := apiparams.UpdateMigratedModelRequest{
 		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetController: name,
+		TargetController: s.Model2.Controller.Name,
 	}
 	err := conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -627,14 +621,14 @@ func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 
 	req = apiparams.UpdateMigratedModelRequest{
 		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetController: name,
+		TargetController: s.Model2.Controller.Name,
 	}
 	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	req = apiparams.UpdateMigratedModelRequest{
 		ModelTag:         "invalid-model-tag",
-		TargetController: name,
+		TargetController: s.Model2.Controller.Name,
 	}
 	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
@@ -644,8 +638,7 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 	// Open the API connection as user "bob".
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
-
-	name, _ := s.GetOneControllerConfig(c)
+	controllerName := s.Model2.Controller.Name
 
 	err := s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), s.Model2.Controller.ResourceTag(), s.Model2.ResourceTag())
 	c.Assert(err, gc.Equals, nil)
@@ -653,7 +646,7 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	req := apiparams.ImportModelRequest{
-		Controller: name,
+		Controller: controllerName,
 		ModelTag:   s.Model2.Tag().String(),
 		Owner:      "",
 	}
@@ -674,7 +667,7 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 	c.Check(model2.CreatedAt.After(s.Model2.CreatedAt), gc.Equals, true)
 
 	req = apiparams.ImportModelRequest{
-		Controller: name,
+		Controller: controllerName,
 		ModelTag:   "invalid-model-tag",
 	}
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
@@ -916,20 +909,21 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 // detect that a model with the same UUID already exists on the target controller.
 func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 	modelName := petname.Generate(2, "-")
-	mt := s.AddModel(
+	name, _ := s.GetOneControllerConfig(c)
+	mt := s.AddModelToController(
 		c,
 		names.NewUserTag("charlie@canonical.com"),
 		modelName,
 		names.NewCloudTag(jimmtest.TestE2ECloudName),
 		jimmtest.TestE2ECloudRegionName,
 		s.Model2.CloudCredential.ResourceTag(),
+		name,
 	)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 
-	name, _ := s.GetOneControllerConfig(c)
 	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
 		Specs: []apiparams.MigrateModelInfo{
 			{TargetModelNameOrUUID: mt.Id(), TargetController: name},
@@ -1005,43 +999,37 @@ func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
 }
 
 func (s *jimmSuite) TestListMigrationTargets(c *gc.C) {
+	// Add model to a specific controller and verify other controllers are listed as migration targets.
+	confs := s.GetControllersConfig(c)
+	var controllerName string
+	otherControllers := []apiparams.ControllerInfo{}
+	for name, conf := range confs.Controllers {
+		if controllerName == "" {
+			controllerName = name
+			continue
+		}
+		otherControllers = append(otherControllers, apiparams.ControllerInfo{
+			Name:          name,
+			UUID:          conf.UUID,
+			APIAddresses:  conf.ToAPIInfo().Addrs,
+			CACertificate: conf.ToAPIInfo().CACert,
+			CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
+			CloudRegion:   jimmtest.TestE2ECloudRegionName,
+			Status: jujuparams.EntityStatus{
+				Status: "available",
+			},
+		})
+	}
 	// Add model that could migrate to target
-	mt := s.AddModel(
+	mt := s.AddModelToController(
 		c,
 		names.NewUserTag("charlie@canonical.com"),
 		petname.Generate(2, "-"),
 		names.NewCloudTag(jimmtest.TestE2ECloudName),
 		jimmtest.TestE2ECloudRegionName,
 		s.Model2.CloudCredential.ResourceTag(),
+		controllerName,
 	)
-
-	// Add migration target controller
-	_, conf := s.GetOneControllerConfig(c)
-	info := conf.ToAPIInfo()
-	ctl := &dbmodel.Controller{
-		UUID:          info.ControllerUUID,
-		Name:          "controller-2",
-		CACertificate: info.CACert,
-		Addresses:     nil,
-		CloudName:     jimmtest.TestE2ECloudName,
-		TLSHostname:   "juju-apiserver",
-		CloudRegion:   jimmtest.TestE2ECloudRegionName,
-	}
-	ctlCreds := juju.ControllerCreds{
-		AdminIdentityName: info.Tag.Id(),
-		AdminPassword:     info.Password,
-	}
-	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
-	for _, addr := range info.Addrs {
-		hp, err := network.ParseMachineHostPort(addr)
-		c.Assert(err, gc.Equals, nil)
-		ctl.Addresses = append(ctl.Addresses, []jujuparams.HostPort{{
-			Address: jujuparams.FromMachineAddress(hp.MachineAddress),
-			Port:    hp.Port(),
-		}})
-	}
-	err := s.JIMM.JujuManager().AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
-	c.Assert(err, gc.Equals, nil)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -1052,20 +1040,7 @@ func (s *jimmSuite) TestListMigrationTargets(c *gc.C) {
 	})
 	c.Assert(err, gc.Equals, nil)
 
-	expectedControllerInfo := []apiparams.ControllerInfo{{
-		Name:          "controller-2",
-		UUID:          s.Model.Controller.UUID,
-		APIAddresses:  info.Addrs,
-		CACertificate: info.CACert,
-		CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
-		CloudRegion:   jimmtest.TestE2ECloudRegionName,
-		AgentVersion:  s.Model.Controller.AgentVersion,
-		Status: jujuparams.EntityStatus{
-			Status: "available",
-		},
-	}}
-
-	assertControllerInfos(c, cis, expectedControllerInfo, s.GetControllersConfig(c))
+	assertControllerInfos(c, cis, otherControllers, s.GetControllersConfig(c))
 }
 
 // TestUpgradeTo_Unauthorized verifies non-admins cannot call the facade.

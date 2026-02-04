@@ -300,6 +300,9 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 	sort.Slice(modelResults, func(i, j int) bool {
 		return modelResults[i].ModelUUID < modelResults[j].ModelUUID
 	})
+	sort.Slice(resp.Results[0].Models, func(i, j int) bool {
+		return resp.Results[0].Models[i].ModelUUID < resp.Results[0].Models[j].ModelUUID
+	})
 	c.Assert(resp, jc.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
 			CredentialTag: credTag.String(),

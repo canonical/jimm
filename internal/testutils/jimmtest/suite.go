@@ -377,23 +377,36 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 	c.Assert(err, gc.Equals, nil)
 }
 
-func (s *JIMMSuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
+type addModelArgs struct {
+	owner                names.UserTag
+	name                 string
+	cloud                names.CloudTag
+	region               string
+	cred                 names.CloudCredentialTag
+	targetControllerName string
+}
+
+func (s *JIMMSuite) AddModel(c *gc.C, args addModelArgs) names.ModelTag {
 	ctx := context.Background()
 
-	u, err := dbmodel.NewIdentity(owner.Id())
+	u, err := dbmodel.NewIdentity(args.owner.Id())
 	c.Assert(err, gc.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	mi, err := s.JIMM.JujuManager().AddModel(ctx, s.NewUser(u), &juju.ModelCreateArgs{
-		Name:            name,
-		Owner:           owner,
-		Cloud:           cloud,
-		CloudRegion:     region,
-		CloudCredential: cred,
-	})
-	c.Assert(err, gc.Equals, nil, gc.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", name, owner.String(), cloud.String(), region, cred.String(), err))
+	modelCreateArgs := &juju.ModelCreateArgs{
+		Name:            args.name,
+		Owner:           args.owner,
+		Cloud:           args.cloud,
+		CloudRegion:     args.region,
+		CloudCredential: args.cred,
+	}
+	if args.targetControllerName != "" {
+		modelCreateArgs.ControllerName = args.targetControllerName
+	}
 
+	mi, err := s.JIMM.JujuManager().AddModel(ctx, s.NewUser(u), modelCreateArgs)
+	c.Assert(err, gc.Equals, nil, gc.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", args.name, args.owner.String(), args.cloud.String(), args.region, args.cred.String(), err))
 	return names.NewModelTag(mi.UUID)
 }
 

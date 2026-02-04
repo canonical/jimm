@@ -94,6 +94,15 @@ func (s *E2ESuite) GetControllersConfig(c *gc.C) *ControllersConfig {
 	return &config
 }
 
+// GetControllerConfig retrieves the controller information
+// for the given controller name from the controllers config file.
+func (s *E2ESuite) GetControllerConfig(c *gc.C, name string) ControllerInfo {
+	config := s.GetControllersConfig(c)
+	info, ok := config.Controllers[name]
+	c.Assert(ok, gc.Equals, true, gc.Commentf("controller %q not found in config", name))
+	return info
+}
+
 // GetOneControllerConfig retrieves one controller configuration
 // from the controllers config file. It can be used in tests when
 // a valid controller config is needed.
@@ -383,7 +392,28 @@ func (s *E2ESuite) Cleanup(f func()) {
 }
 
 func (s *E2ESuite) AddModel(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
-	mt := s.JIMMSuite.AddModel(c, owner, name, cloud, region, cred)
+	mt := s.JIMMSuite.AddModel(c, addModelArgs{
+		owner:  owner,
+		name:   name,
+		cloud:  cloud,
+		region: region,
+		cred:   cred,
+	})
+	s.Cleanup(func() {
+		s.DestroyModelAndDeleteFromDatabase(c, mt)
+	})
+	return mt
+}
+
+func (s *E2ESuite) AddModelToController(c *gc.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag, controllerName string) names.ModelTag {
+	mt := s.JIMMSuite.AddModel(c, addModelArgs{
+		owner:                owner,
+		name:                 name,
+		cloud:                cloud,
+		region:               region,
+		cred:                 cred,
+		targetControllerName: controllerName,
+	})
 	s.Cleanup(func() {
 		s.DestroyModelAndDeleteFromDatabase(c, mt)
 	})
