@@ -105,7 +105,7 @@ type bootstrapManager struct {
 // NewBootstrapManager creates a new BootstrapManager instance.
 func NewBootstrapManager(
 	store Store,
-	JobQueue JobQueue,
+	jobQueue JobQueue,
 	jujuManager JujuManager,
 	binaryStore BinaryStore,
 	jimmWellknownJWKSEndpoint string,
@@ -130,7 +130,7 @@ func NewBootstrapManager(
 	if credentialStore == nil {
 		return nil, errors.E("credential store cannot be nil")
 	}
-	if JobQueue == nil {
+	if jobQueue == nil {
 		return nil, errors.E("job queue cannot be nil")
 	}
 	return &bootstrapManager{
@@ -139,7 +139,7 @@ func NewBootstrapManager(
 		binaryStore:               binaryStore,
 		jimmWellknownJWKSEndpoint: jimmWellknownJWKSEndpoint,
 		credentialStore:           credentialStore,
-		jobQueue:                  JobQueue,
+		jobQueue:                  jobQueue,
 	}, nil
 }
 

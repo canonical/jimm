@@ -14,6 +14,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/cloud"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivertest"
@@ -47,6 +48,13 @@ func TestBootstrapWorker(t *testing.T) {
 		BootstrapController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, p bootstrap.RunBootstrapArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
 			gotArgs = p
+			c.Assert(p.CloudCred.Attributes(), qt.DeepEquals, map[string]string{"attr-1": "val-1"})
+			c.Assert(p.CloudCred.AuthType(), qt.Equals, cloud.AccessKeyAuthType)
+			c.Assert(p.Cloud.Name, qt.Equals, "mycloud")
+			c.Assert(p.Cloud.Type, qt.Equals, "openstack")
+			c.Assert(p.Cloud.Regions, qt.DeepEquals, []cloud.Region{
+				{Name: "region-1", Endpoint: "region-1-endpoint"},
+			})
 			c.Assert(p.Username, qt.Equals, u.Name)
 			c.Assert(p.ControllerName, qt.Equals, "controller-name")
 			c.Assert(p.CloudNameAndRegion, qt.Equals, "aws/us-east-1")
@@ -65,7 +73,13 @@ func TestBootstrapWorker(t *testing.T) {
 	defer func() { _ = tx.Rollback() }()
 
 	result, err := testWorker.Work(c.Context(), c.TB, tx, rivertypes.BootstrapArgs{
-		Username:             u.Name,
+		Username: u.Name,
+		CloudCred: cloud.NewCredential(cloud.AccessKeyAuthType, map[string]string{
+			"attr-1": "val-1",
+		}),
+		Cloud: cloud.Cloud{Name: "mycloud", Type: "openstack", Regions: []cloud.Region{
+			{Name: "region-1", Endpoint: "region-1-endpoint"},
+		}},
 		CLIVersion:           "3.6.1",
 		CloudNameAndRegion:   "aws/us-east-1",
 		ControllerName:       "controller-name",
@@ -109,14 +123,7 @@ func TestBootstrapWorker_Error(t *testing.T) {
 
 	bootstrapManager.EXPECT().
 		BootstrapController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, p bootstrap.RunBootstrapArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
-			c.Cleanup(func() {
-				if p.JujuDataDir != "" {
-					_ = os.RemoveAll(p.JujuDataDir)
-				}
-			})
-			return errors.New("some-error")
-		})
+		Return(errors.New("some-error"))
 
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)

@@ -124,8 +124,6 @@ func init() {
 		r.AddMethod("JIMM", 4, "StopJob", stopJob)
 		// JIMM Upgrades
 		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
-		// River Jobs
-		// r.AddMethod("JIMM", 4, "GetJobDetails", getJobDetails)
 
 		return []int{4}
 	}

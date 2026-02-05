@@ -2,7 +2,7 @@
 ---
 --- The table was originally introduced as bootstrap_logs (028) with a UUID job_id
 --- referencing job_tracker_entries, then renamed to job_logs (033). The new job
---- identifier used by JIMM for these logs is River's job ID (BIGINT) from river_job.
+--- identifier used by JIMM for these logs is River's job ID (BIGINT).
 
 DROP TABLE IF EXISTS job_logs;
 

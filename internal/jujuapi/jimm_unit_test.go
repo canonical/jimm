@@ -9,7 +9,6 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
@@ -169,7 +168,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 
 	// Test job not found
 	_, err = root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
-		JobID:     uuid.New().String(),
+		JobID:     "999",
 		Watermark: 0,
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
@@ -274,16 +273,16 @@ func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 
 	// Test job not found
 	err = root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: uuid.New().String(),
+		JobID: "999",
 	})
 	c.Assert(err, gc.ErrorMatches, ".*job not found.*")
 
 	// Test stop bootstrap not valid job ID
 	err = root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: "not-a-valid-uuid",
+		JobID: "random-string",
 	})
 	c.Assert(err, gc.NotNil)
-	c.Assert(err.Error(), gc.Matches, "invalid job ID")
+	c.Assert(err.Error(), gc.Matches, "invalid job ID.*")
 }
 
 func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {

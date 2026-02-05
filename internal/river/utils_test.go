@@ -50,7 +50,6 @@ type testDeps struct {
 	mockUpgradeManager   *MockUpgradeManager
 	mockBootstrapManager *MockBootstrapManager
 	identity             string
-	contextCanceled      context.Context
 }
 
 func setupIntegrationTest(

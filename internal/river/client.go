@@ -41,7 +41,7 @@ func (c *Client) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeTo
 	return job.Job.ID, err
 }
 
-// TODO(Kian): Return the isDuplicate flag so we can either return an error to callers
+// TODO(Kian JUJU-9159): Return the isDuplicate flag so we can either return an error to callers
 // or at least inform them that a bootstrap is in-progress and their request was ignored.
 
 // EnqueueBootstrap inserts a River job to bootstrap a new controller.

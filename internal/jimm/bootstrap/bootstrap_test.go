@@ -35,10 +35,10 @@ type bootstrapManagerSuite struct {
 	adminUser *openfga.User
 }
 
-var (
+const (
 	defaultJobID int64 = 123
 	//nolint:gosec
-	loginTokenRefreshURLParam = "jimm.com/.well-known/jwks.json"
+	loginTokenRefreshURLParam = "https://jimm.com/.well-known/jwks.json"
 )
 
 func defaultBootstrapArgs() bootstrap.RunBootstrapArgs {
@@ -1127,7 +1127,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 		select {
 		case <-ctx.Done():
 		case <-time.After(time.Second * 5):
-			c.Fatal("expected context to be cancelled")
+			c.Error("expected context to be cancelled")
 		}
 
 		outputCh := make(chan jujucommands.OutputLine, 1)

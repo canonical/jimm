@@ -23,7 +23,6 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	// Allow each child to fail once and then succeed.
 	testDeps := setupIntegrationTest(
 		c,
 		setupWorkerParams{
@@ -64,7 +63,6 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	// Allow each child to fail once and then succeed.
 	testDeps := setupIntegrationTest(
 		c,
 		setupWorkerParams{
@@ -142,7 +140,6 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	// Allow each child to fail once and then succeed.
 	testDeps := setupIntegrationTest(
 		c,
 		setupWorkerParams{
@@ -187,7 +184,6 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	// Allow each child to fail once and then succeed.
 	testDeps := setupIntegrationTest(
 		c,
 		setupWorkerParams{
@@ -237,7 +233,6 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	// Allow each child to fail once and then succeed.
 	testDeps := setupIntegrationTest(
 		c,
 		setupWorkerParams{

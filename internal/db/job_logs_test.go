@@ -36,6 +36,8 @@ func (s *dbSuite) TestJobLogs_AddJobLog(c *qt.C) {
 
 	// Test adding another where job id is different
 	jobID2 := int64(2)
+	err = s.Database.AddJobLog(ctx, jobID2, "Creating Juju controller \"diglett2\" on the-most-amazing-cloud")
+	c.Assert(err, qt.IsNil)
 
 	var logs2 []dbmodel.JobLog
 	err = s.Database.DB.Where("job_id = ?", jobID2).Order("line_number asc").Find(&logs2).Error
@@ -53,8 +55,9 @@ func (s *dbSuite) TestJobLogs_QueryJobLogs(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	// Query where the job doesn't exist
-	_, _, err = s.Database.QueryJobLog(ctx, 0, 0)
-	c.Assert(err, qt.ErrorMatches, "job not found")
+	logs, _, err := s.Database.QueryJobLog(ctx, 0, 0)
+	c.Assert(err, qt.IsNil)
+	c.Assert(logs, qt.HasLen, 0)
 
 	// Add job to reference
 	jobID := int64(1)
