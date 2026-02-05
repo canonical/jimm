@@ -145,6 +145,7 @@ func (s *bootstrapManagerSuite) TestStartBootstrapJob_EnqueuesJob(c *qt.C) {
 	}
 
 	mocks.jobQueue.EXPECT().EnqueueBootstrap(gomock.Any(), rivertypes.BootstrapArgs{
+		Username:             "bob@canonical.com",
 		CLIVersion:           requested.CLIVersion,
 		CloudNameAndRegion:   requested.CloudNameAndRegion,
 		ControllerName:       requested.ControllerName,
@@ -223,7 +224,7 @@ func (s *bootstrapManagerSuite) TestGetJobInfo_JobFailed(c *qt.C) {
 
 	response, err := manager.GetJobInfo(ctx, s.adminUser, jobID, 0)
 	c.Assert(err, qt.IsNil)
-	c.Assert(response.Status, qt.Equals, params.JobStatus(rivertype.JobStateDiscarded))
+	c.Assert(response.Status, qt.Equals, params.StatusFailed)
 	c.Assert(response.Error, qt.Equals, "attempt 0: I died really fast\n")
 }
 
@@ -1150,7 +1151,48 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 	c.Assert(cleanupCalled, qt.IsTrue)
 }
 
-func (s *bootstrapManagerSuite) TestDestroyControllerJob(c *qt.C) {
+func (s *bootstrapManagerSuite) TestStartDestroyControllerJob(c *qt.C) {
+	testCtx := c.Context()
+
+	ctrl, mocks, user := setupTest(c)
+	defer ctrl.Finish()
+
+	manager, err := bootstrap.NewBootstrapManager(mocks.store, mocks.jobQueue, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam, mocks.credentialStore)
+	c.Assert(err, qt.IsNil)
+
+	args := bootstrap.DestroyControllerParams{
+		ControllerName: "controller-foo",
+		AgentVersion:   "3.6.9",
+		ControllerUUID: "some-uuid",
+		CloudName:      "cloud-foo",
+		CloudRegion:    "region-foo",
+		APIEndpoints:   []string{"ep-1", "ep-2"},
+		PublicAddress:  "public-address",
+		CACertificate:  "ca-cert",
+	}
+
+	mocks.jobQueue.EXPECT().EnqueueDestroyController(
+		gomock.Any(),
+		gomock.Any(),
+	).DoAndReturn(func(ctx context.Context, dca rivertypes.DestroyControllerArgs) (int64, error) {
+		c.Check(dca.Username, qt.Equals, user.Name)
+		c.Check(dca.ControllerName, qt.Equals, "controller-foo")
+		c.Check(dca.AgentVersion, qt.Equals, "3.6.9")
+		c.Check(dca.ControllerUUID, qt.Equals, "some-uuid")
+		c.Check(dca.CloudName, qt.Equals, "cloud-foo")
+		c.Check(dca.CloudRegion, qt.Equals, "region-foo")
+		c.Check(dca.APIEndpoints, qt.DeepEquals, []string{"ep-1", "ep-2"})
+		c.Check(dca.PublicAddress, qt.Equals, "public-address")
+		c.Check(dca.CACertificate, qt.Equals, "ca-cert")
+		return 456, nil
+	})
+
+	jobID, err := manager.StartDestroyControllerJob(testCtx, user, args)
+	c.Assert(err, qt.IsNil)
+	c.Assert(jobID, qt.Equals, int64(456))
+}
+
+func (s *bootstrapManagerSuite) TestDestroyController(c *qt.C) {
 	testCtx := c.Context()
 
 	cliVersion := "3.6.9"

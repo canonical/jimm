@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/network"
 	"github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -160,11 +159,35 @@ func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobI
 		fmt.Fprintf(&errorMsg, "attempt %d: %s\n", i, attemptErr.Error)
 	}
 	return params.GetJobInfoResponse{
-		Status:    params.JobStatus(job.State),
+		Status:    toParamsJobState(ctx, job.State),
 		Error:     errorMsg.String(),
 		Logs:      loggies,
 		Watermark: newOffset,
 	}, nil
+}
+
+func toParamsJobState(ctx context.Context, state rivertype.JobState) params.JobStatus {
+	switch state {
+	case rivertype.JobStateCompleted:
+		return params.StatusSuccessful
+
+	case rivertype.JobStateRunning:
+		return params.StatusRunning
+
+	case rivertype.JobStateCancelled,
+		rivertype.JobStateDiscarded:
+		return params.StatusFailed
+
+	case rivertype.JobStateAvailable,
+		rivertype.JobStatePending,
+		rivertype.JobStateScheduled,
+		rivertype.JobStateRetryable:
+		return params.StatusPending
+
+	default:
+		zapctx.Error(ctx, "unknown river job state", zap.String("state", string(state)))
+		return params.StatusUnknown
+	}
 }
 
 // StopJob stops a bootstrap job by its ID.
@@ -227,6 +250,7 @@ func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	}
 
 	bootstrapArgs := rivertypes.BootstrapArgs{
+		Username: user.Name,
 		// Binary args.
 		CLIVersion: params.CLIVersion,
 		// User defined command arguments
@@ -291,34 +315,6 @@ func (h JujuCLI) RunWrapper(
 	r := jujucommands.NewCommandRunner(binaryPath, jujuDataDir)
 	command := jujucommands.NewBootstrapCmd(r)
 	return command.Run(ctx, params)
-}
-
-// JobParams holds the params to run a juju bootstrap job.
-type JobParams struct {
-	// Runner params.
-
-	JujuDataDir string
-
-	// CLI Download params.
-
-	CLIVersion string
-
-	// User defined command arguments
-
-	CloudNameAndRegion string
-	ControllerName     string
-	AgentVersion       string
-	CloudCred          jujucloud.Credential
-	// Cloud contains the definition of the cloud e.g. endpoints, regions, TLS config.
-	// It only needs to be set if the cloud is not a public cloud (e.g. not AWS, Azure, etc).
-	Cloud jujucloud.Cloud
-
-	// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
-
-	LoginTokenRefreshURL string
-
-	// User provided config
-	UserConfig map[string]string
 }
 
 // BootstrapController bootstraps a new Juju controller and adds it to JIMM.
@@ -534,6 +530,7 @@ func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId int64, logLine
 // StartDestroyControllerJob inserts a destroy-controller job into the database.
 func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *openfga.User, params DestroyControllerParams) (int64, error) {
 	destroyArgs := rivertypes.DestroyControllerArgs{
+		Username:       user.Name,
 		ControllerName: params.ControllerName,
 		ControllerUUID: params.ControllerUUID,
 		AgentVersion:   params.AgentVersion,
