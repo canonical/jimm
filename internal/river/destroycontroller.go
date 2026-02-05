@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -84,4 +85,10 @@ func (w *destroyControllerWorker) Work(ctx context.Context, job *river.Job[river
 	}
 
 	return nil
+}
+
+// Timeout implements the [river.Worker] interface.
+// Destroy operations can take a while to complete so we set a generous timeout.
+func (w *destroyControllerWorker) Timeout(*river.Job[rivertypes.DestroyControllerArgs]) time.Duration {
+	return 60 * time.Minute
 }

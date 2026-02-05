@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -84,4 +85,10 @@ func (w *bootstrapWorker) Work(ctx context.Context, job *river.Job[rivertypes.Bo
 	}
 
 	return nil
+}
+
+// Timeout implements the [river.Worker] interface.
+// Bootstrap operations can take a while to complete so we set a generous timeout.
+func (w *bootstrapWorker) Timeout(*river.Job[rivertypes.BootstrapArgs]) time.Duration {
+	return 60 * time.Minute
 }
