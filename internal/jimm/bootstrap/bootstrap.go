@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	jujucloud "github.com/juju/juju/cloud"
@@ -35,6 +36,10 @@ var (
 	binaryDone = func(b *jujuclistore.Binary) {
 		b.Done()
 	}
+	// jujuCLILock ensures that only 1 routine uses the Juju CLI at a time due to a global lock
+	// in the store package used to access the CLI data directory.
+	// TODO: Create a more granular, safe-store implementation (see the TF provider).
+	jujuCLILock = sync.Mutex{}
 )
 
 const (
@@ -326,12 +331,9 @@ func (b *bootstrapManager) BootstrapController(
 	cmdFactory CommandFactory,
 	user *openfga.User,
 ) error {
-	ctx = zapctx.WithFields(
-		ctx,
-		zap.String("controller-name", p.ControllerName),
-	)
-
-	zapctx.Debug(ctx, "starting bootstrap job")
+	// Lock the bootstrap concurrently with destroy to avoid misuse of the store commands.
+	jujuCLILock.Lock()
+	defer jujuCLILock.Unlock()
 
 	// If we allow concurrent bootstraps, both could pass this check but only one would
 	// succeed when trying to add the controller to JIMM.
@@ -560,27 +562,9 @@ func (b *bootstrapManager) DestroyController(
 	cmdFactory CommandFactory,
 	user *openfga.User,
 ) error {
-	ctx = zapctx.WithFields(ctx, zap.String("controller-name", p.ControllerName))
-
-	zapctx.Debug(ctx, "starting destroy-controller job")
-
-	// Lock the bootstrap for the same length the process is allowed to run for
-	// before being killed.
-	if err := b.store.LockBootstrap(ctx, jujucommands.CommandKillDelay); err != nil {
-		return errors.E(fmt.Errorf("failed to acquire bootstrap lock: %w", err))
-	}
-
-	// Use a background context to unlock the bootstrap lock.
-	// This ensures that the lock is released even if the job context is cancelled.
-	defer func() {
-		if err := b.store.UnlockBootstrap(context.Background()); err != nil {
-			zapctx.Error(
-				ctx,
-				"failed to unlock bootstrap lock",
-				zap.Error(err),
-			)
-		}
-	}()
+	// Lock the destroy concurrently with bootstrap to avoid misuse of the store commands.
+	jujuCLILock.Lock()
+	defer jujuCLILock.Unlock()
 
 	b.writeJobLog(ctx, p.JobID,
 		fmt.Sprintf("Downloading the Juju CLI, version %s for destroy-controller. This may take a few minutes", p.AgentVersion))

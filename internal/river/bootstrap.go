@@ -12,7 +12,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 )
 
 // newBootstrapWorker creates a new bootstrapWorker.
@@ -46,6 +48,13 @@ type bootstrapWorker struct {
 
 // Work implements the [river.Worker] interface.
 func (w *bootstrapWorker) Work(ctx context.Context, job *river.Job[rivertypes.BootstrapArgs]) error {
+	ctx = zapctx.WithFields(ctx,
+		zap.String("controller-name", job.Args.ControllerName),
+		zap.Int64("job-id", job.ID),
+	)
+
+	zapctx.Debug(ctx, "starting bootstrap-controller job")
+
 	u := &dbmodel.Identity{Name: job.Args.Username}
 	if err := w.store.FetchIdentity(ctx, u); err != nil {
 		return err
