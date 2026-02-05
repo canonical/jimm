@@ -36,8 +36,9 @@ var (
 	binaryDone = func(b *jujuclistore.Binary) {
 		b.Done()
 	}
-	// jujuCLILock ensures that only 1 routine uses the Juju CLI at a time due to a global lock
-	// in the store package used to access the CLI data directory.
+	// jujuCLILock ensures that only 1 routine (across bootstrap and destroy) uses the
+	// Juju CLI at a time due to a global lock in Juju's store package used to access the
+	// CLI data directory.
 	// TODO: Create a more granular, safe-store implementation (see the TF provider).
 	jujuCLILock = sync.Mutex{}
 )

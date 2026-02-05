@@ -66,8 +66,9 @@ func (BootstrapArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
 		MaxAttempts: 1,
 		// Only allow 1 bootstrap job at a time.
-		// This avoids issues with a global lock in Juju's cmd pkg
-		// used during bootstrap.
+		// This is used in conjuction with a global mutex
+		// in the bootstrap package to avoid issues with a
+		// global lock in Juju's cmd pkg used during bootstrap.
 		UniqueOpts: river.UniqueOpts{
 			ByState: []rivertype.JobState{
 				rivertype.JobStateAvailable,
