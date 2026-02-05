@@ -44,6 +44,76 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) 
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 }
 
+func (s *jimmUnitTestSuite) TestAddController_UnauthorizedUser(c *gc.C) {
+	ctx := context.Background()
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
+
+	_, err := root.AddController(ctx, apiparams.AddControllerRequest{})
+
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+}
+
+func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
+	ctx := context.Background()
+
+	called := false
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				ControllerService: mocks.ControllerService{
+					AddController_: func(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error {
+						called = true
+						c.Assert(user.JimmAdmin, gc.Equals, true)
+						c.Assert(ctl.Name, gc.Equals, "controller-2")
+						c.Assert(ctl.UUID, gc.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
+						c.Assert(ctl.PublicAddress, gc.Equals, "controller.example.com:443")
+						c.Assert(ctl.CACertificate, gc.Equals, "ca-cert")
+						c.Assert(ctl.TLSHostname, gc.Equals, "juju-apiserver")
+						c.Assert(creds.AdminIdentityName, gc.Equals, "admin")
+						c.Assert(creds.AdminPassword, gc.Equals, "super-secret")
+
+						// Simulate the JujuManager filling in extra data during the add.
+						ctl.CloudName = "aws"
+						ctl.CloudRegion = "eu-west-1"
+						ctl.AgentVersion = "3.6.9"
+						return nil
+					},
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	req := apiparams.AddControllerRequest{
+		UUID:          "982b16d9-a945-4762-b684-fd4fd885aa11",
+		Name:          "controller-2",
+		PublicAddress: "controller.example.com:443",
+		TLSHostname:   "juju-apiserver",
+		APIAddresses:  []string{"127.0.0.1:17070"},
+		CACertificate: "ca-cert",
+		Username:      "admin",
+		Password:      "super-secret",
+	}
+
+	info, err := root.AddController(ctx, req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(called, gc.Equals, true)
+	c.Assert(info.Name, gc.Equals, req.Name)
+	c.Assert(info.UUID, gc.Equals, req.UUID)
+	c.Assert(info.PublicAddress, gc.Equals, req.PublicAddress)
+	c.Assert(info.CACertificate, gc.Equals, req.CACertificate)
+	c.Assert(info.APIAddresses, gc.DeepEquals, req.APIAddresses)
+	c.Assert(info.CloudTag, gc.Equals, names.NewCloudTag("aws").String())
+	c.Assert(info.CloudRegion, gc.Equals, "eu-west-1")
+	c.Assert(info.AgentVersion, gc.Equals, "3.6.9")
+}
+
 func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 	ctx := context.Background()
 

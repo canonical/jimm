@@ -212,6 +212,9 @@ func (r *controllerRoot) AddModelToController(ctx context.Context, req apiparams
 // AddController allows adds a controller to the pool of controllers
 // available to JIMM.
 func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.ControllerInfo{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
 
 	if req.Name == jimmControllerName {
 		return apiparams.ControllerInfo{}, errors.E(errors.CodeBadRequest, fmt.Sprintf("cannot add a controller with name %q", jimmControllerName))

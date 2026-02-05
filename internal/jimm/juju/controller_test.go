@@ -116,7 +116,6 @@ func TestAddController(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	alice := openfga.NewUser(u, j.OpenFGAClient)
-	alice.JimmAdmin = true
 	err = alice.SetControllerAccess(context.Background(), j.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 
