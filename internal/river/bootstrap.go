@@ -65,6 +65,11 @@ func (w *bootstrapWorker) Work(ctx context.Context, job *river.Job[rivertypes.Bo
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
 	}
+	defer func() {
+		if err := os.RemoveAll(temp); err != nil {
+			zapctx.Error(ctx, "failed to remove temporary Juju data directory", zap.String("path", temp), zap.Error(err))
+		}
+	}()
 
 	bootstrapArgs := bootstrap.RunBootstrapArgs{
 		BootstrapArgs: job.Args,

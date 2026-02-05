@@ -53,7 +53,12 @@ func StartWorkers(
 	upgradeManager UpgradeManager,
 	bootstrapManager BootstrapManager,
 ) error {
-	workers, err := newWorkers(openfgaClient, db, upgradeManager, bootstrapManager)
+	workerParams := workerParams{
+		migrateRetryCount: defaultMigrateRetries,
+		upgradeRetryCount: defaultUpgradeRetries,
+		awaitFunc:         waitForJobToFinalise,
+	}
+	workers, err := newWorkers(workerParams, openfgaClient, db, upgradeManager, bootstrapManager)
 	if err != nil {
 		return err
 	}
@@ -76,7 +81,13 @@ func StartWorkers(
 	return riverClient.Start(ctx)
 }
 
-func newWorkers(openfgaClient *openfga.OFGAClient, store *db.Database, upgradeManager UpgradeManager, bootstrapManager BootstrapManager) (*river.Workers, error) {
+type workerParams struct {
+	migrateRetryCount int
+	upgradeRetryCount int
+	awaitFunc         awaitCompletionFunc
+}
+
+func newWorkers(wp workerParams, openfgaClient *openfga.OFGAClient, store *db.Database, upgradeManager UpgradeManager, bootstrapManager BootstrapManager) (*river.Workers, error) {
 	workers := river.NewWorkers()
 
 	migrationWorker, err := newMigrationWorker(openfgaClient, store, upgradeManager)
@@ -95,7 +106,7 @@ func newWorkers(openfgaClient *openfga.OFGAClient, store *db.Database, upgradeMa
 		return nil, err
 	}
 
-	upgradeToWorker := newUpgradeToWorker(defaultMigrateRetries, defaultUpgradeRetries, waitForJobToFinalise)
+	upgradeToWorker := newUpgradeToWorker(wp.migrateRetryCount, wp.upgradeRetryCount, wp.awaitFunc)
 	if err := river.AddWorkerSafely(workers, upgradeToWorker); err != nil {
 		return nil, err
 	}
@@ -105,6 +116,14 @@ func newWorkers(openfgaClient *openfga.OFGAClient, store *db.Database, upgradeMa
 		return nil, err
 	}
 	if err := river.AddWorkerSafely(workers, bootstrapWorker); err != nil {
+		return nil, err
+	}
+
+	destroyControllerWorker, err := newDestroyControllerWorker(openfgaClient, store, bootstrapManager)
+	if err != nil {
+		return nil, err
+	}
+	if err := river.AddWorkerSafely(workers, destroyControllerWorker); err != nil {
 		return nil, err
 	}
 

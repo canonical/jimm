@@ -65,6 +65,11 @@ func (w *destroyControllerWorker) Work(ctx context.Context, job *river.Job[river
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
 	}
+	defer func() {
+		if err := os.RemoveAll(temp); err != nil {
+			zapctx.Error(ctx, "failed to remove temporary Juju data directory", zap.String("path", temp), zap.Error(err))
+		}
+	}()
 
 	destroyArgs := bootstrap.RunDestroyControllerArgs{
 		DestroyControllerArgs: job.Args,

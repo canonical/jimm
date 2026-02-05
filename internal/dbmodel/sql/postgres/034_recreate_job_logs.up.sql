@@ -7,7 +7,7 @@
 DROP TABLE IF EXISTS job_logs;
 
 CREATE TABLE IF NOT EXISTS job_logs (
-    job_id BIGINT NOT NULL REFERENCES river_job(id) ON DELETE CASCADE,
+    job_id BIGINT NOT NULL,
     line_number INT NOT NULL,
     log_line TEXT NOT NULL,
     PRIMARY KEY (job_id, line_number)

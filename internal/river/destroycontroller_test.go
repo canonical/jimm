@@ -21,7 +21,7 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-func TestBootstrapWorker(t *testing.T) {
+func TestDestroyControllerWorker(t *testing.T) {
 	c := qt.New(t)
 
 	ctrl := gomock.NewController(c)
@@ -29,7 +29,7 @@ func TestBootstrapWorker(t *testing.T) {
 
 	database, sqlDb := setupTestDB(c)
 
-	// Prepare identity needed by bootstrapWorker.
+	// Prepare identity needed by destroyControllerWorker.
 	u, err := dbmodel.NewIdentity("ash@catchum.com")
 	c.Assert(err, qt.IsNil)
 	err = database.GetIdentity(c.Context(), u)
@@ -37,22 +37,25 @@ func TestBootstrapWorker(t *testing.T) {
 
 	bootstrapManager := NewMockBootstrapManager(ctrl)
 	openfgaClient := &openfga.OFGAClient{}
-	w, err := newBootstrapWorker(openfgaClient, database, bootstrapManager)
+	w, err := newDestroyControllerWorker(openfgaClient, database, bootstrapManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
 
-	var gotArgs bootstrap.RunBootstrapArgs
+	var gotArgs bootstrap.RunDestroyControllerArgs
 	bootstrapManager.EXPECT().
-		BootstrapController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, p bootstrap.RunBootstrapArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
+		DestroyController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, p bootstrap.RunDestroyControllerArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
 			gotArgs = p
 			c.Assert(p.Username, qt.Equals, u.Name)
 			c.Assert(p.ControllerName, qt.Equals, "controller-name")
-			c.Assert(p.CloudNameAndRegion, qt.Equals, "aws/us-east-1")
-			c.Assert(p.CLIVersion, qt.Equals, "3.6.1")
-			c.Assert(p.LoginTokenRefreshURL, qt.Equals, "https://jimm.example.com/refresh")
-			c.Assert(p.UserConfig["some"], qt.Equals, "value")
+			c.Assert(p.ControllerUUID, qt.Equals, "controller-uuid")
+			c.Assert(p.AgentVersion, qt.Equals, "3.6.0")
+			c.Assert(p.CloudName, qt.Equals, "aws")
+			c.Assert(p.CloudRegion, qt.Equals, "us-east-1")
+			c.Assert(p.APIEndpoints, qt.DeepEquals, []string{"10.0.0.1:17070", "10.0.0.2:17070"})
+			c.Assert(p.PublicAddress, qt.Equals, "1.2.3.4")
+			c.Assert(p.CACertificate, qt.Equals, "ca-cert")
 			c.Assert(p.JujuDataDir, qt.Not(qt.Equals), "")
 			st, err := os.Stat(p.JujuDataDir)
 			c.Assert(err, qt.IsNil)
@@ -64,16 +67,16 @@ func TestBootstrapWorker(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	defer func() { _ = tx.Rollback() }()
 
-	result, err := testWorker.Work(c.Context(), c.TB, tx, rivertypes.BootstrapArgs{
-		Username:             u.Name,
-		CLIVersion:           "3.6.1",
-		CloudNameAndRegion:   "aws/us-east-1",
-		ControllerName:       "controller-name",
-		AgentVersion:         "3.6.0",
-		LoginTokenRefreshURL: "https://jimm.example.com/refresh",
-		UserConfig: map[string]string{
-			"some": "value",
-		},
+	result, err := testWorker.Work(c.Context(), c.TB, tx, rivertypes.DestroyControllerArgs{
+		Username:       u.Name,
+		ControllerName: "controller-name",
+		ControllerUUID: "controller-uuid",
+		AgentVersion:   "3.6.0",
+		CloudName:      "aws",
+		CloudRegion:    "us-east-1",
+		APIEndpoints:   []string{"10.0.0.1:17070", "10.0.0.2:17070"},
+		PublicAddress:  "1.2.3.4",
+		CACertificate:  "ca-cert",
 	}, nil)
 
 	c.Assert(err, qt.IsNil)
@@ -86,7 +89,7 @@ func TestBootstrapWorker(t *testing.T) {
 	c.Assert(os.IsNotExist(err), qt.IsTrue)
 }
 
-func TestBootstrapWorker_Error(t *testing.T) {
+func TestDestroyControllerWorker_Error(t *testing.T) {
 	c := qt.New(t)
 
 	ctrl := gomock.NewController(c)
@@ -94,7 +97,7 @@ func TestBootstrapWorker_Error(t *testing.T) {
 
 	database, sqlDb := setupTestDB(c)
 
-	// Prepare identity needed by bootstrapWorker.
+	// Prepare identity needed by destroyControllerWorker.
 	u, err := dbmodel.NewIdentity("ash@catchum.com")
 	c.Assert(err, qt.IsNil)
 	err = database.GetIdentity(c.Context(), u)
@@ -102,36 +105,32 @@ func TestBootstrapWorker_Error(t *testing.T) {
 
 	bootstrapManager := NewMockBootstrapManager(ctrl)
 	openfgaClient := &openfga.OFGAClient{}
-	w, err := newBootstrapWorker(openfgaClient, database, bootstrapManager)
+	w, err := newDestroyControllerWorker(openfgaClient, database, bootstrapManager)
 	c.Assert(err, qt.IsNil)
 
 	testWorker := rivertest.NewWorker(c.TB, riverdatabasesql.New(sqlDb), nil, w)
 
 	bootstrapManager.EXPECT().
-		BootstrapController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, p bootstrap.RunBootstrapArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
-			c.Cleanup(func() {
-				if p.JujuDataDir != "" {
-					_ = os.RemoveAll(p.JujuDataDir)
-				}
-			})
-			return errors.New("some-error")
-		})
+		DestroyController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(errors.New("some-error"))
 
 	tx, err := sqlDb.Begin()
 	c.Assert(err, qt.IsNil)
 	defer func() { _ = tx.Rollback() }()
 
-	result, err := testWorker.Work(c.Context(), c.TB, tx, rivertypes.BootstrapArgs{
+	result, err := testWorker.Work(c.Context(), c.TB, tx, rivertypes.DestroyControllerArgs{
 		Username:       u.Name,
 		ControllerName: "controller-name",
+		ControllerUUID: "controller-uuid",
+		AgentVersion:   "3.6.0",
 	}, nil)
+
 	c.Assert(err, qt.ErrorMatches, "some-error")
 	c.Assert(result.EventKind, qt.Equals, river.EventKindJobFailed)
-	c.Assert(result.Job.State, qt.Equals, rivertype.JobStateDiscarded)
+	c.Assert(result.Job.State, qt.Equals, rivertype.JobStateAvailable)
 }
 
-func TestBootstrapWorker_Unique(t *testing.T) {
+func TestDestroyControllerWorker_Unique(t *testing.T) {
 	c := qt.New(t)
 	ctx, cancel := context.WithTimeout(c.Context(), 10*time.Second)
 	c.Cleanup(cancel)
@@ -146,37 +145,41 @@ func TestBootstrapWorker_Unique(t *testing.T) {
 
 	block := make(chan struct{})
 
-	// First bootstrap blocks (keeps job running), second completes.
+	// First destroy blocks (keeps job running), second completes.
 	gomock.InOrder(
 		bootstrapManager.EXPECT().
-			BootstrapController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-			DoAndReturn(func(ctx context.Context, p bootstrap.RunBootstrapArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
+			DestroyController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, p bootstrap.RunDestroyControllerArgs, _ bootstrap.CommandFactory, _ *openfga.User) error {
 				<-block
 				return nil
 			}),
 		bootstrapManager.EXPECT().
-			BootstrapController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			DestroyController(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(nil),
 	)
 
 	sub, cancelSub := riverClient.Subscribe(river.EventKindJobCompleted)
 	c.Cleanup(cancelSub)
 
-	ins1, err := riverClient.Insert(ctx, rivertypes.BootstrapArgs{
+	ins1, err := riverClient.Insert(ctx, rivertypes.DestroyControllerArgs{
 		Username:       username,
 		ControllerName: "controller-name-1",
+		ControllerUUID: "uuid-1",
+		AgentVersion:   "3.6.0",
 	}, nil)
 	c.Assert(err, qt.IsNil)
 
-	bootstrapKind := rivertypes.BootstrapArgs{}.Kind()
-	waitForJobState(c, ctx, riverClient, ins1.Job.ID, rivertype.JobStateRunning, bootstrapKind)
+	destroyKind := rivertypes.DestroyControllerArgs{}.Kind()
+	waitForJobState(c, ctx, riverClient, ins1.Job.ID, rivertype.JobStateRunning, destroyKind)
 
-	ins2, err := riverClient.Insert(ctx, rivertypes.BootstrapArgs{
+	ins2, err := riverClient.Insert(ctx, rivertypes.DestroyControllerArgs{
 		Username:       username,
 		ControllerName: "controller-name-2",
+		ControllerUUID: "uuid-2",
+		AgentVersion:   "3.6.0",
 	}, nil)
 	c.Assert(err, qt.IsNil)
-	// Because BootstrapArgs.InsertOpts uses only ByState uniqueness, the second insert should be skipped
+	// Because DestroyControllerArgs.InsertOpts uses only ByState uniqueness, the second insert should be skipped
 	// while the first job is not in a completed state.
 	c.Assert(ins2.UniqueSkippedAsDuplicate, qt.IsTrue)
 	c.Assert(ins2.Job.ID, qt.Equals, ins1.Job.ID)
@@ -186,9 +189,11 @@ func TestBootstrapWorker_Unique(t *testing.T) {
 	c.Assert(row1.State, qt.Equals, rivertype.JobStateCompleted)
 
 	// After the first job completes, a subsequent insert should not be considered a duplicate.
-	ins3, err := riverClient.Insert(ctx, rivertypes.BootstrapArgs{
+	ins3, err := riverClient.Insert(ctx, rivertypes.DestroyControllerArgs{
 		Username:       username,
 		ControllerName: "controller-name-3",
+		ControllerUUID: "uuid-3",
+		AgentVersion:   "3.6.0",
 	}, nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(ins3.UniqueSkippedAsDuplicate, qt.IsFalse)

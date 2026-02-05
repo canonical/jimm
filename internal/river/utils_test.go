@@ -72,19 +72,13 @@ func setupIntegrationTest(
 	c.Assert(err, qt.IsNil)
 
 	openfgaClient := &openfga.OFGAClient{}
-	migrationW, err := newMigrationWorker(openfgaClient, database, upgradeManager)
+	workerParams := workerParams{
+		migrateRetryCount: p.migrateRetryCount,
+		upgradeRetryCount: p.upgradeRetryCount,
+		awaitFunc:         p.awaitFunc,
+	}
+	workers, err := newWorkers(workerParams, openfgaClient, database, upgradeManager, bootstrapManager)
 	c.Assert(err, qt.IsNil)
-	upgradeW, err := newUpgradeWorker(upgradeManager)
-	c.Assert(err, qt.IsNil)
-	upgradeToW := newUpgradeToWorker(p.migrateRetryCount, p.upgradeRetryCount, p.awaitFunc)
-	bootstrapW, err := newBootstrapWorker(openfgaClient, database, bootstrapManager)
-	c.Assert(err, qt.IsNil)
-
-	workers := river.NewWorkers()
-	c.Assert(river.AddWorkerSafely(workers, migrationW), qt.IsNil)
-	c.Assert(river.AddWorkerSafely(workers, upgradeW), qt.IsNil)
-	c.Assert(river.AddWorkerSafely(workers, upgradeToW), qt.IsNil)
-	c.Assert(river.AddWorkerSafely(workers, bootstrapW), qt.IsNil)
 
 	riverClient, err := river.NewClient(riverdatabasesql.New(sqlDb), &river.Config{
 		TestOnly: true,
