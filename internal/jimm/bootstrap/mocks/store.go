@@ -12,7 +12,6 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
-	time "time"
 
 	dbmodel "github.com/canonical/jimm/v3/internal/dbmodel"
 	gomock "go.uber.org/mock/gomock"
@@ -118,44 +117,6 @@ func (c *MockStoreGetControllerCall) DoAndReturn(f func(context.Context, *dbmode
 	return c
 }
 
-// LockBootstrap mocks base method.
-func (m *MockStore) LockBootstrap(ctx context.Context, ttl time.Duration) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LockBootstrap", ctx, ttl)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// LockBootstrap indicates an expected call of LockBootstrap.
-func (mr *MockStoreMockRecorder) LockBootstrap(ctx, ttl any) *MockStoreLockBootstrapCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockBootstrap", reflect.TypeOf((*MockStore)(nil).LockBootstrap), ctx, ttl)
-	return &MockStoreLockBootstrapCall{Call: call}
-}
-
-// MockStoreLockBootstrapCall wrap *gomock.Call
-type MockStoreLockBootstrapCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockStoreLockBootstrapCall) Return(arg0 error) *MockStoreLockBootstrapCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockStoreLockBootstrapCall) Do(f func(context.Context, time.Duration) error) *MockStoreLockBootstrapCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreLockBootstrapCall) DoAndReturn(f func(context.Context, time.Duration) error) *MockStoreLockBootstrapCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // QueryJobLog mocks base method.
 func (m *MockStore) QueryJobLog(ctx context.Context, jobId int64, offset int) ([]string, int, error) {
 	m.ctrl.T.Helper()
@@ -192,44 +153,6 @@ func (c *MockStoreQueryJobLogCall) Do(f func(context.Context, int64, int) ([]str
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockStoreQueryJobLogCall) DoAndReturn(f func(context.Context, int64, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// UnlockBootstrap mocks base method.
-func (m *MockStore) UnlockBootstrap(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UnlockBootstrap", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UnlockBootstrap indicates an expected call of UnlockBootstrap.
-func (mr *MockStoreMockRecorder) UnlockBootstrap(ctx any) *MockStoreUnlockBootstrapCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlockBootstrap", reflect.TypeOf((*MockStore)(nil).UnlockBootstrap), ctx)
-	return &MockStoreUnlockBootstrapCall{Call: call}
-}
-
-// MockStoreUnlockBootstrapCall wrap *gomock.Call
-type MockStoreUnlockBootstrapCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockStoreUnlockBootstrapCall) Return(arg0 error) *MockStoreUnlockBootstrapCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockStoreUnlockBootstrapCall) Do(f func(context.Context) error) *MockStoreUnlockBootstrapCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreUnlockBootstrapCall) DoAndReturn(f func(context.Context) error) *MockStoreUnlockBootstrapCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

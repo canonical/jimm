@@ -51,11 +51,8 @@ type Store interface {
 	QueryJobLog(ctx context.Context, jobId int64, offset int) (loggies []string, nextOffsetValue int, err error)
 
 	// BootstrapJob store methods:
-
-	LockBootstrap(ctx context.Context, ttl time.Duration) error
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
 	AddJobLog(ctx context.Context, jobId int64, logLine string) (err error)
-	UnlockBootstrap(ctx context.Context) error
 }
 
 // JobQueue defines the method to enqueue a bootstrap/destroy-controller job.

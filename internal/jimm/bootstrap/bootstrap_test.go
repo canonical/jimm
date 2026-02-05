@@ -237,7 +237,6 @@ func (s *bootstrapManagerSuite) TestGetJobInfo_JobNotFound(c *qt.C) {
 	manager, err := bootstrap.NewBootstrapManager(mocks.store, mocks.jobQueue, mocks.jujuManager, mocks.binaryStore, loginTokenRefreshURLParam, mocks.credentialStore)
 	c.Assert(err, qt.IsNil)
 
-	mocks.store.EXPECT().QueryJobLog(gomock.Any(), jobID, gomock.Any()).Return(nil, 0, nil)
 	mocks.jobQueue.EXPECT().GetJobInfo(gomock.Any(), jobID).Return(nil, errors.E("not found"))
 
 	_, err = manager.GetJobInfo(ctx, s.adminUser, jobID, 0)
@@ -1180,7 +1179,6 @@ func (s *bootstrapManagerSuite) TestDestroyControllerJob(c *qt.C) {
 		},
 	}
 
-	mocks.store.EXPECT().LockBootstrap(gomock.Any(), gomock.Any()).Return(nil)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
 		jujuclistore.JujuBinarySpec{
@@ -1217,8 +1215,6 @@ func (s *bootstrapManagerSuite) TestDestroyControllerJob(c *qt.C) {
 	mocks.store.EXPECT().AddJobLog(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	mocks.jujuManager.EXPECT().RemoveController(gomock.Any(), user, controllerName, true)
-
-	mocks.store.EXPECT().UnlockBootstrap(gomock.Any()).Return(nil)
 
 	err = manager.DestroyController(testCtx, args, mocks.commandFactory, user)
 	c.Assert(err, qt.IsNil)
