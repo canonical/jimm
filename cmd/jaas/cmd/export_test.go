@@ -61,15 +61,6 @@ func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore,
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewUnregisterControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &unregisterControllerCommand{
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-	cmd.SetClientStore(store)
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &setControllerDeprecatedCommand{
 		dialOpts: cmdtest.TestDialOpts(lp),
