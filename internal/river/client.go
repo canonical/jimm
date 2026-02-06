@@ -14,9 +14,6 @@ import (
 )
 
 // Client wraps a River client and provides higher-level enqueue helpers.
-//
-// In particular, it implements [ports.UpgradeEnqueuer] for enqueueing upgrade
-// orchestration jobs.
 type Client struct {
 	client *river.Client[*sql.Tx]
 }
@@ -68,6 +65,8 @@ func (c *Client) CancelJob(ctx context.Context, jobID int64) (*rivertype.JobRow,
 
 // WaitForJobCompletion waits for the specified job to complete, returning the final job state.
 // If the job has already completed, it returns immediately.
+//
+// Specify a context with an appropriate timeout when calling this method to avoid waiting indefinitely.
 func (c *Client) WaitForJobCompletion(ctx context.Context, jobID int64) (*rivertype.JobRow, error) {
 	// Subscribe to job completion events before checking the job status to avoid
 	// missing the completion event in case the job completes between the JobGet and Subscribe calls.

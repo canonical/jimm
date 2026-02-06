@@ -75,8 +75,12 @@ func setupIntegrationTest(
 		migrateRetryCount: p.migrateRetryCount,
 		upgradeRetryCount: p.upgradeRetryCount,
 		awaitFunc:         p.awaitFunc,
+		openfgaClient:     openfgaClient,
+		store:             database,
+		upgradeManager:    upgradeManager,
+		bootstrapManager:  bootstrapManager,
 	}
-	workers, err := newWorkers(workerParams, openfgaClient, database, upgradeManager, bootstrapManager)
+	workers, err := newWorkers(workerParams)
 	c.Assert(err, qt.IsNil)
 
 	riverClient, err := river.NewClient(riverdatabasesql.New(sqlDb), &river.Config{

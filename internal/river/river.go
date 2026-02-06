@@ -34,6 +34,7 @@ type UpgradeManager interface {
 	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
 }
 
+// BootstrapManager defines the methods for the domain logic of bootstrapping and destroying controllers.
 type BootstrapManager interface {
 	BootstrapController(ctx context.Context, p bootstrap.RunBootstrapArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
 	DestroyController(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
@@ -58,8 +59,12 @@ func StartWorkers(
 		migrateRetryCount: defaultMigrateRetries,
 		upgradeRetryCount: defaultUpgradeRetries,
 		awaitFunc:         waitForJobToFinalise,
+		openfgaClient:     openfgaClient,
+		store:             db,
+		upgradeManager:    upgradeManager,
+		bootstrapManager:  bootstrapManager,
 	}
-	workers, err := newWorkers(workerParams, openfgaClient, db, upgradeManager, bootstrapManager)
+	workers, err := newWorkers(workerParams)
 	if err != nil {
 		return err
 	}
@@ -86,12 +91,16 @@ type workerParams struct {
 	migrateRetryCount int
 	upgradeRetryCount int
 	awaitFunc         awaitCompletionFunc
+	openfgaClient     *openfga.OFGAClient
+	store             *db.Database
+	upgradeManager    UpgradeManager
+	bootstrapManager  BootstrapManager
 }
 
-func newWorkers(wp workerParams, openfgaClient *openfga.OFGAClient, store *db.Database, upgradeManager UpgradeManager, bootstrapManager BootstrapManager) (*river.Workers, error) {
+func newWorkers(wp workerParams) (*river.Workers, error) {
 	workers := river.NewWorkers()
 
-	migrationWorker, err := newMigrationWorker(openfgaClient, store, upgradeManager)
+	migrationWorker, err := newMigrationWorker(wp.openfgaClient, wp.store, wp.upgradeManager)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +108,7 @@ func newWorkers(wp workerParams, openfgaClient *openfga.OFGAClient, store *db.Da
 		return nil, err
 	}
 
-	upgradeWorker, err := newUpgradeWorker(upgradeManager)
+	upgradeWorker, err := newUpgradeWorker(wp.upgradeManager)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +121,7 @@ func newWorkers(wp workerParams, openfgaClient *openfga.OFGAClient, store *db.Da
 		return nil, err
 	}
 
-	bootstrapWorker, err := newBootstrapWorker(openfgaClient, store, bootstrapManager)
+	bootstrapWorker, err := newBootstrapWorker(wp.openfgaClient, wp.store, wp.bootstrapManager)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +129,7 @@ func newWorkers(wp workerParams, openfgaClient *openfga.OFGAClient, store *db.Da
 		return nil, err
 	}
 
-	destroyControllerWorker, err := newDestroyControllerWorker(openfgaClient, store, bootstrapManager)
+	destroyControllerWorker, err := newDestroyControllerWorker(wp.openfgaClient, wp.store, wp.bootstrapManager)
 	if err != nil {
 		return nil, err
 	}
