@@ -5,6 +5,7 @@ package river
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
@@ -66,34 +67,29 @@ func (c *Client) CancelJob(ctx context.Context, jobID int64) (*rivertype.JobRow,
 	return c.client.JobCancel(ctx, jobID)
 }
 
-// WaitForJobCompletion waits for the specified job to complete, returning the final job state.
-// If the job has already completed, it returns immediately.
+// WaitForJobCompletion polls the database, waiting for the specified job to complete,
+// returning the final job state. If the job has already completed, it returns immediately.
 func (c *Client) WaitForJobCompletion(ctx context.Context, jobID int64) (*rivertype.JobRow, error) {
-	// Subscribe to job completion events before checking the job status to avoid
-	// missing the completion event in case the job completes between the JobGet and Subscribe calls.
-	subscribeChan, subscribeCancel :=
-		c.client.Subscribe(
-			river.EventKindJobCompleted,
-			river.EventKindJobCancelled,
-			river.EventKindJobFailed,
-		)
-	defer subscribeCancel()
+	// River event subscriptions only emit events for jobs worked by the *same*
+	// client instance. Callers waiting on a job that may be worked by another
+	// client/process must poll for job state instead.
+	const pollInterval = 500 * time.Millisecond
 
-	job, err := c.client.JobGet(ctx, jobID)
-	if err != nil {
-		return nil, err
-	}
-
-	if job.FinalizedAt != nil {
-		return job, nil
-	}
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
 
 	for {
+		job, err := c.client.JobGet(ctx, jobID)
+		if err != nil {
+			return nil, err
+		}
+		if job.FinalizedAt != nil {
+			return job, nil
+		}
+
 		select {
-		case event := <-subscribeChan:
-			if event.Job.ID == jobID {
-				return event.Job, nil
-			}
+		case <-ticker.C:
+			continue
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		}

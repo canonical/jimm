@@ -266,7 +266,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	client = api.NewClient(conn)
 	acr.Name = "controller-2"
 	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `failed to add controller: unauthorized \(unauthorized access\)`)
+	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
 
 	acr.Name = "jimm"
