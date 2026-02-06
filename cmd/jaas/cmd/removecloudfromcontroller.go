@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -7,7 +7,6 @@ import (
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -32,7 +31,6 @@ Removes the specified cloud from the specified controller in JIMM.
 func NewRemoveCloudFromControllerCommand() cmd.Command {
 	cmd := &removeCloudFromControllerCommand{}
 	cmd.SetClientStore(jujuclient.NewFileClientStore())
-	cmd.removeCloudFromControllerAPIFunc = cmd.cloudAPI
 
 	return modelcmd.WrapBase(cmd)
 }
@@ -49,12 +47,7 @@ type removeCloudFromControllerCommand struct {
 	// should be removed from.
 	targetControllerName string
 
-	removeCloudFromControllerAPIFunc func() (removeCloudFromControllerAPI, error)
-	dialOpts                         *jujuapi.DialOpts
-}
-
-type removeCloudFromControllerAPI interface {
-	RemoveCloudFromController(params *apiparams.RemoveCloudFromControllerRequest) error
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 // Info implements Command.Info.
@@ -108,10 +101,15 @@ func (c *removeCloudFromControllerCommand) Run(ctxt *cmd.Context) error {
 }
 
 func (c *removeCloudFromControllerCommand) removeCloudFromController(ctxt *cmd.Context) error {
-	client, err := c.removeCloudFromControllerAPIFunc()
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
+	}
+
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
 	params := &apiparams.RemoveCloudFromControllerRequest{
 		CloudTag:       "cloud-" + c.cloudName,
@@ -127,12 +125,13 @@ func (c *removeCloudFromControllerCommand) removeCloudFromController(ctxt *cmd.C
 	return nil
 }
 
-func (c *removeCloudFromControllerCommand) cloudAPI() (removeCloudFromControllerAPI, error) {
+func (c *removeCloudFromControllerCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.ClientStore().CurrentController()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine the current controller: %w", err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
 	if err != nil {
 		return nil, err
 	}

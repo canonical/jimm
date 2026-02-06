@@ -46,21 +46,6 @@ func NewRevokeAuditLogAccessCommandForTesting(store jujuclient.ClientStore, lp j
 	return modelcmd.WrapBase(cmd)
 }
 
-type RemoveCloudFromControllerAPI = removeCloudFromControllerAPI
-
-func NewRemoveCloudFromControllerCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider, removeCloudFromControllerAPIFunc func() (RemoveCloudFromControllerAPI, error)) cmd.Command {
-	cmd := &removeCloudFromControllerCommand{
-		dialOpts:                         cmdtest.TestDialOpts(lp),
-		removeCloudFromControllerAPIFunc: removeCloudFromControllerAPIFunc,
-	}
-	cmd.SetClientStore(store)
-	if removeCloudFromControllerAPIFunc == nil {
-		cmd.removeCloudFromControllerAPIFunc = cmd.cloudAPI
-	}
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &setControllerDeprecatedCommand{
 		dialOpts: cmdtest.TestDialOpts(lp),
