@@ -4,7 +4,6 @@ package river
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"sync"
@@ -13,12 +12,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivertype"
 	gomock "go.uber.org/mock/gomock"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
@@ -27,25 +23,18 @@ func TestUpgradeToWorker_Success(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
-
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
 		},
 	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	upgradeManager.EXPECT().
 		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
@@ -74,25 +63,18 @@ func TestUpgradeToWorker_SuccessCanBeUpgradedToAgain(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
-
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
 		},
 	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	upgradeManager.EXPECT().
 		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
@@ -158,26 +140,18 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
-
-	// Retry a few times to ensure retries work as expected and surface the LAST error.
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 3,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
 		},
 	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	attempt := 0
 	upgradeManager.EXPECT().
@@ -210,26 +184,18 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
-
-	// Retry a few times to ensure retries work as expected and surface the LAST error.
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 3,
 			awaitFunc:         waitForJobToFinalise,
 		},
 	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	upgradeManager.EXPECT().
 		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
@@ -267,26 +233,18 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
-
-	// Allow each child to fail once and then succeed.
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 2,
 			upgradeRetryCount: 2,
 			awaitFunc:         waitForJobToFinalise,
 		},
 	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	migAttempt := 0
 	upgradeManager.EXPECT().
@@ -333,27 +291,20 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	c := qt.New(t)
 	ctx := c.Context()
 
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
-
 	supervisingJobId := int64(1)
 
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 3,
 			upgradeRetryCount: 1,
 			awaitFunc:         waitForJobToFinalise,
 		},
 	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	attempt := 0
 	upgradeManager.EXPECT().
@@ -402,15 +353,7 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 // The aim of this test is to ensure that only 1 migrate job is inserted, even after a crash.
 func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	c := qt.New(t)
-
 	ctx := c.Context()
-
-	ctrl := gomock.NewController(c)
-	defer ctrl.Finish()
-
-	database, sqlDb := setupTestDB(c)
-
-	upgradeManager := NewMockUpgradeManager(ctrl)
 
 	migrateWaitToComplete := make(chan struct{})
 
@@ -419,13 +362,9 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	crash := true
 	var once sync.Once
 
-	riverClient, username := setupWorkers(
+	testDeps := setupIntegrationTest(
 		c,
-		ctx,
 		setupWorkerParams{
-			database:          database,
-			upgradeManager:    upgradeManager,
-			sqlDB:             sqlDb,
 			migrateRetryCount: 1,
 			upgradeRetryCount: 1,
 			awaitFunc: func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
@@ -440,6 +379,9 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 			},
 		},
 	)
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
 
 	upgradeManager.EXPECT().
 		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
@@ -485,69 +427,4 @@ func TestUpgradeToWorker_SupervisorHandlesCrashMidway(t *testing.T) {
 	migrateListRes, err := riverClient.JobList(ctx, migrateParams)
 	c.Assert(err, qt.IsNil)
 	c.Assert(migrateListRes.Jobs, qt.HasLen, 1)
-}
-
-type setupWorkerParams struct {
-	database          *db.Database
-	upgradeManager    UpgradeManager
-	sqlDB             *sql.DB
-	migrateRetryCount int
-	upgradeRetryCount int
-	awaitFunc         awaitCompletionFunc
-}
-
-func setupWorkers(
-	c *qt.C,
-	ctx context.Context,
-	p setupWorkerParams,
-) (*river.Client[*sql.Tx], string) {
-	// Prepare identity needed by migrationWorker.
-	u, err := dbmodel.NewIdentity("ash@catchum.com")
-	c.Assert(err, qt.IsNil)
-	err = p.database.GetIdentity(c.Context(), u)
-	c.Assert(err, qt.IsNil)
-
-	openfgaClient := &openfga.OFGAClient{}
-	migrationW, err := newMigrationWorker(openfgaClient, p.database, p.upgradeManager)
-	c.Assert(err, qt.IsNil)
-	upgradeW, err := newUpgradeWorker(p.upgradeManager)
-	c.Assert(err, qt.IsNil)
-	upgradeToW := newUpgradeToWorker(p.migrateRetryCount, p.upgradeRetryCount, p.awaitFunc)
-
-	workers := river.NewWorkers()
-	c.Assert(river.AddWorkerSafely(workers, migrationW), qt.IsNil)
-	c.Assert(river.AddWorkerSafely(workers, upgradeW), qt.IsNil)
-	c.Assert(river.AddWorkerSafely(workers, upgradeToW), qt.IsNil)
-
-	riverClient, err := river.NewClient(riverdatabasesql.New(p.sqlDB), &river.Config{
-		TestOnly: true,
-		Queues: map[string]river.QueueConfig{
-			river.QueueDefault: {MaxWorkers: 5},
-		},
-		Workers:     workers,
-		RetryPolicy: &testRetryPolicy{},
-	})
-	c.Assert(err, qt.IsNil)
-
-	c.Assert(riverClient.Start(ctx), qt.IsNil)
-	c.Cleanup(func() {
-		err := riverClient.Stop(context.Background())
-		c.Check(err, qt.IsNil)
-	})
-
-	return riverClient, u.Name
-}
-
-func waitForFinalisedJob(c *qt.C, ctx context.Context, sub <-chan *river.Event, jobID int64) *rivertype.JobRow {
-	for {
-		select {
-		case event := <-sub:
-			c.Logf("received job event for job ID %d", event.Job.ID)
-			if event.Job.ID == jobID && event.Job.FinalizedAt != nil {
-				return event.Job
-			}
-		case <-ctx.Done():
-			c.Fatal("timed out waiting for job event")
-		}
-	}
 }

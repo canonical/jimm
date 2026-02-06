@@ -5,9 +5,6 @@ package river
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	_ "github.com/canonical/jimm/v3/internal/jimm/upgrade" // Dummy import to prevent future circular dependency
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
@@ -16,6 +13,11 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/zap"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	_ "github.com/canonical/jimm/v3/internal/jimm/upgrade" // Dummy import to prevent future circular dependency
 )
 
 const (
@@ -32,6 +34,11 @@ type UpgradeManager interface {
 	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
 }
 
+type BootstrapManager interface {
+	BootstrapController(ctx context.Context, p bootstrap.RunBootstrapArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
+	DestroyController(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
+}
+
 // Store defines a method to retrieve a user from the database for the purpose
 // of authenticating river jobs.
 type Store interface {
@@ -45,8 +52,14 @@ func StartWorkers(
 	db *db.Database,
 	openfgaClient *openfga.OFGAClient,
 	upgradeManager UpgradeManager,
+	bootstrapManager BootstrapManager,
 ) error {
-	workers, err := newWorkers(openfgaClient, db, upgradeManager)
+	workerParams := workerParams{
+		migrateRetryCount: defaultMigrateRetries,
+		upgradeRetryCount: defaultUpgradeRetries,
+		awaitFunc:         waitForJobToFinalise,
+	}
+	workers, err := newWorkers(workerParams, openfgaClient, db, upgradeManager, bootstrapManager)
 	if err != nil {
 		return err
 	}
@@ -69,7 +82,13 @@ func StartWorkers(
 	return riverClient.Start(ctx)
 }
 
-func newWorkers(openfgaClient *openfga.OFGAClient, store *db.Database, upgradeManager UpgradeManager) (*river.Workers, error) {
+type workerParams struct {
+	migrateRetryCount int
+	upgradeRetryCount int
+	awaitFunc         awaitCompletionFunc
+}
+
+func newWorkers(wp workerParams, openfgaClient *openfga.OFGAClient, store *db.Database, upgradeManager UpgradeManager, bootstrapManager BootstrapManager) (*river.Workers, error) {
 	workers := river.NewWorkers()
 
 	migrationWorker, err := newMigrationWorker(openfgaClient, store, upgradeManager)
@@ -88,8 +107,24 @@ func newWorkers(openfgaClient *openfga.OFGAClient, store *db.Database, upgradeMa
 		return nil, err
 	}
 
-	upgradeToWorker := newUpgradeToWorker(defaultMigrateRetries, defaultUpgradeRetries, waitForJobToFinalise)
+	upgradeToWorker := newUpgradeToWorker(wp.migrateRetryCount, wp.upgradeRetryCount, wp.awaitFunc)
 	if err := river.AddWorkerSafely(workers, upgradeToWorker); err != nil {
+		return nil, err
+	}
+
+	bootstrapWorker, err := newBootstrapWorker(openfgaClient, store, bootstrapManager)
+	if err != nil {
+		return nil, err
+	}
+	if err := river.AddWorkerSafely(workers, bootstrapWorker); err != nil {
+		return nil, err
+	}
+
+	destroyControllerWorker, err := newDestroyControllerWorker(openfgaClient, store, bootstrapManager)
+	if err != nil {
+		return nil, err
+	}
+	if err := river.AddWorkerSafely(workers, destroyControllerWorker); err != nil {
 		return nil, err
 	}
 
