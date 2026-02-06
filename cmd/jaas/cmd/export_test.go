@@ -88,15 +88,6 @@ func NewSetControllerDeprecatedCommandForTesting(store jujuclient.ClientStore, l
 	return modelcmd.WrapBase(cmd)
 }
 
-func NewUpdateMigratedModelCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
-	cmd := &updateMigratedModelCommand{
-		dialOpts: cmdtest.TestDialOpts(lp),
-	}
-	cmd.SetClientStore(store)
-
-	return modelcmd.WrapBase(cmd)
-}
-
 func NewAddRoleCommandForTesting(store jujuclient.ClientStore, lp jujuapi.LoginProvider) cmd.Command {
 	cmd := &addRoleCommand{
 		dialOpts: cmdtest.TestDialOpts(lp),
