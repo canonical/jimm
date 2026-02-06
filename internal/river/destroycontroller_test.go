@@ -127,7 +127,7 @@ func TestDestroyControllerWorker_Error(t *testing.T) {
 
 	c.Assert(err, qt.ErrorMatches, "some-error")
 	c.Assert(result.EventKind, qt.Equals, river.EventKindJobFailed)
-	c.Assert(result.Job.State, qt.Equals, rivertype.JobStateAvailable)
+	c.Assert(result.Job.State, qt.Equals, rivertype.JobStateDiscarded)
 }
 
 func TestDestroyControllerWorker_Unique(t *testing.T) {

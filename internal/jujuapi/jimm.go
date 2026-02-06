@@ -281,6 +281,9 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 
 // RemoveController removes a controller.
 func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.ControllerInfo{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
 
 	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.Name)
 	if err != nil {

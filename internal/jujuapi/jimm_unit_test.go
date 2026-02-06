@@ -114,6 +114,66 @@ func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
 	c.Assert(info.AgentVersion, gc.Equals, "3.6.9")
 }
 
+func (s *jimmUnitTestSuite) TestRemoveController_UnauthorizedUser(c *gc.C) {
+	ctx := context.Background()
+	jimm := &jimmtest.JIMM{}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
+
+	_, err := root.RemoveController(ctx, apiparams.RemoveControllerRequest{})
+
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+}
+
+func (s *jimmUnitTestSuite) TestRemoveController_Success(c *gc.C) {
+	ctx := context.Background()
+
+	removeCalled := false
+	infoCalled := false
+	testControllerName := "test-controller"
+	jimm := &jimmtest.JIMM{
+
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				ControllerService: mocks.ControllerService{
+					ControllerInfo_: func(ctx context.Context, name string) (*dbmodel.Controller, error) {
+						infoCalled = true
+						return &dbmodel.Controller{
+							Name:          testControllerName,
+							UUID:          "982b16d9-a945-4762-b684-fd4fd885aa11",
+							PublicAddress: "controller.example.com:443",
+							CACertificate: "ca-cert",
+							TLSHostname:   "juju-apiserver",
+							CloudName:     "openstack",
+						}, nil
+					},
+					RemoveController_: func(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
+						removeCalled = true
+						c.Check(controllerName, gc.Equals, testControllerName)
+						c.Check(user.JimmAdmin, gc.Equals, true)
+						return nil
+					},
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	req := apiparams.RemoveControllerRequest{
+		Name: testControllerName,
+	}
+
+	info, err := root.RemoveController(ctx, req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(removeCalled, gc.Equals, true)
+	c.Assert(infoCalled, gc.Equals, true)
+	c.Assert(info.Name, gc.Equals, req.Name)
+	c.Assert(info.UUID, gc.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
+	c.Assert(info.PublicAddress, gc.Equals, "controller.example.com:443")
+	c.Assert(info.CACertificate, gc.Equals, "ca-cert")
+	c.Assert(info.CloudTag, gc.Equals, names.NewCloudTag("openstack").String())
+}
+
 func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 	ctx := context.Background()
 

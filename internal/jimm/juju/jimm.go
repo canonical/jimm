@@ -119,11 +119,6 @@ func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga
 
 // RemoveController removes a controller.
 func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
-
-	if !user.JimmAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
-	}
-
 	// Update the local database with the updated cloud definition. We
 	// do this in a transaction so that the local view cannot finish in
 	// an inconsistent state.

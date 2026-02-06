@@ -100,7 +100,7 @@ func (DestroyControllerArgs) Kind() string { return "destroy-controller" }
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
 func (DestroyControllerArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
-		MaxAttempts: 3,
+		MaxAttempts: 1,
 		UniqueOpts: river.UniqueOpts{
 			// Only allow 1 bootstrap job at a time.
 			// This avoids issues with a global lock in Juju's cmd pkg
