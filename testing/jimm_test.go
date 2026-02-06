@@ -261,6 +261,11 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `failed to add controller: controller "controller-2" already exists \(already exists\)`)
 	c.Assert(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
 
+	acr.Name = "jimm"
+	_, err = client.AddController(&acr)
+	c.Assert(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
+	c.Assert(jujuparams.IsBadRequest(err), gc.Equals, true)
+
 	conn = s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client = api.NewClient(conn)
@@ -268,11 +273,6 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	_, err = client.AddController(&acr)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
-
-	acr.Name = "jimm"
-	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
-	c.Assert(jujuparams.IsBadRequest(err), gc.Equals, true)
 }
 
 func (s *jimmSuite) TestRemoveAndAddController(c *gc.C) {
