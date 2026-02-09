@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	context "context"
 	reflect "reflect"
 
 	rivertypes "github.com/canonical/jimm/v3/internal/rivertypes"
@@ -41,18 +42,18 @@ func (m *MockUpgradeEnqueuer) EXPECT() *MockUpgradeEnqueuerMockRecorder {
 }
 
 // EnqueueUpgradeTo mocks base method.
-func (m *MockUpgradeEnqueuer) EnqueueUpgradeTo(args rivertypes.UpgradeToArgs) (int64, error) {
+func (m *MockUpgradeEnqueuer) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnqueueUpgradeTo", args)
+	ret := m.ctrl.Call(m, "EnqueueUpgradeTo", ctx, args)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // EnqueueUpgradeTo indicates an expected call of EnqueueUpgradeTo.
-func (mr *MockUpgradeEnqueuerMockRecorder) EnqueueUpgradeTo(args any) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
+func (mr *MockUpgradeEnqueuerMockRecorder) EnqueueUpgradeTo(ctx, args any) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnqueueUpgradeTo", reflect.TypeOf((*MockUpgradeEnqueuer)(nil).EnqueueUpgradeTo), args)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnqueueUpgradeTo", reflect.TypeOf((*MockUpgradeEnqueuer)(nil).EnqueueUpgradeTo), ctx, args)
 	return &MockUpgradeEnqueuerEnqueueUpgradeToCall{Call: call}
 }
 
@@ -68,13 +69,13 @@ func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Return(arg0 int64, arg1 error)
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Do(f func(rivertypes.UpgradeToArgs) (int64, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
+func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Do(f func(context.Context, rivertypes.UpgradeToArgs) (int64, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) DoAndReturn(f func(rivertypes.UpgradeToArgs) (int64, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
+func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) DoAndReturn(f func(context.Context, rivertypes.UpgradeToArgs) (int64, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

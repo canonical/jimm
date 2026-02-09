@@ -173,7 +173,7 @@ func TestCloneController_Success(t *testing.T) {
 	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
-	jobId := "550e8400-e29b-41d4-a716-446655440000"
+	jobId := int64(1)
 
 	s.bootstrapManager.EXPECT().
 		StartBootstrapJob(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -197,7 +197,7 @@ func TestCloneController_Error(t *testing.T) {
 	errorToReturn := errors.New("bootstrap error")
 	s.bootstrapManager.EXPECT().
 		StartBootstrapJob(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return("", errorToReturn)
+		Return(0, errorToReturn)
 
 	err = upgradeMgr.CloneController(c.Context(), &openfga.User{}, upgrade.CloneControllerParams{})
 	c.Assert(err, qt.ErrorMatches, ".*failed to start bootstrap job.*bootstrap error.*")
@@ -210,7 +210,7 @@ func TestCloneController_WaitForJobCompletionError(t *testing.T) {
 	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
 	c.Assert(err, qt.IsNil)
 
-	jobId := "550e8400-e29b-41d4-a716-446655440000"
+	jobId := int64(1)
 	errorToReturn := errors.New("job failed")
 
 	s.bootstrapManager.EXPECT().
@@ -299,13 +299,13 @@ func TestUpgradeTo_Success(t *testing.T) {
 	var newControllerName string
 	s.bootstrapManager.EXPECT().
 		StartBootstrapJob(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, u *openfga.User, params bootstrap.BootstrapParams) (string, error) {
+		DoAndReturn(func(ctx context.Context, u *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
 			newControllerName = params.ControllerName
 			c.Assert(params.CLIVersion, qt.Equals, targetVersion.String())
 			c.Assert(params.CloudNameAndRegion, qt.Equals, "aws/us-east-1")
 			c.Assert(regexp.MustCompile(`^controller-\d+$`).MatchString(newControllerName), qt.IsTrue)
 			c.Assert(params.Cloud.Name, qt.Equals, "aws")
-			return "550e8400-e29b-41d4-a716-446655440000", nil
+			return 1, nil
 		})
 
 	s.bootstrapManager.EXPECT().
@@ -313,7 +313,7 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(nil)
 
 	// Migration expectations.
-	s.enqueuer.EXPECT().EnqueueUpgradeTo(gomock.Any()).DoAndReturn(func(uta rivertypes.UpgradeToArgs) (int64, error) {
+	s.enqueuer.EXPECT().EnqueueUpgradeTo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, uta rivertypes.UpgradeToArgs) (int64, error) {
 		c.Check(uta.ModelUUID, qt.Equals, modelUUID)
 		c.Check(uta.TargetVersion, qt.Equals, targetVersion)
 		c.Check(uta.Username, qt.Equals, user.Name)
