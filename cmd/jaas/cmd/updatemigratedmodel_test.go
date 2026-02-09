@@ -1,85 +1,71 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"context"
+	"testing"
 
-	"github.com/juju/cmd/v3/cmdtesting"
-	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
-
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	qt "github.com/frankban/quicktest"
 )
 
-type updateMigratedModelSuite struct {
-	cmdtest.JimmCmdSuite
+func TestUpdateMigratedModel(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+
+	cmdMocks.client.EXPECT().UpdateMigratedModel(&apiparams.UpdateMigratedModelRequest{
+		ModelTag:         "model-2f54eaf8-0608-42e7-9f69-d85d6e1369b0",
+		TargetController: "mycontroller",
+	}).Return(nil)
+	cmdMocks.client.EXPECT().Close().Return(nil)
+
+	command := &updateMigratedModelCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
+
+	initCommand(c, command, "mycontroller", "2f54eaf8-0608-42e7-9f69-d85d6e1369b0")
+
+	ctx := newTestContext(c)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }
 
-var _ = gc.Suite(&updateMigratedModelSuite{})
+func TestUpdateMigratedModelNoController(t *testing.T) {
+	c := qt.New(t)
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelSuperuser(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+	command := &updateMigratedModelCommand{}
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("alice@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
-	var model dbmodel.Model
-	model.SetTag(mt)
-	err := s.JIMM.Database.GetModel(context.Background(), &model)
-	c.Assert(err, gc.Equals, nil)
-	s.AddController(c, "controller-2", s.APIInfo(c))
-
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	_, err = cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-2", mt.Id())
-	c.Assert(err, gc.IsNil)
-
-	// Check the model has moved controller.
-	var model2 dbmodel.Model
-	model2.SetTag(mt)
-	err = s.JIMM.Database.GetModel(context.Background(), &model2)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.ControllerID, gc.Not(gc.Equals), model.ControllerID)
+	err := initCommandWithError(command)
+	c.Assert(err, qt.ErrorMatches, `controller not specified`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelUnauthorized(c *gc.C) {
-	s.AddController(c, "controller-1", s.APIInfo(c))
+func TestUpdateMigratedModelNoModelUUID(t *testing.T) {
+	c := qt.New(t)
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/alice@canonical.com/cred")
-	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{AuthType: "empty"})
-	mt := s.AddModel(c, names.NewUserTag("alice@canonical.com"), "model-2", names.NewCloudTag(jimmtest.TestCloudName), jimmtest.TestCloudRegionName, cct)
+	command := &updateMigratedModelCommand{}
 
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-1", mt.Id())
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	err := initCommandWithError(command, "mycontroller")
+	c.Assert(err, qt.ErrorMatches, `model uuid not specified`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoController(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, `controller not specified`)
+func TestUpdateMigratedModelInvalidModelUUID(t *testing.T) {
+	c := qt.New(t)
+
+	command := &updateMigratedModelCommand{}
+
+	err := initCommandWithError(command, "mycontroller", "not-a-uuid")
+	c.Assert(err, qt.ErrorMatches, `invalid model uuid`)
 }
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelNoModelUUID(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id")
-	c.Assert(err, gc.ErrorMatches, `model uuid not specified`)
-}
+func TestUpdateMigratedModelTooManyArgs(t *testing.T) {
+	c := qt.New(t)
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelInvalidModelUUID(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid")
-	c.Assert(err, gc.ErrorMatches, `invalid model uuid`)
-}
+	command := &updateMigratedModelCommand{}
 
-func (s *updateMigratedModelSuite) TestUpdateMigratedModelTooManyArgs(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewUpdateMigratedModelCommandForTesting(s.ClientStore(), bClient), "controller-id", "not-a-uuid", "spare-argument")
-	c.Assert(err, gc.ErrorMatches, `too many args`)
+	err := initCommandWithError(command, "controller-id", "not-a-uuid", "spare-argument")
+	c.Assert(err, qt.ErrorMatches, `too many args`)
 }

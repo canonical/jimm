@@ -8,7 +8,6 @@ import (
 	"github.com/juju/cmd/v3"
 	"github.com/juju/errors"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -63,15 +62,17 @@ type registerControllerCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	dialOpts       *jujuapi.DialOpts
 	file           cmd.FileVar
 	local          bool
 	tlsHostname    string
 	controllerName string
 	publicAddress  string
 	dryRun         bool
+
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
+// Info implements the cmd.Command interface.
 func (c *registerControllerCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "register-controller",
@@ -126,27 +127,21 @@ func (c *registerControllerCommand) Run(ctxt *cmd.Context) error {
 		return c.out.Write(ctxt, params)
 	}
 
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return errors.Annotate(err, "could not determine controller")
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
-
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
-	client := api.NewClient(apiCaller)
 	info, err := client.AddController(&params)
 	if err != nil {
 		return err
 	}
 
-	err = c.out.Write(ctxt, info)
-	if err != nil {
-		return err
-	}
-	return nil
+	return c.out.Write(ctxt, info)
 }
 
 func unmarshalControllerDetails(v interface{}, data []byte) error {
@@ -196,4 +191,18 @@ func (c *registerControllerCommand) getControllerDetails(ctxt *cmd.Context) ([]b
 		return nil, errors.Mask(err)
 	}
 	return data, nil
+}
+
+func (c *registerControllerCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, errors.Annotate(err, "could not determine controller")
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

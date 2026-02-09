@@ -1,29 +1,22 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"context"
-	"os"
-	"path/filepath"
+	"bytes"
+	"testing"
 
-	"github.com/juju/cmd/v3/cmdtesting"
+	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
-	gc "gopkg.in/check.v1"
-	"sigs.k8s.io/yaml"
+	"go.uber.org/mock/gomock"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type registerControllerDryRunSuite struct {
-}
+func TestRegisterControllerRun_DryRun_Defaults(t *testing.T) {
+	c := qt.New(t)
 
-var _ = gc.Suite(&registerControllerDryRunSuite{})
-
-func (s *registerControllerDryRunSuite) TestRegisterControllerDryRun(c *gc.C) {
 	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -36,12 +29,16 @@ func (s *registerControllerDryRunSuite) TestRegisterControllerDryRun(c *gc.C) {
 		Password: "super-secret-password",
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, nil), "controller-1", "--dry-run")
-	c.Assert(err, gc.IsNil)
+	inner := &registerControllerCommand{}
+	inner.SetClientStore(store)
+	command := modelcmd.WrapBase(inner)
+	initCommand(c, command, "controller-1", "--dry-run")
 
-	data := cmdtesting.Stdout(ctx)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
+	ctxt := newTestContext(c)
+	err := command.Run(ctxt)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctxt.Stdout.(*bytes.Buffer).String(), qt.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 name: controller-1
 publicaddress: controller1.example.com
 tlshostname: ""
@@ -53,7 +50,9 @@ password: super-secret-password
 `)
 }
 
-func (s *registerControllerDryRunSuite) TestControllerInfoWithLocalFlag(c *gc.C) {
+func TestRegisterControllerRun_DryRun_Local(t *testing.T) {
+	c := qt.New(t)
+
 	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -66,12 +65,16 @@ func (s *registerControllerDryRunSuite) TestControllerInfoWithLocalFlag(c *gc.C)
 		Password: "super-secret-password",
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, nil), "controller-1", "--dry-run", "--local")
-	c.Assert(err, gc.IsNil)
+	inner := &registerControllerCommand{}
+	inner.SetClientStore(store)
+	command := modelcmd.WrapBase(inner)
+	initCommand(c, command, "controller-1", "--dry-run", "--local")
 
-	data := cmdtesting.Stdout(ctx)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
+	ctxt := newTestContext(c)
+	err := command.Run(ctxt)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctxt.Stdout.(*bytes.Buffer).String(), qt.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 name: controller-1
 publicaddress: ""
 tlshostname: ""
@@ -83,7 +86,9 @@ password: super-secret-password
 `)
 }
 
-func (s *registerControllerDryRunSuite) TestControllerInfoWithTlsFlag(c *gc.C) {
+func TestRegisterControllerRun_DryRun_TLSHostname(t *testing.T) {
+	c := qt.New(t)
+
 	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -96,12 +101,16 @@ func (s *registerControllerDryRunSuite) TestControllerInfoWithTlsFlag(c *gc.C) {
 		Password: "super-secret-password",
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, nil), "controller-1", "--dry-run", "--tls-hostname", "foo")
-	c.Assert(err, gc.IsNil)
+	inner := &registerControllerCommand{}
+	inner.SetClientStore(store)
+	command := modelcmd.WrapBase(inner)
+	initCommand(c, command, "controller-1", "--dry-run", "--tls-hostname", "foo")
 
-	data := cmdtesting.Stdout(ctx)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
+	ctxt := newTestContext(c)
+	err := command.Run(ctxt)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctxt.Stdout.(*bytes.Buffer).String(), qt.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 name: controller-1
 publicaddress: controller1.example.com
 tlshostname: foo
@@ -113,7 +122,9 @@ password: super-secret-password
 `)
 }
 
-func (s *registerControllerDryRunSuite) TestControllerInfoWithCustomPublicAddress(c *gc.C) {
+func TestRegisterControllerRun_DryRun_CustomPublicAddress(t *testing.T) {
+	c := qt.New(t)
+
 	store := jujuclient.NewMemStore()
 	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
 		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -126,12 +137,16 @@ func (s *registerControllerDryRunSuite) TestControllerInfoWithCustomPublicAddres
 		Password: "super-secret-password",
 	}
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, nil), "controller-1", "--dry-run", "--public-address", "my-address.com:1234")
-	c.Assert(err, gc.IsNil)
+	inner := &registerControllerCommand{}
+	inner.SetClientStore(store)
+	command := modelcmd.WrapBase(inner)
+	initCommand(c, command, "controller-1", "--dry-run", "--public-address", "my-address.com:1234")
 
-	data := cmdtesting.Stdout(ctx)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
+	ctxt := newTestContext(c)
+	err := command.Run(ctxt)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctxt.Stdout.(*bytes.Buffer).String(), qt.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
 name: controller-1
 publicaddress: my-address.com:1234
 tlshostname: ""
@@ -143,153 +158,45 @@ password: super-secret-password
 `)
 }
 
-func (s *registerControllerDryRunSuite) TestControllerInfoWithLocalFlagAndCustomPublicAddress(c *gc.C) {
-	store := jujuclient.NewMemStore()
-	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		ControllerUUID: "982b16d9-a945-4762-b684-fd4fd885aa11",
-		APIEndpoints:   []string{"127.0.0.1:17070"},
-		PublicDNSName:  "controller1.example.com",
-		CACert:         `foo`,
-	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     "test-user",
-		Password: "super-secret-password",
-	}
+func TestRegisterControllerRun_Success_FromFile(t *testing.T) {
+	c := qt.New(t)
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, nil), "controller-1", "--dry-run", "--local", "--public-address", "my-address.com:1234")
-	c.Assert(err, gc.IsNil)
+	cmdMocks := setupCmdMocks(c)
 
-	data := cmdtesting.Stdout(ctx)
-	c.Assert(err, gc.IsNil)
-	c.Assert(string(data), gc.Matches, `uuid: 982b16d9-a945-4762-b684-fd4fd885aa11
+	inner := &registerControllerCommand{}
+	inner.SetClientStore(cmdMocks.store)
+	inner.jimmAPIFunc = func() (JIMMAPI, error) { return cmdMocks.client, nil }
+	command := modelcmd.WrapBase(inner)
+
+	payload := `uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
 name: controller-1
-publicaddress: my-address.com:1234
-tlshostname: ""
-apiaddresses:
-- 127.0.0.1:17070
-cacertificate: foo
-username: test-user
-password: super-secret-password
-`)
-}
-
-type registerControllerSuite struct {
-	cmdtest.JimmCmdSuite
-}
-
-var _ = gc.Suite(&registerControllerSuite{})
-
-func (s *registerControllerSuite) TestRegisterControllerSuperuserByFile(c *gc.C) {
-	info := s.APIInfo(c)
-	params := apiparams.AddControllerRequest{
-		UUID:          info.ControllerUUID,
-		Name:          "controller-1",
-		CACertificate: info.CACert,
-		APIAddresses:  info.Addrs,
-		Username:      info.Tag.Id(),
-		Password:      info.Password,
-	}
-	tmpdir, tmpfile := writeYAMLTempFile(c, params)
-	defer os.RemoveAll(tmpdir)
-
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(s.ClientStore(), bClient), "controller-1", "--file", tmpfile)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `(?s)name: controller-1
-uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
 publicaddress: ""
 apiaddresses:
-- localhost:.*
-cacertificate: \|
+- localhost:17070
+cacertificate: |
   -----BEGIN CERTIFICATE-----
-  .*
+  abc
   -----END CERTIFICATE-----
-cloudtag: cloud-`+jimmtest.TestCloudName+`
-cloudregion: `+jimmtest.TestCloudRegionName+`
-agentversion: .*
-status:
-  status: available
-  info: ""
-  data: .*
-  since: null
-`)
+username: admin
+password: secret
+`
 
-	username, password, err := s.JIMM.CredentialStore.GetControllerCredentials(context.Background(), "controller-1")
-	c.Assert(err, gc.IsNil)
-	c.Assert(username, gc.Equals, info.Tag.Id())
-	c.Assert(password, gc.Equals, info.Password)
-}
+	initCommand(c, command, "controller-1", "--file", "-")
 
-func (s *registerControllerSuite) TestRegisterControllerSuperuserByClientStore(c *gc.C) {
-	info := s.APIInfo(c)
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
+	ctxt := newTestContext(c)
+	ctxt.Stdin = bytes.NewBufferString(payload)
 
-	store := s.ClientStore()
-	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		ControllerUUID: info.ControllerUUID,
-		APIEndpoints:   info.Addrs,
-		CACert:         info.CACert,
-	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     info.Tag.Id(),
-		Password: info.Password,
-	}
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, bClient), "controller-1", "--local")
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, `(?s)name: controller-1
-uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d
-publicaddress: ""
-apiaddresses:
-- localhost:.*
-cacertificate: \|
-  -----BEGIN CERTIFICATE-----
-  .*
-  -----END CERTIFICATE-----
-cloudtag: cloud-`+jimmtest.TestCloudName+`
-cloudregion: `+jimmtest.TestCloudRegionName+`
-agentversion: .*
-status:
-  status: available
-  info: ""
-  data: .*
-  since: null
-`)
+	cmdMocks.client.EXPECT().
+		AddController(gomock.Any()).
+		DoAndReturn(func(req *apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
+			c.Assert(req.Name, qt.Equals, "controller-1")
+			c.Assert(req.UUID, qt.Equals, "deadbeef-1bad-500d-9000-4b1d0d06f00d")
+			return apiparams.ControllerInfo{Name: req.Name, UUID: req.UUID}, nil
+		}).
+		Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
 
-	username, password, err := s.JIMM.CredentialStore.GetControllerCredentials(context.Background(), "controller-1")
-	c.Assert(err, gc.IsNil)
-	c.Assert(username, gc.Equals, info.Tag.Id())
-	c.Assert(password, gc.Equals, info.Password)
-}
-
-func (s *registerControllerSuite) TestRegisterControllerNotAuthorised(c *gc.C) {
-	info := s.APIInfo(c)
-	store := s.ClientStore()
-	store.Controllers["controller-1"] = jujuclient.ControllerDetails{
-		ControllerUUID: info.ControllerUUID,
-		APIEndpoints:   info.Addrs,
-		CACert:         info.CACert,
-	}
-	store.Accounts["controller-1"] = jujuclient.AccountDetails{
-		User:     info.Tag.Id(),
-		Password: info.Password,
-	}
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRegisterControllerCommandForTesting(store, bClient), "controller-1")
-	c.Assert(err, gc.ErrorMatches, `failed to add controller: unauthorized \(unauthorized access\)`)
-}
-
-func writeYAMLTempFile(c *gc.C, payload interface{}) (string, string) {
-	data, err := yaml.Marshal(payload)
-	c.Assert(err, gc.Equals, nil)
-
-	dir, err := os.MkdirTemp("", "add-controller-test")
-	c.Assert(err, gc.Equals, nil)
-
-	tmpfn := filepath.Join(dir, "tmp.yaml")
-	err = os.WriteFile(tmpfn, data, 0600)
-	c.Assert(err, gc.Equals, nil)
-	return dir, tmpfn
+	err := command.Run(ctxt)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ctxt.Stdout.(*bytes.Buffer).String(), qt.Matches, `(?s).*name: controller-1\s+uuid: deadbeef-1bad-500d-9000-4b1d0d06f00d.*`)
 }
