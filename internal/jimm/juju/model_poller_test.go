@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -115,16 +116,16 @@ func TestModelCleanup(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(model names.ModelTag) (base.ModelInfo, error) {
+			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
 				switch model.Id() {
 				case s.env.Models[0].UUID:
-					return base.ModelInfo{}, errors.E(errors.CodeNotFound)
+					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
 				case s.env.Models[1].UUID:
-					return base.ModelInfo{UUID: model.Id()}, nil
+					return jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: model.Id()}}, nil
 				case s.env.Models[2].UUID:
-					return base.ModelInfo{}, errors.E(fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id()))
+					return jujuclient.ModelInfo{}, errors.E(fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id()))
 				default:
-					return base.ModelInfo{}, errors.E("new error")
+					return jujuclient.ModelInfo{}, errors.E("new error")
 				}
 			},
 			DestroyModel_: func(tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
@@ -171,8 +172,8 @@ func TestInternalMigrationSuccess(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-				return &jujurpc.RequestError{
+			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+				return jujuclient.ModelInfo{}, &jujurpc.RequestError{
 					Message: "redirect",
 					Code:    jujuparams.CodeRedirect,
 					Info: jujuparams.RedirectErrorInfo{
@@ -213,13 +214,14 @@ func TestInternalMigrationFailure(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-				mi.Migration = &jujuparams.ModelMigrationStatus{
+			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+				mi := jujuclient.ModelInfo{}
+				mi.MigrationStatus = &jujuclient.ModelMigrationStatus{
 					Status: "migration failed",
 					Start:  &time.Time{},
 					End:    &time.Time{},
 				}
-				return nil
+				return mi, nil
 			},
 		},
 	}
@@ -246,8 +248,8 @@ func TestPollModelsDyingControllerErrors(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(model names.ModelTag) (base.ModelInfo, error) {
-				return base.ModelInfo{}, errors.E("controller not available")
+			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+				return jujuclient.ModelInfo{}, errors.E("controller not available")
 			},
 			DestroyModel_: func(tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 				return nil

@@ -36,14 +36,25 @@ func (c Connection) CreateModel(args *CreateModelArgs) (base.ModelInfo, error) {
 		args.Config)
 }
 
+type ModelMigrationStatus struct {
+	Status string
+	Start  *time.Time
+	End    *time.Time
+}
+
+type ModelInfo struct {
+	base.ModelInfo
+	MigrationStatus *ModelMigrationStatus
+}
+
 // ModelInfo retrieves information about a model from the controller.
-func (c Connection) ModelInfo(model names.ModelTag) (base.ModelInfo, error) {
+func (c Connection) ModelInfo(model names.ModelTag) (ModelInfo, error) {
 	res, err := modelmanager.NewClient(&c).ModelInfo([]names.ModelTag{model})
 	if err != nil {
-		return base.ModelInfo{}, err
+		return ModelInfo{}, err
 	}
 	if res[0].Error != nil {
-		return base.ModelInfo{}, errors.E(res[0].Error)
+		return ModelInfo{}, errors.E(res[0].Error)
 	}
 	return convertParamsModelInfo(*res[0].Result)
 }

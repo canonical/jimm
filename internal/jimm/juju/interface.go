@@ -132,7 +132,7 @@ type API interface {
 	ListModelSummaries(jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
 
 	// ModelInfo fetches a model's ModelInfo.
-	ModelInfo(names.ModelTag) (base.ModelInfo, error)
+	ModelInfo(names.ModelTag) (jujuclient.ModelInfo, error)
 
 	// ModelStatus fetches a model's ModelStatus.
 	ModelStatus(names.ModelTag) (base.ModelStatus, error)

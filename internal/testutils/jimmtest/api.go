@@ -152,7 +152,7 @@ type API struct {
 	IsBroken_                          bool
 	LatestLogTime_                     func(string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	ModelInfo_                         func(model names.ModelTag) (base.ModelInfo, error)
+	ModelInfo_                         func(model names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_                       func(modelTag names.ModelTag) (base.ModelStatus, error)
 	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
 	ModelSummaryWatcherStop_           func(context.Context, string) error
@@ -337,9 +337,9 @@ func (a *API) ListApplicationOffers(ctx context.Context, f []jujuparams.OfferFil
 	return a.ListApplicationOffers_(ctx, f)
 }
 
-func (a *API) ModelInfo(model names.ModelTag) (base.ModelInfo, error) {
+func (a *API) ModelInfo(model names.ModelTag) (jujuclient.ModelInfo, error) {
 	if a.ModelInfo_ == nil {
-		return base.ModelInfo{}, errors.E(errors.CodeNotImplemented)
+		return jujuclient.ModelInfo{}, errors.E(errors.CodeNotImplemented)
 	}
 	return a.ModelInfo_(model)
 }

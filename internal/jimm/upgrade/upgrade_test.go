@@ -14,6 +14,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuerrors "github.com/juju/errors"
+	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -24,6 +25,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade/mocks"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
@@ -119,15 +121,14 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 		Return(s.api, nil)
 
 	s.api.EXPECT().
-		ControllerModelSummary(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, modelSummary *jujuparams.ModelSummary) error {
+		ControllerModelSummary().
+		DoAndReturn(func() (base.UserModelSummary, error) {
 			// Mutate the pointer argument to simulate controller response
-			*modelSummary = jujuparams.ModelSummary{
-				CloudTag:           "cloud-aws",
-				CloudCredentialTag: "cloudcred-aws_alice_mycredential",
-				CloudRegion:        "us-east-1",
-			}
-			return nil
+			return base.UserModelSummary{
+				Cloud:           "aws",
+				CloudCredential: "aws_alice_mycredential",
+				CloudRegion:     "us-east-1",
+			}, nil
 		})
 
 	s.api.EXPECT().
@@ -256,14 +257,13 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(s.api, nil)
 
 	s.api.EXPECT().
-		ControllerModelSummary(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, ms *jujuparams.ModelSummary) error {
-			*ms = jujuparams.ModelSummary{
-				CloudTag:           "cloud-aws",
-				CloudCredentialTag: "cloudcred-aws_alice_mycredential",
-				CloudRegion:        "us-east-1",
-			}
-			return nil
+		ControllerModelSummary().
+		DoAndReturn(func() (base.UserModelSummary, error) {
+			return base.UserModelSummary{
+				Cloud:           "aws",
+				CloudCredential: "aws_alice_mycredential",
+				CloudRegion:     "us-east-1",
+			}, nil
 		})
 
 	s.api.EXPECT().
@@ -368,8 +368,10 @@ func TestMigrateModel_Success(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	s.jujuManager.EXPECT().
@@ -399,8 +401,10 @@ func TestMigrateModel_Success(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	s.jujuManager.EXPECT().
@@ -436,8 +440,10 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	// Model is a different controller, so continues.
@@ -458,7 +464,7 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 	// Expect 3 because we're going to retry twice before succeeding.
 	s.jujuManager.EXPECT().
 		ModelInfo(gomock.Any(), gomock.Any(), targetMt).
-		Return(&jujuparams.ModelInfo{UUID: targetMt.Id()}, nil).
+		Return(jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: targetMt.Id()}}, nil).
 		Times(3)
 
 	// Retry 3 times.
@@ -500,8 +506,10 @@ func TestMigrateModel_IdempotencyWhenModelHasAlreadyBeenMigrated(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	// Model is already on the target controller, so migration is a no-op.
@@ -584,10 +592,13 @@ func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {
 		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-		v := targetVersion
-		mi.AgentVersion = &v
-		return nil
+	s.api.EXPECT().ModelInfo(gomock.Any()).DoAndReturn(func(mt names.ModelTag) (jujuclient.ModelInfo, error) {
+		return jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID:         modelUUID,
+				AgentVersion: &targetVersion,
+			},
+		}, nil
 	})
 
 	err = upgradeMgr.UpgradeModel(ctx, modelUUID, targetVersion)
@@ -624,7 +635,7 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 		Return(s.api, nil)
 
 	modelInfoCalls := 0
-	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+	s.api.EXPECT().ModelInfo(gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
 		c.Check(mi.UUID, qt.Equals, modelUUID)
 		modelInfoCalls++
 		if modelInfoCalls == 1 {
@@ -678,10 +689,13 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-		v := oldVersion
-		mi.AgentVersion = &v
-		return nil
+	s.api.EXPECT().ModelInfo(gomock.Any()).DoAndReturn(func(mt names.ModelTag) (jujuclient.ModelInfo, error) {
+		return jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID:         modelUUID,
+				AgentVersion: &oldVersion,
+			},
+		}, nil
 	})
 
 	s.api.EXPECT().UpgradeModel(modelUUID, targetVersion, "", false, false).Return(version.Number{}, jujuerrors.AlreadyExists)

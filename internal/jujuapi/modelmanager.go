@@ -195,7 +195,7 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 			continue
 		}
 
-		apiModelInfo := toModelInfoParams(modelInfo)
+		apiModelInfo := toModelInfoParamsWithMigrationInfo(modelInfo)
 		results[i].Result = &apiModelInfo
 		if r.controllerUUIDMasking {
 			results[i].Result.ControllerUUID = r.params.ControllerUUID

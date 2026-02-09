@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	dbmodel "github.com/canonical/jimm/v3/internal/dbmodel"
+	jujuclient "github.com/canonical/jimm/v3/internal/jujuclient"
 	openfga "github.com/canonical/jimm/v3/internal/openfga"
 	params "github.com/juju/juju/rpc/params"
 	names "github.com/juju/names/v5"
@@ -123,10 +124,10 @@ func (c *MockJujuManagerInitiateInternalMigrationCall) DoAndReturn(f func(contex
 }
 
 // ModelInfo mocks base method.
-func (m *MockJujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*params.ModelInfo, error) {
+func (m *MockJujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ModelInfo", ctx, user, mt)
-	ret0, _ := ret[0].(*params.ModelInfo)
+	ret0, _ := ret[0].(jujuclient.ModelInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -144,19 +145,19 @@ type MockJujuManagerModelInfoCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockJujuManagerModelInfoCall) Return(arg0 *params.ModelInfo, arg1 error) *MockJujuManagerModelInfoCall {
+func (c *MockJujuManagerModelInfoCall) Return(arg0 jujuclient.ModelInfo, arg1 error) *MockJujuManagerModelInfoCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJujuManagerModelInfoCall) Do(f func(context.Context, *openfga.User, names.ModelTag) (*params.ModelInfo, error)) *MockJujuManagerModelInfoCall {
+func (c *MockJujuManagerModelInfoCall) Do(f func(context.Context, *openfga.User, names.ModelTag) (jujuclient.ModelInfo, error)) *MockJujuManagerModelInfoCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJujuManagerModelInfoCall) DoAndReturn(f func(context.Context, *openfga.User, names.ModelTag) (*params.ModelInfo, error)) *MockJujuManagerModelInfoCall {
+func (c *MockJujuManagerModelInfoCall) DoAndReturn(f func(context.Context, *openfga.User, names.ModelTag) (jujuclient.ModelInfo, error)) *MockJujuManagerModelInfoCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

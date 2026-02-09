@@ -17,28 +17,28 @@ import (
 // them where the Juju client has inconsistent behaviour.
 
 // convertParamsModelInfo converts a params.ModelInfo to a base.ModelInfo.
-// It is copied from the Juju codebase because it is not exported and in some
-// API methods like CreateModel, a base.ModelInfo type is returned, while in
-// calls to ModelInfo a params.ModelInfo type is returned. We want consistent
-// types preferably of the form base.ModelInfo. Until either that inconsitency
-// is fixed or we export the convertParamsModelInfo function, we copy it here
-// here have better consistency in our domain layer.
-func convertParamsModelInfo(modelInfo params.ModelInfo) (base.ModelInfo, error) {
+// It is copied from the Juju codebase because it is not exported and has
+// additional logic to parse the migration status. In some API methods like
+// CreateModel, a base.ModelInfo type is returned, while in calls to ModelInfo
+// a params.ModelInfo type is returned. We want consistent types preferably of
+// the form base.ModelInfo. Until the client returns a consistent set of types
+// we copy it here here to have better consistency in our domain layer.
+func convertParamsModelInfo(modelInfo params.ModelInfo) (ModelInfo, error) {
 	cloud, err := names.ParseCloudTag(modelInfo.CloudTag)
 	if err != nil {
-		return base.ModelInfo{}, err
+		return ModelInfo{}, err
 	}
 	var credential string
 	if modelInfo.CloudCredentialTag != "" {
 		credTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
 		if err != nil {
-			return base.ModelInfo{}, err
+			return ModelInfo{}, err
 		}
 		credential = credTag.Id()
 	}
 	ownerTag, err := names.ParseUserTag(modelInfo.OwnerTag)
 	if err != nil {
-		return base.ModelInfo{}, err
+		return ModelInfo{}, err
 	}
 	result := base.ModelInfo{
 		Name:            modelInfo.Name,
@@ -101,5 +101,16 @@ func convertParamsModelInfo(modelInfo params.ModelInfo) (base.ModelInfo, error) 
 		}
 		result.Machines[i] = machine
 	}
-	return result, nil
+	var migrationStatus *ModelMigrationStatus
+	if modelInfo.Migration != nil {
+		migrationStatus = &ModelMigrationStatus{
+			Status: modelInfo.Migration.Status,
+			Start:  modelInfo.Migration.Start,
+			End:    modelInfo.Migration.End,
+		}
+	}
+	return ModelInfo{
+		ModelInfo:       result,
+		MigrationStatus: migrationStatus,
+	}, nil
 }

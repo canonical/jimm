@@ -365,10 +365,11 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	}
 	defer api.Close()
 
-	m.modelInfo, err = api.ModelInfo(modelTag)
+	modelInfo, err := api.ModelInfo(modelTag)
 	if err != nil {
 		return err
 	}
+	m.modelInfo = modelInfo.ModelInfo
 
 	m.originalOwner = names.NewUserTag(m.modelInfo.Owner)
 

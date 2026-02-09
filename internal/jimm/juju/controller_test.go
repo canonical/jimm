@@ -27,6 +27,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -531,7 +532,7 @@ func TestImportModel(t *testing.T) {
 		user           string
 		controllerName string
 		modelUUID      string
-		modelInfo      func(model names.ModelTag) (base.ModelInfo, error)
+		modelInfo      func(model names.ModelTag) (jujuclient.ModelInfo, error)
 		newOwner       string
 		jimmAdmin      bool
 		expectedModel  dbmodel.Model
@@ -544,8 +545,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -613,42 +614,38 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(_ context.Context, info *jujuparams.ModelInfo) error {
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
 			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
 			info.DefaultSeries = "test-series"
-			info.CloudTag = names.NewCloudTag("test-cloud").String()
+			info.Cloud = "test-cloud"
 			// info.CloudRegion is not set to test default region handling
-			info.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential").String()
-			info.CloudCredentialValidity = &trueValue
-			info.OwnerTag = names.NewUserTag("alice@canonical.com").String()
+			info.CloudCredential = "test-cloud/alice@canonical.com/test-credential"
+			info.Owner = "alice@canonical.com"
 			info.Life = life.Alive
-			info.Status = jujuparams.EntityStatus{
+			info.Status = base.Status{
 				Status: status.Status("ok"),
 				Info:   "test-info",
 				Since:  &now,
 			}
-			info.Users = []jujuparams.ModelUserInfo{{
+			info.Users = []base.UserInfo{{
 				UserName: "alice@canonical.com",
-				Access:   jujuparams.ModelAdminAccess,
+				Access:   string(jujuparams.ModelAdminAccess),
 			}, {
 				UserName: "bob@canonical.com",
-				Access:   jujuparams.ModelReadAccess,
+				Access:   string(jujuparams.ModelReadAccess),
 			}}
-			info.Machines = []jujuparams.ModelMachineInfo{{
+			info.Machines = []base.Machine{{
 				Id:          "test-machine",
 				DisplayName: "Test machine",
 				Status:      "test-status",
 				Message:     "test-message",
 			}}
-			info.SLA = &jujuparams.ModelSLAInfo{
-				Level: "essential",
-				Owner: "alice@canonical.com",
-			}
 			info.AgentVersion = newVersion("2.1.0")
-			return nil
+			return info, nil
 		},
 		expectedModel: dbmodel.Model{
 			Name: "test-model",
@@ -686,8 +683,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "alice@canonical.com",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -756,8 +753,8 @@ func TestImportModel(t *testing.T) {
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		expectedError:  "cannot import model from local user, try --owner to switch the model owner",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -796,8 +793,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			return base.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
 		},
 		expectedError: "model not found",
 	}, {
@@ -807,8 +804,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -828,8 +825,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -849,8 +846,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -870,8 +867,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      false,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -891,8 +888,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000002",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "model-1"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -912,8 +909,8 @@ func TestImportModel(t *testing.T) {
 		newOwner:       "",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			info := base.ModelInfo{}
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
 			info.Name = "test-model"
 			info.Type = "test-type"
 			info.UUID = "00000002-0000-0000-0000-000000000001"
@@ -1116,7 +1113,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 	tests := []struct {
 		about            string
 		user             string
-		modelInfo        func(model names.ModelTag) (base.ModelInfo, error)
+		modelInfo        func(model names.ModelTag) (jujuclient.ModelInfo, error)
 		model            names.ModelTag
 		targetController string
 		jimmAdmin        bool
@@ -1143,8 +1140,8 @@ func TestUpdateMigratedModel(t *testing.T) {
 		user:             "alice@canonical.com",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "controller-2",
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			return base.ModelInfo{}, errors.E("an error")
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			return jujuclient.ModelInfo{}, errors.E("an error")
 		},
 		expectedError: "an error",
 		jimmAdmin:     true,
@@ -1153,8 +1150,8 @@ func TestUpdateMigratedModel(t *testing.T) {
 		user:             "alice@canonical.com",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "controller-2",
-		modelInfo: func(model names.ModelTag) (base.ModelInfo, error) {
-			return base.ModelInfo{}, nil
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			return jujuclient.ModelInfo{}, nil
 		},
 		jimmAdmin: true,
 	}}

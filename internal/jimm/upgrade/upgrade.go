@@ -7,10 +7,9 @@ package upgrade
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"fmt"
 	"time"
-
-	stderrors "errors"
 
 	"github.com/juju/clock"
 	jujuerrors "github.com/juju/errors"
@@ -26,6 +25,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
@@ -44,7 +44,7 @@ type BootstrapManager interface {
 type JujuManager interface {
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
-	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
+	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
 }
 
 // Store defines the store methods required by the upgrade manager.
@@ -129,25 +129,17 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to dial the controller: %w", err))
 	}
 
-	var ctrlModelSummary jujuparams.ModelSummary
-	if err := api.ControllerModelSummary(ctx, &ctrlModelSummary); err != nil {
+	ctrlModelSummary, err := api.ControllerModelSummary()
+	if err != nil {
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get controller model summary: %w", err))
 	}
 
 	// TODO(ale8k): Handle K8S clouds here in future. (HostCloudRegion field.)
 	bootstrapCloudRegion = ctrlModelSummary.CloudRegion
+	ctrlCloud := ctrlModelSummary.Cloud
+	ctrlCloudCred := ctrlModelSummary.CloudCredential
 
-	ctrlCloud, err := names.ParseCloudTag(ctrlModelSummary.CloudTag)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to parse cloud tag from controller model summary: %w", err))
-	}
-
-	ctrlCloudCred, err := names.ParseCloudCredentialTag(ctrlModelSummary.CloudCredentialTag)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to parse cloud credential tag from controller model summary: %w", err))
-	}
-
-	credentialContents, err := api.CredentialContents(ctrlCloud.Id(), ctrlCloudCred.Name(), true)
+	credentialContents, err := api.CredentialContents(ctrlCloud, ctrlCloudCred, true)
 	if err != nil {
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get credential contents from controller model summary: %w", err))
 	}
@@ -167,7 +159,7 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		credentialContents[0].Result.Content.Attributes,
 	)
 
-	if err := api.Cloud(ctrlCloud, &bootstrapCloud); err != nil {
+	if err := api.Cloud(names.NewCloudTag(ctrlCloud), &bootstrapCloud); err != nil {
 		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get cloud from controller model summary: %w", err))
 	}
 
@@ -237,8 +229,7 @@ func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 			Attempts: 6,
 			Delay:    10 * time.Second,
 			Func: func() error {
-				mi := jujuparams.ModelInfo{UUID: modelUUID}
-				err := api.ModelInfo(ctx, &mi)
+				mi, err := api.ModelInfo(model.ResourceTag())
 				if err != nil {
 					return fmt.Errorf("failed to get model info before upgrade: %w", err)
 				}

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuapi_test
 
@@ -9,6 +9,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
@@ -467,14 +468,14 @@ func (s *jimmUnitTestSuite) TestAddModelToController(c *gc.C) {
 		JujuManager_: func() jimm.JujuManager {
 			return &mocks.JujuManager{
 				ModelManager: mocks.ModelManager{
-					AddModel_: func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (*jujuparams.ModelInfo, error) {
+					AddModel_: func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (base.ModelInfo, error) {
 						c.Check(args.Name, gc.Equals, "mymodel")
 						c.Check(args.Owner.String(), gc.Equals, "user-alice@canonical.com")
 						c.Check(args.Cloud.String(), gc.Equals, "cloud-openstack")
 						c.Check(args.CloudRegion, gc.Equals, "region-1")
 						c.Check(args.CloudCredential.String(), gc.Equals, "cloudcred-openstack_alice_mycred")
 						c.Check(args.ControllerName, gc.Equals, "controller-1")
-						return &jujuparams.ModelInfo{}, nil
+						return base.ModelInfo{}, nil
 					},
 				},
 			}

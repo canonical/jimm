@@ -1,4 +1,5 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
+
 package mocks
 
 import (
@@ -12,6 +13,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -31,7 +33,7 @@ type ModelManager struct {
 	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	ModelDefaultsForCloud_  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
-	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelInfo, error)
+	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelStatus, error)
 	QueryModelsJq_          func(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
 	SetModelDefaults_       func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
@@ -117,9 +119,9 @@ func (j *ModelManager) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.
 	return j.ModelDefaultsForCloud_(ctx, user, cloudTag)
 }
 
-func (j *ModelManager) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelInfo, error) {
+func (j *ModelManager) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 	if j.ModelInfo_ == nil {
-		return base.ModelInfo{}, errors.E(errors.CodeNotImplemented)
+		return jujuclient.ModelInfo{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ModelInfo_(ctx, u, mt)
 }

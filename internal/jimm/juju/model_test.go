@@ -1849,8 +1849,8 @@ func TestModelInfo(t *testing.T) {
 			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						ModelInfo_: func(model names.ModelTag) (base.ModelInfo, error) {
-							mi := base.ModelInfo{}
+						ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+							mi := jujuclient.ModelInfo{}
 							mi.Name = "model-1"
 							mi.Type = "iaas"
 							mi.ControllerUUID = "00000001-0000-0000-0000-000000000001"
@@ -1921,8 +1921,8 @@ func TestModelInfoNotFound(t *testing.T) {
 	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
-					return errors.E(errors.CodeNotFound, "model not found")
+				ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -1964,8 +1964,8 @@ func TestModelInfoRedirect(t *testing.T) {
 	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
-					return errors.E(errors.CodeNotFound, "model not found")
+				ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -1994,10 +1994,10 @@ func TestModelInfoRedirect(t *testing.T) {
 	numCalls := 0
 	j.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
 				if numCalls == 0 {
 					numCalls++
-					return &jujurpc.RequestError{
+					return jujuclient.ModelInfo{}, &jujurpc.RequestError{
 						Message: "redirect",
 						Code:    jujuparams.CodeRedirect,
 						Info: jujuparams.RedirectErrorInfo{
@@ -2005,7 +2005,7 @@ func TestModelInfoRedirect(t *testing.T) {
 						}.AsMap(),
 					}
 				} else {
-					return nil
+					return jujuclient.ModelInfo{}, nil
 				}
 			},
 		},
@@ -2025,8 +2025,8 @@ func TestModelStatusNotFound(t *testing.T) {
 	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelStatus_: func(_ context.Context, ms *jujuparams.ModelStatus) error {
-					return errors.E(errors.CodeNotFound, "model not found")
+				ModelStatus_: func(modelTag names.ModelTag) (base.ModelStatus, error) {
+					return base.ModelStatus{}, errors.E(errors.CodeNotFound, "model not found")
 				},
 			},
 		},

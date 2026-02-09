@@ -11,6 +11,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 )
 
 func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
@@ -280,4 +281,16 @@ func toModelInfoParams(modelInfo base.ModelInfo) jujuparams.ModelInfo {
 		})
 	}
 	return mi
+}
+
+func toModelInfoParamsWithMigrationInfo(modelInfo jujuclient.ModelInfo) jujuparams.ModelInfo {
+	modelInfoParams := toModelInfoParams(modelInfo.ModelInfo)
+	if modelInfo.MigrationStatus != nil {
+		modelInfoParams.Migration = &jujuparams.ModelMigrationStatus{
+			Status: modelInfo.MigrationStatus.Status,
+			Start:  modelInfo.MigrationStatus.Start,
+			End:    modelInfo.MigrationStatus.End,
+		}
+	}
+	return modelInfoParams
 }
