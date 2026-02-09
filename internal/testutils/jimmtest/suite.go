@@ -169,13 +169,16 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		Store:  credentialStore,
 		Expiry: time.Minute,
 	})
+
+	dialer := &jujuclient.Dialer{
+		ControllerCredentialsStore: credentialStore,
+		JWTService:                 jwtService,
+	}
+
 	s.JIMM, err = jimm.New(jimm.Parameters{
-		UUID:     ControllerUUID,
-		Database: database,
-		Dialer: &jujuclient.Dialer{
-			ControllerCredentialsStore: credentialStore,
-			JWTService:                 jwtService,
-		},
+		UUID:                          ControllerUUID,
+		Database:                      database,
+		Dialer:                        jimm.NewDialerAdapter(dialer),
 		CredentialStore:               credentialStore,
 		Pubsub:                        &pubsub.Hub{MaxConcurrency: 10},
 		OpenFGAClient:                 s.OFGAClient,

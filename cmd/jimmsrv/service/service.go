@@ -444,11 +444,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		Store:  credentialStore,
 		Expiry: p.JWTExpiryDuration,
 	})
-	jimmParameters.Dialer = &jujuclient.Dialer{
+	dialer := &jujuclient.Dialer{
 		ControllerCredentialsStore: credentialStore,
 		JWTService:                 jimmParameters.JWTService,
 	}
 	jimmParameters.MigrationTokenGenerator = authSvc
+	jimmParameters.Dialer = jimm.NewDialerAdapter(dialer)
 
 	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
 		return nil, errors.E(err, "failed to parse final redirect url for the dashboard")

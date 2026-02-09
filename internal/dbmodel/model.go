@@ -6,12 +6,11 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
-
-	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // MigrationMode specifies where the Model is with respect to migration.
@@ -110,31 +109,20 @@ func (m *Model) SetOwner(u *Identity) {
 //
 // Some fields specific to JIMM which aren't present in a jujuparams.ModelInfo type
 // will need to be filled in manually by the caller of this function.
-func (m *Model) FromJujuModelInfo(info jujuparams.ModelInfo) error {
+func (m *Model) FromJujuModelInfo(info base.ModelInfo) error {
 	m.Name = info.Name
 	SetNullString(&m.UUID, &info.UUID)
-	if info.OwnerTag != "" {
-		ut, err := names.ParseUserTag(info.OwnerTag)
-		if err != nil {
-			return errors.E(err)
-		}
-		m.OwnerIdentityName = ut.Id()
+	if info.Owner != "" {
+		m.OwnerIdentityName = info.Owner
 	}
 	m.Life = string(info.Life)
 
 	m.CloudRegion.Name = info.CloudRegion
-	if info.CloudTag != "" {
-		ct, err := names.ParseCloudTag(info.CloudTag)
-		if err != nil {
-			return errors.E(err)
-		}
-		m.CloudRegion.Cloud.Name = ct.Id()
+	if info.Cloud != "" {
+		m.CloudRegion.Cloud.Name = info.Cloud
 	}
-	if info.CloudCredentialTag != "" {
-		cct, err := names.ParseCloudCredentialTag(info.CloudCredentialTag)
-		if err != nil {
-			return errors.E(err)
-		}
+	if info.CloudCredential != "" {
+		cct := names.NewCloudCredentialTag(info.CloudCredential)
 		m.CloudCredential.Name = cct.Name()
 		m.CloudCredential.CloudName = cct.Cloud().Id()
 		m.CloudCredential.Owner.Name = cct.Owner().Id()
@@ -158,29 +146,26 @@ func (m Model) ToJujuModel() jujuparams.Model {
 	return jm
 }
 
-// MergeModelSummaryFromController converts a model to a jujuparams.ModelSummary.
-// It uses the info from the controller and JIMM's db to fill the jujuparams.ModelSummary.
-// maskingControllerUUID is used to mask the controllerUUID with the JIMM's one.
-// access is the user access level got from JIMM.
-func (m Model) MergeModelSummaryFromController(modelSummaryFromController *jujuparams.ModelSummary, maskingControllerUUID string, access jujuparams.UserAccessPermission) jujuparams.ModelSummary {
-	if modelSummaryFromController == nil {
-		modelSummaryFromController = &jujuparams.ModelSummary{}
-	}
-	modelSummaryFromController.Name = m.Name
-	modelSummaryFromController.UUID = m.UUID.String
+// MergeModelSummaryFromController merges a model as received from Juju with info in JIMM.
+// It uses the info from the controller and JIMM's stores (database+OpenFGA).
+// maskingControllerUUID is used to mask the controllerUUID with the JIMM's.
+// access is the user's access level to the model.
+func (m Model) MergeModelSummaryFromController(jujuModelSummary base.UserModelSummary, maskingControllerUUID string, access string) base.UserModelSummary {
+	jujuModelSummary.Name = m.Name
+	jujuModelSummary.UUID = m.UUID.String
 	if maskingControllerUUID != "" {
-		modelSummaryFromController.ControllerUUID = maskingControllerUUID
+		jujuModelSummary.ControllerUUID = maskingControllerUUID
 	} else {
-		modelSummaryFromController.ControllerUUID = m.Controller.UUID
+		jujuModelSummary.ControllerUUID = m.Controller.UUID
 	}
-	modelSummaryFromController.ProviderType = m.CloudRegion.Cloud.Type
-	modelSummaryFromController.CloudTag = m.CloudRegion.Cloud.Tag().String()
-	modelSummaryFromController.CloudRegion = m.CloudRegion.Name
-	modelSummaryFromController.CloudCredentialTag = m.CloudCredential.Tag().String()
-	modelSummaryFromController.OwnerTag = m.Owner.Tag().String()
-	modelSummaryFromController.Life = life.Value(m.Life)
-	modelSummaryFromController.UserAccess = access
-	return *modelSummaryFromController
+	jujuModelSummary.ProviderType = m.CloudRegion.Cloud.Type
+	jujuModelSummary.Cloud = m.CloudRegion.Cloud.Name
+	jujuModelSummary.CloudRegion = m.CloudRegion.Name
+	jujuModelSummary.CloudCredential = m.CloudCredential.Tag().Id()
+	jujuModelSummary.Owner = m.Owner.Name
+	jujuModelSummary.Life = life.Value(m.Life)
+	jujuModelSummary.ModelUserAccess = access
+	return jujuModelSummary
 }
 
 // MigrationFailed processes a failed migration by resetting the

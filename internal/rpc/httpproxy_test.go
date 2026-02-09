@@ -15,7 +15,6 @@ import (
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 
-	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
@@ -41,15 +40,15 @@ func TestProxyHTTP(t *testing.T) {
 
 	tests := []struct {
 		description          string
-		getConnectionDetails func(c *qt.C) juju.ControllerConnectionDetails
+		getConnectionDetails func(c *qt.C) rpc.ConnectionDetails
 		path                 string
 		statusExpected       int
 	}{
 		{
 			description: "good",
-			getConnectionDetails: func(c *qt.C) juju.ControllerConnectionDetails {
+			getConnectionDetails: func(c *qt.C) rpc.ConnectionDetails {
 
-				return juju.ControllerConnectionDetails{
+				return rpc.ConnectionDetails{
 					CACertificate: controllerCACert,
 					PublicAddress: fakeControllerURL.Host,
 				}
@@ -57,17 +56,17 @@ func TestProxyHTTP(t *testing.T) {
 			statusExpected: http.StatusOK,
 		}, {
 			description: "controller no public address, only addresses",
-			getConnectionDetails: func(c *qt.C) juju.ControllerConnectionDetails {
+			getConnectionDetails: func(c *qt.C) rpc.ConnectionDetails {
 				hp, err := network.ParseMachineHostPort(fakeController.Listener.Addr().String())
 				c.Assert(err, qt.Equals, nil)
 				hp.Scope = network.ScopePublic
 
-				hostPorts := [][]jujuparams.HostPort{[]jujuparams.HostPort{{
+				hostPorts := [][]jujuparams.HostPort{{{
 					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
 					Port:    hp.Port(),
 				}}}
 				controllerAddresses := jujuparams.ToMachineHostsPorts(hostPorts)
-				return juju.ControllerConnectionDetails{
+				return rpc.ConnectionDetails{
 					CACertificate: controllerCACert,
 					Addresses:     controllerAddresses,
 				}
@@ -76,17 +75,17 @@ func TestProxyHTTP(t *testing.T) {
 		},
 		{
 			description: "controller public address with unreachable alternatives",
-			getConnectionDetails: func(c *qt.C) juju.ControllerConnectionDetails {
+			getConnectionDetails: func(c *qt.C) rpc.ConnectionDetails {
 				hp, err := network.ParseMachineHostPort("unreachable:61213")
 				c.Assert(err, qt.Equals, nil)
 				hp.Scope = network.ScopePublic
 
-				hostPorts := [][]jujuparams.HostPort{[]jujuparams.HostPort{{
+				hostPorts := [][]jujuparams.HostPort{{{
 					Address: jujuparams.FromMachineAddress(hp.MachineAddress),
 					Port:    hp.Port(),
 				}}}
 				controllerAddresses := jujuparams.ToMachineHostsPorts(hostPorts)
-				return juju.ControllerConnectionDetails{
+				return rpc.ConnectionDetails{
 					PublicAddress: fakeController.Listener.Addr().String(),
 					Addresses:     controllerAddresses,
 					CACertificate: controllerCACert,
@@ -96,8 +95,8 @@ func TestProxyHTTP(t *testing.T) {
 		},
 		{
 			description: "controller responds unauthorized",
-			getConnectionDetails: func(c *qt.C) juju.ControllerConnectionDetails {
-				return juju.ControllerConnectionDetails{
+			getConnectionDetails: func(c *qt.C) rpc.ConnectionDetails {
+				return rpc.ConnectionDetails{
 					PublicAddress: fakeControllerURL.Host,
 					CACertificate: controllerCACert,
 				}
@@ -107,8 +106,8 @@ func TestProxyHTTP(t *testing.T) {
 		},
 		{
 			description: "controller not reachable",
-			getConnectionDetails: func(c *qt.C) juju.ControllerConnectionDetails {
-				return juju.ControllerConnectionDetails{
+			getConnectionDetails: func(c *qt.C) rpc.ConnectionDetails {
+				return rpc.ConnectionDetails{
 					PublicAddress: "localhost-not-found:61213",
 					CACertificate: controllerCACert,
 				}
@@ -126,10 +125,8 @@ func TestProxyHTTP(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
 			connectionDetails := test.getConnectionDetails(c)
-			connectionDetails.Credentials = juju.ControllerCreds{
-				AdminIdentityName: "test-user",
-				AdminPassword:     "test-password",
-			}
+			connectionDetails.Username = "test-user"
+			connectionDetails.Password = "test-password"
 			rpc.ProxyHTTP(ctx, connectionDetails, recorder, req)
 
 			resp := recorder.Result()

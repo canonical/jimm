@@ -5,10 +5,12 @@ package juju_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/api/base"
 	jujurpc "github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -113,19 +115,19 @@ func TestModelCleanup(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-				switch mi.UUID {
+			ModelInfo_: func(model names.ModelTag) (base.ModelInfo, error) {
+				switch model.Id() {
 				case s.env.Models[0].UUID:
-					return errors.E(errors.CodeNotFound)
+					return base.ModelInfo{}, errors.E(errors.CodeNotFound)
 				case s.env.Models[1].UUID:
-					return nil
+					return base.ModelInfo{UUID: model.Id()}, nil
 				case s.env.Models[2].UUID:
-					return nil
+					return base.ModelInfo{}, errors.E(fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id()))
 				default:
-					return errors.E("new error")
+					return base.ModelInfo{}, errors.E("new error")
 				}
 			},
-			DestroyModel_: func(ctx context.Context, mt names.ModelTag, b1, b2 *bool, d1, d2 *time.Duration) error {
+			DestroyModel_: func(tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 				return nil
 			},
 		},
@@ -244,10 +246,10 @@ func TestPollModelsDyingControllerErrors(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-				return errors.E("controller not available")
+			ModelInfo_: func(model names.ModelTag) (base.ModelInfo, error) {
+				return base.ModelInfo{}, errors.E("controller not available")
 			},
-			DestroyModel_: func(ctx context.Context, mt names.ModelTag, b1, b2 *bool, d1, d2 *time.Duration) error {
+			DestroyModel_: func(tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 				return nil
 			},
 		},

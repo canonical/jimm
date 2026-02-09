@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -129,19 +130,19 @@ type API struct {
 	Abort_                             func(modelUUID string) error
 	AddCloud_                          func(names.CloudTag, jujucloud.Cloud, bool) error
 	AdoptResources_                    func(modelUUID string, controllerVersion version.Number) error
-	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
+	ChangeModelCredential_             func(model names.ModelTag, credential names.CloudCredentialTag) error
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	CheckMachines_                     func(modelUUID string) ([]error, error)
 	Close_                             func() error
 	Cloud_                             func(names.CloudTag, *jujucloud.Cloud) error
 	Clouds_                            func() (map[names.CloudTag]jujucloud.Cloud, error)
-	ControllerModelSummary_            func(context.Context, *jujuparams.ModelSummary) error
+	ControllerModelSummary_            func() (base.UserModelSummary, error)
 	ControllerConfig_                  func(context.Context) (jujuparams.ControllerConfigResult, error)
-	CreateModel_                       func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
+	CreateModel_                       func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	DestroyApplicationOffer_           func(context.Context, string, bool) error
-	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
-	DumpModel_                         func(context.Context, names.ModelTag, bool) (string, error)
-	DumpModelDB_                       func(context.Context, names.ModelTag) (map[string]interface{}, error)
+	DestroyModel_                      func(tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error
+	DumpModel_                         func(tag names.ModelTag, simplified bool) (map[string]interface{}, error)
+	DumpModelDB_                       func(tag names.ModelTag) (map[string]interface{}, error)
 	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
@@ -151,11 +152,11 @@ type API struct {
 	IsBroken_                          bool
 	LatestLogTime_                     func(string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	ModelInfo_                         func(context.Context, *jujuparams.ModelInfo) error
-	ModelStatus_                       func(context.Context, *jujuparams.ModelStatus) error
+	ModelInfo_                         func(model names.ModelTag) (base.ModelInfo, error)
+	ModelStatus_                       func(modelTag names.ModelTag) (base.ModelStatus, error)
 	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
 	ModelSummaryWatcherStop_           func(context.Context, string) error
-	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error)
+	ListModelSummaries_                func(ms jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(names.CloudTag) error
@@ -167,12 +168,12 @@ type API struct {
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
 	UpdateCloud_                       func(names.CloudTag, jujucloud.Cloud) error
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
-	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
+	ValidateModelUpgrade_              func(model names.ModelTag, force bool) error
 	WatchAllModelSummaries_            func(context.Context) (string, error)
 	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
-	ListModels_                        func(ctx context.Context) ([]base.UserModel, error)
+	ListModels_                        func() ([]base.UserModel, error)
 	CredentialContents_                func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
 	UpgradeModel_                      func(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error)
 }
@@ -241,11 +242,11 @@ func (a *API) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {
 	return a.Clouds_()
 }
 
-func (a *API) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
+func (a *API) ControllerModelSummary() (base.UserModelSummary, error) {
 	if a.ControllerModelSummary_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return base.UserModelSummary{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ControllerModelSummary_(ctx, ms)
+	return a.ControllerModelSummary_()
 }
 
 func (a *API) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
@@ -255,11 +256,11 @@ func (a *API) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfig
 	return a.ControllerConfig_(ctx)
 }
 
-func (a *API) CreateModel(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+func (a *API) CreateModel(args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 	if a.CreateModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return base.ModelInfo{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.CreateModel_(ctx, args, mi)
+	return a.CreateModel_(args)
 }
 
 func (a *API) DestroyApplicationOffer(ctx context.Context, offerURL string, force bool) error {
@@ -269,25 +270,25 @@ func (a *API) DestroyApplicationOffer(ctx context.Context, offerURL string, forc
 	return a.DestroyApplicationOffer_(ctx, offerURL, force)
 }
 
-func (a *API) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
+func (a *API) DestroyModel(tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	if a.DestroyModel_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.DestroyModel_(ctx, tag, destroyStorage, force, maxWait, timeout)
+	return a.DestroyModel_(tag, destroyStorage, force, maxWait, timeout)
 }
 
-func (a *API) DumpModel(ctx context.Context, mt names.ModelTag, simplified bool) (string, error) {
+func (a *API) DumpModel(tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
 	if a.DumpModel_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.DumpModel_(ctx, mt, simplified)
+	return a.DumpModel_(tag, simplified)
 }
 
-func (a *API) DumpModelDB(ctx context.Context, mt names.ModelTag) (map[string]interface{}, error) {
+func (a *API) DumpModelDB(tag names.ModelTag) (map[string]interface{}, error) {
 	if a.DumpModelDB_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.DumpModelDB_(ctx, mt)
+	return a.DumpModelDB_(tag)
 }
 
 func (a *API) FindApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
@@ -336,18 +337,18 @@ func (a *API) ListApplicationOffers(ctx context.Context, f []jujuparams.OfferFil
 	return a.ListApplicationOffers_(ctx, f)
 }
 
-func (a *API) ModelInfo(ctx context.Context, mi *jujuparams.ModelInfo) error {
+func (a *API) ModelInfo(model names.ModelTag) (base.ModelInfo, error) {
 	if a.ModelInfo_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return base.ModelInfo{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ModelInfo_(ctx, mi)
+	return a.ModelInfo_(model)
 }
 
-func (a *API) ModelStatus(ctx context.Context, ms *jujuparams.ModelStatus) error {
+func (a *API) ModelStatus(modelTag names.ModelTag) (base.ModelStatus, error) {
 	if a.ModelStatus_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return base.ModelStatus{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ModelStatus_(ctx, ms)
+	return a.ModelStatus_(modelTag)
 }
 
 func (a *API) ModelSummaryWatcherNext(ctx context.Context, id string) ([]jujuparams.ModelAbstract, error) {
@@ -371,11 +372,11 @@ func (a *API) LatestLogTime(modelUUID string) (time.Time, error) {
 	return a.LatestLogTime_(modelUUID)
 }
 
-func (a *API) ListModelSummaries(ctx context.Context, req jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
+func (a *API) ListModelSummaries(ms jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error) {
 	if a.ListModelSummaries_ == nil {
-		return jujuparams.ModelSummaryResults{}, errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ListModelSummaries_(ctx, req)
+	return a.ListModelSummaries_(ms)
 }
 
 func (a *API) Offer(ctx context.Context, offerURL crossmodel.OfferURL, aao jujuparams.AddApplicationOffer) error {
@@ -449,11 +450,11 @@ func (a *API) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCreden
 	return a.UpdateCredential_(ctx, cred)
 }
 
-func (a *API) ValidateModelUpgrade(ctx context.Context, tag names.ModelTag, force bool) error {
+func (a *API) ValidateModelUpgrade(model names.ModelTag, force bool) error {
 	if a.ValidateModelUpgrade_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.ValidateModelUpgrade_(ctx, tag, force)
+	return a.ValidateModelUpgrade_(model, force)
 }
 
 func (a *API) WatchAllModelSummaries(ctx context.Context) (string, error) {
@@ -463,11 +464,11 @@ func (a *API) WatchAllModelSummaries(ctx context.Context) (string, error) {
 	return a.WatchAllModelSummaries_(ctx)
 }
 
-func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, cred names.CloudCredentialTag) error {
+func (a *API) ChangeModelCredential(model names.ModelTag, credential names.CloudCredentialTag) error {
 	if a.ChangeModelCredential_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.ChangeModelCredential_(ctx, model, cred)
+	return a.ChangeModelCredential_(model, credential)
 }
 
 func (a *API) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
@@ -491,11 +492,11 @@ func (a *API) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetai
 	return a.ListStorageDetails_(ctx)
 }
 
-func (a *API) ListModels(ctx context.Context) ([]base.UserModel, error) {
+func (a *API) ListModels() ([]base.UserModel, error) {
 	if a.ListModels_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ListModels_(ctx)
+	return a.ListModels_()
 }
 
 func (a *API) Import(bytes []byte) error {
