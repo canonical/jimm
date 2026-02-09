@@ -5,17 +5,16 @@ package river
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // Client wraps a River client and provides higher-level enqueue helpers.
-//
-// In particular, it implements [ports.UpgradeEnqueuer] for enqueueing upgrade
-// orchestration jobs.
 type Client struct {
 	client *river.Client[*sql.Tx]
 }
@@ -35,7 +34,61 @@ func NewRiverClient(db *db.Database) (*Client, error) {
 
 // EnqueueUpgradeTo inserts a River job to upgrade a model to the specified version
 // by migrating and upgrading it.
-func (c *Client) EnqueueUpgradeTo(args rivertypes.UpgradeToArgs) (int64, error) {
-	job, err := c.client.Insert(context.Background(), args, nil)
+func (c *Client) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (int64, error) {
+	job, err := c.client.Insert(ctx, args, nil)
 	return job.Job.ID, err
+}
+
+// TODO(Kian JUJU-9159): Return the isDuplicate flag so we can either return an error to callers
+// or at least inform them that a bootstrap is in-progress and their request was ignored.
+
+// EnqueueBootstrap inserts a River job to bootstrap a new controller.
+func (c *Client) EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (int64, error) {
+	job, err := c.client.Insert(ctx, args, nil)
+	return job.Job.ID, err
+}
+
+// EnqueueDestroyController inserts a River job to destroy an existing controller.
+func (c *Client) EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (int64, error) {
+	job, err := c.client.Insert(ctx, args, nil)
+	return job.Job.ID, err
+}
+
+// GetJobInfo returns the current state of the specified job.
+func (c *Client) GetJobInfo(ctx context.Context, jobID int64) (*rivertype.JobRow, error) {
+	return c.client.JobGet(ctx, jobID)
+}
+
+// CancelJob cancels the specified job. It returns the final job state after cancellation.
+func (c *Client) CancelJob(ctx context.Context, jobID int64) (*rivertype.JobRow, error) {
+	return c.client.JobCancel(ctx, jobID)
+}
+
+// WaitForJobCompletion polls the database, waiting for the specified job to complete,
+// returning the final job state. If the job has already completed, it returns immediately.
+func (c *Client) WaitForJobCompletion(ctx context.Context, jobID int64) (*rivertype.JobRow, error) {
+	// River event subscriptions only emit events for jobs worked by the *same*
+	// client instance. Callers waiting on a job that may be worked by another
+	// client/process must poll for job state instead.
+	const pollInterval = 500 * time.Millisecond
+
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+
+	for {
+		job, err := c.client.JobGet(ctx, jobID)
+		if err != nil {
+			return nil, err
+		}
+		if job.FinalizedAt != nil {
+			return job, nil
+		}
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
 }
