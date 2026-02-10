@@ -6,8 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
-
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
@@ -19,7 +17,7 @@ var (
 )
 
 // AddJobLog adds a job log entry to the store.
-func (d *Database) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine string) (err error) {
+func (d *Database) AddJobLog(ctx context.Context, jobId int64, logLine string) (err error) {
 	const op = "db.AddJobLog"
 
 	if err := d.ready(); err != nil {
@@ -66,7 +64,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId uuid.UUID, logLine strin
 // It returns the next offset value to use, and this offset value may be the same
 // as the one initially presented / previously returned. This means no new logs have
 // come in, but they may later, and the client should query again for logs after some time.
-func (d *Database) QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int) (loggies []string, nextOffsetValue int, err error) {
+func (d *Database) QueryJobLog(ctx context.Context, jobId int64, offset int) (loggies []string, nextOffsetValue int, err error) {
 	const op = "db.QueryJobLog"
 
 	if err := d.ready(); err != nil {
@@ -79,11 +77,6 @@ func (d *Database) QueryJobLog(ctx context.Context, jobId uuid.UUID, offset int)
 
 	var logs []dbmodel.JobLog
 	err = d.Transaction(func(d *Database) error {
-		// Make sure job exists, if it doesn't, there's no point running the query
-		if err := d.DB.WithContext(ctx).First(&dbmodel.JobTrackerEntry{JobID: jobId}, "job_id = ?", jobId).Error; err != nil {
-			return errors.E("job not found", dbError(err))
-		}
-
 		query := d.DB.WithContext(ctx).
 			Model(&dbmodel.JobLog{}).
 			Where("job_id = ?", jobId)

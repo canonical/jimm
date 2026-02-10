@@ -4,11 +4,11 @@ package jujuapi_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	gc "gopkg.in/check.v1"
@@ -42,6 +42,136 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) 
 	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{})
 
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
+}
+
+func (s *jimmUnitTestSuite) TestAddController_UnauthorizedUser(c *gc.C) {
+	ctx := context.Background()
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
+
+	_, err := root.AddController(ctx, apiparams.AddControllerRequest{})
+
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+}
+
+func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
+	ctx := context.Background()
+
+	called := false
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				ControllerService: mocks.ControllerService{
+					AddController_: func(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error {
+						called = true
+						c.Assert(user.JimmAdmin, gc.Equals, true)
+						c.Assert(ctl.Name, gc.Equals, "controller-2")
+						c.Assert(ctl.UUID, gc.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
+						c.Assert(ctl.PublicAddress, gc.Equals, "controller.example.com:443")
+						c.Assert(ctl.CACertificate, gc.Equals, "ca-cert")
+						c.Assert(ctl.TLSHostname, gc.Equals, "juju-apiserver")
+						c.Assert(creds.AdminIdentityName, gc.Equals, "admin")
+						c.Assert(creds.AdminPassword, gc.Equals, "super-secret")
+
+						// Simulate the JujuManager filling in extra data during the add.
+						ctl.CloudName = "aws"
+						ctl.CloudRegion = "eu-west-1"
+						ctl.AgentVersion = "3.6.9"
+						return nil
+					},
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	req := apiparams.AddControllerRequest{
+		UUID:          "982b16d9-a945-4762-b684-fd4fd885aa11",
+		Name:          "controller-2",
+		PublicAddress: "controller.example.com:443",
+		TLSHostname:   "juju-apiserver",
+		APIAddresses:  []string{"127.0.0.1:17070"},
+		CACertificate: "ca-cert",
+		Username:      "admin",
+		Password:      "super-secret",
+	}
+
+	info, err := root.AddController(ctx, req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(called, gc.Equals, true)
+	c.Assert(info.Name, gc.Equals, req.Name)
+	c.Assert(info.UUID, gc.Equals, req.UUID)
+	c.Assert(info.PublicAddress, gc.Equals, req.PublicAddress)
+	c.Assert(info.CACertificate, gc.Equals, req.CACertificate)
+	c.Assert(info.APIAddresses, gc.DeepEquals, req.APIAddresses)
+	c.Assert(info.CloudTag, gc.Equals, names.NewCloudTag("aws").String())
+	c.Assert(info.CloudRegion, gc.Equals, "eu-west-1")
+	c.Assert(info.AgentVersion, gc.Equals, "3.6.9")
+}
+
+func (s *jimmUnitTestSuite) TestRemoveController_UnauthorizedUser(c *gc.C) {
+	ctx := context.Background()
+	jimm := &jimmtest.JIMM{}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
+
+	_, err := root.RemoveController(ctx, apiparams.RemoveControllerRequest{})
+
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+}
+
+func (s *jimmUnitTestSuite) TestRemoveController_Success(c *gc.C) {
+	ctx := context.Background()
+
+	removeCalled := false
+	infoCalled := false
+	testControllerName := "test-controller"
+	jimm := &jimmtest.JIMM{
+
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				ControllerService: mocks.ControllerService{
+					ControllerInfo_: func(ctx context.Context, name string) (*dbmodel.Controller, error) {
+						infoCalled = true
+						return &dbmodel.Controller{
+							Name:          testControllerName,
+							UUID:          "982b16d9-a945-4762-b684-fd4fd885aa11",
+							PublicAddress: "controller.example.com:443",
+							CACertificate: "ca-cert",
+							TLSHostname:   "juju-apiserver",
+							CloudName:     "openstack",
+						}, nil
+					},
+					RemoveController_: func(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
+						removeCalled = true
+						c.Check(controllerName, gc.Equals, testControllerName)
+						c.Check(user.JimmAdmin, gc.Equals, true)
+						return nil
+					},
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	req := apiparams.RemoveControllerRequest{
+		Name: testControllerName,
+	}
+
+	info, err := root.RemoveController(ctx, req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(removeCalled, gc.Equals, true)
+	c.Assert(infoCalled, gc.Equals, true)
+	c.Assert(info.Name, gc.Equals, req.Name)
+	c.Assert(info.UUID, gc.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
+	c.Assert(info.PublicAddress, gc.Equals, "controller.example.com:443")
+	c.Assert(info.CACertificate, gc.Equals, "ca-cert")
+	c.Assert(info.CloudTag, gc.Equals, names.NewCloudTag("openstack").String())
 }
 
 func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
@@ -139,12 +269,12 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C
 
 func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	ctx := context.Background()
-	uuidGenerated := uuid.New()
+	expectedJobID := int64(1)
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (apiparams.GetJobInfoResponse, error) {
-					if jobId != uuidGenerated {
+				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId int64, offset int) (apiparams.GetJobInfoResponse, error) {
+					if jobId != expectedJobID {
 						return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeNotFound, "job not found")
 					}
 					return apiparams.GetJobInfoResponse{
@@ -158,7 +288,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	response, err := root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
-		JobID:     uuidGenerated.String(),
+		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
 
@@ -168,7 +298,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 
 	// Test job not found
 	_, err = root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
-		JobID:     uuid.New().String(),
+		JobID:     "999",
 		Watermark: 0,
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
@@ -176,7 +306,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	// Test unauthorized user
 	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
 	_, err = root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
-		JobID:     uuidGenerated.String(),
+		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
@@ -203,11 +333,11 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				StartBootstrapJob_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error) {
+				StartBootstrapJob_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
 					if startBootstrapErr != nil {
-						return "", startBootstrapErr
+						return 0, startBootstrapErr
 					}
-					return uuid.New().String(), nil
+					return 1, nil
 				},
 			}
 		},
@@ -243,13 +373,13 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 
 func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	ctx := context.Background()
-	uuidGenerated := uuid.New()
+	expectedJobID := int64(1)
 
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				StopJob_: func(ctx context.Context, user *openfga.User, jobId uuid.UUID) error {
-					if jobId != uuidGenerated {
+				StopJob_: func(ctx context.Context, user *openfga.User, jobId int64) error {
+					if jobId != expectedJobID {
 						return errors.E(errors.CodeNotFound, "job not found")
 					}
 					return nil
@@ -260,29 +390,29 @@ func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
 	// Test stop bootstrap job unauthorized user
 	err := root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: uuidGenerated.String(),
+		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 
 	// Test stop bootstrap job
 	root = newTestControllerRoot(jimm, "alice@canonical.com", true)
 	err = root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: uuidGenerated.String(),
+		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
 	c.Assert(err, gc.IsNil)
 
 	// Test job not found
 	err = root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: uuid.New().String(),
+		JobID: "999",
 	})
 	c.Assert(err, gc.ErrorMatches, ".*job not found.*")
 
 	// Test stop bootstrap not valid job ID
 	err = root.StopJob(ctx, apiparams.StopJobRequest{
-		JobID: "not-a-valid-uuid",
+		JobID: "random-string",
 	})
 	c.Assert(err, gc.NotNil)
-	c.Assert(err.Error(), gc.Matches, "invalid job ID")
+	c.Assert(err.Error(), gc.Matches, "invalid job ID.*")
 }
 
 func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
@@ -302,8 +432,8 @@ func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				StartDestroyControllerJob_: func(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (string, error) {
-					return uuid.New().String(), nil
+				StartDestroyControllerJob_: func(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error) {
+					return 1, nil
 				},
 			}
 		},

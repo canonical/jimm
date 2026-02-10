@@ -5,7 +5,6 @@ package river
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/riverqueue/river"
@@ -18,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	_ "github.com/canonical/jimm/v3/internal/jimm/upgrade" // Dummy import to prevent future circular dependency
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 const (

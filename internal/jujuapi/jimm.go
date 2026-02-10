@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -211,6 +212,9 @@ func (r *controllerRoot) AddModelToController(ctx context.Context, req apiparams
 // AddController allows adds a controller to the pool of controllers
 // available to JIMM.
 func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddControllerRequest) (apiparams.ControllerInfo, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.ControllerInfo{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
 
 	if req.Name == jimmControllerName {
 		return apiparams.ControllerInfo{}, errors.E(errors.CodeBadRequest, fmt.Sprintf("cannot add a controller with name %q", jimmControllerName))
@@ -277,6 +281,9 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 
 // RemoveController removes a controller.
 func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.RemoveControllerRequest) (apiparams.ControllerInfo, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.ControllerInfo{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
 
 	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.Name)
 	if err != nil {
@@ -605,12 +612,12 @@ func (r *controllerRoot) GetJobInfo(ctx context.Context, req apiparams.GetJobInf
 		return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	jobId, err := uuid.Parse(req.JobID)
+	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
 	if err != nil {
-		return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeBadRequest, "invalid job ID", err)
+		return apiparams.GetJobInfoResponse{}, errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
 	}
 
-	return r.jimm.BootstrapManager().GetJobInfo(ctx, r.user, jobId, req.Watermark)
+	return r.jimm.BootstrapManager().GetJobInfo(ctx, r.user, jobID, req.Watermark)
 }
 
 // StopJob stops a job.
@@ -620,9 +627,9 @@ func (r *controllerRoot) StopJob(ctx context.Context, req apiparams.StopJobReque
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	jobID, err := uuid.Parse(req.JobID)
+	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
 	if err != nil {
-		return errors.E(errors.CodeBadRequest, "invalid job ID", err)
+		return errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
 	}
 
 	err = r.jimm.BootstrapManager().StopJob(ctx, r.user, jobID)
@@ -678,7 +685,7 @@ func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.Bo
 		return apiparams.StartJobResponse{}, errors.E(fmt.Errorf("failed to start bootstrap job: %v", err))
 	}
 	return apiparams.StartJobResponse{
-		JobID: jobID,
+		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
 }
 
@@ -713,7 +720,7 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 	}
 
 	return apiparams.StartJobResponse{
-		JobID: jobID,
+		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
 }
 

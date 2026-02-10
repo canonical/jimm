@@ -5,10 +5,11 @@ package river
 import (
 	"context"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 func newUpgradeWorker(upgradeManager UpgradeManager) (*upgradeWorker, error) {

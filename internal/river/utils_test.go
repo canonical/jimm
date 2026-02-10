@@ -7,15 +7,16 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/openfga"
-	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 	qt "github.com/frankban/quicktest"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivertype"
 	gomock "go.uber.org/mock/gomock"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
 func setupTestDB(c *qt.C) (*db.Database, *sql.DB) {

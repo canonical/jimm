@@ -4,31 +4,24 @@ package dbmodel
 
 import (
 	"errors"
-
-	"github.com/google/uuid"
 )
 
 // JobLog represents a log entry for a job.
 type JobLog struct {
 	// JobID is the unique identifier for the job. References a [JobTrackerEntry].
-	JobID uuid.UUID `gorm:"type:uuid;not null;primaryKey"`
+	JobID int64 `gorm:"type:bigint;not null;primaryKey"`
 	// LineNumber is the line number of a running job. It is used to offset the log lines
 	// when fetching logs.
 	LineNumber int `gorm:"not null;primaryKey"`
 	// LogLine is an actual log line from the job.
 	LogLine string `gorm:"type:text;not null"`
-
-	Job JobTrackerEntry `gorm:"constraint:OnDelete:CASCADE;foreignKey:JobID;references:JobID"`
 }
 
 // NewJobLog creates a new JobLog with the given jobId, lineNumber, and logLine.
 // It returns an error if any of the parameters are invalid.
-func NewJobLog(jobId uuid.UUID, lineNumber int, logLine string) (*JobLog, error) {
+func NewJobLog(jobId int64, lineNumber int, logLine string) (*JobLog, error) {
 	res := &JobLog{}
 
-	if jobId == uuid.Nil {
-		return res, errors.New("job id cannot be nil")
-	}
 	if lineNumber < 0 {
 		return res, errors.New("line number must be non-negative")
 	}
