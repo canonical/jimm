@@ -94,6 +94,15 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 }
 
 func toModelStatusParams(modelStatus base.ModelStatus) jujuparams.ModelStatus {
+	if modelStatus.Error != nil {
+		return jujuparams.ModelStatus{
+			Error: &jujuparams.Error{
+				Message: modelStatus.Error.Error(),
+				Code:    string(errors.ErrorCode(modelStatus.Error)),
+				Info:    errors.ErrorInfo(modelStatus.Error),
+			},
+		}
+	}
 	st := jujuparams.ModelStatus{
 		ModelTag:           names.NewModelTag(modelStatus.UUID).String(),
 		Life:               modelStatus.Life,
@@ -109,15 +118,9 @@ func toModelStatusParams(modelStatus base.ModelStatus) jujuparams.ModelStatus {
 		})
 	}
 	for _, machine := range modelStatus.Machines {
-		st.Machines = append(st.Machines, jujuparams.ModelMachineInfo{
-			Id:          machine.Id,
-			InstanceId:  machine.InstanceId,
-			DisplayName: machine.DisplayName,
-			HasVote:     machine.HasVote,
-			WantsVote:   machine.WantsVote,
-			Status:      machine.Status,
-			Message:     machine.Message,
-			Hardware: &jujuparams.MachineHardware{
+		hardware := &jujuparams.MachineHardware{}
+		if machine.Hardware != nil {
+			hardware = &jujuparams.MachineHardware{
 				Arch:             machine.Hardware.Arch,
 				Cores:            machine.Hardware.CpuCores,
 				Mem:              machine.Hardware.Mem,
@@ -126,8 +129,18 @@ func toModelStatusParams(modelStatus base.ModelStatus) jujuparams.ModelStatus {
 				Tags:             machine.Hardware.Tags,
 				AvailabilityZone: machine.Hardware.AvailabilityZone,
 				VirtType:         machine.Hardware.VirtType,
-			},
-			HAPrimary: machine.HAPrimary,
+			}
+		}
+		st.Machines = append(st.Machines, jujuparams.ModelMachineInfo{
+			Id:          machine.Id,
+			InstanceId:  machine.InstanceId,
+			DisplayName: machine.DisplayName,
+			HasVote:     machine.HasVote,
+			WantsVote:   machine.WantsVote,
+			Status:      machine.Status,
+			Message:     machine.Message,
+			Hardware:    hardware,
+			HAPrimary:   machine.HAPrimary,
 		})
 	}
 	for _, volume := range modelStatus.Volumes {
@@ -148,11 +161,6 @@ func toModelStatusParams(modelStatus base.ModelStatus) jujuparams.ModelStatus {
 			Message:    fs.Message,
 		})
 	}
-	if modelStatus.Error != nil {
-		st.Error = &jujuparams.Error{
-			Message: modelStatus.Error.Error(),
-		}
-	}
 	return st
 }
 
@@ -163,6 +171,8 @@ func toModelSummariesParams(modelSummaries []base.UserModelSummary) jujuparams.M
 			modelSummaryResults[i] = jujuparams.ModelSummaryResult{
 				Error: &jujuparams.Error{
 					Message: ms.Error.Error(),
+					Code:    string(errors.ErrorCode(ms.Error)),
+					Info:    errors.ErrorInfo(ms.Error),
 				},
 			}
 			continue
