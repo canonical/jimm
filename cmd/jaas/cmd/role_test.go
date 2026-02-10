@@ -1,145 +1,134 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"context"
-	"fmt"
-	"strings"
+	"bytes"
+	"testing"
 
-	"github.com/juju/cmd/v3/cmdtesting"
-	gc "gopkg.in/check.v1"
-	"gopkg.in/yaml.v3"
-
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
 	"github.com/canonical/jimm/v3/pkg/api/params"
+	qt "github.com/frankban/quicktest"
+	"go.uber.org/mock/gomock"
 )
 
-type roleSuite struct {
-	cmdtest.JimmCmdSuite
-}
+func TestAddRole(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-var _ = gc.Suite(&roleSuite{})
-
-func (s *roleSuite) TestAddRoleSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewAddRoleCommandForTesting(s.ClientStore(), bClient), "test-role")
-	c.Assert(err, gc.IsNil)
-
-	role := &dbmodel.RoleEntry{Name: "test-role"}
-	err = s.JIMM.Database.GetRole(context.Background(), role)
-	c.Assert(err, gc.IsNil)
-	c.Assert(role.ID, gc.Equals, uint(1))
-	c.Assert(role.Name, gc.Equals, "test-role")
-
-	c.Assert(cmdtesting.Stdout(ctx), gc.Matches, fmt.Sprintf(`(?s).*uuid: %s\n.*`, role.UUID))
-}
-
-func (s *roleSuite) TestAddRole(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddRoleCommandForTesting(s.ClientStore(), bClient), "test-role")
-	c.Assert(err, gc.ErrorMatches, `failed to add role: unauthorized \(unauthorized access\)`)
-}
-
-func (s *roleSuite) TestRenameRoleSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	roleEntry, err := s.JIMM.Database.AddRole(context.TODO(), "test-role")
-	c.Assert(err, gc.IsNil)
-	c.Assert(roleEntry.UUID, gc.Not(gc.Equals), "")
-
-	_, err = cmdtesting.RunCommand(c, cmd.NewRenameRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "renamed-role")
-	c.Assert(err, gc.IsNil)
-
-	role := &dbmodel.RoleEntry{Name: "renamed-role"}
-	err = s.JIMM.Database.GetRole(context.TODO(), role)
-	c.Assert(err, gc.IsNil)
-	c.Assert(role.ID, gc.Equals, uint(1))
-	c.Assert(role.Name, gc.Equals, "renamed-role")
-}
-
-func (s *roleSuite) TestRenameRole(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRenameRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "renamed-role")
-	c.Assert(err, gc.ErrorMatches, `failed to rename role: unauthorized \(unauthorized access\)`)
-}
-
-func (s *roleSuite) TestRemoveRoleSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	_, err := s.JIMM.Database.AddRole(context.TODO(), "test-role")
-	c.Assert(err, gc.IsNil)
-
-	_, err = cmdtesting.RunCommand(c, cmd.NewRemoveRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "-y")
-	c.Assert(err, gc.IsNil)
-
-	role := &dbmodel.RoleEntry{Name: "test-role"}
-	err = s.JIMM.Database.GetRole(context.TODO(), role)
-	c.Assert(err, gc.ErrorMatches, "record not found")
-}
-
-func (s *roleSuite) TestRemoveRoleWithoutFlag(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRoleCommandForTesting(s.ClientStore(), bClient), "test-role")
-	c.Assert(err.Error(), gc.Matches, "failed to read from input: EOF")
-}
-
-func (s *roleSuite) TestRemoveRole(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemoveRoleCommandForTesting(s.ClientStore(), bClient), "test-role", "-y")
-	c.Assert(err, gc.ErrorMatches, `failed to remove role: unauthorized \(unauthorized access\)`)
-}
-
-func (s *roleSuite) TestListRolesSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	for i := 0; i < 3; i++ {
-		_, err := s.JIMM.Database.AddRole(context.TODO(), fmt.Sprint("test-role", i))
-		c.Assert(err, gc.IsNil)
+	command := &addRoleCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
 	}
+	command.SetClientStore(cmdMocks.store)
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewListRolesCommandForTesting(s.ClientStore(), bClient), "test-role")
-	c.Assert(err, gc.IsNil)
-	output := cmdtesting.Stdout(ctx)
-	c.Assert(strings.Contains(output, "test-role0"), gc.Equals, true)
-	c.Assert(strings.Contains(output, "test-role1"), gc.Equals, true)
-	c.Assert(strings.Contains(output, "test-role2"), gc.Equals, true)
+	initCommand(c, command, "myrole")
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		AddRole(gomock.Any()).
+		DoAndReturn(func(req *params.AddRoleRequest) (params.AddRoleResponse, error) {
+			c.Check(req.Name, qt.Equals, "myrole")
+			return params.AddRoleResponse{
+				Role: params.Role{
+					Name: "myrole",
+				},
+			}, nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctx.Stdout.(*bytes.Buffer).String(), qt.Contains, "myrole")
 }
 
-func (s *roleSuite) TestListRolesLimitSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
+func TestRenameRole(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-	for i := 0; i < 3; i++ {
-		_, err := s.JIMM.Database.AddRole(context.TODO(), fmt.Sprint("test-role", i))
-		c.Assert(err, gc.IsNil)
+	command := &renameRoleCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
 	}
+	command.SetClientStore(cmdMocks.store)
 
-	ctx, err := cmdtesting.RunCommand(c, cmd.NewListRolesCommandForTesting(s.ClientStore(), bClient), "test-role", "--limit", "1", "--offset", "1")
-	c.Assert(err, gc.IsNil)
-	output := cmdtesting.Stdout(ctx)
-	roles := []params.Role{}
-	err = yaml.Unmarshal([]byte(output), &roles)
-	c.Assert(err, gc.IsNil)
-	c.Assert(roles, gc.HasLen, 1)
-	c.Assert(roles[0].Name, gc.Equals, "test-role1")
-	c.Assert(roles[0].UUID, gc.Not(gc.Equals), "")
+	initCommand(c, command, "myrole", "yourrole")
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		RenameRole(gomock.Any()).
+		DoAndReturn(func(req *params.RenameRoleRequest) error {
+			c.Check(req.Name, qt.Equals, "myrole")
+			return nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *roleSuite) TestListRoles(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewListRolesCommandForTesting(s.ClientStore(), bClient), "test-role")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+func TestRemoveRole(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+
+	command := &removeRoleCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
+
+	initCommand(c, command, "myrole", "-y")
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		RemoveRole(gomock.Any()).
+		DoAndReturn(func(req *params.RemoveRoleRequest) error {
+			c.Check(req.Name, qt.Equals, "myrole")
+			return nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestListRoles(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+
+	command := &listRolesCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
+
+	initCommand(c, command, "--limit", "10", "--offset", "5")
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		ListRoles(gomock.Any()).
+		DoAndReturn(func(req *params.ListRolesRequest) ([]params.Role, error) {
+			c.Check(req.Limit, qt.Equals, 10)
+			c.Check(req.Offset, qt.Equals, 5)
+			return []params.Role{
+				{Name: "myrole"},
+				{Name: "yourrole"},
+			}, nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	output := ctx.Stdout.(*bytes.Buffer).String()
+	c.Assert(output, qt.Contains, "myrole")
+	c.Assert(output, qt.Contains, "yourrole")
 }

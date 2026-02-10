@@ -1,31 +1,57 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"github.com/juju/cmd/v3/cmdtesting"
-	gc "gopkg.in/check.v1"
+	"fmt"
+	"testing"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
+	qt "github.com/frankban/quicktest"
+	"github.com/juju/cmd/v3/cmdtesting"
+	"github.com/juju/names/v5"
+
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type revokeAuditLogAccessSuite struct {
-	cmdtest.JimmCmdSuite
+func runRevokeAuditLogAccessCommand(c *qt.C, mocks *cmdMocks, args ...string) (string, error) {
+	revokeAuditLogAccessCmd := revokeAuditLogAccessCommand{
+		client: mocks.client,
+	}
+	revokeAuditLogAccessCmd.SetClientStore(mocks.store)
+	ctx := newTestContext(c)
+	err := initCommandWithError(&revokeAuditLogAccessCmd, args...)
+	if err != nil {
+		return "", err
+	}
+
+	err = revokeAuditLogAccessCmd.Run(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return cmdtesting.Stdout(ctx), nil
 }
 
-var _ = gc.Suite(&revokeAuditLogAccessSuite{})
+func TestRevokeAuditLogAccess(t *testing.T) {
+	c := qt.New(t)
 
-func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccessSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRevokeAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
-	c.Assert(err, gc.IsNil)
+	mocks := setupCmdMocks(c)
+	mocks.client.EXPECT().RevokeAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag("alice@canonical.com").String(),
+	}).Return(nil)
+
+	_, err := runRevokeAuditLogAccessCommand(c, mocks, "alice@canonical.com")
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *revokeAuditLogAccessSuite) TestRevokeAuditLogAccess(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRevokeAuditLogAccessCommandForTesting(s.ClientStore(), bClient), "bob@canonical.com")
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+func TestRevokeAuditLogAccessError(t *testing.T) {
+	c := qt.New(t)
+
+	mocks := setupCmdMocks(c)
+	mocks.client.EXPECT().RevokeAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag("alice@canonical.com").String(),
+	}).Return(fmt.Errorf("unauthorized"))
+
+	_, err := runRevokeAuditLogAccessCommand(c, mocks, "alice@canonical.com")
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -40,8 +39,9 @@ type unregisterControllerCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	dialOpts *jujuapi.DialOpts
-	params   apiparams.RemoveControllerRequest
+	params apiparams.RemoveControllerRequest
+
+	jimmAPIFunc func() (JIMMAPI, error)
 }
 
 func (c *unregisterControllerCommand) Info() *cmd.Info {
@@ -78,16 +78,16 @@ func (c *unregisterControllerCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *unregisterControllerCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
-	client := api.NewClient(apiCaller)
+	defer client.Close()
+
 	info, err := client.RemoveController(&c.params)
 	if err != nil {
 		return err
@@ -98,4 +98,18 @@ func (c *unregisterControllerCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (c *unregisterControllerCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }

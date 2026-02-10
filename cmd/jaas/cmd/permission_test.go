@@ -1,659 +1,295 @@
 // Copyright 2025 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"context"
-	"database/sql"
-	"encoding/json"
-	"fmt"
+	"bytes"
 	"os"
-	"sort"
-	"strings"
+	"path"
+	"testing"
 
-	petname "github.com/dustinkirkland/golang-petname"
-	"github.com/google/uuid"
-	"github.com/juju/cmd/v3/cmdtesting"
-	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
-	yamlv2 "gopkg.in/yaml.v2"
+	qt "github.com/frankban/quicktest"
+	"go.uber.org/mock/gomock"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/openfga"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
-	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
-	jimmnames "github.com/canonical/jimm/v3/pkg/names"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type relationSuite struct {
-	cmdtest.JimmCmdSuite
+func TestAddRelationMissingParams(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+
+	command := &addPermissionCommand{}
+	command.SetClientStore(cmdMocks.store)
+
+	err := initCommandWithError(command, "foo", "bar")
+	c.Assert(err, qt.ErrorMatches, "target object not specified")
+
+	err = initCommandWithError(command, "foo")
+	c.Assert(err, qt.ErrorMatches, "relation not specified")
+
+	err = initCommandWithError(command)
+	c.Assert(err, qt.ErrorMatches, "object not specified")
 }
 
-var _ = gc.Suite(&relationSuite{})
+func TestAddRelation(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-func (s *relationSuite) TestAddRelationSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	group1 := "testGroup1"
-	group2 := "testGroup2"
-	type tuple struct {
-		user     string
-		relation string
-		target   string
-	}
-	tests := []struct {
-		testName string
-		input    tuple
-		err      bool
-		message  string
-	}{
-		{
-			testName: "Add Group",
-			input: tuple{
-				user:     "group-" + group1 + "#member",
-				relation: "member",
-				target:   "group-" + group2,
-			},
-			err: false,
-		},
-		{
-			testName: "Add admin relation to controller-jimm",
-			input: tuple{
-				user:     "group-" + group1 + "#member",
-				relation: "administrator",
-				target:   "controller-jimm",
-			},
-			err: false,
-		},
-		{
-			testName: "Invalid Relation",
-			input: tuple{
-				user:     "group-" + group1 + "#member",
-				relation: "admin",
-				target:   "group-" + group2,
-			},
-			err:     true,
-			message: "unknown relation",
+	command := &addPermissionCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
 		},
 	}
+	command.SetClientStore(cmdMocks.store)
 
-	_, err := s.JIMM.Database.AddGroup(context.Background(), group1)
-	c.Assert(err, gc.IsNil)
-	_, err = s.JIMM.Database.AddGroup(context.Background(), group2)
-	c.Assert(err, gc.IsNil)
+	initCommand(c, command, "user-alice@canonical.com", "member", "group-mygroup")
 
-	for i, tc := range tests {
-		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
-		c.Log("Test: " + tc.testName)
-		if tc.err {
-			c.Logf("error message: %s", err.Error())
-			c.Assert(strings.Contains(err.Error(), tc.message), gc.Equals, true)
-		} else {
-			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
-			c.Assert(err, gc.IsNil)
-			c.Assert(ct, gc.Equals, "")
-			// NOTE: this is a bad test because it relies on the number of related objects. So all the
-			// non-failing test cases must be executed before any of the failing tests - failing tests
-			// do not add any tuples therefore the following assertion fails.
-			c.Assert(len(tuples), gc.Equals, i+3)
-		}
-	}
+	ctx := newTestContext(c)
 
+	cmdMocks.client.EXPECT().
+		AddRelation(gomock.Any()).
+		DoAndReturn(func(req *params.AddRelationRequest) error {
+			c.Check(req.Tuples, qt.HasLen, 1)
+			tuple := req.Tuples[0]
+			c.Check(tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(tuple.Relation, qt.Equals, "member")
+			c.Check(tuple.TargetObject, qt.Equals, "group-mygroup")
+			return nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *relationSuite) TestMissingParamsAddRelationSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
+func TestAddRelationFromFile(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "foo", "bar")
-	c.Assert(err, gc.ErrorMatches, "target object not specified")
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "foo")
-	c.Assert(err, gc.ErrorMatches, "relation not specified")
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.ErrorMatches, "object not specified")
+	command := &addPermissionCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
 
+	tmpFile := makeTempFile(c, "add_permission_test.json", `[{
+	  "object": "user-alice@canonical.com",
+	  "relation": "member",
+	  "target_object": "group-mygroup"
+	}]`)
+
+	initCommand(c, command, "-f", tmpFile)
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		AddRelation(gomock.Any()).
+		DoAndReturn(func(req *params.AddRelationRequest) error {
+			c.Check(req.Tuples, qt.HasLen, 1)
+			tuple := req.Tuples[0]
+			c.Check(tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(tuple.Relation, qt.Equals, "member")
+			c.Check(tuple.TargetObject, qt.Equals, "group-mygroup")
+			return nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *relationSuite) TestAddRelationViaFileSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	group1 := "testGroup1"
-	group2 := "testGroup2"
-	group3 := "testGroup3"
+func TestRemovePermission(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group1)
-	c.Assert(err, gc.IsNil)
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group2)
-	c.Assert(err, gc.IsNil)
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group3)
-	c.Assert(err, gc.IsNil)
+	command := &removePermissionCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
 
-	file, err := os.CreateTemp(".", "relations.json")
-	c.Assert(err, gc.IsNil)
-	defer os.Remove(file.Name())
-	testRelations := `[{"object":"user-alice","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
-	_, err = file.Write([]byte(testRelations))
-	c.Assert(err, gc.IsNil)
+	initCommand(c, command, "user-alice@canonical.com", "member", "group-mygroup")
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
-	c.Assert(err, gc.IsNil)
+	ctx := newTestContext(c)
 
-	tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
-	c.Assert(err, gc.IsNil)
-	c.Assert(ct, gc.Equals, "")
-	c.Assert(len(tuples), gc.Equals, 4)
+	cmdMocks.client.EXPECT().
+		RemoveRelation(gomock.Any()).
+		DoAndReturn(func(req *params.RemoveRelationRequest) error {
+			c.Check(req.Tuples, qt.HasLen, 1)
+			tuple := req.Tuples[0]
+			c.Check(tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(tuple.Relation, qt.Equals, "member")
+			c.Check(tuple.TargetObject, qt.Equals, "group-mygroup")
+			return nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *relationSuite) TestAddRelationRejectsUnauthorisedUsers(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "test-group1", "member", "test-group2")
-	c.Assert(err, gc.ErrorMatches, `failed to add relation: unauthorized \(unauthorized access\)`)
+func TestRemoveRelationFromFile(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+
+	command := &removePermissionCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
+
+	tmpFile := makeTempFile(c, "add_permission_test.json", `[{
+	  "object": "user-alice@canonical.com",
+	  "relation": "member",
+	  "target_object": "group-mygroup"
+	}]`)
+
+	initCommand(c, command, "-f", tmpFile)
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		RemoveRelation(gomock.Any()).
+		DoAndReturn(func(req *params.RemoveRelationRequest) error {
+			c.Check(req.Tuples, qt.HasLen, 1)
+			tuple := req.Tuples[0]
+			c.Check(tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(tuple.Relation, qt.Equals, "member")
+			c.Check(tuple.TargetObject, qt.Equals, "group-mygroup")
+			return nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *relationSuite) TestRemoveRelationSuperuser(c *gc.C) {
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-	group1 := "testGroup1"
-	group2 := "testGroup2"
-	type tuple struct {
-		user     string
-		relation string
-		target   string
-	}
-	tests := []struct {
-		testName string
-		input    tuple
-		err      bool
-		message  string
-	}{
-		{testName: "Remove Group Relation", input: tuple{user: "group-" + group1 + "#member", relation: "member", target: "group-" + group2}, err: false},
-	}
+func TestCheckPermission(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-	// Create groups and relation
-	_, err := s.JIMM.Database.AddGroup(context.Background(), group1)
-	c.Assert(err, gc.IsNil)
-	_, err = s.JIMM.Database.AddGroup(context.Background(), group2)
-	c.Assert(err, gc.IsNil)
-	totalKeys := 2
-	for _, tc := range tests {
-		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
-		c.Assert(err, gc.IsNil)
-		totalKeys++
+	command := &checkPermissionCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
 	}
+	command.SetClientStore(cmdMocks.store)
 
-	for _, tc := range tests {
-		_, err := cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), tc.input.user, tc.input.relation, tc.input.target)
-		c.Log("Test: " + tc.testName)
-		if tc.err {
-			c.Assert(err, gc.ErrorMatches, tc.message)
-		} else {
-			c.Assert(err, gc.IsNil)
-			tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
-			c.Assert(err, gc.IsNil)
-			c.Assert(ct, gc.Equals, "")
-			totalKeys--
-			c.Assert(len(tuples), gc.Equals, totalKeys)
-		}
-	}
+	initCommand(c, command, "user-alice@canonical.com", "member", "group-mygroup")
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		CheckRelation(gomock.Any()).
+		DoAndReturn(func(req *params.CheckRelationRequest) (params.CheckRelationResponse, error) {
+			c.Check(req.Tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(req.Tuple.Relation, qt.Equals, "member")
+			c.Check(req.Tuple.TargetObject, qt.Equals, "group-mygroup")
+			return params.CheckRelationResponse{
+				Allowed: true,
+			}, nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctx.Stdout.(*bytes.Buffer).String(), qt.Contains, `is allowed`)
 }
 
-func (s *relationSuite) TestRemoveRelationViaFileSuperuser(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "alice")
-	group1 := "testGroup1"
-	group2 := "testGroup2"
-	group3 := "testGroup3"
+func TestListPermissions(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
 
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group1)
-	c.Assert(err, gc.IsNil)
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group2)
-	c.Assert(err, gc.IsNil)
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), group3)
-	c.Assert(err, gc.IsNil)
+	command := &listPermissionsCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
 
-	file, err := os.CreateTemp(".", "relations.json")
-	c.Assert(err, gc.IsNil)
-	defer os.Remove(file.Name())
-	testRelations := `[{"object":"group-` + group1 + `#member","relation":"member","target_object":"group-` + group3 + `"},{"object":"group-` + group2 + `#member","relation":"member","target_object":"group-` + group3 + `"}]`
-	_, err = file.Write([]byte(testRelations))
-	c.Assert(err, gc.IsNil)
+	initCommand(c, command, "--object", "user-alice@canonical.com", "--relation", "member", "--target", "group-mygroup", "--resolve")
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
-	c.Assert(err, gc.IsNil)
+	ctx := newTestContext(c)
 
-	_, err = cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), "-f", file.Name())
-	c.Assert(err, gc.IsNil)
+	cmdMocks.client.EXPECT().
+		ListRelationshipTuples(gomock.Any()).
+		DoAndReturn(func(req *params.ListRelationshipTuplesRequest) (*params.ListRelationshipTuplesResponse, error) {
+			c.Check(req.Tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(req.Tuple.Relation, qt.Equals, "member")
+			c.Check(req.Tuple.TargetObject, qt.Equals, "group-mygroup")
+			c.Check(req.ResolveUUIDs, qt.Equals, true)
+			return &params.ListRelationshipTuplesResponse{
+				Tuples: []params.RelationshipTuple{
+					{
+						Object:       "user-alice@canonical.com",
+						Relation:     "member",
+						TargetObject: "group-mygroup",
+					},
+				},
+			}, nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
 
-	tuples, ct, err := s.JIMM.OpenFGAClient.ReadRelatedObjects(context.Background(), openfga.Tuple{}, 50, "")
-	c.Assert(err, gc.IsNil)
-	c.Assert(ct, gc.Equals, "")
-	c.Logf("existing relations %v", tuples)
-	// Only two relations exist.
-	sort.Slice(tuples, func(i, j int) bool {
-		return tuples[i].Object.ID < tuples[j].Object.ID
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(ctx.Stdout.(*bytes.Buffer).String(), qt.Contains, "user-alice@canonical.com")
+}
+
+func TestListPermissionsTabular(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+
+	command := &listPermissionsCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return cmdMocks.client, nil
+		},
+	}
+	command.SetClientStore(cmdMocks.store)
+
+	initCommand(c, command, "--format", "tabular", "--object", "user-alice@canonical.com", "--relation", "member", "--target", "group-mygroup", "--resolve")
+
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		ListRelationshipTuples(gomock.Any()).
+		DoAndReturn(func(req *params.ListRelationshipTuplesRequest) (*params.ListRelationshipTuplesResponse, error) {
+			c.Check(req.Tuple.Object, qt.Equals, "user-alice@canonical.com")
+			c.Check(req.Tuple.Relation, qt.Equals, "member")
+			c.Check(req.Tuple.TargetObject, qt.Equals, "group-mygroup")
+			c.Check(req.ResolveUUIDs, qt.Equals, true)
+			return &params.ListRelationshipTuplesResponse{
+				Tuples: []params.RelationshipTuple{
+					{
+						Object:       "user-alice@canonical.com",
+						Relation:     "member",
+						TargetObject: "group-mygroup",
+					},
+				},
+			}, nil
+		}).Times(1)
+	cmdMocks.client.EXPECT().Close().Times(1)
+
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+
+	output := ctx.Stdout.(*bytes.Buffer).String()
+	c.Assert(output, qt.Contains, "\nuser-alice@canonical.com\tmember  \tgroup-mygroup")
+}
+
+func makeTempFile(c *qt.C, name, contents string) string {
+	tmpDir := os.TempDir()
+	c.Cleanup(func() {
+		os.Remove(tmpDir)
 	})
-	c.Assert(tuples, gc.DeepEquals, []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("admin")),
-		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
-	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
-		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(names.NewControllerTag(s.Params.ControllerUUID)),
-	}})
-}
+	tmpFile := path.Join(os.TempDir(), name)
 
-func (s *relationSuite) TestRemoveRelation(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(c, cmd.NewRemovePermissionCommandForTesting(s.ClientStore(), bClient), "group-testGroup1#member", "member", "group-testGroup2")
-	c.Assert(err, gc.ErrorMatches, `failed to remove relation: unauthorized \(unauthorized access\)`)
-}
+	err := os.WriteFile(tmpFile, []byte(contents), os.FileMode(0644))
+	c.Assert(err, qt.IsNil)
 
-type environment struct {
-	users             []dbmodel.Identity
-	clouds            []dbmodel.Cloud
-	credentials       []dbmodel.CloudCredential
-	controllers       []dbmodel.Controller
-	models            []dbmodel.Model
-	applicationOffers []dbmodel.ApplicationOffer
-}
-
-func initializeEnvironment(c *gc.C, ctx context.Context, db *db.Database, u dbmodel.Identity) *environment {
-	env := environment{}
-
-	u1, err := dbmodel.NewIdentity("eve@canonical.com")
-	c.Assert(err, gc.IsNil)
-	c.Assert(db.DB.Create(u1).Error, gc.IsNil)
-
-	env.users = []dbmodel.Identity{u, *u1}
-
-	cloud := dbmodel.Cloud{
-		Name: "test-cloud",
-		Type: "test-provider",
-		Regions: []dbmodel.CloudRegion{{
-			Name: "test-region-1",
-		}},
-	}
-	c.Assert(db.DB.Create(&cloud).Error, gc.IsNil)
-	env.clouds = []dbmodel.Cloud{cloud}
-
-	controller := dbmodel.Controller{
-		Name:          "test-controller-1",
-		UUID:          "1fffa2ed-8fd9-49f4-94c0-149288891dd6",
-		PublicAddress: "test-public-address",
-		CACertificate: "test-ca-cert",
-		CloudName:     cloud.Name,
-		CloudRegion:   cloud.Regions[0].Name,
-		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-			Priority:      0,
-			CloudRegionID: cloud.Regions[0].ID,
-		}},
-	}
-	err = db.AddController(ctx, &controller)
-	c.Assert(err, gc.Equals, nil)
-	env.controllers = []dbmodel.Controller{controller}
-
-	cred := dbmodel.CloudCredential{
-		Name:              "test-credential-1",
-		CloudName:         cloud.Name,
-		OwnerIdentityName: u.Name,
-		AuthType:          "empty",
-	}
-	err = db.SetCloudCredential(ctx, &cred)
-	c.Assert(err, gc.Equals, nil)
-	env.credentials = []dbmodel.CloudCredential{cred}
-
-	model := dbmodel.Model{
-		Name: "test-model-1",
-		UUID: sql.NullString{
-			String: "acdbf3e5-67e1-42a2-a2dc-64505265c030",
-			Valid:  true,
-		},
-		OwnerIdentityName: u.Name,
-		ControllerID:      controller.ID,
-		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
-	}
-	err = db.AddModel(ctx, &model)
-	c.Assert(err, gc.IsNil)
-	env.models = []dbmodel.Model{model}
-
-	offer := dbmodel.ApplicationOffer{
-		ID:      1,
-		UUID:    "436b2264-d8f8-4e24-b16f-dd43c4116528",
-		URL:     env.controllers[0].Name + ":" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name + ".testoffer1",
-		Name:    "testoffer1",
-		ModelID: model.ID,
-		Model:   model,
-	}
-	err = db.AddApplicationOffer(ctx, &offer)
-	c.Assert(err, gc.IsNil)
-	env.applicationOffers = []dbmodel.ApplicationOffer{offer}
-
-	return &env
-}
-
-func (s *relationSuite) TestListRelations(c *gc.C) {
-	env := initializeEnvironment(c, context.Background(), s.JIMM.Database, *s.AdminUser)
-	bClient := s.SetupCLIAccess(c, "alice") // alice is superuser
-
-	relations := []apiparams.RelationshipTuple{{
-		Object:       "user-" + env.users[0].Name,
-		Relation:     "member",
-		TargetObject: "group-group-1",
-	}, {
-		Object:       "group-group-2#member",
-		Relation:     "member",
-		TargetObject: "group-group-3",
-	}, {
-		Object:       "group-group-3#member",
-		Relation:     "administrator",
-		TargetObject: "controller-" + env.controllers[0].Name,
-	}, {
-		Object:       "group-group-1#member",
-		Relation:     "administrator",
-		TargetObject: "model-" + env.models[0].OwnerIdentityName + "/" + env.models[0].Name,
-	}, {
-		Object:       "user-" + env.users[1].Name,
-		Relation:     "administrator",
-		TargetObject: "applicationoffer-" + env.applicationOffers[0].URL,
-	}}
-
-	for i := 0; i < cmd.DefaultPageSize+1; i++ {
-		groupName := fmt.Sprintf("group-%d", i)
-		_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), groupName)
-		c.Assert(err, gc.IsNil)
-
-		relations = append(relations, apiparams.RelationshipTuple{
-			Object:       "user-" + env.users[1].Name,
-			Relation:     "member",
-			TargetObject: "group-" + groupName,
-		})
-	}
-
-	for _, relation := range relations {
-		_, err := cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), relation.Object, relation.Relation, relation.TargetObject)
-		c.Assert(err, gc.IsNil)
-	}
-
-	expectedData := apiparams.ListRelationshipTuplesResponse{Tuples: append(
-		[]apiparams.RelationshipTuple{{
-			Object:       "user-admin",
-			Relation:     "administrator",
-			TargetObject: "controller-jimm",
-		}, {
-			Object:       "user-alice@canonical.com",
-			Relation:     "administrator",
-			TargetObject: "controller-jimm",
-		}},
-		relations...,
-	)}
-
-	context, err := cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
-	c.Assert(err, gc.IsNil)
-	var builder strings.Builder
-	err = cmd.FormatRelationsTabular(&builder, &expectedData)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
-
-	expectedJSONData, err := json.Marshal(expectedData)
-	c.Assert(err, gc.IsNil)
-	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
-	c.Assert(err, gc.IsNil)
-	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
-
-	// Necessary to use yamlv2 to match what Juju does.
-	expectedYAMLData, err := yamlv2.Marshal(expectedData)
-	c.Assert(err, gc.IsNil)
-	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
-}
-
-func (s *relationSuite) TestListRelationsWithError(c *gc.C) {
-	env := initializeEnvironment(c, context.Background(), s.JIMM.Database, *s.AdminUser)
-	// alice is superuser
-	bClient := s.SetupCLIAccess(c, "alice")
-
-	_, err := cmdtesting.RunCommand(c, cmd.NewAddGroupCommandForTesting(s.ClientStore(), bClient), "group-1")
-	c.Assert(err, gc.IsNil)
-
-	relation := apiparams.RelationshipTuple{
-		Object:       "user-" + env.users[0].Name,
-		Relation:     "member",
-		TargetObject: "group-group-1",
-	}
-	_, err = cmdtesting.RunCommand(c, cmd.NewAddRelationCommandForTesting(s.ClientStore(), bClient), relation.Object, relation.Relation, relation.TargetObject)
-	c.Assert(err, gc.IsNil)
-
-	ctx := context.Background()
-	group := &dbmodel.GroupEntry{Name: "group-1"}
-	err = s.JIMM.Database.GetGroup(ctx, group)
-	c.Assert(err, gc.IsNil)
-	err = s.JIMM.Database.RemoveGroup(ctx, group)
-	c.Assert(err, gc.IsNil)
-
-	expectedData := apiparams.ListRelationshipTuplesResponse{
-		Tuples: []apiparams.RelationshipTuple{{
-			Object:       "user-admin",
-			Relation:     "administrator",
-			TargetObject: "controller-jimm",
-		}, {
-			Object:       "user-alice@canonical.com",
-			Relation:     "administrator",
-			TargetObject: "controller-jimm",
-		}, {
-			Object:       "user-" + env.users[0].Name,
-			Relation:     "member",
-			TargetObject: "group:" + group.UUID,
-		}},
-		Errors: []string{
-			"failed to parse target: failed to fetch group information: " + group.UUID,
-		},
-	}
-	expectedJSONData, err := json.Marshal(expectedData)
-	c.Assert(err, gc.IsNil)
-	// Necessary to use yamlv2 to match what Juju does.
-	expectedYAMLData, err := yamlv2.Marshal(expectedData)
-	c.Assert(err, gc.IsNil)
-
-	context, err := cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "json")
-	c.Assert(err, gc.IsNil)
-	c.Assert(strings.TrimRight(cmdtesting.Stdout(context), "\n"), gc.Equals, string(expectedJSONData))
-
-	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, string(expectedYAMLData))
-
-	context, err = cmdtesting.RunCommand(c, cmd.NewListPermissionsCommandForTesting(s.ClientStore(), bClient), "--format", "tabular")
-	c.Assert(err, gc.IsNil)
-	var builder strings.Builder
-	err = cmd.FormatRelationsTabular(&builder, &expectedData)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cmdtesting.Stdout(context), gc.Equals, builder.String())
-}
-
-// TODO: remove boilerplate of env setup and use initialiseEnvironment
-func (s *relationSuite) TestCheckRelationViaSuperuser(c *gc.C) {
-	ctx := context.TODO()
-	bClient := s.SetupCLIAccess(c, "alice")
-	ofgaClient := s.JIMM.OpenFGAClient
-
-	// Add some resources to check against
-	db := s.JIMM.Database
-	_, err := db.AddGroup(ctx, "test-group")
-	c.Assert(err, gc.IsNil)
-	group := dbmodel.GroupEntry{Name: "test-group"}
-	err = db.GetGroup(ctx, &group)
-	c.Assert(err, gc.IsNil)
-
-	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
-	c.Assert(err, gc.IsNil)
-	c.Assert(db.DB.Create(u).Error, gc.IsNil)
-
-	cloud := dbmodel.Cloud{
-		Name: petname.Generate(2, "-"),
-		Type: "aws",
-		Regions: []dbmodel.CloudRegion{{
-			Name: petname.Generate(2, "-"),
-		}},
-	}
-	c.Assert(db.DB.Create(&cloud).Error, gc.IsNil)
-	id, _ := uuid.NewRandom()
-	controller := dbmodel.Controller{
-		Name:        petname.Generate(2, "-"),
-		UUID:        id.String(),
-		CloudName:   cloud.Name,
-		CloudRegion: cloud.Regions[0].Name,
-		CloudRegions: []dbmodel.CloudRegionControllerPriority{{
-			Priority:      0,
-			CloudRegionID: cloud.Regions[0].ID,
-		}},
-	}
-	err = db.AddController(ctx, &controller)
-	c.Assert(err, gc.IsNil)
-
-	cred := dbmodel.CloudCredential{
-		Name:              petname.Generate(2, "-"),
-		CloudName:         cloud.Name,
-		OwnerIdentityName: u.Name,
-		AuthType:          "empty",
-	}
-	err = db.SetCloudCredential(ctx, &cred)
-	c.Assert(err, gc.IsNil)
-
-	model := dbmodel.Model{
-		Name: petname.Generate(2, "-"),
-		UUID: sql.NullString{
-			String: id.String(),
-			Valid:  true,
-		},
-		OwnerIdentityName: u.Name,
-		ControllerID:      controller.ID,
-		CloudRegionID:     cloud.Regions[0].ID,
-		CloudCredentialID: cred.ID,
-		Life:              "alive",
-	}
-
-	err = db.AddModel(ctx, &model)
-	c.Assert(err, gc.IsNil)
-
-	err = ofgaClient.AddRelation(ctx,
-		openfga.Tuple{
-			Object:   ofganames.ConvertTag(u.ResourceTag()),
-			Relation: "member",
-			Target:   ofganames.ConvertTag(group.Tag().(jimmnames.GroupTag)),
-		},
-		openfga.Tuple{
-			Object:   ofganames.ConvertTagWithRelation(group.Tag().(jimmnames.GroupTag), ofganames.MemberRelation),
-			Relation: "reader",
-			Target:   ofganames.ConvertTag(model.ResourceTag()),
-		},
-	)
-	c.Assert(err, gc.IsNil)
-
-	// Test reader is OK
-	userToCheck := "user-" + u.Name
-	modelToCheck := "model-" + u.Name + "/" + model.Name
-	cmdCtx, err := cmdtesting.RunCommand(
-		c,
-		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
-		userToCheck,
-		"reader",
-		modelToCheck,
-	)
-
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(
-		cmdtesting.Stdout(cmdCtx),
-		gc.Equals,
-		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "reader", cmd.AccessResultAllowed),
-	)
-
-	// Test writer is NOT OK
-	cmdCtx, err = cmdtesting.RunCommand(
-		c,
-		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
-		userToCheck,
-		"writer",
-		modelToCheck,
-	)
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(
-		cmdtesting.Stdout(cmdCtx),
-		gc.Equals,
-		fmt.Sprintf(cmd.AccessMessage, userToCheck, modelToCheck, "writer", cmd.AccessResultDenied),
-	)
-
-	// Test format JSON
-	cmdCtx, err = cmdtesting.RunCommand(
-		c,
-		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
-		userToCheck,
-		"reader",
-		modelToCheck,
-		"--format",
-		"json",
-	)
-	c.Assert(err, gc.IsNil)
-
-	res := cmdtesting.Stdout(cmdCtx)
-	ar := cmd.AccessResult{}
-	err = json.Unmarshal([]byte(res), &ar)
-	c.Assert(err, gc.IsNil)
-	b, err := json.Marshal(ar)
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(
-		strings.TrimRight(cmdtesting.Stdout(cmdCtx), "\n"),
-		gc.Equals,
-		string(b),
-	)
-
-	// Test format YAML
-	cmdCtx, err = cmdtesting.RunCommand(
-		c,
-		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
-		userToCheck,
-		"reader",
-		modelToCheck,
-		"--format",
-		"yaml",
-	)
-	c.Assert(err, gc.IsNil)
-
-	// Create identical test output as we expect the CLI to return
-	// via marshalling and umarshalling.
-	res = cmdtesting.Stdout(cmdCtx)
-	ar = cmd.AccessResult{}
-	err = yamlv2.Unmarshal([]byte(res), &ar)
-	c.Assert(err, gc.IsNil)
-	b, err = yamlv2.Marshal(ar)
-	c.Assert(err, gc.IsNil)
-
-	c.Assert(
-		cmdtesting.Stdout(cmdCtx),
-		gc.Equals,
-		string(b),
-	)
-
-}
-
-func (s *relationSuite) TestCheckRelation(c *gc.C) {
-	// bob is not superuser
-	bClient := s.SetupCLIAccess(c, "bob")
-	_, err := cmdtesting.RunCommand(
-		c,
-		cmd.NewCheckPermissionCommandForTesting(s.ClientStore(), bClient),
-		"user-diglett",
-		"reader",
-		"controller-jimm",
-	)
-	c.Assert(err, gc.ErrorMatches, `failed to check relation: unauthorized \(unauthorized access\)`)
+	return tmpFile
 }

@@ -1,88 +1,69 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
-package cmd_test
+package cmd
 
 import (
-	"github.com/juju/cmd/v3/cmdtesting"
-	jujutesting "github.com/juju/testing"
-	gc "gopkg.in/check.v1"
+	"fmt"
+	"testing"
 
-	"github.com/canonical/jimm/v3/cmd/jaas/cmd"
-	"github.com/canonical/jimm/v3/internal/testutils/cmdtest"
+	qt "github.com/frankban/quicktest"
+	"github.com/juju/cmd/v3/cmdtesting"
+	"go.uber.org/mock/gomock"
+
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type removeCloudFromControllerSuite struct {
-	cmdtest.JimmCmdSuite
+func TestRemoveCloudFromController(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(c)
 
-	api *fakeRemoveCloudFromControllerAPI
-}
-
-var _ = gc.Suite(&removeCloudFromControllerSuite{})
-
-func (s *removeCloudFromControllerSuite) SetUpTest(c *gc.C) {
-	s.JimmCmdSuite.SetUpTest(c)
-	s.api = &fakeRemoveCloudFromControllerAPI{}
-}
-
-func (s *removeCloudFromControllerSuite) TestRemoveCloudFromController(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "alice@canonical.com")
-
-	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
-		s.ClientStore(),
-		bClient,
-		func() (cmd.RemoveCloudFromControllerAPI, error) {
-			return s.api, nil
+	s.client.EXPECT().RemoveCloudFromController(gomock.Any()).DoAndReturn(
+		func(rcfcr *apiparams.RemoveCloudFromControllerRequest) error {
+			c.Check(rcfcr.ControllerName, qt.Equals, "controller-1")
+			c.Check(rcfcr.CloudTag, qt.Equals, "cloud-test-cloud")
+			return nil
 		})
-	ctx, err := cmdtesting.RunCommand(c, command, "controller-1", "test-cloud")
-	c.Assert(err, gc.IsNil)
-	s.api.CheckCallNames(c, "RemoveCloudFromController")
-	s.api.CheckCalls(c, []jujutesting.StubCall{{
-		FuncName: "RemoveCloudFromController",
-		Args: []interface{}{&apiparams.RemoveCloudFromControllerRequest{
-			ControllerName: "controller-1",
-			CloudTag:       "cloud-test-cloud",
-		}},
-	}})
-	c.Assert(cmdtesting.Stderr(ctx), gc.Equals, "Cloud \"test-cloud\" removed from controller \"controller-1\".\n")
+	s.client.EXPECT().Close()
+
+	command := &removeCloudFromControllerCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+
+	initCommand(c, command, "controller-1", "test-cloud")
+	ctx := newTestContext(c)
+	err := command.Run(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(cmdtesting.Stderr(ctx), qt.Equals, "Cloud \"test-cloud\" removed from controller \"controller-1\".\n")
 }
 
-func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerWrongArguments(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "alice@canonical.com")
+func TestRemoveCloudFromControllerWrongArguments(t *testing.T) {
+	c := qt.New(t)
 
-	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
-		s.ClientStore(),
-		bClient,
-		func() (cmd.RemoveCloudFromControllerAPI, error) {
-			return s.api, nil
-		})
-	_, err := cmdtesting.RunCommand(c, command, "controller-1")
-	c.Assert(err, gc.ErrorMatches, "missing arguments")
-	_, err = cmdtesting.RunCommand(c, command, "controller-1", "cloud", "fake-arg")
-	c.Assert(err, gc.ErrorMatches, "too many arguments")
+	command := &removeCloudFromControllerCommand{}
+
+	err := initCommandWithError(command, "controller-1")
+	c.Assert(err, qt.ErrorMatches, "missing arguments")
+
+	err = initCommandWithError(command, "controller-1", "cloud", "fake-arg")
+	c.Assert(err, qt.ErrorMatches, "too many arguments")
 }
 
-func (s *removeCloudFromControllerSuite) TestRemoveCloudFromControllerCloudNotFound(c *gc.C) {
-	bClient := s.SetupCLIAccess(c, "alice@canonical.com")
+func TestRemoveCloudFromControllerCloudNotFound(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(c)
 
-	command := cmd.NewRemoveCloudFromControllerCommandForTesting(
-		s.ClientStore(),
-		bClient,
-		nil)
-	_, err := cmdtesting.RunCommand(c, command, "controller-1", "test-cloud")
-	c.Assert(err, gc.ErrorMatches, ".*cloud \"test-cloud\" not found.*")
-}
+	s.client.EXPECT().RemoveCloudFromController(gomock.Any()).Return(fmt.Errorf("cloud \"test-cloud\" not found"))
+	command := &removeCloudFromControllerCommand{
+		jimmAPIFunc: func() (JIMMAPI, error) {
+			return s.client, nil
+		},
+	}
+	s.client.EXPECT().Close()
 
-type fakeRemoveCloudFromControllerAPI struct {
-	jujutesting.Stub
-}
-
-func (api *fakeRemoveCloudFromControllerAPI) Close() error {
-	api.AddCall("Close", nil)
-	return api.NextErr()
-}
-
-func (api *fakeRemoveCloudFromControllerAPI) RemoveCloudFromController(params *apiparams.RemoveCloudFromControllerRequest) error {
-	api.AddCall("RemoveCloudFromController", params)
-	return api.NextErr()
+	initCommand(c, command, "controller-1", "test-cloud")
+	ctx := newTestContext(c)
+	err := command.Run(ctx)
+	c.Assert(err, qt.ErrorMatches, ".*cloud \"test-cloud\" not found")
 }

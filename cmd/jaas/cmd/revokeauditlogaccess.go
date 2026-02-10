@@ -41,6 +41,8 @@ type revokeAuditLogAccessCommand struct {
 	modelcmd.ControllerCommandBase
 
 	dialOpts *jujuapi.DialOpts
+	client   JIMMAPI
+
 	username string
 }
 
@@ -73,20 +75,25 @@ func (c *revokeAuditLogAccessCommand) Init(args []string) error {
 
 // Run implements Command.Run.
 func (c *revokeAuditLogAccessCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+	var client JIMMAPI
+	if c.client != nil {
+		client = c.client
+	} else {
+		currentController, err := c.ClientStore().CurrentController()
+		if err != nil {
+			return fmt.Errorf("could not determine controller: %w", err)
+		}
+
+		apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+		if err != nil {
+			return err
+		}
+
+		client = api.NewClient(apiCaller)
 	}
 
-	userTag := names.NewUserTag(c.username)
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
-	if err != nil {
-		return err
-	}
-
-	client := api.NewClient(apiCaller)
-	err = client.RevokeAuditLogAccess(&apiparams.AuditLogAccessRequest{
-		UserTag: userTag.String(),
+	err := client.RevokeAuditLogAccess(&apiparams.AuditLogAccessRequest{
+		UserTag: names.NewUserTag(c.username).String(),
 	})
 	if err != nil {
 		return err

@@ -11,7 +11,6 @@ import (
 	"github.com/gosuri/uitable"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
-	jujuapi "github.com/juju/juju/api"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
@@ -159,18 +158,18 @@ List permissions where the target object and relation match
 
 // NewAddPermissionCommand returns a command to grant access.
 func NewAddPermissionCommand() cmd.Command {
-	cmd := &addPermission{}
+	cmd := &addPermissionCommand{}
 	cmd.SetClientStore(jujuclient.NewFileClientStore())
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// addPermission adds permission.
-type addPermission struct {
+// addPermissionCommand adds permission.
+type addPermissionCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	dialOpts *jujuapi.DialOpts
+	jimmAPIFunc func() (JIMMAPI, error)
 
 	object       string
 	relation     string
@@ -180,7 +179,7 @@ type addPermission struct {
 }
 
 // Info implements the cmd.Command interface.
-func (c *addPermission) Info() *cmd.Info {
+func (c *addPermissionCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "add-permission",
 		Args:     "<object> <relation> <target_object>",
@@ -191,7 +190,7 @@ func (c *addPermission) Info() *cmd.Info {
 }
 
 // Init implements the cmd.Command interface.
-func (c *addPermission) Init(args []string) error {
+func (c *addPermissionCommand) Init(args []string) error {
 	if c.filename != "" {
 		return nil
 	}
@@ -204,7 +203,7 @@ func (c *addPermission) Init(args []string) error {
 }
 
 // SetFlags implements Command.SetFlags.
-func (c *addPermission) SetFlags(f *gnuflag.FlagSet) {
+func (c *addPermissionCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
 		"yaml": cmd.FormatYaml,
@@ -214,16 +213,15 @@ func (c *addPermission) SetFlags(f *gnuflag.FlagSet) {
 }
 
 // Run implements Command.Run.
-func (c *addPermission) Run(ctxt *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+func (c *addPermissionCommand) Run(ctxt *cmd.Context) error {
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
-
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
 	var params apiparams.AddRelationRequest
 	if c.filename == "" {
@@ -239,13 +237,26 @@ func (c *addPermission) Run(ctxt *cmd.Context) error {
 		}
 	}
 
-	client := api.NewClient(apiCaller)
 	err = client.AddRelation(&params)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (c *addPermissionCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }
 
 // NewRemovePermissionCommand returns a command to remove access.
@@ -261,7 +272,7 @@ type removePermissionCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	dialOpts *jujuapi.DialOpts
+	jimmAPIFunc func() (JIMMAPI, error)
 
 	object       string
 	relation     string
@@ -306,15 +317,14 @@ func (c *removePermissionCommand) SetFlags(f *gnuflag.FlagSet) {
 
 // Run implements Command.Run.
 func (c *removePermissionCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
-
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
 	var params apiparams.RemoveRelationRequest
 	if c.filename == "" {
@@ -330,7 +340,6 @@ func (c *removePermissionCommand) Run(ctxt *cmd.Context) error {
 		}
 	}
 
-	client := api.NewClient(apiCaller)
 	err = client.RemoveRelation(&params)
 	if err != nil {
 		return err
@@ -339,11 +348,26 @@ func (c *removePermissionCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
+func (c *removePermissionCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
+}
+
 // checkPermissionCommand holds the fields required to check for access.
 type checkPermissionCommand struct {
 	modelcmd.ControllerCommandBase
-	out      cmd.Output
-	dialOpts *jujuapi.DialOpts
+	out cmd.Output
+
+	jimmAPIFunc func() (JIMMAPI, error)
 
 	tuple apiparams.RelationshipTuple
 }
@@ -423,16 +447,14 @@ func formatCheckRelationString(writer io.Writer, value interface{}) error {
 
 // Run implements Command.Run.
 func (c *checkPermissionCommand) Run(ctxt *cmd.Context) error {
-	currentController, err := c.ClientStore().CurrentController()
-	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
 	}
-
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
-	client := api.NewClient(apiCaller)
+	defer client.Close()
 
 	resp, err := client.CheckRelation(&apiparams.CheckRelationRequest{
 		Tuple: c.tuple,
@@ -448,6 +470,20 @@ func (c *checkPermissionCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (c *checkPermissionCommand) newClient() (JIMMAPI, error) {
+	currentController, err := c.ClientStore().CurrentController()
+	if err != nil {
+		return nil, fmt.Errorf("could not determine controller: %w", err)
+	}
+
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
 }
 
 // readTupleFile reads a file with filename as provided by the user and attempts to
@@ -495,7 +531,7 @@ type listPermissionsCommand struct {
 	modelcmd.ControllerCommandBase
 	out cmd.Output
 
-	dialOpts *jujuapi.DialOpts
+	jimmAPIFunc func() (JIMMAPI, error)
 
 	tuple        apiparams.RelationshipTuple
 	resolveUUIDs bool
@@ -534,19 +570,31 @@ func (c *listPermissionsCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.BoolVar(&c.resolveUUIDs, "resolve", true, "resolves UUIDs to human readable tags")
 }
 
-// Run implements Command.Run.
-func (c *listPermissionsCommand) Run(ctxt *cmd.Context) error {
+func (c *listPermissionsCommand) newClient() (JIMMAPI, error) {
 	currentController, err := c.ClientStore().CurrentController()
 	if err != nil {
-		return fmt.Errorf("could not determine controller: %w", err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
-	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", c.dialOpts)
+	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return api.NewClient(apiCaller), nil
+}
+
+// Run implements Command.Run.
+func (c *listPermissionsCommand) Run(ctxt *cmd.Context) error {
+	if c.jimmAPIFunc == nil {
+		c.jimmAPIFunc = c.newClient
+	}
+	client, err := c.jimmAPIFunc()
 	if err != nil {
 		return err
 	}
+	defer client.Close()
 
-	client := api.NewClient(apiCaller)
 	params := apiparams.ListRelationshipTuplesRequest{
 		Tuple:        c.tuple,
 		PageSize:     defaultPageSize,
@@ -567,7 +615,7 @@ func (c *listPermissionsCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func fetchRelations(client *api.Client, params apiparams.ListRelationshipTuplesRequest) (*apiparams.ListRelationshipTuplesResponse, error) {
+func fetchRelations(client JIMMAPI, params apiparams.ListRelationshipTuplesRequest) (*apiparams.ListRelationshipTuplesResponse, error) {
 	tuples := make([]apiparams.RelationshipTuple, 0)
 	for {
 		response, err := client.ListRelationshipTuples(&params)
