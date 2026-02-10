@@ -7,9 +7,10 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
+
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
 // awaitCompletionFunc is a function that waits for a job to finalise.

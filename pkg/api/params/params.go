@@ -599,6 +599,7 @@ const (
 	StatusSuccessful JobStatus = "successful"
 	StatusPending    JobStatus = "pending"
 	StatusFailed     JobStatus = "failed"
+	StatusUnknown    JobStatus = "unknown"
 )
 
 // GetJobInfoRequest holds the request to get the status of a job.

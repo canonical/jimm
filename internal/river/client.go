@@ -7,11 +7,12 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivertype"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
 // Client wraps a River client and provides higher-level enqueue helpers.

@@ -6,14 +6,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	qt "github.com/frankban/quicktest"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivertest"
 	"github.com/riverqueue/river/rivertype"
 	gomock "go.uber.org/mock/gomock"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
 func TestMigrationWorker(t *testing.T) {
