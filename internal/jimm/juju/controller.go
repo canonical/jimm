@@ -222,10 +222,6 @@ func addControllerTx(ctx context.Context, j *JujuManager, jujuClouds []dbmodel.C
 // returned.
 func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds ControllerCreds) error {
 
-	if err := j.checkJimmAdmin(user); err != nil {
-		return err
-	}
-
 	api, err := j.dialController(ctx, ctl)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to dial the controller: %v", err))

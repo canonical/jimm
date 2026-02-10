@@ -10,6 +10,7 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
 // BootstrapParams defines the parameters required for bootstrapping a JIMM controller.
@@ -25,12 +26,30 @@ type BootstrapParams struct {
 	UserConfig map[string]string
 }
 
+// RunnerArgs defines the parameters required for running a bootstrap or destroy-controller job.
+type RunnerArgs struct {
+	JujuDataDir string
+	JobID       int64
+}
+
+// RunBootstrapArgs combines the arguments for the bootstrap worker,
+// including both the Rivertypes and the RunnerArgs.
+type RunBootstrapArgs struct {
+	rivertypes.BootstrapArgs
+	RunnerArgs
+}
+
+// RunDestroyControllerArgs combines the arguments for the destroy-controller worker,
+// including both the Rivertypes and the RunnerArgs.
+type RunDestroyControllerArgs struct {
+	rivertypes.DestroyControllerArgs
+	RunnerArgs
+}
+
 // WaitConfig holds the configuration for waiting for job completion.
 type WaitConfig struct {
 	// MaxJobDuration is the maximum duration to wait for a job to complete.
 	MaxJobDuration time.Duration
-	// PollingInterval is the interval at which to poll for job status.
-	PollingInterval time.Duration
 }
 
 // Validate checks if the BootstrapParams are valid.

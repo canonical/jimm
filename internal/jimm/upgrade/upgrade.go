@@ -12,7 +12,6 @@ import (
 
 	stderrors "errors"
 
-	"github.com/google/uuid"
 	"github.com/juju/clock"
 	jujuerrors "github.com/juju/errors"
 	jujucloud "github.com/juju/juju/cloud"
@@ -37,8 +36,8 @@ var (
 
 // BootstrapManager defines the bootstrap manager methods required by the upgrade manager.
 type BootstrapManager interface {
-	WaitForJobCompletion(ctx context.Context, jobId uuid.UUID, config bootstrap.WaitConfig) error
-	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
+	WaitForJobCompletion(ctx context.Context, jobId int64, config bootstrap.WaitConfig) error
+	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error)
 }
 
 // JujuManager defines the juju manager methods required by the upgrade manager.
@@ -56,7 +55,7 @@ type Store interface {
 
 // UpgradeEnqueuer defines the method to enqueue an upgrade job.
 type UpgradeEnqueuer interface {
-	EnqueueUpgradeTo(args rivertypes.UpgradeToArgs) (int64, error)
+	EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (int64, error)
 }
 
 // upgradeManager provides a means to manage controller upgrades within JIMM.
@@ -204,12 +203,9 @@ func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
 	}
-	parsedJobId, err := uuid.Parse(jobId)
-	if err != nil {
-		return errors.E(fmt.Errorf("failed to parse bootstrap job ID: %w", err))
-	}
+
 	// Wait for the bootstrap job to complete
-	if err := u.bootstrapManager.WaitForJobCompletion(ctx, parsedJobId, bootstrap.WaitConfig{}); err != nil {
+	if err := u.bootstrapManager.WaitForJobCompletion(ctx, jobId, bootstrap.WaitConfig{}); err != nil {
 		return errors.E(fmt.Errorf("bootstrap job failed: %w", err))
 	}
 
@@ -316,7 +312,7 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 		return 0, errors.E(fmt.Errorf("failed to clone controller: %w", err))
 	}
 
-	id, err := u.enqueuer.EnqueueUpgradeTo(rivertypes.UpgradeToArgs{
+	id, err := u.enqueuer.EnqueueUpgradeTo(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            modelUUID,
 		TargetVersion:        targetVersion,
 		Username:             user.Name,

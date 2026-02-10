@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/google/uuid"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
@@ -41,7 +40,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
-	"github.com/canonical/jimm/v3/internal/jobtracker"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -308,15 +306,19 @@ type JujuManager interface {
 // BootstrapManager provides methods to manage bootstrap jobs.
 type BootstrapManager interface {
 	// GetJobInfo retrieves the status and logs of a job.
-	GetJobInfo(ctx context.Context, user *openfga.User, jobId uuid.UUID, offset int) (params.GetJobInfoResponse, error)
+	GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetJobInfoResponse, error)
 	// StopJob stops a job.
-	StopJob(ctx context.Context, user *openfga.User, jobId uuid.UUID) error
+	StopJob(ctx context.Context, user *openfga.User, jobId int64) error
 	// WaitForJobCompletion waits for a job to complete.
-	WaitForJobCompletion(ctx context.Context, jobId uuid.UUID, config bootstrap.WaitConfig) error
+	WaitForJobCompletion(ctx context.Context, jobId int64, config bootstrap.WaitConfig) error
 	// StartBootstrapJob starts a bootstrap job and returns the job ID.
-	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (string, error)
+	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error)
 	// StartDestroyControllerJob starts a destroy-controller job and returns the job ID.
-	StartDestroyControllerJob(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (string, error)
+	StartDestroyControllerJob(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error)
+	// BootstrapController bootstraps a new Juju controller.
+	BootstrapController(ctx context.Context, p bootstrap.RunBootstrapArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
+	// DestroyController destroys a Juju controller.
+	DestroyController(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
 }
 
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.
@@ -535,11 +537,6 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.offerAuthorizer = offerAuthorizer
 
-	jobTracker, err := jobtracker.New(j.Database, 5*time.Second)
-	if err != nil {
-		return nil, err
-	}
-
 	binaryStore, err := jujuclistore.NewJujuCLIStore(jujuclistore.Config{})
 	if err != nil {
 		return nil, err
@@ -547,7 +544,7 @@ func New(p Parameters) (*JIMM, error) {
 
 	bootstrapManager, err := bootstrap.NewBootstrapManager(
 		j.Database,
-		jobTracker,
+		p.RiverClient,
 		j.jujuManager,
 		binaryStore,
 		p.BootstrapLoginTokenRefreshURL,

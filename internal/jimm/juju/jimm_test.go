@@ -280,37 +280,21 @@ func TestRemoveController(t *testing.T) {
 		user             string
 		unavailableSince *time.Time
 		force            bool
-		jimmAdmin        bool
 		expectedError    string
 	}{{
-		about:            "superuser can remove an unavailable controller",
+		about:            "remove an unavailable controller",
 		user:             "alice@canonical.com",
 		unavailableSince: &now,
 		force:            true,
-		jimmAdmin:        true,
 	}, {
-		about:     "superuser can remove a live controller with force",
-		user:      "alice@canonical.com",
-		force:     true,
-		jimmAdmin: true,
+		about: "remove a live controller with force",
+		user:  "alice@canonical.com",
+		force: true,
 	}, {
-		about:         "superuser cannot remove a live controller",
+		about:         "error when removing a live controller",
 		user:          "alice@canonical.com",
 		force:         false,
-		jimmAdmin:     true,
 		expectedError: "controller is still alive",
-	}, {
-		about:         "add-model user cannot remove a controller",
-		user:          "bob@canonical.com",
-		expectedError: "unauthorized",
-		jimmAdmin:     false,
-		force:         false,
-	}, {
-		about:         "user withouth access rights cannot remove a controller",
-		user:          "eve@canonical.com",
-		expectedError: "unauthorized",
-		jimmAdmin:     false,
-		force:         false,
 	}}
 
 	for _, test := range tests {
@@ -322,7 +306,6 @@ func TestRemoveController(t *testing.T) {
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, nil)
-			user.JimmAdmin = test.jimmAdmin
 
 			if test.unavailableSince != nil {
 				// make the controller unavailable
