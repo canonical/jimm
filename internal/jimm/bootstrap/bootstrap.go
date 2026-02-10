@@ -150,7 +150,7 @@ func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobI
 	if err != nil {
 		return params.GetJobInfoResponse{}, fmt.Errorf("failed to get job info: %w", err)
 	}
-	loggies, newOffset, err := b.store.QueryJobLog(ctx, jobId, offset)
+	logs, newOffset, err := b.store.QueryJobLog(ctx, jobId, offset)
 	if err != nil {
 		return params.GetJobInfoResponse{}, fmt.Errorf("failed to query job logs: %w", err)
 	}
@@ -161,7 +161,7 @@ func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobI
 	return params.GetJobInfoResponse{
 		Status:    toParamsJobState(ctx, job.State),
 		Error:     errorMsg.String(),
-		Logs:      loggies,
+		Logs:      logs,
 		Watermark: newOffset,
 	}, nil
 }
@@ -326,7 +326,10 @@ func (b *bootstrapManager) BootstrapController(
 	user *openfga.User,
 ) error {
 	// Lock the bootstrap concurrently with destroy to avoid misuse of the store commands.
-	jujuCLILock.Lock()
+	isLocked := jujuCLILock.TryLock()
+	if !isLocked {
+		return errors.E("another bootstrap or destroy operation is currently running, please wait for it to finish before starting a new one")
+	}
 	defer jujuCLILock.Unlock()
 
 	// If we allow concurrent bootstraps, both could pass this check but only one would
@@ -558,7 +561,10 @@ func (b *bootstrapManager) DestroyController(
 	user *openfga.User,
 ) error {
 	// Lock the destroy concurrently with bootstrap to avoid misuse of the store commands.
-	jujuCLILock.Lock()
+	isLocked := jujuCLILock.TryLock()
+	if !isLocked {
+		return errors.E("another bootstrap or destroy operation is currently running, please wait for it to finish before starting a new one")
+	}
 	defer jujuCLILock.Unlock()
 
 	b.writeJobLog(ctx, p.JobID,
