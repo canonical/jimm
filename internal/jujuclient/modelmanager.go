@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuclient
 
@@ -36,12 +36,16 @@ func (c Connection) CreateModel(args *CreateModelArgs) (base.ModelInfo, error) {
 		args.Config)
 }
 
+// ModelMigrationStatus holds the migration status of a model.
 type ModelMigrationStatus struct {
 	Status string
 	Start  *time.Time
 	End    *time.Time
 }
 
+// ModelInfo holds information about a model.
+// It combines the base.ModelInfo returned by the Juju client in other API methods with additional
+// information that is contained in the params.ModelInfo returned by the ModelInfo API call.
 type ModelInfo struct {
 	base.ModelInfo
 	MigrationStatus *ModelMigrationStatus
@@ -57,6 +61,18 @@ func (c Connection) ModelInfo(model names.ModelTag) (ModelInfo, error) {
 		return ModelInfo{}, errors.E(res[0].Error)
 	}
 	return convertParamsModelInfo(*res[0].Result)
+}
+
+// GrantJIMMModelAdmin ensures that the JIMM user is an admin level user
+// of the given model. This is a specialized wrapper around
+// ModifyModelAccess to be used when bootstrapping a model. Any error
+// that is returned from the API will be of type *APIError.
+// GrantJIMMModelAdmin uses the ModifyModelAccess procedure on the
+// ModelManager facade.
+func (c Connection) GrantJIMMModelAdmin(tag names.ModelTag) error {
+	userID := c.user.ResourceTag().Id()
+	access := string(jujuparams.ModelAdminAccess)
+	return modelmanager.NewClient(&c).GrantModel(userID, access, tag.Id())
 }
 
 // DumpModel dumps debugging details for the given model. If the simplied

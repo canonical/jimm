@@ -596,12 +596,18 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	// PR Note: I think this can be removed. Let's see what CI says.
-	// if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-	// 	zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-	// 	b.err = errors.E(err)
-	// 	return b
-	// }
+	// Grant JIMM admin access to the model. Note that if this fails,
+	// the local database entry will be deleted but the model
+	// will remain on the controller and will trigger the "already exists
+	// in the backend controller" message above when the user
+	// attempts to create a model with the same name again.
+	// TODO(JUJU-8869): We need to keep this despite encoding permissions in
+	// JWTs because Juju returns a different result on migrated models otherwise.
+	if err := api.GrantJIMMModelAdmin(names.NewModelTag(info.UUID)); err != nil {
+		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
+		b.err = errors.E(err)
+		return b
+	}
 
 	b.modelInfo = info
 	return b

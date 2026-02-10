@@ -147,7 +147,7 @@ type API struct {
 	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
 	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
 	GrantApplicationOfferAccess_       func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
-	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
+	GrantJIMMModelAdmin_               func(names.ModelTag) error
 	Import_                            func(bytes []byte) error
 	IsBroken_                          bool
 	LatestLogTime_                     func(string) (time.Time, error)
@@ -319,11 +319,11 @@ func (a *API) GrantApplicationOfferAccess(ctx context.Context, offerURL string, 
 	return a.GrantApplicationOfferAccess_(ctx, offerURL, tag, p)
 }
 
-func (a *API) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error {
+func (a *API) GrantJIMMModelAdmin(tag names.ModelTag) error {
 	if a.GrantJIMMModelAdmin_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.GrantJIMMModelAdmin_(ctx, tag)
+	return a.GrantJIMMModelAdmin_(tag)
 }
 
 func (a *API) IsBroken() bool {

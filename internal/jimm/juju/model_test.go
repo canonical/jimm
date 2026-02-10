@@ -35,7 +35,7 @@ var addModelTests = []struct {
 	name                string
 	env                 string
 	updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
-	grantJIMMModelAdmin func(context.Context, names.ModelTag) error
+	grantJIMMModelAdmin func(names.ModelTag) error
 	createModel         func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	username            string
 	jimmAdmin           bool
@@ -99,7 +99,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -209,7 +209,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -320,7 +320,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -426,7 +426,7 @@ users:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: createModel(`
@@ -526,7 +526,7 @@ users:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: createModel(`
@@ -593,7 +593,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
@@ -668,7 +668,7 @@ models:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: createModel(`
@@ -736,7 +736,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, errors.E("a silly error")
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: createModel(`
@@ -801,7 +801,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: createModel(`
@@ -880,7 +880,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -996,7 +996,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -1066,7 +1066,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertCreateModelArgs(&jujuclient.CreateModelArgs{
@@ -1171,7 +1171,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -1232,7 +1232,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel:  nil,
@@ -1275,7 +1275,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel:  nil,
@@ -1346,7 +1346,7 @@ controllers:
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 		return nil, nil
 	},
-	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
+	grantJIMMModelAdmin: func(_ names.ModelTag) error {
 		return nil
 	},
 	createModel: assertConfig(map[string]interface{}{
@@ -3317,7 +3317,7 @@ func TestAddModelDeletedController(t *testing.T) {
 		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 			return nil, nil
 		},
-		GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
+		GrantJIMMModelAdmin_: func(mt names.ModelTag) error {
 			return nil
 		},
 		CreateModel_: createModel(`

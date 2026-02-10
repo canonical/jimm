@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju
 
@@ -116,6 +116,9 @@ type API interface {
 	// GrantApplicationOfferAccess grants access to an application offer to
 	// a user.
 	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
+
+	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
+	GrantJIMMModelAdmin(names.ModelTag) error
 
 	// IsBroken returns true if the API connection has failed.
 	IsBroken() bool

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju_test
 
@@ -764,7 +764,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 						}}, nil
 					}
 				},
-				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+				GrantJIMMModelAdmin_: func(_ names.ModelTag) error {
 					return nil
 				},
 				CreateModel_: func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
@@ -1232,7 +1232,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 						ModelName: "test-model",
 					}}, nil
 				},
-				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+				GrantJIMMModelAdmin_: func(_ names.ModelTag) error {
 					return nil
 				},
 				CreateModel_: func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {

@@ -1129,6 +1129,44 @@ func (c *MockAPIGrantApplicationOfferAccessCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// GrantJIMMModelAdmin mocks base method.
+func (m *MockAPI) GrantJIMMModelAdmin(arg0 names.ModelTag) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GrantJIMMModelAdmin", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GrantJIMMModelAdmin indicates an expected call of GrantJIMMModelAdmin.
+func (mr *MockAPIMockRecorder) GrantJIMMModelAdmin(arg0 any) *MockAPIGrantJIMMModelAdminCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GrantJIMMModelAdmin", reflect.TypeOf((*MockAPI)(nil).GrantJIMMModelAdmin), arg0)
+	return &MockAPIGrantJIMMModelAdminCall{Call: call}
+}
+
+// MockAPIGrantJIMMModelAdminCall wrap *gomock.Call
+type MockAPIGrantJIMMModelAdminCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPIGrantJIMMModelAdminCall) Return(arg0 error) *MockAPIGrantJIMMModelAdminCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPIGrantJIMMModelAdminCall) Do(f func(names.ModelTag) error) *MockAPIGrantJIMMModelAdminCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPIGrantJIMMModelAdminCall) DoAndReturn(f func(names.ModelTag) error) *MockAPIGrantJIMMModelAdminCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // HTTPClient mocks base method.
 func (m *MockAPI) HTTPClient() (*httprequest.Client, error) {
 	m.ctrl.T.Helper()
