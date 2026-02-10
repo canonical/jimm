@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju_test
 
@@ -17,7 +17,6 @@ import (
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/model"
 	jujurpc "github.com/juju/juju/rpc"
-	"github.com/juju/juju/rpc/params"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -1478,7 +1477,7 @@ func TestAddModel(t *testing.T) {
 // a base.ModelInfo object. Now that we are using Juju's client and in turn,
 // using base.ModelInfo in most places, we need to convert the params.ModelInfo
 // to base.ModelInfo to keep these tests working until they get a larger refactor.
-func convertParamsModelInfo(modelInfo params.ModelInfo) (base.ModelInfo, error) {
+func convertParamsModelInfo(modelInfo jujuparams.ModelInfo) (base.ModelInfo, error) {
 	var cloudTag names.CloudTag
 	var err error
 	if modelInfo.CloudTag != "" {
@@ -1718,7 +1717,7 @@ const modelInfoTestEnvWithEveryoneAccess = modelInfoTestEnv + `
     access: read
 `
 
-func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUsers []base.UserInfo) base.ModelInfo {
+func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUsers []base.UserInfo) jujuclient.ModelInfo {
 	info := base.ModelInfo{
 		Name:            "model-1",
 		Type:            "iaas",
@@ -1771,7 +1770,7 @@ func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUser
 	if limitedExpectedUsers != nil {
 		info.Users = limitedExpectedUsers
 	}
-	return info
+	return jujuclient.ModelInfo{ModelInfo: info}
 }
 
 var modelInfoTests = []struct {
@@ -1780,7 +1779,7 @@ var modelInfoTests = []struct {
 	username         string
 	uuid             string
 	originModelOwner string
-	expectModelInfo  base.ModelInfo
+	expectModelInfo  jujuclient.ModelInfo
 	expectError      string
 }{{
 	name:             "AdminUser",
@@ -2503,6 +2502,8 @@ func TestModelSummaries(t *testing.T) {
 						Status: "available",
 					},
 				},
+			},
+			expectedSummaries: []base.UserModelSummary{
 				{
 					Name:            "model-1",
 					UUID:            "00000002-0000-0000-0000-000000000001",
@@ -2549,6 +2550,25 @@ func TestModelSummaries(t *testing.T) {
 					Type:            "",
 					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
 					IsController:    false,
+					ProviderType:    "test-provider",
+					DefaultSeries:   "",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "unavailable",
+					},
+					ModelUserAccess: "admin",
+				},
+				{
+					Name:            "model-2",
+					UUID:            "00000002-0000-0000-0000-000000000002",
+					Type:            "",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
 					DefaultSeries:   "",
 					Cloud:           "test-cloud",
 					CloudRegion:     "test-cloud-region",

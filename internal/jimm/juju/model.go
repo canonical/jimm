@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju
 
@@ -75,6 +75,15 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	builder = builder.WithOwner(owner)
 	builder = builder.WithAuthorizer(user)
 	builder = builder.WithName(args.Name)
+	if err := builder.Error(); err != nil {
+		return base.ModelInfo{}, errors.E(err)
+	}
+
+	if args.ControllerName != "" {
+		builder = builder.WithController(args.ControllerName)
+	} else {
+		builder = builder.WithAnyController()
+	}
 	if err := builder.Error(); err != nil {
 		return base.ModelInfo{}, errors.E(err)
 	}

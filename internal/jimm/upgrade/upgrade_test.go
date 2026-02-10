@@ -123,7 +123,6 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 	s.api.EXPECT().
 		ControllerModelSummary().
 		DoAndReturn(func() (base.UserModelSummary, error) {
-			// Mutate the pointer argument to simulate controller response
 			return base.UserModelSummary{
 				Cloud:           "aws",
 				CloudCredential: "aws_alice_mycredential",
@@ -132,7 +131,7 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 		})
 
 	s.api.EXPECT().
-		CredentialContents("aws", "mycredential", true).
+		CredentialContents("aws", "aws_alice_mycredential", true).
 		DoAndReturn(func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 			return []jujuparams.CredentialContentResult{
 				{
@@ -267,7 +266,7 @@ func TestUpgradeTo_Success(t *testing.T) {
 		})
 
 	s.api.EXPECT().
-		CredentialContents("aws", "mycredential", true).
+		CredentialContents("aws", "aws_alice_mycredential", true).
 		DoAndReturn(func(cloud, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 			return []jujuparams.CredentialContentResult{
 				{
@@ -635,18 +634,19 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 		Return(s.api, nil)
 
 	modelInfoCalls := 0
-	s.api.EXPECT().ModelInfo(gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-		c.Check(mi.UUID, qt.Equals, modelUUID)
+	s.api.EXPECT().ModelInfo(gomock.Any()).DoAndReturn(func(mt names.ModelTag) (jujuclient.ModelInfo, error) {
+		c.Check(mt.Id(), qt.Equals, modelUUID)
+		mi := jujuclient.ModelInfo{}
 		modelInfoCalls++
 		if modelInfoCalls == 1 {
 			v := oldVersion
 			mi.AgentVersion = &v
-			return nil
+			return mi, nil
 		}
 		v := targetVersion
 		mi.AgentVersion = &v
-		return nil
-	})
+		return mi, nil
+	}).Times(2)
 
 	s.api.EXPECT().UpgradeModel(modelUUID, targetVersion, "", false, false).Return(targetVersion, nil)
 

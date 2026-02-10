@@ -475,7 +475,11 @@ func (s *jimmUnitTestSuite) TestAddModelToController(c *gc.C) {
 						c.Check(args.CloudRegion, gc.Equals, "region-1")
 						c.Check(args.CloudCredential.String(), gc.Equals, "cloudcred-openstack_alice_mycred")
 						c.Check(args.ControllerName, gc.Equals, "controller-1")
-						return base.ModelInfo{}, nil
+						return base.ModelInfo{
+							Cloud:           "openstack",
+							Owner:           "alice@canonical.com",
+							CloudCredential: "openstack/alice@canonical.com/mycred",
+						}, nil
 					},
 				},
 			}
