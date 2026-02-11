@@ -16,6 +16,7 @@ import (
 	jujuerrors "github.com/juju/errors"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/environs/cloudspec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -120,32 +121,16 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
+	cloudCred := jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
+		"access-key": "AKIA...",
+	})
 	s.api.EXPECT().
-		ControllerModelSummary().
-		DoAndReturn(func() (base.UserModelSummary, error) {
-			return base.UserModelSummary{
-				Cloud:           "aws",
-				CloudCredential: "aws_alice_mycredential",
-				CloudRegion:     "us-east-1",
-			}, nil
-		})
-
-	s.api.EXPECT().
-		CredentialContents("aws", "aws_alice_mycredential", true).
-		DoAndReturn(func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
-			return []jujuparams.CredentialContentResult{
-				{
-					Result: &jujuparams.ControllerCredentialInfo{
-						Content: jujuparams.CredentialContent{
-							Name:     "mycredential",
-							Cloud:    "aws",
-							AuthType: string(jujucloud.AccessKeyAuthType),
-							Attributes: map[string]string{
-								"access-key": "AKIA...",
-							},
-						},
-					},
-				},
+		CloudSpec().
+		DoAndReturn(func() (cloudspec.CloudSpec, error) {
+			return cloudspec.CloudSpec{
+				Name:       "aws",
+				Credential: &cloudCred,
+				Region:     "us-east-1",
 			}, nil
 		})
 
@@ -256,31 +241,12 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(s.api, nil)
 
 	s.api.EXPECT().
-		ControllerModelSummary().
-		DoAndReturn(func() (base.UserModelSummary, error) {
-			return base.UserModelSummary{
-				Cloud:           "aws",
-				CloudCredential: "aws_alice_mycredential",
-				CloudRegion:     "us-east-1",
-			}, nil
-		})
-
-	s.api.EXPECT().
-		CredentialContents("aws", "aws_alice_mycredential", true).
-		DoAndReturn(func(cloud, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
-			return []jujuparams.CredentialContentResult{
-				{
-					Result: &jujuparams.ControllerCredentialInfo{
-						Content: jujuparams.CredentialContent{
-							Name:     "mycredential",
-							Cloud:    "aws",
-							AuthType: string(jujucloud.AccessKeyAuthType),
-							Attributes: map[string]string{
-								"access-key": "AKIA...",
-							},
-						},
-					},
-				},
+		CloudSpec().
+		DoAndReturn(func() (cloudspec.CloudSpec, error) {
+			return cloudspec.CloudSpec{
+				Name:       "aws",
+				Credential: &jujucloud.Credential{},
+				Region:     "us-east-1",
 			}, nil
 		})
 

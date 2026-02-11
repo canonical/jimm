@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmtest
 
@@ -13,6 +13,7 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
 	coremigration "github.com/juju/juju/core/migration"
+	"github.com/juju/juju/environs/cloudspec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	jujuversion "github.com/juju/juju/version"
 	"github.com/juju/names/v5"
@@ -136,7 +137,7 @@ type API struct {
 	Close_                             func() error
 	Cloud_                             func(names.CloudTag, *jujucloud.Cloud) error
 	Clouds_                            func() (map[names.CloudTag]jujucloud.Cloud, error)
-	ControllerModelSummary_            func() (base.UserModelSummary, error)
+	ControllerModelSummary_            func() (cloudspec.CloudSpec, error)
 	ControllerConfig_                  func(context.Context) (jujuparams.ControllerConfigResult, error)
 	CreateModel_                       func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	DestroyApplicationOffer_           func(context.Context, string, bool) error
@@ -242,9 +243,9 @@ func (a *API) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {
 	return a.Clouds_()
 }
 
-func (a *API) ControllerModelSummary() (base.UserModelSummary, error) {
+func (a *API) CloudSpec() (cloudspec.CloudSpec, error) {
 	if a.ControllerModelSummary_ == nil {
-		return base.UserModelSummary{}, errors.E(errors.CodeNotImplemented)
+		return cloudspec.CloudSpec{}, errors.E(errors.CodeNotImplemented)
 	}
 	return a.ControllerModelSummary_()
 }

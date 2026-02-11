@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju_test
 
@@ -18,6 +18,7 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
+	"github.com/juju/juju/environs/cloudspec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -84,25 +85,12 @@ func TestAddController(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		ControllerModelSummary_: func() (base.UserModelSummary, error) {
-			ms := base.UserModelSummary{}
-			ms.Name = "controller"
-			ms.UUID = "5fddf0ed-83d5-47e8-ae7b-a4b27fc04a9f"
-			ms.Type = "iaas"
-			ms.ControllerUUID = jimmtest.DefaultControllerUUID
-			ms.IsController = true
-			ms.ProviderType = "ec2"
-			ms.DefaultSeries = "warty"
-			ms.Cloud = "aws"
-			ms.CloudRegion = "eu-west-1"
-			ms.Owner = "admin"
-			ms.Life = life.Value(state.Alive.String())
-			ms.Status = base.Status{
-				Status: "available",
-			}
-			ms.ModelUserAccess = "admin"
-			ms.AgentVersion = newVersion("1.2.3")
-			return ms, nil
+		ControllerModelSummary_: func() (cloudspec.CloudSpec, error) {
+			cs := cloudspec.CloudSpec{}
+			cs.Name = "aws"
+			cs.Type = "iaas"
+			cs.Region = "eu-west-1"
+			return cs, nil
 		},
 	}
 
@@ -168,24 +156,11 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		ControllerModelSummary_: func() (base.UserModelSummary, error) {
-			ms := base.UserModelSummary{}
-			ms.Name = "controller"
-			ms.UUID = "5fddf0ed-83d5-47e8-ae7b-a4b27fc04a9f"
-			ms.Type = "iaas"
-			ms.ControllerUUID = jimmtest.DefaultControllerUUID
-			ms.IsController = true
-			ms.ProviderType = "ec2"
-			ms.DefaultSeries = "warty"
-			ms.Cloud = "k8s"
-			ms.Owner = "admin"
-			ms.Life = life.Value(state.Alive.String())
-			ms.Status = base.Status{
-				Status: "available",
-			}
-			ms.ModelUserAccess = "admin"
-			ms.AgentVersion = newVersion("1.2.3")
-			return ms, nil
+		ControllerModelSummary_: func() (cloudspec.CloudSpec, error) {
+			cs := cloudspec.CloudSpec{}
+			cs.Name = "k8s"
+			cs.Type = "iaas"
+			return cs, nil
 		},
 	}
 
@@ -296,25 +271,12 @@ func TestAddControllerWithVault(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		ControllerModelSummary_: func() (base.UserModelSummary, error) {
-			ms := base.UserModelSummary{}
-			ms.Name = "controller"
-			ms.UUID = "5fddf0ed-83d5-47e8-ae7b-a4b27fc04a9f"
-			ms.Type = "iaas"
-			ms.ControllerUUID = jimmtest.DefaultControllerUUID
-			ms.IsController = true
-			ms.ProviderType = "ec2"
-			ms.DefaultSeries = "warty"
-			ms.Cloud = "aws"
-			ms.CloudRegion = "eu-west-1"
-			ms.Owner = "admin"
-			ms.Life = life.Value(state.Alive.String())
-			ms.Status = base.Status{
-				Status: "available",
-			}
-			ms.ModelUserAccess = "admin"
-			ms.AgentVersion = newVersion("1.2.3")
-			return ms, nil
+		ControllerModelSummary_: func() (cloudspec.CloudSpec, error) {
+			cs := cloudspec.CloudSpec{}
+			cs.Name = "aws"
+			cs.Type = "iaas"
+			cs.Region = "eu-west-1"
+			return cs, nil
 		},
 	}
 

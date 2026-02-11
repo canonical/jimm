@@ -105,73 +105,48 @@ func NewUpgradeManager(
 //
 // It returns the cloud and credential to be used for bootstrapping
 // the new controller.
-func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, jujucloud.Credential, error) {
+func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, *jujucloud.Credential, error) {
 	var bootstrapCloud jujucloud.Cloud
 	var bootstrapCloudRegion string
-	var bootstrapCredential jujucloud.Credential
 
 	m, err := u.jujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(err)
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(err)
 	}
 
 	currentVersion, err := version.Parse(m.Controller.AgentVersion)
 	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(err)
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(err)
 	}
 
 	if currentVersion.Compare(targetVersion) == 1 {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(errors.CodeBadRequest, "target version must be greater than or equal to current version")
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(errors.CodeBadRequest, "target version must be greater than or equal to current version")
 	}
 
 	api, err := u.dialer.Dial(ctx, &m.Controller, names.ModelTag{}, nil, nil)
 	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to dial the controller: %w", err))
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(fmt.Errorf("failed to dial the controller: %w", err))
 	}
 
-	ctrlModelSummary, err := api.ControllerModelSummary()
+	ctrlModelSummary, err := api.CloudSpec()
 	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get controller model summary: %w", err))
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(fmt.Errorf("failed to get controller model summary: %w", err))
 	}
 
 	// TODO(ale8k): Handle K8S clouds here in future. (HostCloudRegion field.)
-	bootstrapCloudRegion = ctrlModelSummary.CloudRegion
-	ctrlCloud := ctrlModelSummary.Cloud
-	ctrlCloudCred := ctrlModelSummary.CloudCredential
-
-	credentialContents, err := api.CredentialContents(ctrlCloud, ctrlCloudCred, true)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get credential contents from controller model summary: %w", err))
-	}
-
-	// The client actually returns an error if this is 0 and no error returned, but to be defensive we're checking
-	// anyways.
-	if len(credentialContents) == 0 {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E("no credential contents found for controller cloud credential")
-	}
-
-	if credentialContents[0].Error != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("credential content error: %w", credentialContents[0].Error))
-	}
-
-	bootstrapCredential = jujucloud.NewCredential(
-		jujucloud.AuthType(credentialContents[0].Result.Content.AuthType),
-		credentialContents[0].Result.Content.Attributes,
-	)
+	bootstrapCloudRegion = ctrlModelSummary.Region
+	ctrlCloud := ctrlModelSummary.Name
+	ctrlCloudCred := ctrlModelSummary.Credential
 
 	if err := api.Cloud(names.NewCloudTag(ctrlCloud), &bootstrapCloud); err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E(fmt.Errorf("failed to get cloud from controller model summary: %w", err))
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(fmt.Errorf("failed to get cloud from controller model summary: %w", err))
 	}
 
 	if !bootstrapCloud.IsControllerCloud {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E("controller cloud is not marked as a controller cloud")
+		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E("controller cloud is not marked as a controller cloud")
 	}
 
-	if !bootstrapCloud.IsControllerCloud {
-		return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, errors.E("controller cloud is not marked as a controller cloud")
-	}
-
-	return bootstrapCloud, bootstrapCloudRegion, bootstrapCredential, nil
+	return bootstrapCloud, bootstrapCloudRegion, ctrlCloudCred, nil
 }
 
 // CloneController upgrades a controller by fetching its configuration and initiating
@@ -290,7 +265,7 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 		CLIVersion:         targetVersion.String(),
 		CloudNameAndRegion: fmt.Sprintf("%s/%s", bsCloud.Name, bsCloudRegion),
 		ControllerName:     newControllerName,
-		CloudCred:          bsCredential,
+		CloudCred:          *bsCredential,
 	}
 
 	cloneParams.Cloud = bsCloud

@@ -22,6 +22,7 @@ import (
 	cloud "github.com/juju/juju/cloud"
 	crossmodel "github.com/juju/juju/core/crossmodel"
 	migration "github.com/juju/juju/core/migration"
+	cloudspec "github.com/juju/juju/environs/cloudspec"
 	params "github.com/juju/juju/rpc/params"
 	names "github.com/juju/names/v5"
 	version "github.com/juju/version/v2"
@@ -511,6 +512,45 @@ func (c *MockAPICloudCall) DoAndReturn(f func(names.CloudTag, *cloud.Cloud) erro
 	return c
 }
 
+// CloudSpec mocks base method.
+func (m *MockAPI) CloudSpec() (cloudspec.CloudSpec, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CloudSpec")
+	ret0, _ := ret[0].(cloudspec.CloudSpec)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CloudSpec indicates an expected call of CloudSpec.
+func (mr *MockAPIMockRecorder) CloudSpec() *MockAPICloudSpecCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloudSpec", reflect.TypeOf((*MockAPI)(nil).CloudSpec))
+	return &MockAPICloudSpecCall{Call: call}
+}
+
+// MockAPICloudSpecCall wrap *gomock.Call
+type MockAPICloudSpecCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPICloudSpecCall) Return(arg0 cloudspec.CloudSpec, arg1 error) *MockAPICloudSpecCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPICloudSpecCall) Do(f func() (cloudspec.CloudSpec, error)) *MockAPICloudSpecCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPICloudSpecCall) DoAndReturn(f func() (cloudspec.CloudSpec, error)) *MockAPICloudSpecCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Clouds mocks base method.
 func (m *MockAPI) Clouds() (map[names.CloudTag]cloud.Cloud, error) {
 	m.ctrl.T.Helper()
@@ -701,45 +741,6 @@ func (c *MockAPIControllerConfigCall) Do(f func(context.Context) (params.Control
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAPIControllerConfigCall) DoAndReturn(f func(context.Context) (params.ControllerConfigResult, error)) *MockAPIControllerConfigCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ControllerModelSummary mocks base method.
-func (m *MockAPI) ControllerModelSummary() (base.UserModelSummary, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ControllerModelSummary")
-	ret0, _ := ret[0].(base.UserModelSummary)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ControllerModelSummary indicates an expected call of ControllerModelSummary.
-func (mr *MockAPIMockRecorder) ControllerModelSummary() *MockAPIControllerModelSummaryCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ControllerModelSummary", reflect.TypeOf((*MockAPI)(nil).ControllerModelSummary))
-	return &MockAPIControllerModelSummaryCall{Call: call}
-}
-
-// MockAPIControllerModelSummaryCall wrap *gomock.Call
-type MockAPIControllerModelSummaryCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIControllerModelSummaryCall) Return(arg0 base.UserModelSummary, arg1 error) *MockAPIControllerModelSummaryCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIControllerModelSummaryCall) Do(f func() (base.UserModelSummary, error)) *MockAPIControllerModelSummaryCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIControllerModelSummaryCall) DoAndReturn(f func() (base.UserModelSummary, error)) *MockAPIControllerModelSummaryCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
