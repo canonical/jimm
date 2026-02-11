@@ -85,7 +85,7 @@ func TestAddController(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		ControllerModelSummary_: func() (cloudspec.CloudSpec, error) {
+		CloudSpec_: func() (cloudspec.CloudSpec, error) {
 			cs := cloudspec.CloudSpec{}
 			cs.Name = "aws"
 			cs.Type = "iaas"
@@ -156,7 +156,7 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		ControllerModelSummary_: func() (cloudspec.CloudSpec, error) {
+		CloudSpec_: func() (cloudspec.CloudSpec, error) {
 			cs := cloudspec.CloudSpec{}
 			cs.Name = "k8s"
 			cs.Type = "iaas"
@@ -271,7 +271,7 @@ func TestAddControllerWithVault(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		ControllerModelSummary_: func() (cloudspec.CloudSpec, error) {
+		CloudSpec_: func() (cloudspec.CloudSpec, error) {
 			cs := cloudspec.CloudSpec{}
 			cs.Name = "aws"
 			cs.Type = "iaas"

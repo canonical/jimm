@@ -137,7 +137,7 @@ type API struct {
 	Close_                             func() error
 	Cloud_                             func(names.CloudTag, *jujucloud.Cloud) error
 	Clouds_                            func() (map[names.CloudTag]jujucloud.Cloud, error)
-	ControllerModelSummary_            func() (cloudspec.CloudSpec, error)
+	CloudSpec_                         func() (cloudspec.CloudSpec, error)
 	ControllerConfig_                  func(context.Context) (jujuparams.ControllerConfigResult, error)
 	CreateModel_                       func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	DestroyApplicationOffer_           func(context.Context, string, bool) error
@@ -244,10 +244,10 @@ func (a *API) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {
 }
 
 func (a *API) CloudSpec() (cloudspec.CloudSpec, error) {
-	if a.ControllerModelSummary_ == nil {
+	if a.CloudSpec_ == nil {
 		return cloudspec.CloudSpec{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ControllerModelSummary_()
+	return a.CloudSpec_()
 }
 
 func (a *API) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
