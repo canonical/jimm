@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Note that this file is not an integration test
 // because of limitations with the JujuConnSuite

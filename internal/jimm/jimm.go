@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package jimm contains the business logic used to manage clouds,
 // cloudcredentials and models.

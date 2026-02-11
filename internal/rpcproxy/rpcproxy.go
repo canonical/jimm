@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package rpcproxy implements a proxy for Juju's RPC messages.
 // The rpcproxy is used to proxy messages between jimm and model facades

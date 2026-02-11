@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // The servermon package is used to update statistics used
 // for monitoring the API server.

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package rpc implements the juju RPC protocol. The main difference
 // between this implementation and the implementation in

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package jujuapi implements API endpoints for the juju API.
 package jujuapi

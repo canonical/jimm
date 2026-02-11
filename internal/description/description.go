@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package description provides version-agnostic wrappers around major versions
 // of `github.com/juju/description` which hold Juju model descriptions, to

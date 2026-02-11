@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package jujuauth generates JWT tokens to
 // authenticate and authorize messages to Juju controllers.

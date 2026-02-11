@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package jujucommands provides functions run juju cmds from a JIMM instance.
 // Each command function is run with its own isolated in-mem store.

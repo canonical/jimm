@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // The permissions package provides business logic for handling user permissions.
 package permissions

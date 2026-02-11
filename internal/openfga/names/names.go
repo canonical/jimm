@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package names holds functions used by other jimm components to
 // create valid OpenFGA tags.

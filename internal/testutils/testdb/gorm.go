@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // Package testdb contains useful helpers for creating and managing test databases.
 package testdb
