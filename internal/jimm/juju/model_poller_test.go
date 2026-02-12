@@ -116,7 +116,7 @@ func TestModelCleanup(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 				switch model.Id() {
 				case s.env.Models[0].UUID:
 					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
@@ -128,7 +128,7 @@ func TestModelCleanup(t *testing.T) {
 					return jujuclient.ModelInfo{}, errors.E("new error")
 				}
 			},
-			DestroyModel_: func(tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+			DestroyModel_: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 				return nil
 			},
 		},
@@ -172,7 +172,7 @@ func TestInternalMigrationSuccess(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 				return jujuclient.ModelInfo{}, &jujurpc.RequestError{
 					Message: "redirect",
 					Code:    jujuparams.CodeRedirect,
@@ -214,7 +214,7 @@ func TestInternalMigrationFailure(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 				mi := jujuclient.ModelInfo{}
 				mi.MigrationStatus = &jujuclient.ModelMigrationStatus{
 					Status: "migration failed",
@@ -248,10 +248,10 @@ func TestPollModelsDyingControllerErrors(t *testing.T) {
 
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 				return jujuclient.ModelInfo{}, errors.E("controller not available")
 			},
-			DestroyModel_: func(tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+			DestroyModel_: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 				return nil
 			},
 		},

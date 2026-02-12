@@ -177,7 +177,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 							return nil
 						},
 						SupportsModelSummaryWatcher_: true,
-						ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+						ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 							switch model.Id() {
 							default:
 								c.Errorf("unexpected model uuid: %s", model.Id())
@@ -282,7 +282,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 					<-ctx.Done()
 					return nil, ctx.Err()
 				},
-				ModelInfo_: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 					switch model.Id() {
 					default:
 						c.Errorf("unexpected model uuid: %s", model)

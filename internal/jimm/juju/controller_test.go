@@ -85,7 +85,7 @@ func TestAddController(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		CloudSpec_: func() (cloudspec.CloudSpec, error) {
+		CloudSpec_: func(ctx context.Context) (cloudspec.CloudSpec, error) {
 			cs := cloudspec.CloudSpec{}
 			cs.Name = "aws"
 			cs.Type = "iaas"
@@ -156,7 +156,7 @@ func TestAddControllerWithCloudWithoutRegions(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		CloudSpec_: func() (cloudspec.CloudSpec, error) {
+		CloudSpec_: func(ctx context.Context) (cloudspec.CloudSpec, error) {
 			cs := cloudspec.CloudSpec{}
 			cs.Name = "k8s"
 			cs.Type = "iaas"
@@ -271,7 +271,7 @@ func TestAddControllerWithVault(t *testing.T) {
 			}
 			return clouds, nil
 		},
-		CloudSpec_: func() (cloudspec.CloudSpec, error) {
+		CloudSpec_: func(ctx context.Context) (cloudspec.CloudSpec, error) {
 			cs := cloudspec.CloudSpec{}
 			cs.Name = "aws"
 			cs.Type = "iaas"
@@ -952,7 +952,9 @@ func TestImportModel(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			api := &jimmtest.API{
-				ModelInfo_: test.modelInfo,
+				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+					return test.modelInfo(model)
+				},
 				ListApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 					return test.offers, nil
 				},
@@ -1123,7 +1125,9 @@ func TestUpdateMigratedModel(t *testing.T) {
 			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						ModelInfo_: test.modelInfo,
+						ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+							return test.modelInfo(model)
+						},
 					},
 				},
 			})

@@ -128,7 +128,7 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(fmt.Errorf("failed to dial the controller: %w", err))
 	}
 
-	ctrlModelSummary, err := api.CloudSpec()
+	ctrlModelSummary, err := api.CloudSpec(ctx)
 	if err != nil {
 		return bootstrapCloud, bootstrapCloudRegion, nil, errors.E(fmt.Errorf("failed to get controller model summary: %w", err))
 	}
@@ -204,7 +204,7 @@ func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 			Attempts: 6,
 			Delay:    10 * time.Second,
 			Func: func() error {
-				mi, err := api.ModelInfo(model.ResourceTag())
+				mi, err := api.ModelInfo(ctx, model.ResourceTag())
 				if err != nil {
 					return fmt.Errorf("failed to get model info before upgrade: %w", err)
 				}

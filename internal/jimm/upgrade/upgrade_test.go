@@ -125,8 +125,8 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 		"access-key": "AKIA...",
 	})
 	s.api.EXPECT().
-		CloudSpec().
-		DoAndReturn(func() (cloudspec.CloudSpec, error) {
+		CloudSpec(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (cloudspec.CloudSpec, error) {
 			return cloudspec.CloudSpec{
 				Name:       "aws",
 				Credential: &cloudCred,
@@ -241,8 +241,8 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(s.api, nil)
 
 	s.api.EXPECT().
-		CloudSpec().
-		DoAndReturn(func() (cloudspec.CloudSpec, error) {
+		CloudSpec(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (cloudspec.CloudSpec, error) {
 			return cloudspec.CloudSpec{
 				Name:       "aws",
 				Credential: &jujucloud.Credential{},
@@ -557,7 +557,7 @@ func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {
 		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(gomock.Any()).DoAndReturn(func(mt names.ModelTag) (jujuclient.ModelInfo, error) {
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 		return jujuclient.ModelInfo{
 			ModelInfo: base.ModelInfo{
 				UUID:         modelUUID,
@@ -600,7 +600,7 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 		Return(s.api, nil)
 
 	modelInfoCalls := 0
-	s.api.EXPECT().ModelInfo(gomock.Any()).DoAndReturn(func(mt names.ModelTag) (jujuclient.ModelInfo, error) {
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 		c.Check(mt.Id(), qt.Equals, modelUUID)
 		mi := jujuclient.ModelInfo{}
 		modelInfoCalls++
@@ -655,7 +655,7 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(gomock.Any()).DoAndReturn(func(mt names.ModelTag) (jujuclient.ModelInfo, error) {
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 		return jujuclient.ModelInfo{
 			ModelInfo: base.ModelInfo{
 				UUID:         modelUUID,

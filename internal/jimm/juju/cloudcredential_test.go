@@ -707,7 +707,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 			checkErrors := test.checkCredentialErrors
 			updateErrors := test.updateCredentialErrors
 			api := &jimmtest.API{
-				SupportsCheckCredentialModels_: true,
 				CheckCredentialModels_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 					if len(checkErrors) > 0 {
 						var err error
@@ -764,10 +763,10 @@ func TestUpdateCloudCredential(t *testing.T) {
 						}}, nil
 					}
 				},
-				GrantJIMMModelAdmin_: func(_ names.ModelTag) error {
+				GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
 					return nil
 				},
-				CreateModel_: func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+				CreateModel_: func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 					mi := base.ModelInfo{}
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
@@ -1232,10 +1231,10 @@ func TestRevokeCloudCredential(t *testing.T) {
 						ModelName: "test-model",
 					}}, nil
 				},
-				GrantJIMMModelAdmin_: func(_ names.ModelTag) error {
+				GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
 					return nil
 				},
-				CreateModel_: func(args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+				CreateModel_: func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 					mi := base.ModelInfo{}
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"

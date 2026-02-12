@@ -57,7 +57,7 @@ func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	info, err := s.API.CreateModel(&jujuclient.CreateModelArgs{
+	info, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
@@ -65,7 +65,7 @@ func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid1 := info.UUID
 
-	info, err = s.API.CreateModel(&jujuclient.CreateModelArgs{
+	info, err = s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-2",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
@@ -164,7 +164,7 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	info, err := s.API.CreateModel(&jujuclient.CreateModelArgs{
+	info, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
@@ -172,7 +172,7 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	uuid1 := info.UUID
 
-	info, err = s.API.CreateModel(&jujuclient.CreateModelArgs{
+	info, err = s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-2",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,

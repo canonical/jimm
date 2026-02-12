@@ -209,7 +209,7 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 	}
 	defer api.Close()
 
-	cloudSpec, err := api.CloudSpec()
+	cloudSpec, err := api.CloudSpec(ctx)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to get model summary: %v", err))
 	}
@@ -365,7 +365,7 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	}
 	defer api.Close()
 
-	modelInfo, err := api.ModelInfo(modelTag)
+	modelInfo, err := api.ModelInfo(ctx, modelTag)
 	if err != nil {
 		return err
 	}
@@ -603,7 +603,7 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 	}
 	defer api.Close()
 
-	_, err = api.ModelInfo(modelTag)
+	_, err = api.ModelInfo(ctx, modelTag)
 	if err != nil {
 		return errors.E(err)
 	}

@@ -50,7 +50,7 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	modelInfo, err := s.API.CreateModel(&jujuclient.CreateModelArgs{
+	modelInfo, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,

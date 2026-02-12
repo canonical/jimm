@@ -55,7 +55,7 @@ type API interface {
 	AdoptResources(string, version.Number) error
 
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
-	ChangeModelCredential(names.ModelTag, names.CloudCredentialTag) error
+	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
 
 	// CheckCredentialModels checks that an updated credential can be used
 	// with the associated models.
@@ -78,28 +78,28 @@ type API interface {
 	Clouds() (map[names.CloudTag]jujucloud.Cloud, error)
 
 	// CloudSpec fetches the cloud spec of the model connected to.
-	CloudSpec() (cloudspec.CloudSpec, error)
+	CloudSpec(context.Context) (cloudspec.CloudSpec, error)
 
 	// ControllerConfig fetches the controller configuration.
 	ControllerConfig(context.Context) (jujuparams.ControllerConfigResult, error)
 
 	// CreateModel creates a new model.
-	CreateModel(*jujuclient.CreateModelArgs) (base.ModelInfo, error)
+	CreateModel(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 
 	// DestroyApplicationOffer destroys an application offer.
 	DestroyApplicationOffer(context.Context, string, bool) error
 
 	// DestroyModel destroys a model.
-	DestroyModel(tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error
+	DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error
 
 	// ConnectStream creates a new connection to a streaming endpoint.
 	ConnectStream(string, url.Values) (base.Stream, error)
 
 	// DumpModel collects a database-agnostic dump of a model.
-	DumpModel(tag names.ModelTag, simplified bool) (map[string]interface{}, error)
+	DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error)
 
 	// DumpModelDB collects a database dump of a model.
-	DumpModelDB(tag names.ModelTag) (map[string]interface{}, error)
+	DumpModelDB(context.Context, names.ModelTag) (map[string]interface{}, error)
 
 	// FindApplicationOffers finds application offers that match the
 	// filter.
@@ -118,7 +118,7 @@ type API interface {
 	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 
 	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
-	GrantJIMMModelAdmin(names.ModelTag) error
+	GrantJIMMModelAdmin(context.Context, names.ModelTag) error
 
 	// IsBroken returns true if the API connection has failed.
 	IsBroken() bool
@@ -132,13 +132,13 @@ type API interface {
 	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
 	// ListModelSummaries lists models summaries
-	ListModelSummaries(jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
+	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
 
 	// ModelInfo fetches a model's ModelInfo.
-	ModelInfo(names.ModelTag) (jujuclient.ModelInfo, error)
+	ModelInfo(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 
 	// ModelStatus fetches a model's ModelStatus.
-	ModelStatus(names.ModelTag) (base.ModelStatus, error)
+	ModelStatus(context.Context, names.ModelTag) (base.ModelStatus, error)
 
 	// ModelSummaryWatcherNext returns the next set of model summaries from
 	// the watcher.
@@ -180,7 +180,7 @@ type API interface {
 	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 
 	// ValidateModelUpgrade validates that a model can be upgraded.
-	ValidateModelUpgrade(model names.ModelTag, force bool) error
+	ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error
 
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
 	WatchAllModelSummaries(context.Context) (string, error)
@@ -197,7 +197,7 @@ type API interface {
 	ListStorageDetails(context.Context) ([]jujuparams.StorageDetails, error)
 
 	// ListModels returns all UserModel's on the controller.
-	ListModels() ([]base.UserModel, error)
+	ListModels(context.Context) ([]base.UserModel, error)
 
 	// CredentialContents returns contents of the credential values for the specified
 	// cloud and credential name. Secrets will be included if requested.

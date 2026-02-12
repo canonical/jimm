@@ -231,7 +231,7 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 // modelInfo retrieves the model information from the controller and reacts
 // to the error to update JIMM's state.
 func (j *JujuManager) modelInfo(ctx context.Context, model *dbmodel.Model, api API) (jujuclient.ModelInfo, error) {
-	modelInfo, errFromAPI := api.ModelInfo(model.ResourceTag())
+	modelInfo, errFromAPI := api.ModelInfo(ctx, model.ResourceTag())
 
 	if errFromAPI == nil {
 		return j.reactToModelInfoSuccess(ctx, model, modelInfo)
@@ -266,7 +266,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, errFromAPI erro
 			return jujuclient.ModelInfo{}, err
 		}
 		defer api.Close()
-		return api.ModelInfo(model.ResourceTag())
+		return api.ModelInfo(ctx, model.ResourceTag())
 	// If the migration mode is exporting or importing, we return the error as is.
 	case dbmodel.MigrationModeExporting, dbmodel.MigrationModeImporting:
 		return jujuclient.ModelInfo{}, errFromAPI
@@ -345,7 +345,7 @@ func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User
 
 	// we query the model summaries for each controller
 	err = j.forEachController(ctx, uniqueControllers, func(c *dbmodel.Controller, a API) error {
-		results, err := a.ListModelSummaries(jujuparams.ModelSummariesRequest{All: true})
+		results, err := a.ListModelSummaries(ctx, jujuparams.ModelSummariesRequest{All: true})
 		if err != nil {
 			return err
 		}
@@ -441,7 +441,7 @@ func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt na
 	ms := base.ModelStatus{}
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
-		ms, err = api.ModelStatus(mt)
+		ms, err = api.ModelStatus(ctx, mt)
 		if err != nil {
 			// If the model is not found on the backing controller then
 			// we delete the model from JIMM.
@@ -562,7 +562,7 @@ func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt n
 			zapctx.Error(ctx, "failed to store model change", zaputil.Error(err))
 			return err
 		}
-		if err := api.DestroyModel(mt, destroyStorage, force, maxWait, timeout); err != nil {
+		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {
 			zapctx.Error(ctx, "failed to call DestroyModel juju api", zaputil.Error(err))
 			// this is a manual way of restoring the life state to alive if the JUJU api fails.
 			m.Life = state.Alive.String()
@@ -594,7 +594,7 @@ func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt name
 	var dump map[string]interface{}
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
-		dump, err = api.DumpModel(mt, simplified)
+		dump, err = api.DumpModel(ctx, mt, simplified)
 		return err
 	})
 	if err != nil {
@@ -610,7 +610,7 @@ func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt na
 	var dump map[string]interface{}
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
-		dump, err = api.DumpModelDB(mt)
+		dump, err = api.DumpModelDB(ctx, mt)
 		return err
 	})
 	if err != nil {
@@ -627,7 +627,7 @@ func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt na
 // CodeNotImplemented error code will be propagated back to the client.
 func (j *JujuManager) ValidateModelUpgrade(ctx context.Context, user *openfga.User, mt names.ModelTag, force bool) error {
 	err := j.doModelAdmin(ctx, user, mt, func(_ *dbmodel.Model, api API) error {
-		return api.ValidateModelUpgrade(mt, force)
+		return api.ValidateModelUpgrade(ctx, mt, force)
 	})
 	if err != nil {
 		return errors.E(err)
@@ -703,7 +703,7 @@ func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.U
 			return errors.E(err)
 		}
 
-		err = api.ChangeModelCredential(modelTag, cloudCredentialTag)
+		err = api.ChangeModelCredential(ctx, modelTag, cloudCredentialTag)
 		if err != nil {
 			return errors.E(err)
 		}
@@ -761,7 +761,7 @@ func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]bas
 	var userModels []base.UserModel
 	var mutex sync.Mutex
 	err = j.forEachController(ctx, controllers, func(_ *dbmodel.Controller, api API) error {
-		ums, err := api.ListModels()
+		ums, err := api.ListModels(ctx)
 		if err != nil {
 			return err
 		}

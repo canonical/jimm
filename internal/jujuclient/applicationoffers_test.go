@@ -32,7 +32,7 @@ func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	s.jujuclientSuite.SetUpTest(c)
 
 	var err error
-	s.modelInfo, err = s.API.CreateModel(&jujuclient.CreateModelArgs{
+	s.modelInfo, err = s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:  "test-model",
 		Owner: "test-user@canonical.com",
 	})

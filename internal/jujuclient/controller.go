@@ -30,7 +30,7 @@ func (c Connection) ControllerConfig(ctx context.Context) (jujuparams.Controller
 }
 
 // CloudSpec retrieves the cloud spec of the model connected to.
-func (c Connection) CloudSpec() (cloudspec.CloudSpec, error) {
+func (c Connection) CloudSpec(ctx context.Context) (cloudspec.CloudSpec, error) {
 	modelCfgClient := modelconfig.NewClient(&c)
 	attrs, err := modelCfgClient.ModelGet()
 	if err != nil {

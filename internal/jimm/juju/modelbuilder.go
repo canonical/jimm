@@ -571,7 +571,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	info, err := api.CreateModel(args)
+	info, err := api.CreateModel(b.ctx, args)
 	if err != nil {
 		switch jujuparams.ErrCode(err) {
 		case jujuparams.CodeAlreadyExists:
@@ -603,7 +603,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	// attempts to create a model with the same name again.
 	// TODO(JUJU-8869): We need to keep this despite encoding permissions in
 	// JWTs because Juju returns a different result on migrated models otherwise.
-	if err := api.GrantJIMMModelAdmin(names.NewModelTag(info.UUID)); err != nil {
+	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
 		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
 		b.err = errors.E(err)
 		return b

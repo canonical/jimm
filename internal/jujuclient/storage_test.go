@@ -47,7 +47,7 @@ func (s *storageSuite) TestListFilesystems(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	modelInfo, err := s.API.CreateModel(&jujuclient.CreateModelArgs{
+	modelInfo, err := s.API.CreateModel(ctx, &jujuclient.CreateModelArgs{
 		Name:               "model-1",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
@@ -90,7 +90,7 @@ func (s *storageSuite) TestListVolumes(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	modelInfo, err := s.API.CreateModel(&jujuclient.CreateModelArgs{
+	modelInfo, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
@@ -133,7 +133,7 @@ func (s *storageSuite) TestListStorageDetails(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	modelInfo, err := s.API.CreateModel(&jujuclient.CreateModelArgs{
+	modelInfo, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
 		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
