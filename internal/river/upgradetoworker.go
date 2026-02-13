@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -33,6 +34,13 @@ type upgradeToWorker struct {
 	upgradeRetries int
 	// awaitCompletion is a function that waits for a job to finalise.
 	awaitCompletion awaitCompletionFunc
+}
+
+// Timeout implements the [river.Worker] interface.
+// To determine the timeout duration, we consider the maximum time
+// for both the migration and upgrade steps, including retries.
+func (w *upgradeToWorker) Timeout(*river.Job[rivertypes.UpgradeToArgs]) time.Duration {
+	return 20 * time.Minute
 }
 
 // Work implements the [river.Worker] interface.

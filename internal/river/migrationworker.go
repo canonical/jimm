@@ -4,6 +4,7 @@ package river
 
 import (
 	"context"
+	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -85,4 +86,9 @@ func (w *migrationWorker) Work(ctx context.Context, job *river.Job[migrationWork
 	}
 
 	return nil
+}
+
+// Timeout implements the [river.Worker] interface.
+func (w *migrationWorker) Timeout(*river.Job[migrationWorkerArgs]) time.Duration {
+	return 10 * time.Minute
 }

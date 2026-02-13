@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	rivertypes "github.com/canonical/jimm/v3/internal/rivertypes"
+	rivertype "github.com/riverqueue/river/rivertype"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,10 +43,10 @@ func (m *MockUpgradeEnqueuer) EXPECT() *MockUpgradeEnqueuerMockRecorder {
 }
 
 // EnqueueUpgradeTo mocks base method.
-func (m *MockUpgradeEnqueuer) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (int64, error) {
+func (m *MockUpgradeEnqueuer) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnqueueUpgradeTo", ctx, args)
-	ret0, _ := ret[0].(int64)
+	ret0, _ := ret[0].(*rivertype.JobInsertResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -63,19 +64,19 @@ type MockUpgradeEnqueuerEnqueueUpgradeToCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Return(arg0 int64, arg1 error) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
+func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Return(arg0 *rivertype.JobInsertResult, arg1 error) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Do(f func(context.Context, rivertypes.UpgradeToArgs) (int64, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
+func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) Do(f func(context.Context, rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) DoAndReturn(f func(context.Context, rivertypes.UpgradeToArgs) (int64, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
+func (c *MockUpgradeEnqueuerEnqueueUpgradeToCall) DoAndReturn(f func(context.Context, rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error)) *MockUpgradeEnqueuerEnqueueUpgradeToCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

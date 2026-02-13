@@ -82,10 +82,10 @@ func (c *MockJobQueueCancelJobCall) DoAndReturn(f func(context.Context, int64) (
 }
 
 // EnqueueBootstrap mocks base method.
-func (m *MockJobQueue) EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (int64, error) {
+func (m *MockJobQueue) EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (*rivertype.JobInsertResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnqueueBootstrap", ctx, args)
-	ret0, _ := ret[0].(int64)
+	ret0, _ := ret[0].(*rivertype.JobInsertResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -103,28 +103,28 @@ type MockJobQueueEnqueueBootstrapCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockJobQueueEnqueueBootstrapCall) Return(arg0 int64, arg1 error) *MockJobQueueEnqueueBootstrapCall {
+func (c *MockJobQueueEnqueueBootstrapCall) Return(arg0 *rivertype.JobInsertResult, arg1 error) *MockJobQueueEnqueueBootstrapCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJobQueueEnqueueBootstrapCall) Do(f func(context.Context, rivertypes.BootstrapArgs) (int64, error)) *MockJobQueueEnqueueBootstrapCall {
+func (c *MockJobQueueEnqueueBootstrapCall) Do(f func(context.Context, rivertypes.BootstrapArgs) (*rivertype.JobInsertResult, error)) *MockJobQueueEnqueueBootstrapCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJobQueueEnqueueBootstrapCall) DoAndReturn(f func(context.Context, rivertypes.BootstrapArgs) (int64, error)) *MockJobQueueEnqueueBootstrapCall {
+func (c *MockJobQueueEnqueueBootstrapCall) DoAndReturn(f func(context.Context, rivertypes.BootstrapArgs) (*rivertype.JobInsertResult, error)) *MockJobQueueEnqueueBootstrapCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // EnqueueDestroyController mocks base method.
-func (m *MockJobQueue) EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (int64, error) {
+func (m *MockJobQueue) EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (*rivertype.JobInsertResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnqueueDestroyController", ctx, args)
-	ret0, _ := ret[0].(int64)
+	ret0, _ := ret[0].(*rivertype.JobInsertResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -142,19 +142,19 @@ type MockJobQueueEnqueueDestroyControllerCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockJobQueueEnqueueDestroyControllerCall) Return(arg0 int64, arg1 error) *MockJobQueueEnqueueDestroyControllerCall {
+func (c *MockJobQueueEnqueueDestroyControllerCall) Return(arg0 *rivertype.JobInsertResult, arg1 error) *MockJobQueueEnqueueDestroyControllerCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJobQueueEnqueueDestroyControllerCall) Do(f func(context.Context, rivertypes.DestroyControllerArgs) (int64, error)) *MockJobQueueEnqueueDestroyControllerCall {
+func (c *MockJobQueueEnqueueDestroyControllerCall) Do(f func(context.Context, rivertypes.DestroyControllerArgs) (*rivertype.JobInsertResult, error)) *MockJobQueueEnqueueDestroyControllerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJobQueueEnqueueDestroyControllerCall) DoAndReturn(f func(context.Context, rivertypes.DestroyControllerArgs) (int64, error)) *MockJobQueueEnqueueDestroyControllerCall {
+func (c *MockJobQueueEnqueueDestroyControllerCall) DoAndReturn(f func(context.Context, rivertypes.DestroyControllerArgs) (*rivertype.JobInsertResult, error)) *MockJobQueueEnqueueDestroyControllerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

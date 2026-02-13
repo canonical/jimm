@@ -153,7 +153,11 @@ func (s *bootstrapManagerSuite) TestStartBootstrapJob_EnqueuesJob(c *qt.C) {
 		Cloud:                requested.Cloud,
 		LoginTokenRefreshURL: loginTokenRefreshURLParam,
 		UserConfig:           requested.UserConfig,
-	}).Return(int64(99), nil)
+	}).Return(&rivertype.JobInsertResult{
+		Job: &rivertype.JobRow{
+			ID: 99,
+		},
+	}, nil)
 
 	jobID, err := manager.StartBootstrapJob(ctx, user, requested)
 	c.Assert(err, qt.IsNil)
@@ -1174,7 +1178,7 @@ func (s *bootstrapManagerSuite) TestStartDestroyControllerJob(c *qt.C) {
 	mocks.jobQueue.EXPECT().EnqueueDestroyController(
 		gomock.Any(),
 		gomock.Any(),
-	).DoAndReturn(func(ctx context.Context, dca rivertypes.DestroyControllerArgs) (int64, error) {
+	).DoAndReturn(func(ctx context.Context, dca rivertypes.DestroyControllerArgs) (*rivertype.JobInsertResult, error) {
 		c.Check(dca.Username, qt.Equals, user.Name)
 		c.Check(dca.ControllerName, qt.Equals, "controller-foo")
 		c.Check(dca.AgentVersion, qt.Equals, "3.6.9")
@@ -1184,7 +1188,9 @@ func (s *bootstrapManagerSuite) TestStartDestroyControllerJob(c *qt.C) {
 		c.Check(dca.APIEndpoints, qt.DeepEquals, []string{"ep-1", "ep-2"})
 		c.Check(dca.PublicAddress, qt.Equals, "public-address")
 		c.Check(dca.CACertificate, qt.Equals, "ca-cert")
-		return 456, nil
+		return &rivertype.JobInsertResult{
+			Job: &rivertype.JobRow{ID: 456},
+		}, nil
 	})
 
 	jobID, err := manager.StartDestroyControllerJob(testCtx, user, args)
