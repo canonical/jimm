@@ -137,6 +137,7 @@ const (
 	CodeServerError                  Code = "server error"
 	CodeSessionTokenInvalid          Code = jujuparams.CodeSessionTokenInvalid
 	CodeUpgradeInProgress            Code = jujuparams.CodeUpgradeInProgress
+	CodeInProgress                   Code = "in progress"
 	CodeFailedToParseTupleKey        Code = "failed to parse tuple"
 	CodeFailedToResolveTupleResource Code = "failed resolve resource"
 	CodeOpenFGARequestFailed         Code = "failed request to OpenFGA"

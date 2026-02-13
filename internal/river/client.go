@@ -35,24 +35,21 @@ func NewRiverClient(db *db.Database) (*Client, error) {
 
 // EnqueueUpgradeTo inserts a River job to upgrade a model to the specified version
 // by migrating and upgrading it.
-func (c *Client) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (int64, error) {
+func (c *Client) EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error) {
 	job, err := c.client.Insert(ctx, args, nil)
-	return job.Job.ID, err
+	return job, err
 }
 
-// TODO(Kian JUJU-9159): Return the isDuplicate flag so we can either return an error to callers
-// or at least inform them that a bootstrap is in-progress and their request was ignored.
-
 // EnqueueBootstrap inserts a River job to bootstrap a new controller.
-func (c *Client) EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (int64, error) {
+func (c *Client) EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (*rivertype.JobInsertResult, error) {
 	job, err := c.client.Insert(ctx, args, nil)
-	return job.Job.ID, err
+	return job, err
 }
 
 // EnqueueDestroyController inserts a River job to destroy an existing controller.
-func (c *Client) EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (int64, error) {
+func (c *Client) EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (*rivertype.JobInsertResult, error) {
 	job, err := c.client.Insert(ctx, args, nil)
-	return job.Job.ID, err
+	return job, err
 }
 
 // GetJobInfo returns the current state of the specified job.

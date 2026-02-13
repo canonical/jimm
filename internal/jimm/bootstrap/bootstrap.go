@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // bootstrap package provides functionality to manage the bootstrap process
 // for controllers in JIMM.
@@ -57,8 +57,8 @@ type Store interface {
 
 // JobQueue defines the method to enqueue a bootstrap/destroy-controller job.
 type JobQueue interface {
-	EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (int64, error)
-	EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (int64, error)
+	EnqueueBootstrap(ctx context.Context, args rivertypes.BootstrapArgs) (*rivertype.JobInsertResult, error)
+	EnqueueDestroyController(ctx context.Context, args rivertypes.DestroyControllerArgs) (*rivertype.JobInsertResult, error)
 	WaitForJobCompletion(ctx context.Context, jobID int64) (*rivertype.JobRow, error)
 	GetJobInfo(ctx context.Context, jobID int64) (*rivertype.JobRow, error)
 	CancelJob(ctx context.Context, jobID int64) (*rivertype.JobRow, error)
@@ -263,12 +263,15 @@ func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 		// User defined config
 		UserConfig: params.UserConfig,
 	}
-	jobID, err := b.jobQueue.EnqueueBootstrap(ctx, bootstrapArgs)
+	job, err := b.jobQueue.EnqueueBootstrap(ctx, bootstrapArgs)
 	if err != nil {
 		return 0, errors.E(fmt.Errorf("failed to enqueue bootstrap job: %w", err))
 	}
+	if job.UniqueSkippedAsDuplicate {
+		return 0, errors.E(fmt.Errorf("a bootstrap job is already in progress - please wait for it to complete before starting a new one"), errors.CodeInProgress)
+	}
 
-	return jobID, nil
+	return job.Job.ID, nil
 }
 
 type command struct {
@@ -544,12 +547,15 @@ func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 		PublicAddress:  params.PublicAddress,
 	}
 
-	jobID, err := b.jobQueue.EnqueueDestroyController(ctx, destroyArgs)
+	job, err := b.jobQueue.EnqueueDestroyController(ctx, destroyArgs)
 	if err != nil {
 		return 0, errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
 	}
+	if job.UniqueSkippedAsDuplicate {
+		return 0, errors.E(fmt.Errorf("a destroy job is already in progress - please wait for it to complete before starting a new one"), errors.CodeInProgress)
+	}
 
-	return jobID, nil
+	return job.Job.ID, nil
 }
 
 // DestroyController destroys a Juju controller and removes it from JIMM.

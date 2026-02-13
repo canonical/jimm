@@ -7,10 +7,9 @@ package upgrade
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"fmt"
 	"time"
-
-	stderrors "errors"
 
 	"github.com/juju/clock"
 	jujuerrors "github.com/juju/errors"
@@ -20,6 +19,7 @@ import (
 	"github.com/juju/retry"
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
+	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -55,7 +55,7 @@ type Store interface {
 
 // UpgradeEnqueuer defines the method to enqueue an upgrade job.
 type UpgradeEnqueuer interface {
-	EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (int64, error)
+	EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error)
 }
 
 // upgradeManager provides a means to manage controller upgrades within JIMM.
@@ -312,7 +312,7 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 		return 0, errors.E(fmt.Errorf("failed to clone controller: %w", err))
 	}
 
-	id, err := u.enqueuer.EnqueueUpgradeTo(ctx, rivertypes.UpgradeToArgs{
+	job, err := u.enqueuer.EnqueueUpgradeTo(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            modelUUID,
 		TargetVersion:        targetVersion,
 		Username:             user.Name,
@@ -321,8 +321,11 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 	if err != nil {
 		return 0, errors.E(fmt.Errorf("failed to enqueue model migration and upgrade job: %w", err))
 	}
+	if job.UniqueSkippedAsDuplicate {
+		return 0, errors.E("an upgrade job for this model is already in progress", errors.CodeInProgress)
+	}
 
-	return id, nil
+	return job.Job.ID, nil
 }
 
 // MigrateModel migrates a model to a new controller without upgrading the model's agent.
@@ -367,7 +370,7 @@ func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 			Attempts: 30,
 			Delay:    10 * time.Second,
 			Func: func() error {
-				_, err = u.jujuManager.ModelInfo(ctx, user, mt)
+				mi, err := u.jujuManager.ModelInfo(ctx, user, mt)
 				if err != nil {
 					return err
 				}
@@ -377,12 +380,16 @@ func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 					return err
 				}
 
-				// It hasn't migrated yet, so error out.
-				if m.Controller.Name != targetControllerName {
-					return modelNotMigratedErr
+				if m.Controller.Name == targetControllerName {
+					return nil
 				}
 
-				return nil
+				if mi.Migration != nil && mi.Migration.End != nil {
+					endUTC := mi.Migration.End.UTC().Format(time.RFC3339)
+					return fmt.Errorf("model migration failed: migration ended at %s with status %s", endUTC, mi.Migration.Status)
+				}
+
+				return modelNotMigratedErr
 			},
 			NotifyFunc: func(lastError error, attempt int) {
 				zapctx.Debug(ctx, "model migrate attempt", zap.Error(lastError), zap.Int("attempt", attempt))

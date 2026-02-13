@@ -18,6 +18,7 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
+	"github.com/riverqueue/river/rivertype"
 	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -313,12 +314,14 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(nil)
 
 	// Migration expectations.
-	s.enqueuer.EXPECT().EnqueueUpgradeTo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, uta rivertypes.UpgradeToArgs) (int64, error) {
+	s.enqueuer.EXPECT().EnqueueUpgradeTo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, uta rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error) {
 		c.Check(uta.ModelUUID, qt.Equals, modelUUID)
 		c.Check(uta.TargetVersion, qt.Equals, targetVersion)
 		c.Check(uta.Username, qt.Equals, user.Name)
 		// Don't check target controller name since that is currently generated based on the current time.
-		return 1, nil
+		return &rivertype.JobInsertResult{
+			Job: &rivertype.JobRow{ID: 1},
+		}, nil
 	})
 
 	jobID, err := upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetVersion)
@@ -416,6 +419,55 @@ func TestMigrateModel_Success(t *testing.T) {
 
 	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, targetMt.Id(), targetController)
 	c.Assert(err, qt.IsNil)
+}
+
+func TestMigrateModel_EndsEarly(t *testing.T) {
+	s := setupTest(t)
+	c := qt.New(t)
+
+	ctx := c.Context()
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.bootstrapManager, s.jujuManager, s.store, s.dialer, s.enqueuer)
+	c.Assert(err, qt.IsNil)
+
+	targetMt := names.NewModelTag("93608db4-f1cb-4da5-9926-8233981aef0a")
+	targetController := "4.0controller"
+
+	s.jujuManager.EXPECT().InitiateInternalMigration(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(jujuparams.InitiateMigrationResult{}, nil)
+
+	s.jujuManager.EXPECT().
+		GetModel(gomock.Any(), targetMt.Id()).
+		Return(
+			dbmodel.Model{Controller: dbmodel.Controller{Name: "source controller"}},
+			nil,
+		)
+
+	timeFailed := time.Date(2026, 2, 13, 13, 31, 2, 983062723, time.FixedZone("SAST", 2*60*60))
+	expectedEndUTC := timeFailed.UTC().Format(time.RFC3339)
+	gomock.InOrder(
+		s.jujuManager.EXPECT().
+			ModelInfo(gomock.Any(), gomock.Any(), targetMt).
+			Return(&jujuparams.ModelInfo{}, nil),
+		s.jujuManager.EXPECT().
+			ModelInfo(gomock.Any(), gomock.Any(), targetMt).
+			Return(&jujuparams.ModelInfo{
+				UUID: targetMt.Id(),
+				Migration: &jujuparams.ModelMigrationStatus{
+					Status: "some-status",
+					End:    &timeFailed,
+				},
+			}, nil),
+	)
+
+	s.jujuManager.EXPECT().GetModel(gomock.Any(), targetMt.Id()).Return(
+		dbmodel.Model{Controller: dbmodel.Controller{
+			Name: "source controller",
+		}}, nil,
+	)
+
+	err = upgradeMgr.MigrateModel(ctx, &openfga.User{}, targetMt.Id(), targetController)
+	c.Assert(err, qt.ErrorMatches, ".*model migration failed: migration ended at "+regexp.QuoteMeta(expectedEndUTC)+" with status some-status")
 }
 
 func TestMigrateModel_Retries2Times(t *testing.T) {

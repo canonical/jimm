@@ -4,6 +4,7 @@ package river
 
 import (
 	"context"
+	"time"
 
 	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
@@ -67,4 +68,9 @@ func (w *upgradeWorker) Work(ctx context.Context, job *river.Job[upgradeWorkerAr
 		return err
 	}
 	return nil
+}
+
+// Timeout implements the [river.Worker] interface.
+func (w *upgradeWorker) Timeout(*river.Job[upgradeWorkerArgs]) time.Duration {
+	return 10 * time.Minute
 }
