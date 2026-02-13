@@ -44,12 +44,40 @@ type ModelMigrationStatus struct {
 	End    *time.Time
 }
 
+// SupportedFeature represents jujuparams.SupportedFeature.
+type SupportedFeature struct {
+	Name        string
+	Description string
+	Version     string
+}
+
+// SecretBackend represents jujuparams.SecretBackend.
+type SecretBackend struct {
+	Name                string
+	BackendType         string
+	TokenRotateInterval *time.Duration
+	Config              map[string]interface{}
+}
+
+// SecretBackendResult represents jujuparams.SecretBackendResult.
+type SecretBackendResult struct {
+	Result     SecretBackend
+	ID         string
+	NumSecrets int
+	Status     string
+	Message    string
+	Error      error
+}
+
 // ModelInfo holds information about a model.
 // It combines the base.ModelInfo returned by the Juju client in other API methods with additional
 // information that is contained in the params.ModelInfo returned by the ModelInfo API call.
 type ModelInfo struct {
 	base.ModelInfo
-	MigrationStatus *ModelMigrationStatus
+	MigrationStatus         *ModelMigrationStatus
+	CloudCredentialValidity *bool
+	SupportedFeatures       []SupportedFeature
+	SecretBackends          []SecretBackendResult
 }
 
 // ModelInfo retrieves information about a model from the controller.

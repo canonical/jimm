@@ -195,7 +195,7 @@ func (r *controllerRoot) ModelInfo(ctx context.Context, args jujuparams.Entities
 			continue
 		}
 
-		apiModelInfo := toModelInfoParamsWithMigrationInfo(modelInfo)
+		apiModelInfo := toFullModelInfo(modelInfo)
 		results[i].Result = &apiModelInfo
 		if r.controllerUUIDMasking {
 			results[i].Result.ControllerUUID = r.params.ControllerUUID
@@ -226,7 +226,7 @@ func (r *controllerRoot) CreateModel(ctx context.Context, args jujuparams.ModelC
 	if r.controllerUUIDMasking {
 		info.ControllerUUID = r.params.ControllerUUID
 	}
-	return toModelInfoParams(info), nil
+	return toModelInfo(info), nil
 }
 
 // DestroyModels implements the ModelManager facade's DestroyModels

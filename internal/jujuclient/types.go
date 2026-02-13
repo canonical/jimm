@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuclient
 
@@ -109,8 +109,38 @@ func convertParamsModelInfo(modelInfo params.ModelInfo) (ModelInfo, error) {
 			End:    modelInfo.Migration.End,
 		}
 	}
+	supportedFeatures := make([]SupportedFeature, len(modelInfo.SupportedFeatures))
+	for i, f := range modelInfo.SupportedFeatures {
+		supportedFeatures[i] = SupportedFeature{
+			Name:        f.Name,
+			Description: f.Description,
+			Version:     f.Version,
+		}
+	}
+	var secretBackendResults []SecretBackendResult
+	for _, sb := range modelInfo.SecretBackends {
+		res := SecretBackendResult{
+			Result: SecretBackend{
+				Name:                sb.Result.Name,
+				BackendType:         sb.Result.BackendType,
+				Config:              sb.Result.Config,
+				TokenRotateInterval: sb.Result.TokenRotateInterval,
+			},
+			ID:         sb.ID,
+			Status:     sb.Status,
+			NumSecrets: sb.NumSecrets,
+			Message:    sb.Message,
+		}
+		if sb.Error != nil {
+			res.Error = sb.Error
+		}
+		secretBackendResults = append(secretBackendResults, res)
+	}
 	return ModelInfo{
-		ModelInfo:       result,
-		MigrationStatus: migrationStatus,
+		ModelInfo:               result,
+		MigrationStatus:         migrationStatus,
+		CloudCredentialValidity: modelInfo.CloudCredentialValidity,
+		SupportedFeatures:       supportedFeatures,
+		SecretBackends:          secretBackendResults,
 	}, nil
 }

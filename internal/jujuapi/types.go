@@ -237,7 +237,7 @@ func toModelDumpParams(modelDump map[string]any) (string, error) {
 	return string(yamlDump), err
 }
 
-func toModelInfoParams(modelInfo base.ModelInfo) jujuparams.ModelInfo {
+func toModelInfo(modelInfo base.ModelInfo) jujuparams.ModelInfo {
 	mi := jujuparams.ModelInfo{
 		Name:               modelInfo.Name,
 		UUID:               modelInfo.UUID,
@@ -293,8 +293,9 @@ func toModelInfoParams(modelInfo base.ModelInfo) jujuparams.ModelInfo {
 	return mi
 }
 
-func toModelInfoParamsWithMigrationInfo(modelInfo jujuclient.ModelInfo) jujuparams.ModelInfo {
-	modelInfoParams := toModelInfoParams(modelInfo.ModelInfo)
+func toFullModelInfo(modelInfo jujuclient.ModelInfo) jujuparams.ModelInfo {
+	modelInfoParams := toModelInfo(modelInfo.ModelInfo)
+
 	if modelInfo.MigrationStatus != nil {
 		modelInfoParams.Migration = &jujuparams.ModelMigrationStatus{
 			Status: modelInfo.MigrationStatus.Status,
@@ -302,5 +303,41 @@ func toModelInfoParamsWithMigrationInfo(modelInfo jujuclient.ModelInfo) jujupara
 			End:    modelInfo.MigrationStatus.End,
 		}
 	}
+	if modelInfo.CloudCredentialValidity != nil {
+		modelInfoParams.CloudCredentialValidity = modelInfo.CloudCredentialValidity
+	}
+
+	var supportedFeatures []jujuparams.SupportedFeature
+	for _, f := range modelInfo.SupportedFeatures {
+		supportedFeatures = append(supportedFeatures, jujuparams.SupportedFeature{
+			Name:        f.Name,
+			Description: f.Description,
+			Version:     f.Version,
+		})
+	}
+	modelInfoParams.SupportedFeatures = supportedFeatures
+
+	var secretBackendResults []jujuparams.SecretBackendResult
+	for _, sb := range modelInfo.SecretBackends {
+		secretBackendResults = append(secretBackendResults, jujuparams.SecretBackendResult{
+			Result: jujuparams.SecretBackend{
+				Name:                sb.Result.Name,
+				BackendType:         sb.Result.BackendType,
+				TokenRotateInterval: sb.Result.TokenRotateInterval,
+				Config:              sb.Result.Config,
+			},
+			ID:         sb.ID,
+			NumSecrets: sb.NumSecrets,
+			Status:     sb.Status,
+			Message:    sb.Message,
+			Error: &jujuparams.Error{
+				Message: sb.Error.Error(),
+				Code:    string(errors.ErrorCode(sb.Error)),
+				Info:    errors.ErrorInfo(sb.Error),
+			},
+		})
+	}
+	modelInfoParams.SecretBackends = secretBackendResults
+
 	return modelInfoParams
 }
