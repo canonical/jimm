@@ -37,6 +37,8 @@ type upgradeToWorker struct {
 }
 
 // Timeout implements the [river.Worker] interface.
+// To determine the timeout duration, we consider the maximum time
+// for both the migration and upgrade steps, including retries.
 func (w *upgradeToWorker) Timeout(*river.Job[rivertypes.UpgradeToArgs]) time.Duration {
 	return 20 * time.Minute
 }
