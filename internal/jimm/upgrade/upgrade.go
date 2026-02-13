@@ -351,9 +351,9 @@ func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 					return nil
 				}
 
-				if mi.Migration != nil && mi.Migration.End != nil {
-					endUTC := mi.Migration.End.UTC().Format(time.RFC3339)
-					return fmt.Errorf("model migration failed: migration ended at %s with status %s", endUTC, mi.Migration.Status)
+				if mi.MigrationStatus != nil && mi.MigrationStatus.End != nil {
+					endUTC := mi.MigrationStatus.End.UTC().Format(time.RFC3339)
+					return fmt.Errorf("model migration failed: migration ended at %s with status %s", endUTC, mi.MigrationStatus.Status)
 				}
 
 				return modelNotMigratedErr

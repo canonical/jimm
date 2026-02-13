@@ -417,12 +417,14 @@ func TestMigrateModel_EndsEarly(t *testing.T) {
 	gomock.InOrder(
 		s.jujuManager.EXPECT().
 			ModelInfo(gomock.Any(), gomock.Any(), targetMt).
-			Return(&jujuparams.ModelInfo{}, nil),
+			Return(jujuclient.ModelInfo{}, nil),
 		s.jujuManager.EXPECT().
 			ModelInfo(gomock.Any(), gomock.Any(), targetMt).
-			Return(&jujuparams.ModelInfo{
-				UUID: targetMt.Id(),
-				Migration: &jujuparams.ModelMigrationStatus{
+			Return(jujuclient.ModelInfo{
+				ModelInfo: base.ModelInfo{
+					UUID: targetMt.Id(),
+				},
+				MigrationStatus: &jujuclient.ModelMigrationStatus{
 					Status: "some-status",
 					End:    &timeFailed,
 				},
