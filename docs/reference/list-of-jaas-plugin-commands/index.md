@@ -300,6 +300,58 @@ Note that JIMM will internally do the following:
 - register the controller with JIMM
 
 
+(command-jaas-bootstrap-status)=
+# jaas bootstrap-status
+
+**Aliases:** destroy-status
+
+## Summary
+Displays logs for a bootstrap/destroy job
+
+## Usage
+```jaas bootstrap-status [options] <job id>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `-f` | false | follow the logs |
+
+## Examples
+
+    juju bootstrap-status <id>
+    juju destroy-status <id>
+
+
+## Details
+
+Displays logs for a bootstrap or destroy-controller job.
+
+
+(command-jaas-bootstrap-stop)=
+# jaas bootstrap-stop
+
+## Summary
+Stop an in-progress bootstrap job
+
+## Usage
+```jaas bootstrap-stop [options] <job id>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+
+## Examples
+
+    juju bootstrap-stop <id>
+
+
+## Details
+
+Stop a bootstrap job.
+
+
 (command-jaas-check-permission)=
 # jaas check-permission
 
@@ -524,55 +576,6 @@ that represent a user's access to the incoming model's cloud.
 
 The --owner command is necessary when importing a model created by a
 local user and it will switch the model owner to the desired external user.
-
-
-(command-jaas-job-status)=
-# jaas job-status
-
-## Summary
-Displays logs for a job
-
-## Usage
-```jaas job-status [options] <job uuid>```
-
-### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `-f` | false | follow the logs of the job |
-
-## Examples
-
-    juju job-status 2cb433a6-04eb-4ec4-9567-90426d20a004
-
-
-## Details
-
-Displays logs for a job.
-
-
-(command-jaas-job-stop)=
-# jaas job-stop
-
-## Summary
-Stop a job
-
-## Usage
-```jaas job-stop [options] <job uuid>```
-
-### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-
-## Examples
-
-    juju job-stop 2cb433a6-04eb-4ec4-9567-90426d20a004
-
-
-## Details
-
-Stop a job.
 
 
 (command-jaas-list-audit-events)=

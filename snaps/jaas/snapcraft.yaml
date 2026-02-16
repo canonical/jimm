@@ -73,8 +73,9 @@ parts:
       ln -sf jaas bin/juju-unregister-controller
       ln -sf jaas bin/juju-update-migrated-model
       ln -sf jaas bin/juju-update-service-account-credential
-      ln -sf jaas bin/juju-job-status
-      ln -sf jaas bin/juju-job-stop
+      ln -sf jaas bin/juju-bootstrap-stop
+      ln -sf jaas bin/juju-bootstrap-status
+      ln -sf jaas bin/juju-destroy-status
       ln -sf jaas bin/juju-bootstrap
       ln -sf jaas bin/juju-destroy-controller
       ln -sf jaas bin/juju-upgrade-to

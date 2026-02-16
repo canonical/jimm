@@ -22,7 +22,7 @@ Displays logs for a bootstrap or destroy-controller job.
 `
 	bootstrapStatusCommandExample = `
     juju bootstrap-status <id>
-	juju destroy-status <id>
+    juju destroy-status <id>
 `
 )
 
