@@ -19,6 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
+	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -699,4 +700,69 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 			c.Assert(info, gc.DeepEquals, test.expectedInfo)
 		}
 	}
+}
+
+func (s *jimmUnitTestSuite) TestJobInfo(c *gc.C) {
+	ctx := context.Background()
+
+	finishedTime := time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC)
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jimm.JujuManager {
+			return &mocks.JujuManager{
+				JobInfo_: func(ctx context.Context, jobID string) (jobs.JobInfo, error) {
+					if jobID != "1" {
+						return jobs.JobInfo{}, errors.E(errors.CodeNotFound, "job not found")
+					}
+					c.Check(jobID, gc.Equals, "1")
+					return jobs.JobInfo{
+						ID:             1,
+						Kind:           "bootstrap",
+						Status:         "running",
+						CurrentAttempt: 1,
+						MaxAttempts:    3,
+						FinishedAt:     &finishedTime,
+						Errors: []jobs.JobError{
+							{
+								At:      finishedTime,
+								Attempt: 1,
+								Error:   "some error",
+							},
+						},
+					}, nil
+				},
+			}
+		},
+	}
+
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+	req := apiparams.JobInfoRequest{JobID: "1"}
+
+	resp, err := root.JobInfo(ctx, req)
+	c.Assert(err, gc.IsNil)
+	c.Assert(resp.ID, gc.Equals, "1")
+	c.Assert(resp.Kind, gc.Equals, "bootstrap")
+	c.Assert(resp.Status, gc.Equals, "running")
+	c.Assert(resp.CurrentAttempt, gc.Equals, 1)
+	c.Assert(resp.MaxAttempts, gc.Equals, 3)
+	c.Assert(resp.FinishedAt, gc.Equals, finishedTime)
+	c.Assert(len(resp.Errors), gc.Equals, 1)
+	c.Assert(resp.Errors[0].At, gc.Equals, finishedTime)
+	c.Assert(resp.Errors[0].Attempt, gc.Equals, 1)
+	c.Assert(resp.Errors[0].Error, gc.Equals, "some error")
+
+	// Test non-existent job ID
+	_, err = root.JobInfo(ctx, apiparams.JobInfoRequest{JobID: "invalid"})
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
+	c.Assert(err.Error(), gc.Matches, "job not found")
+}
+
+func (s *jimmUnitTestSuite) TestJobInfo_RequiresAdmin(c *gc.C) {
+	ctx := context.Background()
+
+	root := newTestControllerRoot(nil, "alice@canonical.com", false)
+	req := apiparams.JobInfoRequest{JobID: "1"}
+
+	_, err := root.JobInfo(ctx, req)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }

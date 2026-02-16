@@ -1230,3 +1230,14 @@ func (s *jimmSuite) TestPurgeLogs_NotAdmin(c *gc.C) {
 	})
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
+
+func (s *jimmSuite) TestJobInfo(c *gc.C) {
+	conn := s.Open(c, nil, "alice", nil)
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	req := apiparams.JobInfoRequest{JobID: "123"}
+	_, err := client.JobInfo(&req)
+	c.Assert(err, gc.ErrorMatches, `failed to get job info`)
+}

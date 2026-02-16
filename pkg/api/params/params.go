@@ -692,3 +692,27 @@ type ModelControllerInfo struct {
 	// ControllerUUID is the UUID of the controller hosting the model.
 	ControllerUUID string `json:"controller-uuid" yaml:"controller-uuid"`
 }
+
+// JobInfoRequest holds the request to get information about a job.
+type JobInfoRequest struct {
+	// JobID is the ID of the job to get information about.
+	JobID string `json:"job-id"`
+}
+
+// JobError represents an error that occurred during a job.
+type JobError struct {
+	At      time.Time `json:"at" yaml:"at"`
+	Attempt int       `json:"attempt" yaml:"attempt"`
+	Error   string    `json:"error" yaml:"error"`
+}
+
+// JobInfoResponse holds information about a job.
+type JobInfoResponse struct {
+	ID             int64      `json:"id" yaml:"id"`
+	Status         string     `json:"status" yaml:"status"`
+	Kind           string     `json:"kind" yaml:"kind"`
+	CurrentAttempt int        `json:"current_attempt" yaml:"current_attempt"`
+	MaxAttempts    int        `json:"max_attempts" yaml:"max_attempts"`
+	FinishedAt     *time.Time `json:"finished_at,omitempty" yaml:"finished_at,omitempty"`
+	Errors         []JobError `json:"errors,omitempty" yaml:"errors,omitempty"`
+}

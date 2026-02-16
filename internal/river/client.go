@@ -57,6 +57,11 @@ func (c *Client) GetJobInfo(ctx context.Context, jobID int64) (*rivertype.JobRow
 	return c.client.JobGet(ctx, jobID)
 }
 
+// ListJobs returns a list of jobs matching the specified parameters.
+func (c *Client) ListJobs(ctx context.Context, params *river.JobListParams) (*river.JobListResult, error) {
+	return c.client.JobList(ctx, params)
+}
+
 // CancelJob cancels the specified job. It returns the final job state after cancellation.
 func (c *Client) CancelJob(ctx context.Context, jobID int64) (*rivertype.JobRow, error) {
 	return c.client.JobCancel(ctx, jobID)

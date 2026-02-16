@@ -74,6 +74,7 @@ func init() {
 		upgradeToMethod := rpc.Method(r.UpgradeTo)
 		listUserCloudsMethod := rpc.Method(r.ListUserClouds)
 		modelControllerInfoMethod := rpc.Method(r.ModelControllerInfo)
+		jobInfoMethod := rpc.Method(r.JobInfo)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
@@ -124,6 +125,8 @@ func init() {
 		r.AddMethod("JIMM", 4, "StopBootstrap", stopBootstrap)
 		// JIMM Upgrades
 		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
+		// Job management
+		r.AddMethod("JIMM", 4, "JobInfo", jobInfoMethod)
 
 		return []int{4}
 	}
@@ -810,4 +813,23 @@ func (r *controllerRoot) ModelControllerInfo(ctx context.Context, req apiparams.
 	}
 
 	return *response, nil
+}
+
+// JobInfo returns information about a job given its ID.
+func (r *controllerRoot) JobInfo(ctx context.Context, req apiparams.JobInfoRequest) (apiparams.JobInfoResponse, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.JobInfoResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
+
+	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
+	if err != nil {
+		return apiparams.JobInfoResponse{}, errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
+	}
+
+	jobInfo, err := r.jimm.JobManager().GetJobInfo(ctx, jobID)
+	if err != nil {
+		return apiparams.JobInfoResponse{}, errors.E(fmt.Errorf("failed to get job info: %v", err))
+	}
+
+	return toJobInfoParams(jobInfo), nil
 }

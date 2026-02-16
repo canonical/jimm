@@ -30,6 +30,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
+	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
@@ -329,6 +330,11 @@ type UpgradeManager interface {
 	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
 }
 
+// JobManager provides methods to manage long-running jobs such as bootstrapping and upgrading.
+type JobManager interface {
+	GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error)
+}
+
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
 type Parameters struct {
@@ -564,6 +570,13 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.upgradeManager = upgradeManager
 
+	jobManager, err := jobs.NewJobManager(j.RiverClient)
+	if err != nil {
+		return nil, err
+	}
+
+	j.jobManager = jobManager
+
 	return j, nil
 }
 
@@ -613,6 +626,9 @@ type JIMM struct {
 
 	// upgradeManager provides a means to manage controller cloning and model automated upgrades.
 	upgradeManager UpgradeManager
+
+	// jobManager provides a means to manage long-running jobs.
+	jobManager JobManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -693,6 +709,11 @@ func (j *JIMM) BootstrapManager() BootstrapManager {
 // UpgradeManager returns a manager that enables operations related to controller cloning and model automated upgrades.
 func (j *JIMM) UpgradeManager() UpgradeManager {
 	return j.upgradeManager
+}
+
+// JobManager returns a manager that enables operations related to long-running jobs.
+func (j *JIMM) JobManager() JobManager {
+	return j.jobManager
 }
 
 // DialerAdapter is an adapter that implements the juju.Dialer interface

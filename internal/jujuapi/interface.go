@@ -21,6 +21,7 @@ type JIMM interface {
 	ConfigManager() jimm.ConfigManager
 	BootstrapManager() jimm.BootstrapManager
 	UpgradeManager() jimm.UpgradeManager
+	JobManager() jimm.JobManager
 
 	ResourceTag() names.ControllerTag
 	PubSubHub() *pubsub.Hub

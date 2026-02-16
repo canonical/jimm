@@ -17,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -48,6 +49,7 @@ type JujuManager struct {
 	GrantOfferAccessOnController_      func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration_                 func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
+	JobInfo_                           func(ctx context.Context, jobID string) (jobs.JobInfo, error)
 	ListApplicationOffers_             func(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ListModels_                        func(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
 	ListResources_                     func(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
@@ -178,6 +180,12 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.InitiateInternalMigration_(ctx, user, modelNameOrUUID, targetController)
+}
+func (j *JujuManager) JobInfo(ctx context.Context, jobID string) (jobs.JobInfo, error) {
+	if j.JobInfo_ == nil {
+		return jobs.JobInfo{}, errors.E(errors.CodeNotImplemented)
+	}
+	return j.JobInfo_(ctx, jobID)
 }
 func (j *JujuManager) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
 	if j.ListApplicationOffers_ == nil {

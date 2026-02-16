@@ -28,6 +28,7 @@ type JIMM struct {
 	OfferAuthorizer_   func() jimm.OfferAuthorizer
 	BootstapManager_   func() jimm.BootstrapManager
 	UpgradeManager_    func() jimm.UpgradeManager
+	JobManager_        func() jimm.JobManager
 }
 
 func (j *JIMM) RoleManager() jimm.RoleManager {
@@ -119,4 +120,11 @@ func (j *JIMM) UpgradeManager() jimm.UpgradeManager {
 		return nil
 	}
 	return j.UpgradeManager_()
+}
+
+func (j *JIMM) JobManager() jimm.JobManager {
+	if j.JobManager_ == nil {
+		return nil
+	}
+	return j.JobManager_()
 }

@@ -10,8 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
@@ -340,4 +342,24 @@ func toFullModelInfo(modelInfo jujuclient.ModelInfo) jujuparams.ModelInfo {
 	modelInfoParams.SecretBackends = secretBackendResults
 
 	return modelInfoParams
+}
+
+func toJobInfoParams(jobInfo jobs.JobInfo) params.JobInfoResponse {
+	var jobErrors []params.JobError
+	for _, err := range jobInfo.Errors {
+		jobErrors = append(jobErrors, params.JobError{
+			Error:   err.Error,
+			At:      err.At,
+			Attempt: err.Attempt,
+		})
+	}
+	return params.JobInfoResponse{
+		ID:             jobInfo.ID,
+		Status:         jobInfo.Status,
+		Kind:           jobInfo.Kind,
+		CurrentAttempt: jobInfo.CurrentAttempt,
+		MaxAttempts:    jobInfo.MaxAttempts,
+		FinishedAt:     jobInfo.FinishedAt,
+		Errors:         jobErrors,
+	}
 }
