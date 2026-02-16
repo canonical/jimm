@@ -12,11 +12,13 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
@@ -175,14 +177,14 @@ func TestModelSummaryWatcher(t *testing.T) {
 							return nil
 						},
 						SupportsModelSummaryWatcher_: true,
-						ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-							switch info.UUID {
+						ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+							switch model.Id() {
 							default:
-								c.Errorf("unexpected model uuid: %s", info.UUID)
+								c.Errorf("unexpected model uuid: %s", model.Id())
 							case "00000002-0000-0000-0000-000000000002":
 							case "00000002-0000-0000-0000-000000000003":
 							}
-							return errors.E(errors.CodeNotFound)
+							return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
 						},
 					},
 				},
@@ -280,14 +282,14 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 					<-ctx.Done()
 					return nil, ctx.Err()
 				},
-				ModelInfo_: func(_ context.Context, info *jujuparams.ModelInfo) error {
-					switch info.UUID {
+				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+					switch model.Id() {
 					default:
-						c.Errorf("unexpected model uuid: %s", info.UUID)
+						c.Errorf("unexpected model uuid: %s", model)
 					case "00000002-0000-0000-0000-000000000002":
 					case "00000002-0000-0000-0000-000000000003":
 					}
-					return errors.E(errors.CodeNotFound)
+					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
 				},
 				WatchAllModelSummaries_: func(ctx context.Context) (string, error) {
 					return "1234", nil

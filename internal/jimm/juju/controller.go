@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju
 
@@ -54,25 +54,6 @@ func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujucloud.Cloud) []db
 		dbClouds = append(dbClouds, cloud)
 	}
 	return dbClouds
-}
-
-// getControllerModelSummary returns the controllers model summary.
-func getControllerModelSummary(ctx context.Context, api API) (jujuparams.ModelSummary, error) {
-	var ms jujuparams.ModelSummary
-	if err := api.ControllerModelSummary(ctx, &ms); err != nil {
-		zapctx.Error(ctx, "failed to get model summary", zaputil.Error(err))
-		return ms, err
-	}
-	return ms, nil
-}
-
-// getCloudNameFromModelSummary returns the cloud name for a model summary.
-func getCloudNameFromModelSummary(modelSummary jujuparams.ModelSummary) (string, error) {
-	cloudTag, err := names.ParseCloudTag(modelSummary.CloudTag)
-	if err != nil {
-		return "", err
-	}
-	return cloudTag.Id(), nil
 }
 
 // addControllerTransactor adds a controller to the database ensuring it's clouds, regions
@@ -228,18 +209,13 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 	}
 	defer api.Close()
 
-	modelSummary, err := getControllerModelSummary(ctx, api)
+	cloudSpec, err := api.CloudSpec(ctx)
 	if err != nil {
 		return errors.E(fmt.Errorf("failed to get model summary: %v", err))
 	}
 
-	cloudName, err := getCloudNameFromModelSummary(modelSummary)
-	if err != nil {
-		return errors.E(fmt.Errorf("failed to parse the cloud tag: %v", err))
-	}
-
-	ctl.CloudName = cloudName
-	ctl.CloudRegion = modelSummary.CloudRegion
+	ctl.CloudName = cloudSpec.Name
+	ctl.CloudRegion = cloudSpec.Region
 	// TODO(mhilton) add the controller model?
 
 	clouds, err := api.Clouds()
@@ -282,7 +258,7 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 	for _, cloud := range dbClouds {
 		// If this cloud is the one used by the controller model then
 		// it is available to all users. Other clouds require `juju grant-cloud` to add permissions.
-		if cloud.ResourceTag().String() == modelSummary.CloudTag {
+		if cloud.Name == cloudSpec.Name {
 			if err := j.everyoneUser().SetCloudAccess(ctx, cloud.ResourceTag(), ofganames.CanAddModelRelation); err != nil {
 				zapctx.Error(ctx, "failed to grant everyone add-model access", zap.Error(err))
 			}
@@ -355,7 +331,7 @@ func (j *JujuManager) EarliestControllerVersion(ctx context.Context) (version.Nu
 type modelImporter struct {
 	jimm      *JujuManager
 	model     dbmodel.Model
-	modelInfo jujuparams.ModelInfo
+	modelInfo base.ModelInfo
 	// newOwner may be nil if the user wants to keep the original owner.
 	newOwner      *names.UserTag
 	originalOwner names.UserTag
@@ -389,18 +365,13 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	}
 	defer api.Close()
 
-	m.modelInfo = jujuparams.ModelInfo{
-		UUID: modelTag.Id(),
-	}
-	err = api.ModelInfo(ctx, &m.modelInfo)
+	modelInfo, err := api.ModelInfo(ctx, modelTag)
 	if err != nil {
 		return err
 	}
+	m.modelInfo = modelInfo.ModelInfo
 
-	m.originalOwner, err = names.ParseUserTag(m.modelInfo.OwnerTag)
-	if err != nil {
-		return errors.E(fmt.Sprintf("invalid username %s from original model owner", m.modelInfo.OwnerTag))
-	}
+	m.originalOwner = names.NewUserTag(m.modelInfo.Owner)
 
 	m.offersToAdd, err = api.ListApplicationOffers(ctx, []jujuparams.OfferFilter{
 		{
@@ -470,22 +441,18 @@ func (m *modelImporter) addPermissions(ctx context.Context) error {
 
 func (m *modelImporter) setCloudCredential(ctx context.Context) error {
 	// fetch cloud credential used by the model
-	cloudTag, err := names.ParseCloudTag(m.modelInfo.CloudTag)
-	if err != nil {
-		return err
-	}
 
 	// Note that the model already has a cloud credential configured which it will use when deploying new
 	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
 	// credential against the cloud the model is deployed against. Even using the correct cloud for the
 	// credential is not strictly necessary, but will help prevent the user thinking they can create new
 	// models on the incoming cloud.
-	allCredentials, err := m.jimm.Database.GetIdentityCloudCredentials(ctx, &m.model.Owner, cloudTag.Id())
+	allCredentials, err := m.jimm.Database.GetIdentityCloudCredentials(ctx, &m.model.Owner, m.modelInfo.Cloud)
 	if err != nil {
 		return err
 	}
 	if len(allCredentials) == 0 {
-		return errors.E(errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", m.model.Owner.Name, cloudTag.Id()))
+		return errors.E(errors.CodeNotFound, fmt.Sprintf("Failed to find cloud credential for user %s on cloud %s", m.model.Owner.Name, m.modelInfo.Cloud))
 	}
 	cloudCredential := allCredentials[0]
 
@@ -497,12 +464,8 @@ func (m *modelImporter) setCloudCredential(ctx context.Context) error {
 
 func (m *modelImporter) setModelCloud(ctx context.Context) error {
 	// fetch the cloud used by the model
-	cloudTag, err := names.ParseCloudTag(m.modelInfo.CloudTag)
-	if err != nil {
-		return err
-	}
-	cloud := dbmodel.Cloud{Name: cloudTag.Id()}
-	err = m.jimm.Database.GetCloud(ctx, &cloud)
+	cloud := dbmodel.Cloud{Name: m.modelInfo.Cloud}
+	err := m.jimm.Database.GetCloud(ctx, &cloud)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get cloud", zap.String("cloud", cloud.Name))
 		return err
@@ -640,9 +603,7 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 	}
 	defer api.Close()
 
-	err = api.ModelInfo(ctx, &jujuparams.ModelInfo{
-		UUID: modelTag.Id(),
-	})
+	_, err = api.ModelInfo(ctx, modelTag)
 	if err != nil {
 		return errors.E(err)
 	}

@@ -40,6 +40,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -228,21 +229,21 @@ type JujuManager interface {
 
 	// Model related methods
 
-	AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error)
+	AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ base.ModelInfo, err error)
 	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
-	DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
+	DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error)
 	DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
 	ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
-	ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
+	ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, string) error) error
 	FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
-	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
+	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelControllerInfo(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*params.ModelControllerInfo, error)
-	ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
-	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
+	ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) ([]base.UserModelSummary, error)
+	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelStatus, error)
 	QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
 	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
 	UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
@@ -692,4 +693,26 @@ func (j *JIMM) BootstrapManager() BootstrapManager {
 // UpgradeManager returns a manager that enables operations related to controller cloning and model automated upgrades.
 func (j *JIMM) UpgradeManager() UpgradeManager {
 	return j.upgradeManager
+}
+
+// DialerAdapter is an adapter that implements the juju.Dialer interface
+// using the jujuclient.Dialer. This is useful for integrating with JIMM's
+// existing dialer logic while allowing the jujuclient package to return
+// a concrete type.
+type DialerAdapter struct {
+	dialer *jujuclient.Dialer
+}
+
+// NewDialerAdapter creates a new DialerAdapter instance.
+func NewDialerAdapter(dialer *jujuclient.Dialer) *DialerAdapter {
+	return &DialerAdapter{
+		dialer: dialer,
+	}
+}
+
+// Dial implements the juju.Dialer interface for the DialerAdapter.
+// It uses the underlying jujuclient.Dialer to establish a connection
+// to the Juju controller and returns a juju.API connection.
+func (d *DialerAdapter) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (juju.API, error) {
+	return d.dialer.Dial(ctx, ctl, modelTag, user, withPermissions)
 }

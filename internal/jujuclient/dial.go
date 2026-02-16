@@ -29,8 +29,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -100,7 +98,7 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 	}
 	modelRelation := user.GetModelAccess(ctx, modelTag)
 	if modelRelation != ofganames.NoRelation {
-		p[modelTag.String()] = permissions.ToModelAccessString(modelRelation)
+		p[modelTag.String()] = toModelAccessString(modelRelation)
 	}
 
 	for k, v := range additionalPermissions {
@@ -109,8 +107,22 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 	return d.createLoginRequest1(ctx, ctl.ResourceTag(), user.ResourceTag(), p)
 }
 
+// toModelAccessString maps relation to a model access string.
+func toModelAccessString(relation openfga.Relation) string {
+	switch relation {
+	case ofganames.AdministratorRelation:
+		return "admin"
+	case ofganames.WriterRelation:
+		return "write"
+	case ofganames.ReaderRelation:
+		return "read"
+	default:
+		return ""
+	}
+}
+
 // Dial implements jimm.Dialer.
-func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (juju.API, error) {
+func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User, withPermissions map[string]string) (*Connection, error) {
 
 	conn, err := rpc.Dial(ctx, ctl, modelTag, "", nil, nil)
 	if err != nil {

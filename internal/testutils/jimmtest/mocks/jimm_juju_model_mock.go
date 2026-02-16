@@ -1,37 +1,40 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
+
 package mocks
 
 import (
 	"context"
 	"time"
 
+	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // ModelManager defines the mock struct used to implement the ModelManger interface.
 type ModelManager struct {
-	AddModel_               func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (*jujuparams.ModelInfo, error)
+	AddModel_               func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (base.ModelInfo, error)
 	ChangeModelCredential_  func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	DestroyModel_           func(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
-	DumpModel_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error)
+	DumpModel_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error)
 	DumpModelDB_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
 	ForEachModel_           func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
-	ForEachUserModel_       func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
+	ForEachUserModel_       func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, string) error) error
 	FullModelStatus_        func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
-	ListModelSummaries_     func(ctx context.Context, user *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error)
+	ListModelSummaries_     func(ctx context.Context, user *openfga.User, maskingControllerUUID string) ([]base.UserModelSummary, error)
 	GetModel_               func(ctx context.Context, uuid string) (dbmodel.Model, error)
 	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
 	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
 	ModelDefaultsForCloud_  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
-	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error)
-	ModelStatus_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error)
+	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
+	ModelStatus_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelStatus, error)
 	QueryModelsJq_          func(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
 	SetModelDefaults_       func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
 	UnsetModelDefaults_     func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
@@ -40,9 +43,9 @@ type ModelManager struct {
 	WatchAllModelSummaries_ func(ctx context.Context, controller *dbmodel.Controller) (_ func() error, err error)
 }
 
-func (j *ModelManager) AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ *jujuparams.ModelInfo, err error) {
+func (j *ModelManager) AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ base.ModelInfo, err error) {
 	if j.AddModel_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return base.ModelInfo{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.AddModel_(ctx, u, args)
 }
@@ -61,9 +64,9 @@ func (j *ModelManager) DestroyModel(ctx context.Context, u *openfga.User, mt nam
 	return j.DestroyModel_(ctx, u, mt, destroyStorage, force, maxWait, timeout)
 }
 
-func (j *ModelManager) DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (string, error) {
+func (j *ModelManager) DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error) {
 	if j.DumpModel_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.DumpModel_(ctx, u, mt, simplified)
 }
@@ -81,7 +84,7 @@ func (j *ModelManager) ForEachModel(ctx context.Context, u *openfga.User, f func
 	return j.ForEachModel_(ctx, u, f)
 }
 
-func (j *ModelManager) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
+func (j *ModelManager) ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, string) error) error {
 	if j.ForEachUserModel_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
@@ -116,22 +119,22 @@ func (j *ModelManager) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.
 	return j.ModelDefaultsForCloud_(ctx, user, cloudTag)
 }
 
-func (j *ModelManager) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelInfo, error) {
+func (j *ModelManager) ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 	if j.ModelInfo_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return jujuclient.ModelInfo{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ModelInfo_(ctx, u, mt)
 }
-func (j *ModelManager) ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (*jujuparams.ModelStatus, error) {
+func (j *ModelManager) ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelStatus, error) {
 	if j.ModelStatus_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return base.ModelStatus{}, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ModelStatus_(ctx, u, mt)
 }
 
-func (j *ModelManager) ListModelSummaries(ctx context.Context, u *openfga.User, maskingControllerUUID string) (jujuparams.ModelSummaryResults, error) {
+func (j *ModelManager) ListModelSummaries(ctx context.Context, u *openfga.User, maskingControllerUUID string) ([]base.UserModelSummary, error) {
 	if j.ListModelSummaries_ == nil {
-		return jujuparams.ModelSummaryResults{}, errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return j.ListModelSummaries_(ctx, u, maskingControllerUUID)
 }

@@ -76,5 +76,14 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	rpc.ProxyHTTP(ctx, controllerDetails, w, req)
+	details := rpc.ConnectionDetails{
+		Addresses:     controllerDetails.Addresses,
+		PublicAddress: controllerDetails.PublicAddress,
+		CACertificate: controllerDetails.CACertificate,
+		TLSHostname:   controllerDetails.TLSHostname,
+		Username:      controllerDetails.Credentials.AdminIdentityName,
+		Password:      controllerDetails.Credentials.AdminPassword,
+	}
+
+	rpc.ProxyHTTP(ctx, details, w, req)
 }

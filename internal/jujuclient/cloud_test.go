@@ -11,6 +11,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -40,9 +41,9 @@ func (s *cloudSuite) TestCheckCredentialModels(c *gc.C) {
 func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1")
 	cred := jujuparams.TaggedCredential{
-		Tag: cct,
+		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{
@@ -56,20 +57,19 @@ func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	var info jujuparams.ModelInfo
-	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+	info, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
-	}, &info)
+	})
 	c.Assert(err, gc.Equals, nil)
 	uuid1 := info.UUID
 
-	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+	info, err = s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-2",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
-	}, &info)
+	})
 	c.Assert(err, gc.Equals, nil)
 	uuid2 := info.UUID
 
@@ -82,7 +82,7 @@ func (s *cloudSuite) TestCheckCredentialModelsWithModels(c *gc.C) {
 	}}
 
 	cred = jujuparams.TaggedCredential{
-		Tag: cct,
+		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{
@@ -148,9 +148,9 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1")
 	cred := jujuparams.TaggedCredential{
-		Tag: cct,
+		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{
@@ -164,20 +164,19 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	var info jujuparams.ModelInfo
-	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+	info, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
-	}, &info)
+	})
 	c.Assert(err, gc.Equals, nil)
 	uuid1 := info.UUID
 
-	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+	info, err = s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-2",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
-	}, &info)
+	})
 	c.Assert(err, gc.Equals, nil)
 	uuid2 := info.UUID
 
@@ -190,7 +189,7 @@ func (s *cloudSuite) TestUpdateCredentialWithModels(c *gc.C) {
 	}}
 
 	cred = jujuparams.TaggedCredential{
-		Tag: cct,
+		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{

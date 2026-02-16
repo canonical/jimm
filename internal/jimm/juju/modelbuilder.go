@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/juju/juju/api/base"
 	jujupermission "github.com/juju/juju/core/permission"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -64,7 +66,7 @@ type modelBuilder struct {
 	cloudRegionID      uint
 	cloudRegionVirtual bool
 	model              *dbmodel.Model
-	modelInfo          *jujuparams.ModelInfo
+	modelInfo          base.ModelInfo
 }
 
 // Error returns the error that occurred in the process
@@ -73,7 +75,7 @@ func (b *modelBuilder) Error() error {
 	return b.err
 }
 
-func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error) {
+func (b *modelBuilder) jujuModelCreateArgs() (*jujuclient.CreateModelArgs, error) {
 	if b.name == "" {
 		return nil, errors.E("model name not specified")
 	}
@@ -90,13 +92,13 @@ func (b *modelBuilder) jujuModelCreateArgs() (*jujuparams.ModelCreateArgs, error
 		return nil, errors.E("credentials not specified")
 	}
 
-	args := &jujuparams.ModelCreateArgs{
+	args := &jujuclient.CreateModelArgs{
 		Name:               b.name,
-		OwnerTag:           b.owner.Tag().String(),
+		Owner:              b.owner.Name,
 		Config:             b.config,
-		CloudTag:           b.cloud.Tag().String(),
+		Cloud:              b.cloud.Name,
 		CloudRegion:        b.cloudRegion,
-		CloudCredentialTag: b.credential.Tag().String(),
+		CloudCredentialTag: b.credential.ResourceTag(),
 	}
 	// if this cloud region is a virtual one (cloud did not report
 	// any regions and we added a "default" region), we will
@@ -466,7 +468,7 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	if b.err != nil {
 		return b
 	}
-	err := b.model.FromJujuModelInfo(*b.modelInfo)
+	err := b.model.FromJujuModelInfo(b.modelInfo)
 	if err != nil {
 		b.err = errors.E(err, "failed to convert model info")
 		return b
@@ -569,8 +571,8 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	var info jujuparams.ModelInfo
-	if err := api.CreateModel(b.ctx, args, &info); err != nil {
+	info, err := api.CreateModel(b.ctx, args)
+	if err != nil {
 		switch jujuparams.ErrCode(err) {
 		case jujuparams.CodeAlreadyExists:
 			// The model already exists in the controller but it didn't
@@ -607,7 +609,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	b.modelInfo = &info
+	b.modelInfo = info
 	return b
 }
 
@@ -619,6 +621,6 @@ func (b *modelBuilder) updateCredential(ctx context.Context, api API, cred *dbmo
 }
 
 // JujuModelInfo returns model information returned by the controller.
-func (b *modelBuilder) JujuModelInfo() *jujuparams.ModelInfo {
+func (b *modelBuilder) JujuModelInfo() base.ModelInfo {
 	return b.modelInfo
 }

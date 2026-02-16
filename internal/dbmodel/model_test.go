@@ -8,6 +8,8 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -267,7 +269,7 @@ func TestToJujuModelSummary(t *testing.T) {
 		Life:            state.Alive.String(),
 	}
 	m.CloudRegion.Cloud = cl
-	modelSummaryFromController := jujuparams.ModelSummary{
+	modelSummaryFromController := base.UserModelSummary{
 		Name:           "test-model",
 		Type:           "iaas",
 		UUID:           "00000001-0000-0000-0000-0000-000000000001",
@@ -276,11 +278,11 @@ func TestToJujuModelSummary(t *testing.T) {
 		IsController:   false,
 		ProviderType:   "test-provider",
 		DefaultSeries:  "warty",
-		Status: jujuparams.EntityStatus{
+		Status: base.Status{
 			Status: "available",
 			Since:  &now,
 		},
-		Counts: []jujuparams.ModelEntityCount{{
+		Counts: []base.EntityCount{{
 			Entity: "machines",
 			Count:  1,
 		}, {
@@ -290,30 +292,30 @@ func TestToJujuModelSummary(t *testing.T) {
 			Entity: "units",
 			Count:  3,
 		}},
-		SLA: &jujuparams.ModelSLAInfo{
+		SLA: &base.SLASummary{
 			Level: "unsupported",
 		},
 	}
-	ms := m.MergeModelSummaryFromController(&modelSummaryFromController, "", "writer")
-	c.Check(ms, qt.DeepEquals, jujuparams.ModelSummary{
-		Name:               "test-model",
-		Type:               "iaas",
-		UUID:               "00000001-0000-0000-0000-0000-000000000001",
-		ControllerUUID:     "00000000-0000-0000-0000-0000-0000000000001",
-		IsController:       false,
-		ProviderType:       "test-provider",
-		DefaultSeries:      "warty",
-		CloudTag:           "cloud-test-cloud",
-		CloudRegion:        "test-region",
-		CloudCredentialTag: "cloudcred-test-cloud_bob@canonical.com_test-cred",
-		UserAccess:         "writer",
-		OwnerTag:           "user-bob@canonical.com",
-		Life:               life.Value(state.Alive.String()),
-		Status: jujuparams.EntityStatus{
+	ms := m.MergeModelSummaryFromController(modelSummaryFromController, "", "writer")
+	c.Check(ms, qt.DeepEquals, base.UserModelSummary{
+		Name:            "test-model",
+		Type:            "iaas",
+		UUID:            "00000001-0000-0000-0000-0000-000000000001",
+		ControllerUUID:  "00000000-0000-0000-0000-0000-0000000000001",
+		IsController:    false,
+		ProviderType:    "test-provider",
+		DefaultSeries:   "warty",
+		Cloud:           "test-cloud",
+		CloudRegion:     "test-region",
+		CloudCredential: "test-cloud/bob@canonical.com/test-cred",
+		ModelUserAccess: "writer",
+		Owner:           "bob@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		Status: base.Status{
 			Status: "available",
 			Since:  &now,
 		},
-		Counts: []jujuparams.ModelEntityCount{{
+		Counts: []base.EntityCount{{
 			Entity: "machines",
 			Count:  1,
 		}, {
@@ -323,7 +325,7 @@ func TestToJujuModelSummary(t *testing.T) {
 			Entity: "units",
 			Count:  3,
 		}},
-		SLA: &jujuparams.ModelSLAInfo{
+		SLA: &base.SLASummary{
 			Level: "unsupported",
 		},
 	})
@@ -371,32 +373,31 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 
 	arch := "amd64"
 	count := uint64(2000)
-	modelInfo := jujuparams.ModelInfo{
-		Name:                    "test-model",
-		Type:                    "iaas",
-		UUID:                    "00000001-0000-0000-0000-0000-000000000001",
-		ControllerUUID:          "00000000-0000-0000-0000-0000-0000000000001",
-		IsController:            false,
-		ProviderType:            "test-provider",
-		DefaultSeries:           "warty",
-		CloudTag:                "cloud-test-cloud",
-		CloudRegion:             "test-region",
-		CloudCredentialTag:      "cloudcred-test-cloud_bob@canonical.com_test-cred",
-		CloudCredentialValidity: nil,
-		OwnerTag:                "user-bob@canonical.com",
-		Life:                    life.Value(state.Alive.String()),
-		Status: jujuparams.EntityStatus{
+	modelInfo := base.ModelInfo{
+		Name:            "test-model",
+		Type:            "iaas",
+		UUID:            "00000001-0000-0000-0000-0000-000000000001",
+		ControllerUUID:  "00000000-0000-0000-0000-0000-0000000000001",
+		IsController:    false,
+		ProviderType:    "test-provider",
+		DefaultSeries:   "warty",
+		Cloud:           "test-cloud",
+		CloudRegion:     "test-region",
+		CloudCredential: "test-cloud/bob@canonical.com/test-cred",
+		Owner:           "bob@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		Status: base.Status{
 			Status: "available",
 			Since:  &now,
 		},
-		Users: []jujuparams.ModelUserInfo{{
+		Users: []base.UserInfo{{
 			UserName:    "bob@canonical.com",
 			DisplayName: "bob",
 			Access:      "admin",
 		}},
-		Machines: []jujuparams.ModelMachineInfo{{
+		Machines: []base.Machine{{
 			Id: "0",
-			Hardware: &jujuparams.MachineHardware{
+			Hardware: &instance.HardwareCharacteristics{
 				Arch: &arch,
 				Mem:  &count,
 			},
@@ -405,9 +406,6 @@ func TestModelFromJujuModelInfo(t *testing.T) {
 			Status:      "running",
 			Message:     "ACTIVE",
 		}},
-		SLA: &jujuparams.ModelSLAInfo{
-			Level: "unsupported",
-		},
 	}
 
 	model := dbmodel.Model{}

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju_test
 
@@ -13,7 +13,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"
+	"github.com/juju/juju/core/model"
 	jujurpc "github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
@@ -24,6 +26,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
@@ -33,7 +36,7 @@ var addModelTests = []struct {
 	env                 string
 	updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	grantJIMMModelAdmin func(context.Context, names.ModelTag) error
-	createModel         func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error
+	createModel         func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	username            string
 	jimmAdmin           bool
 	// This cloudCredTag is used to manually populate a dummy cloud credential
@@ -593,8 +596,8 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
-	createModel: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-		return errors.E("a test error")
+	createModel: func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+		return base.ModelInfo{}, errors.E("a test error")
 	},
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
@@ -1066,13 +1069,13 @@ controllers:
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
 	},
-	createModel: assertCreateModelArgs(&jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("alice@canonical.com").String(),
-		CloudTag: names.NewCloudTag("test-cloud").String(),
+	createModel: assertCreateModelArgs(&jujuclient.CreateModelArgs{
+		Name:  "test-model",
+		Owner: "alice@canonical.com",
+		Cloud: "test-cloud",
 		// we expect cloud region to be empty, because it is a virtual "default" region
 		CloudRegion:        "",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1").String(),
+		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1"),
 	}, createModel(`
 uuid: 00000001-0000-0000-0000-0000-000000000001
 status:
@@ -1467,58 +1470,160 @@ func TestAddModel(t *testing.T) {
 	}
 }
 
-func createModel(template string) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
+// convertParamsModelInfo converts a params.ModelInfo to a base.ModelInfo.
+// It is copy/pasted from the juju params package and adjusted to fit the needs
+// of this test where not all values need to be filled in.
+// we only need it for these existing tests that use a yaml template to create
+// a base.ModelInfo object. Now that we are using Juju's client and in turn,
+// using base.ModelInfo in most places, we need to convert the params.ModelInfo
+// to base.ModelInfo to keep these tests working until they get a larger refactor.
+func convertParamsModelInfo(modelInfo jujuparams.ModelInfo) (base.ModelInfo, error) {
+	var cloudTag names.CloudTag
+	var err error
+	if modelInfo.CloudTag != "" {
+		cloudTag, err = names.ParseCloudTag(modelInfo.CloudTag)
+		if err != nil {
+			return base.ModelInfo{}, err
+		}
+	}
+	var credential string
+	if modelInfo.CloudCredentialTag != "" {
+		credTag, err := names.ParseCloudCredentialTag(modelInfo.CloudCredentialTag)
+		if err != nil {
+			return base.ModelInfo{}, err
+		}
+		credential = credTag.Id()
+	}
+	var ownerTag names.UserTag
+	if modelInfo.OwnerTag != "" {
+		ownerTag, err = names.ParseUserTag(modelInfo.OwnerTag)
+		if err != nil {
+			return base.ModelInfo{}, err
+		}
+	}
+	result := base.ModelInfo{
+		Name:            modelInfo.Name,
+		UUID:            modelInfo.UUID,
+		ControllerUUID:  modelInfo.ControllerUUID,
+		IsController:    modelInfo.IsController,
+		ProviderType:    modelInfo.ProviderType,
+		DefaultSeries:   modelInfo.DefaultSeries,
+		Cloud:           cloudTag.Id(),
+		CloudRegion:     modelInfo.CloudRegion,
+		CloudCredential: credential,
+		Owner:           ownerTag.Id(),
+		Life:            modelInfo.Life,
+		AgentVersion:    modelInfo.AgentVersion,
+	}
+	modelType := modelInfo.Type
+	if modelType == "" {
+		modelType = model.IAAS.String()
+	}
+	result.Type = model.ModelType(modelType)
+	result.Status = base.Status{
+		Status: modelInfo.Status.Status,
+		Info:   modelInfo.Status.Info,
+		Data:   make(map[string]interface{}),
+		Since:  modelInfo.Status.Since,
+	}
+	for k, v := range modelInfo.Status.Data {
+		result.Status.Data[k] = v
+	}
+	result.Users = make([]base.UserInfo, len(modelInfo.Users))
+	for i, u := range modelInfo.Users {
+		result.Users[i] = base.UserInfo{
+			UserName:       u.UserName,
+			DisplayName:    u.DisplayName,
+			Access:         string(u.Access),
+			LastConnection: u.LastConnection,
+		}
+	}
+	result.Machines = make([]base.Machine, len(modelInfo.Machines))
+	for i, m := range modelInfo.Machines {
+		machine := base.Machine{
+			Id:          m.Id,
+			InstanceId:  m.InstanceId,
+			DisplayName: m.DisplayName,
+			HasVote:     m.HasVote,
+			WantsVote:   m.WantsVote,
+			Status:      m.Status,
+			HAPrimary:   m.HAPrimary,
+		}
+		if m.Hardware != nil {
+			machine.Hardware = &instance.HardwareCharacteristics{
+				Arch:             m.Hardware.Arch,
+				Mem:              m.Hardware.Mem,
+				RootDisk:         m.Hardware.RootDisk,
+				CpuCores:         m.Hardware.Cores,
+				CpuPower:         m.Hardware.CpuPower,
+				Tags:             m.Hardware.Tags,
+				AvailabilityZone: m.Hardware.AvailabilityZone,
+			}
+		}
+		result.Machines[i] = machine
+	}
+	return result, nil
+}
+
+func createModel(template string) func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 	var tmi jujuparams.ModelInfo
 	err := yaml.Unmarshal([]byte(template), &tmi)
-	return func(_ context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+	if err != nil {
+		panic(fmt.Sprintf("failed to unmarshal template: %v", err))
+	}
+	mi, err := convertParamsModelInfo(tmi)
+	if err != nil {
+		panic(fmt.Sprintf("failed to convert params.ModelInfo to base.ModelInfo: %v", err))
+	}
+
+	return func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 		if err != nil {
-			return err
+			return base.ModelInfo{}, err
 		}
-		*mi = tmi
 		mi.Name = args.Name
-		mi.CloudTag = args.CloudTag
-		mi.CloudCredentialTag = args.CloudCredentialTag
+		mi.Cloud = args.Cloud
+		mi.CloudCredential = args.CloudCredentialTag.Id()
 		mi.CloudRegion = args.CloudRegion
-		mi.OwnerTag = args.OwnerTag
-		return nil
+		mi.Owner = args.Owner
+		return mi, nil
 	}
 }
 
-func assertConfig(config map[string]interface{}, fnc func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
-	return func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
-		if args.CloudTag == "" {
-			return errors.E("cloud not specified")
+func assertConfig(config map[string]interface{}, fnc func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)) func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+	return func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+		if args.Cloud == "" {
+			return base.ModelInfo{}, errors.E("cloud not specified")
 		}
 		if len(config) != len(args.Config) {
-			return errors.E(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
+			return base.ModelInfo{}, errors.E(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
 		}
 		for k, v := range args.Config {
 			if config[k] != v {
-				return errors.E(fmt.Sprintf("config value mismatch for key %s: %s -> %s", k, config[k], v))
+				return base.ModelInfo{}, errors.E(fmt.Sprintf("config value mismatch for key %s: %s -> %s", k, config[k], v))
 			}
 		}
-		return fnc(ctx, args, mi)
+		return fnc(ctx, args)
 	}
 }
 
-func assertCreateModelArgs(expectedArgs *jujuparams.ModelCreateArgs, fnc func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error) func(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error {
-	return func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+func assertCreateModelArgs(expectedArgs *jujuclient.CreateModelArgs, fnc func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)) func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+	return func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 		if expectedArgs.Name != args.Name {
-			return fmt.Errorf("name mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
+			return base.ModelInfo{}, fmt.Errorf("name mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
 		}
-		if expectedArgs.OwnerTag != args.OwnerTag {
-			return fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.OwnerTag, args.OwnerTag)
+		if expectedArgs.Owner != args.Owner {
+			return base.ModelInfo{}, fmt.Errorf("owner mismatch: expected %q, got %q", expectedArgs.Name, args.Name)
 		}
-		if expectedArgs.CloudTag != args.CloudTag {
-			return fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.CloudTag, args.CloudTag)
+		if expectedArgs.Cloud != args.Cloud {
+			return base.ModelInfo{}, fmt.Errorf("cloud mismatch: expected %q, got %q", expectedArgs.Cloud, args.Cloud)
 		}
 		if expectedArgs.CloudRegion != args.CloudRegion {
-			return fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.CloudRegion, args.CloudRegion)
+			return base.ModelInfo{}, fmt.Errorf("cloud region mismatch: expected %q, got %q", expectedArgs.CloudRegion, args.CloudRegion)
 		}
-		if expectedArgs.CloudCredentialTag != args.CloudCredentialTag {
-			return fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.CloudCredentialTag, args.CloudCredentialTag)
+		if expectedArgs.CloudCredentialTag.String() != args.CloudCredentialTag.String() {
+			return base.ModelInfo{}, fmt.Errorf("credential mismatch: expected %q, got %q", expectedArgs.CloudCredentialTag, args.CloudCredentialTag)
 		}
-		return fnc(ctx, args, mi)
+		return fnc(ctx, args)
 	}
 
 }
@@ -1612,25 +1717,25 @@ const modelInfoTestEnvWithEveryoneAccess = modelInfoTestEnv + `
     access: read
 `
 
-func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUsers []jujuparams.ModelUserInfo) *jujuparams.ModelInfo {
-	info := jujuparams.ModelInfo{
-		Name:               "model-1",
-		Type:               "iaas",
-		UUID:               "00000002-0000-0000-0000-000000000001",
-		ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-		ProviderType:       "test-provider",
-		DefaultSeries:      "warty",
-		CloudTag:           names.NewCloudTag("test-cloud").String(),
-		CloudRegion:        "test-cloud-region",
-		CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-		Life:               life.Value(state.Alive.String()),
-		Status: jujuparams.EntityStatus{
+func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUsers []base.UserInfo) jujuclient.ModelInfo {
+	info := base.ModelInfo{
+		Name:            "model-1",
+		Type:            "iaas",
+		UUID:            "00000002-0000-0000-0000-000000000001",
+		ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+		ProviderType:    "test-provider",
+		DefaultSeries:   "warty",
+		Cloud:           "test-cloud",
+		CloudRegion:     "test-cloud-region",
+		CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+		Owner:           "alice@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		Status: base.Status{
 			Status: "available",
 			Info:   "OK!",
 			Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 		},
-		Users: []jujuparams.ModelUserInfo{{
+		Users: []base.UserInfo{{
 			UserName: "alice@canonical.com",
 			Access:   "admin",
 		}, {
@@ -1640,7 +1745,7 @@ func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUser
 			UserName: "charlie@canonical.com",
 			Access:   "read",
 		}},
-		Machines: []jujuparams.ModelMachineInfo{{
+		Machines: []base.Machine{{
 			Id:          "0",
 			Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
 			InstanceId:  "00000009-0000-0000-0000-0000000000000",
@@ -1657,9 +1762,6 @@ func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUser
 			Message:     "OK!",
 			HasVote:     true,
 		}},
-		SLA: &jujuparams.ModelSLAInfo{
-			Level: "unsupported",
-		},
 		AgentVersion: newVersion("1.2.3"),
 	}
 	if !canReadMachineInfo {
@@ -1668,7 +1770,7 @@ func modelInfoTestExpectedModelInfo(canReadMachineInfo bool, limitedExpectedUser
 	if limitedExpectedUsers != nil {
 		info.Users = limitedExpectedUsers
 	}
-	return &info
+	return jujuclient.ModelInfo{ModelInfo: info}
 }
 
 var modelInfoTests = []struct {
@@ -1677,22 +1779,22 @@ var modelInfoTests = []struct {
 	username         string
 	uuid             string
 	originModelOwner string
-	expectModelInfo  *jujuparams.ModelInfo
+	expectModelInfo  jujuclient.ModelInfo
 	expectError      string
 }{{
 	name:             "AdminUser",
 	env:              modelInfoTestEnv,
 	username:         "alice@canonical.com",
 	uuid:             "00000002-0000-0000-0000-000000000001",
-	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
+	originModelOwner: "alice@canonical.com",
 	expectModelInfo:  modelInfoTestExpectedModelInfo(true, nil),
 }, {
 	name:             "WriteUser",
 	env:              modelInfoTestEnv,
 	username:         "bob@canonical.com",
 	uuid:             "00000002-0000-0000-0000-000000000001",
-	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
-	expectModelInfo: modelInfoTestExpectedModelInfo(true, []jujuparams.ModelUserInfo{{
+	originModelOwner: "alice@canonical.com",
+	expectModelInfo: modelInfoTestExpectedModelInfo(true, []base.UserInfo{{
 		UserName: "bob@canonical.com",
 		Access:   "write",
 	}}),
@@ -1701,8 +1803,8 @@ var modelInfoTests = []struct {
 	env:              modelInfoTestEnv,
 	username:         "charlie@canonical.com",
 	uuid:             "00000002-0000-0000-0000-000000000001",
-	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
-	expectModelInfo: modelInfoTestExpectedModelInfo(false, []jujuparams.ModelUserInfo{{
+	originModelOwner: "alice@canonical.com",
+	expectModelInfo: modelInfoTestExpectedModelInfo(false, []base.UserInfo{{
 		UserName: "charlie@canonical.com",
 		Access:   "read",
 	}}),
@@ -1723,8 +1825,8 @@ var modelInfoTests = []struct {
 	env:              modelInfoTestEnvWithEveryoneAccess,
 	username:         "diane@canonical.com",
 	uuid:             "00000002-0000-0000-0000-000000000001",
-	originModelOwner: names.NewUserTag("alice@canonical.com").String(),
-	expectModelInfo: modelInfoTestExpectedModelInfo(false, []jujuparams.ModelUserInfo{{
+	originModelOwner: "alice@canonical.com",
+	expectModelInfo: modelInfoTestExpectedModelInfo(false, []base.UserInfo{{
 		UserName: "everyone@external",
 		Access:   "read",
 	}}),
@@ -1733,7 +1835,7 @@ var modelInfoTests = []struct {
 	env:              modelInfoTestEnv,
 	username:         "alice@canonical.com",
 	uuid:             "00000002-0000-0000-0000-000000000001",
-	originModelOwner: names.NewUserTag("bob").String(),
+	originModelOwner: "bob",
 	expectModelInfo:  modelInfoTestExpectedModelInfo(true, nil),
 },
 }
@@ -1746,25 +1848,27 @@ func TestModelInfo(t *testing.T) {
 			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
+						ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+							mi := jujuclient.ModelInfo{}
 							mi.Name = "model-1"
 							mi.Type = "iaas"
 							mi.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+							mi.UUID = "00000002-0000-0000-0000-000000000001"
 							mi.ProviderType = "test-provider"
 							mi.DefaultSeries = "warty"
-							mi.CloudTag = names.NewCloudTag("test-cloud").String()
+							mi.Cloud = "test-cloud"
 							mi.CloudRegion = "test-cloud-region"
-							mi.CloudCredentialTag = names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String()
-							mi.OwnerTag = test.originModelOwner
+							mi.CloudCredential = "test-cloud/alice@canonical.com/cred-1"
+							mi.Owner = test.originModelOwner
 							mi.Life = life.Value(state.Alive.String())
-							mi.Status = jujuparams.EntityStatus{
+							mi.Status = base.Status{
 								Status: "available",
 								Info:   "OK!",
 								Since:  newDate(2020, 2, 20, 20, 2, 20, 0, time.UTC),
 							}
 							// Note that users are populated from OpenFGA
-							mi.Users = []jujuparams.ModelUserInfo{}
-							mi.Machines = []jujuparams.ModelMachineInfo{{
+							mi.Users = []base.UserInfo{}
+							mi.Machines = []base.Machine{{
 								Id:          "0",
 								Hardware:    jimmtest.ParseMachineHardware("arch=amd64 mem=8096 root-disk=10240 cores=1"),
 								InstanceId:  "00000009-0000-0000-0000-0000000000000",
@@ -1781,11 +1885,8 @@ func TestModelInfo(t *testing.T) {
 								Message:     "OK!",
 								HasVote:     true,
 							}}
-							mi.SLA = &jujuparams.ModelSLAInfo{
-								Level: "unsupported",
-							}
 							mi.AgentVersion = newVersion("1.2.3")
-							return nil
+							return mi, nil
 						},
 					},
 				},
@@ -1819,8 +1920,8 @@ func TestModelInfoNotFound(t *testing.T) {
 	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
-					return errors.E(errors.CodeNotFound, "model not found")
+				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -1862,8 +1963,8 @@ func TestModelInfoRedirect(t *testing.T) {
 	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelInfo_: func(_ context.Context, mi *jujuparams.ModelInfo) error {
-					return errors.E(errors.CodeNotFound, "model not found")
+				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -1892,10 +1993,10 @@ func TestModelInfoRedirect(t *testing.T) {
 	numCalls := 0
 	j.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
-			ModelInfo_: func(ctx context.Context, mi *jujuparams.ModelInfo) error {
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 				if numCalls == 0 {
 					numCalls++
-					return &jujurpc.RequestError{
+					return jujuclient.ModelInfo{}, &jujurpc.RequestError{
 						Message: "redirect",
 						Code:    jujuparams.CodeRedirect,
 						Info: jujuparams.RedirectErrorInfo{
@@ -1903,7 +2004,7 @@ func TestModelInfoRedirect(t *testing.T) {
 						}.AsMap(),
 					}
 				} else {
-					return nil
+					return jujuclient.ModelInfo{}, nil
 				}
 			},
 		},
@@ -1923,8 +2024,8 @@ func TestModelStatusNotFound(t *testing.T) {
 	j := newTestJujuManager(c, &parameters{
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelStatus_: func(_ context.Context, ms *jujuparams.ModelStatus) error {
-					return errors.E(errors.CodeNotFound, "model not found")
+				ModelStatus_: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+					return base.ModelStatus{}, errors.E(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -1997,10 +2098,10 @@ users:
 var modelStatusTests = []struct {
 	name              string
 	env               string
-	modelStatus       func(context.Context, *jujuparams.ModelStatus) error
+	modelStatus       func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error)
 	username          string
 	uuid              string
-	expectModelStatus *jujuparams.ModelStatus
+	expectModelStatus base.ModelStatus
 	expectError       string
 }{{
 	name:        "ModelNotFound",
@@ -2016,33 +2117,36 @@ var modelStatusTests = []struct {
 }, {
 	name: "Success",
 	env:  modelStatusTestEnv,
-	modelStatus: func(_ context.Context, ms *jujuparams.ModelStatus) error {
-		if ms.ModelTag != names.NewModelTag("00000002-0000-0000-0000-000000000001").String() {
-			return errors.E("incorrect model tag")
+	modelStatus: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+			return base.ModelStatus{}, errors.E("incorrect model tag")
 		}
+		ms := base.ModelStatus{}
+		ms.UUID = modelTag.Id()
 		ms.Life = life.Value(state.Alive.String())
-		ms.Type = "iaas"
+		ms.ModelType = "iaas"
 		ms.HostedMachineCount = 10
 		ms.ApplicationCount = 3
 		ms.UnitCount = 20
-		return nil
+		ms.Owner = "alice@canonical.com"
+		return ms, nil
 	},
 	username: "alice@canonical.com",
 	uuid:     "00000002-0000-0000-0000-000000000001",
-	expectModelStatus: &jujuparams.ModelStatus{
-		ModelTag:           names.NewModelTag("00000002-0000-0000-0000-000000000001").String(),
+	expectModelStatus: base.ModelStatus{
+		UUID:               "00000002-0000-0000-0000-000000000001",
 		Life:               life.Value(state.Alive.String()),
-		Type:               "iaas",
+		ModelType:          "iaas",
 		HostedMachineCount: 10,
 		ApplicationCount:   3,
 		UnitCount:          20,
-		OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
+		Owner:              "alice@canonical.com",
 	},
 }, {
 	name: "APIError",
 	env:  modelStatusTestEnv,
-	modelStatus: func(_ context.Context, ms *jujuparams.ModelStatus) error {
-		return errors.E("test error")
+	modelStatus: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+		return base.ModelStatus{}, errors.E("test error")
 	},
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
@@ -2166,52 +2270,46 @@ func TestForEachUserModel(t *testing.T) {
 	dbUser := env.User("bob@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
-	var res []jujuparams.ModelSummaryResult
-	err := j.ForEachUserModel(ctx, user, func(m *dbmodel.Model, access jujuparams.UserAccessPermission) error {
-		s := m.MergeModelSummaryFromController(nil, "", access)
-		res = append(res, jujuparams.ModelSummaryResult{Result: &s})
+	var res []base.UserModelSummary
+	err := j.ForEachUserModel(ctx, user, func(m *dbmodel.Model, access string) error {
+		s := m.MergeModelSummaryFromController(base.UserModelSummary{}, "", access)
+		res = append(res, s)
 		return nil
 	})
 	c.Assert(err, qt.IsNil)
-	c.Check(res, qt.DeepEquals, []jujuparams.ModelSummaryResult{{
-		Result: &jujuparams.ModelSummary{
-			Name:               "model-1",
-			UUID:               "00000002-0000-0000-0000-000000000001",
-			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-			ProviderType:       "test-provider",
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudRegion:        "test-cloud-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			Life:               life.Value(state.Alive.String()),
-			UserAccess:         "admin",
-		},
+	c.Check(res, qt.DeepEquals, []base.UserModelSummary{{
+		Name:            "model-1",
+		UUID:            "00000002-0000-0000-0000-000000000001",
+		ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+		ProviderType:    "test-provider",
+		Cloud:           "test-cloud",
+		CloudRegion:     "test-cloud-region",
+		CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+		Owner:           "alice@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		ModelUserAccess: "admin",
 	}, {
-		Result: &jujuparams.ModelSummary{
-			Name:               "model-2",
-			UUID:               "00000002-0000-0000-0000-000000000002",
-			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-			ProviderType:       "test-provider",
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudRegion:        "test-cloud-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			Life:               life.Value(state.Alive.String()),
-			UserAccess:         "write",
-		},
+		Name:            "model-2",
+		UUID:            "00000002-0000-0000-0000-000000000002",
+		ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+		ProviderType:    "test-provider",
+		Cloud:           "test-cloud",
+		CloudRegion:     "test-cloud-region",
+		CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+		Owner:           "alice@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		ModelUserAccess: "write",
 	}, {
-		Result: &jujuparams.ModelSummary{
-			Name:               "model-4",
-			UUID:               "00000002-0000-0000-0000-000000000004",
-			ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-			ProviderType:       "test-provider",
-			CloudTag:           names.NewCloudTag("test-cloud").String(),
-			CloudRegion:        "test-cloud-region",
-			CloudCredentialTag: names.NewCloudCredentialTag("test-cloud/alice@canonical.com/cred-1").String(),
-			OwnerTag:           names.NewUserTag("alice@canonical.com").String(),
-			Life:               life.Value(state.Alive.String()),
-			UserAccess:         "read",
-		},
+		Name:            "model-4",
+		UUID:            "00000002-0000-0000-0000-000000000004",
+		ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+		ProviderType:    "test-provider",
+		Cloud:           "test-cloud",
+		CloudRegion:     "test-cloud-region",
+		CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+		Owner:           "alice@canonical.com",
+		Life:            life.Value(state.Alive.String()),
+		ModelUserAccess: "read",
 	}})
 }
 
@@ -2315,193 +2413,172 @@ func TestModelSummaries(t *testing.T) {
 
 	tests := []struct {
 		description            string
-		controllerAPISummaries []jujuparams.ModelSummaryResult
-		expectedSummaries      []jujuparams.ModelSummaryResult
+		controllerAPISummaries []base.UserModelSummary
+		expectedSummaries      []base.UserModelSummary
 		expectedSummariesSize  int
 	}{
 		{
 			description: "info from controller, so all models available",
-			controllerAPISummaries: []jujuparams.ModelSummaryResult{
+			controllerAPISummaries: []base.UserModelSummary{
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:           "model-1",
-						UUID:           "00000002-0000-0000-0000-000000000001",
-						Type:           "iaas",
-						ControllerUUID: "00000002-0000-0000-0000-000000000001",
-						IsController:   false,
-						DefaultSeries:  "series-1",
-						Life:           "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "available",
-						},
-						UserAccess: "testtest",
+					Name:           "model-1",
+					UUID:           "00000002-0000-0000-0000-000000000001",
+					Type:           "iaas",
+					ControllerUUID: "00000002-0000-0000-0000-000000000001",
+					IsController:   false,
+					DefaultSeries:  "series-1",
+					Life:           "alive",
+					Status: base.Status{
+						Status: "available",
 					},
+					ModelUserAccess: "testtest",
 				},
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:           "model-2",
-						UUID:           "00000002-0000-0000-0000-000000000002",
-						Type:           "iaas",
-						ControllerUUID: "00000001-0000-0000-0000-000000000001",
-						IsController:   false,
-						DefaultSeries:  "series-2",
-						Life:           "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "available",
-						},
-						UserAccess: "admin",
+					Name:           "model-2",
+					UUID:           "00000002-0000-0000-0000-000000000002",
+					Type:           "iaas",
+					ControllerUUID: "00000001-0000-0000-0000-000000000001",
+					IsController:   false,
+					DefaultSeries:  "series-2",
+					Life:           "alive",
+					Status: base.Status{
+						Status: "available",
 					},
+					ModelUserAccess: "admin",
 				},
 			},
-			expectedSummaries: []jujuparams.ModelSummaryResult{
+			expectedSummaries: []base.UserModelSummary{
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:               "model-1",
-						UUID:               "00000002-0000-0000-0000-000000000001",
-						Type:               "iaas",
-						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-						IsController:       false,
-						ProviderType:       "test-provider",
-						DefaultSeries:      "series-1",
-						CloudTag:           "cloud-test-cloud",
-						CloudRegion:        "test-cloud-region",
-						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
-						OwnerTag:           "user-alice@canonical.com",
-						Life:               "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "available",
-						},
-						UserAccess: "admin",
+
+					Name:            "model-1",
+					UUID:            "00000002-0000-0000-0000-000000000001",
+					Type:            "iaas",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
+					DefaultSeries:   "series-1",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "available",
 					},
-					Error: (*jujuparams.Error)(nil),
+					ModelUserAccess: "admin",
 				},
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:               "model-2",
-						UUID:               "00000002-0000-0000-0000-000000000002",
-						Type:               "iaas",
-						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-						IsController:       false,
-						ProviderType:       "test-provider",
-						DefaultSeries:      "series-2",
-						CloudTag:           "cloud-test-cloud",
-						CloudRegion:        "test-cloud-region",
-						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
-						OwnerTag:           "user-alice@canonical.com",
-						Life:               "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "available",
-						},
-						UserAccess: "admin",
+					Name:            "model-2",
+					UUID:            "00000002-0000-0000-0000-000000000002",
+					Type:            "iaas",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
+					DefaultSeries:   "series-2",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "available",
 					},
+					ModelUserAccess: "admin",
 				},
 			},
 			expectedSummariesSize: 2,
 		},
 		{
 			description: "partial info from controller, so one model is not available and info are not filled in.",
-			controllerAPISummaries: []jujuparams.ModelSummaryResult{
+			controllerAPISummaries: []base.UserModelSummary{
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:           "model-1",
-						UUID:           "00000002-0000-0000-0000-000000000001",
-						Type:           "iaas",
-						ControllerUUID: "00000002-0000-0000-0000-000000000001",
-						IsController:   false,
-						DefaultSeries:  "",
-						Life:           "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "available",
-						},
-						UserAccess: "testtest",
+					Name:           "model-1",
+					UUID:           "00000002-0000-0000-0000-000000000001",
+					Type:           "iaas",
+					ControllerUUID: "00000002-0000-0000-0000-000000000001",
+					IsController:   false,
+					Life:           "alive",
+					Status: base.Status{
+						Status: "available",
 					},
 				},
 			},
-			expectedSummaries: []jujuparams.ModelSummaryResult{
+			expectedSummaries: []base.UserModelSummary{
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:               "model-1",
-						UUID:               "00000002-0000-0000-0000-000000000001",
-						Type:               "iaas",
-						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-						IsController:       false,
-						ProviderType:       "test-provider",
-						DefaultSeries:      "",
-						CloudTag:           "cloud-test-cloud",
-						CloudRegion:        "test-cloud-region",
-						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
-						OwnerTag:           "user-alice@canonical.com",
-						Life:               "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "available",
-						},
-						UserAccess: "admin",
+					Name:            "model-1",
+					UUID:            "00000002-0000-0000-0000-000000000001",
+					Type:            "iaas",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
+					DefaultSeries:   "",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "available",
 					},
-					Error: (*jujuparams.Error)(nil),
+					ModelUserAccess: "admin",
 				},
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:               "model-2",
-						UUID:               "00000002-0000-0000-0000-000000000002",
-						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-						IsController:       false,
-						ProviderType:       "test-provider",
-						CloudTag:           "cloud-test-cloud",
-						CloudRegion:        "test-cloud-region",
-						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
-						OwnerTag:           "user-alice@canonical.com",
-						Life:               "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "unavailable",
-						},
-						UserAccess: "admin",
+					Name:            "model-2",
+					UUID:            "00000002-0000-0000-0000-000000000002",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "unavailable",
 					},
+					ModelUserAccess: "admin",
 				},
 			},
 			expectedSummariesSize: 2,
 		},
 		{
 			description: "no info from controller, so all models unavailable",
-			expectedSummaries: []jujuparams.ModelSummaryResult{
+			expectedSummaries: []base.UserModelSummary{
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:               "model-1",
-						UUID:               "00000002-0000-0000-0000-000000000001",
-						Type:               "",
-						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-						IsController:       false,
-						ProviderType:       "test-provider",
-						DefaultSeries:      "",
-						CloudTag:           "cloud-test-cloud",
-						CloudRegion:        "test-cloud-region",
-						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
-						OwnerTag:           "user-alice@canonical.com",
-						Life:               "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "unavailable",
-						},
-						UserAccess: "admin",
+					Name:            "model-1",
+					UUID:            "00000002-0000-0000-0000-000000000001",
+					Type:            "",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
+					DefaultSeries:   "",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "unavailable",
 					},
+					ModelUserAccess: "admin",
 				},
 				{
-					Result: &jujuparams.ModelSummary{
-						Name:               "model-2",
-						UUID:               "00000002-0000-0000-0000-000000000002",
-						Type:               "",
-						ControllerUUID:     "00000001-0000-0000-0000-000000000001",
-						IsController:       false,
-						ProviderType:       "test-provider",
-						DefaultSeries:      "",
-						CloudTag:           "cloud-test-cloud",
-						CloudRegion:        "test-cloud-region",
-						CloudCredentialTag: "cloudcred-test-cloud_alice@canonical.com_cred-1",
-						OwnerTag:           "user-alice@canonical.com",
-						Life:               "alive",
-						Status: jujuparams.EntityStatus{
-							Status: "unavailable",
-						},
-						UserAccess: "admin",
+					Name:            "model-2",
+					UUID:            "00000002-0000-0000-0000-000000000002",
+					Type:            "",
+					ControllerUUID:  "00000001-0000-0000-0000-000000000001",
+					IsController:    false,
+					ProviderType:    "test-provider",
+					DefaultSeries:   "",
+					Cloud:           "test-cloud",
+					CloudRegion:     "test-cloud-region",
+					CloudCredential: "test-cloud/alice@canonical.com/cred-1",
+					Owner:           "alice@canonical.com",
+					Life:            "alive",
+					Status: base.Status{
+						Status: "unavailable",
 					},
+					ModelUserAccess: "admin",
 				},
 			},
 			expectedSummariesSize: 2,
@@ -2511,15 +2588,15 @@ func TestModelSummaries(t *testing.T) {
 		c.Run(t.description, func(c *qt.C) {
 			j.Dialer = &jimmtest.Dialer{
 				API: &jimmtest.API{
-					ListModelSummaries_: func(ctx context.Context, msr jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-						return jujuparams.ModelSummaryResults{Results: t.controllerAPISummaries}, nil
+					ListModelSummaries_: func(ctx context.Context, ms jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error) {
+						return t.controllerAPISummaries, nil
 					},
 				},
 			}
 			summaries, err := j.ListModelSummaries(ctx, alice, "")
 			c.Check(err, qt.IsNil)
-			c.Check(summaries.Results, qt.HasLen, t.expectedSummariesSize)
-			c.Check(summaries.Results, qt.DeepEquals, t.expectedSummaries)
+			c.Check(summaries, qt.HasLen, t.expectedSummariesSize)
+			c.Check(summaries, qt.DeepEquals, t.expectedSummaries)
 		})
 	}
 }
@@ -2560,7 +2637,7 @@ users:
 var destroyModelTests = []struct {
 	name            string
 	env             string
-	destroyModel    func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
+	destroyModel    func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error
 	dialError       error
 	username        string
 	uuid            string
@@ -2588,8 +2665,8 @@ var destroyModelTests = []struct {
 }, {
 	name: "Success",
 	env:  destroyModelTestEnv,
-	destroyModel: func(_ context.Context, mt names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+	destroyModel: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+		if tag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("incorrect model uuid")
 		}
 		if destroyStorage == nil || *destroyStorage != true {
@@ -2616,7 +2693,7 @@ var destroyModelTests = []struct {
 }, {
 	name: "SuperuserSuccess",
 	env:  destroyModelTestEnv,
-	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
+	destroyModel: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 		return nil
 	},
 	username:     "charlie@canonical.com",
@@ -2633,7 +2710,7 @@ var destroyModelTests = []struct {
 }, {
 	name: "APIError",
 	env:  destroyModelTestEnv,
-	destroyModel: func(_ context.Context, _ names.ModelTag, _, _ *bool, _, _ *time.Duration) error {
+	destroyModel: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 		return errors.E("api error")
 	},
 	username:     "charlie@canonical.com",
@@ -2694,12 +2771,11 @@ func TestDestroyModel(t *testing.T) {
 var dumpModelTests = []struct {
 	name            string
 	env             string
-	dumpModel       func(context.Context, names.ModelTag, bool) (string, error)
+	dumpModel       func(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error)
 	dialError       error
 	username        string
 	uuid            string
 	simplified      bool
-	expectString    string
 	expectError     string
 	expectErrorCode errors.Code
 }{{
@@ -2720,28 +2796,26 @@ var dumpModelTests = []struct {
 }, {
 	name: "Success",
 	env:  destroyModelTestEnv,
-	dumpModel: func(_ context.Context, mt names.ModelTag, simplified bool) (string, error) {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
-			return "", errors.E("incorrect model uuid")
+	dumpModel: func(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
+		if tag.Id() != "00000002-0000-0000-0000-000000000001" {
+			return nil, errors.E("incorrect model uuid")
 		}
 		if simplified != true {
-			return "", errors.E("invalid simplified")
+			return nil, errors.E("invalid simplified")
 		}
-		return "model dump", nil
+		return map[string]interface{}{}, nil
 	},
-	username:     "alice@canonical.com",
-	uuid:         "00000002-0000-0000-0000-000000000001",
-	simplified:   true,
-	expectString: "model dump",
+	username:   "alice@canonical.com",
+	uuid:       "00000002-0000-0000-0000-000000000001",
+	simplified: true,
 }, {
 	name: "SuperuserSuccess",
 	env:  destroyModelTestEnv,
-	dumpModel: func(_ context.Context, _ names.ModelTag, _ bool) (string, error) {
-		return "model dump2", nil
+	dumpModel: func(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
+		return map[string]interface{}{}, nil
 	},
-	username:     "charlie@canonical.com",
-	uuid:         "00000002-0000-0000-0000-000000000001",
-	expectString: "model dump2",
+	username: "charlie@canonical.com",
+	uuid:     "00000002-0000-0000-0000-000000000001",
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
@@ -2752,8 +2826,8 @@ var dumpModelTests = []struct {
 }, {
 	name: "APIError",
 	env:  destroyModelTestEnv,
-	dumpModel: func(_ context.Context, _ names.ModelTag, _ bool) (string, error) {
-		return "", errors.E("api error")
+	dumpModel: func(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
+		return map[string]interface{}{}, errors.E("api error")
 	},
 	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
@@ -2783,7 +2857,7 @@ func TestDumpModel(t *testing.T) {
 			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
-			s, err := j.DumpModel(ctx, user, names.NewModelTag(test.uuid), test.simplified)
+			_, err := j.DumpModel(ctx, user, names.NewModelTag(test.uuid), test.simplified)
 			c.Assert(dialer.IsClosed(), qt.IsTrue)
 			if test.expectError != "" {
 				c.Check(err, qt.ErrorMatches, test.expectError)
@@ -2793,7 +2867,6 @@ func TestDumpModel(t *testing.T) {
 				return
 			}
 			c.Assert(err, qt.IsNil)
-			c.Check(s, qt.Equals, test.expectString)
 		})
 	}
 }
@@ -2801,7 +2874,7 @@ func TestDumpModel(t *testing.T) {
 var dumpModelDBTests = []struct {
 	name            string
 	env             string
-	dumpModelDB     func(context.Context, names.ModelTag) (map[string]interface{}, error)
+	dumpModelDB     func(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error)
 	dialError       error
 	username        string
 	uuid            string
@@ -2826,8 +2899,8 @@ var dumpModelDBTests = []struct {
 }, {
 	name: "Success",
 	env:  destroyModelTestEnv,
-	dumpModelDB: func(_ context.Context, mt names.ModelTag) (map[string]interface{}, error) {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+	dumpModelDB: func(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
+		if tag.Id() != "00000002-0000-0000-0000-000000000001" {
 			return nil, errors.E("incorrect model uuid")
 		}
 		return map[string]interface{}{"model": "dump"}, nil
@@ -2838,7 +2911,7 @@ var dumpModelDBTests = []struct {
 }, {
 	name: "SuperuserSuccess",
 	env:  destroyModelTestEnv,
-	dumpModelDB: func(_ context.Context, _ names.ModelTag) (map[string]interface{}, error) {
+	dumpModelDB: func(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
 		return map[string]interface{}{"model": "dump 2"}, nil
 	},
 	username:   "charlie@canonical.com",
@@ -2854,7 +2927,7 @@ var dumpModelDBTests = []struct {
 }, {
 	name: "APIError",
 	env:  destroyModelTestEnv,
-	dumpModelDB: func(_ context.Context, _ names.ModelTag) (map[string]interface{}, error) {
+	dumpModelDB: func(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
 		return nil, errors.E("api error")
 	},
 	username:    "charlie@canonical.com",
@@ -2903,7 +2976,7 @@ func TestDumpModelDB(t *testing.T) {
 var validateModelUpgradeTests = []struct {
 	name                 string
 	env                  string
-	validateModelUpgrade func(context.Context, names.ModelTag, bool) error
+	validateModelUpgrade func(ctx context.Context, model names.ModelTag, force bool) error
 	dialError            error
 	username             string
 	uuid                 string
@@ -2928,8 +3001,8 @@ var validateModelUpgradeTests = []struct {
 }, {
 	name: "Success",
 	env:  destroyModelTestEnv,
-	validateModelUpgrade: func(_ context.Context, mt names.ModelTag, force bool) error {
-		if mt.Id() != "00000002-0000-0000-0000-000000000001" {
+	validateModelUpgrade: func(ctx context.Context, model names.ModelTag, force bool) error {
+		if model.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("incorrect model uuid")
 		}
 		if force != true {
@@ -2943,7 +3016,7 @@ var validateModelUpgradeTests = []struct {
 }, {
 	name: "SuperuserSuccess",
 	env:  destroyModelTestEnv,
-	validateModelUpgrade: func(_ context.Context, _ names.ModelTag, force bool) error {
+	validateModelUpgrade: func(ctx context.Context, model names.ModelTag, force bool) error {
 		if force != false {
 			return errors.E("incorrect force")
 		}
@@ -2961,7 +3034,7 @@ var validateModelUpgradeTests = []struct {
 }, {
 	name: "APIError",
 	env:  destroyModelTestEnv,
-	validateModelUpgrade: func(_ context.Context, _ names.ModelTag, _ bool) error {
+	validateModelUpgrade: func(ctx context.Context, model names.ModelTag, force bool) error {
 		return errors.E("api error")
 	},
 	username:    "charlie@canonical.com",
@@ -3044,7 +3117,7 @@ var updateModelCredentialTests = []struct {
 	name                  string
 	env                   string
 	updateCredential      func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
-	changeModelCredential func(context.Context, names.ModelTag, names.CloudCredentialTag) error
+	changeModelCredential func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error
 	dialError             error
 	username              string
 	credential            string
@@ -3061,11 +3134,11 @@ var updateModelCredentialTests = []struct {
 		}
 		return nil, nil
 	},
-	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
-		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
+		if model.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "test-cloud/alice@canonical.com/cred-2" {
+		if credential.Id() != "test-cloud/alice@canonical.com/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
@@ -3108,11 +3181,11 @@ var updateModelCredentialTests = []struct {
 		}
 		return nil, nil
 	},
-	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
-		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
+		if model.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "test-cloud/alice@canonical.com/cred-2" {
+		if credential.Id() != "test-cloud/alice@canonical.com/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
@@ -3139,11 +3212,11 @@ var updateModelCredentialTests = []struct {
 		}
 		return nil, nil
 	},
-	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
-		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
+	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
+		if model.Id() != "00000002-0000-0000-0000-000000000001" {
 			return errors.E("bad model tag")
 		}
-		if credentialTag.Id() != "test-cloud/alice@canonical.com/cred-2" {
+		if credential.Id() != "test-cloud/alice@canonical.com/cred-2" {
 			return errors.E("bad cloud credential tag")
 		}
 		return nil
@@ -3172,7 +3245,7 @@ var updateModelCredentialTests = []struct {
 		}
 		return nil, nil
 	},
-	changeModelCredential: func(_ context.Context, modelTag names.ModelTag, credentialTag names.CloudCredentialTag) error {
+	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		return errors.E("an error")
 	},
 	username:    "alice@canonical.com",

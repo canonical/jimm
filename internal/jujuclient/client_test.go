@@ -13,6 +13,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -25,9 +26,9 @@ var _ = gc.Suite(&clientSuite{})
 func (s *clientSuite) TestStatus(c *gc.C) {
 	ctx := context.Background()
 
-	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1").String()
+	cct := names.NewCloudCredentialTag(jimmtest.TestCloudName + "/bob@canonical.com/pw1")
 	cred := jujuparams.TaggedCredential{
-		Tag: cct,
+		Tag: cct.String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Attributes: map[string]string{
@@ -49,12 +50,11 @@ func (s *clientSuite) TestStatus(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 	c.Assert(models, gc.HasLen, 0)
 
-	var modelInfo jujuparams.ModelInfo
-	err = s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
+	modelInfo, err := s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
 		Name:               "model-1",
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+		Owner:              "bob@canonical.com",
 		CloudCredentialTag: cct,
-	}, &modelInfo)
+	})
 	c.Assert(err, gc.Equals, nil)
 	uuid := modelInfo.UUID
 

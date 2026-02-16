@@ -206,7 +206,7 @@ func (r *controllerRoot) AddModelToController(ctx context.Context, req apiparams
 	if r.controllerUUIDMasking {
 		info.ControllerUUID = r.params.ControllerUUID
 	}
-	return *info, nil
+	return toModelInfo(info), nil
 }
 
 // AddController allows adds a controller to the pool of controllers

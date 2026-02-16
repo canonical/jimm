@@ -10,6 +10,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/core/instance"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"sigs.k8s.io/yaml"
@@ -638,11 +639,11 @@ type UserAccess struct {
 // ParseMachineHardware will panic if the value cannot be parsed to the
 // correct type for the key. If the given string is empty then a nil value
 // is retuned.
-func ParseMachineHardware(s string) *jujuparams.MachineHardware {
+func ParseMachineHardware(s string) *instance.HardwareCharacteristics {
 	if s == "" {
 		return nil
 	}
-	var hw jujuparams.MachineHardware
+	var hw instance.HardwareCharacteristics
 	for _, f := range strings.Fields(s) {
 		var err error
 
@@ -666,8 +667,8 @@ func ParseMachineHardware(s string) *jujuparams.MachineHardware {
 				panic(err)
 			}
 		case "cores":
-			hw.Cores = new(uint64)
-			*hw.Cores, err = strconv.ParseUint(parts[1], 0, 64)
+			hw.CpuCores = new(uint64)
+			*hw.CpuCores, err = strconv.ParseUint(parts[1], 0, 64)
 			if err != nil {
 				panic(err)
 			}

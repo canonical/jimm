@@ -14,7 +14,9 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujuerrors "github.com/juju/errors"
+	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
+	"github.com/juju/juju/environs/cloudspec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -25,6 +27,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade/mocks"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
@@ -119,34 +122,16 @@ func TestPrepareUpgradeTo_Success(t *testing.T) {
 		Dial(ctx, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
+	cloudCred := jujucloud.NewCredential(jujucloud.AccessKeyAuthType, map[string]string{
+		"access-key": "AKIA...",
+	})
 	s.api.EXPECT().
-		ControllerModelSummary(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, modelSummary *jujuparams.ModelSummary) error {
-			// Mutate the pointer argument to simulate controller response
-			*modelSummary = jujuparams.ModelSummary{
-				CloudTag:           "cloud-aws",
-				CloudCredentialTag: "cloudcred-aws_alice_mycredential",
-				CloudRegion:        "us-east-1",
-			}
-			return nil
-		})
-
-	s.api.EXPECT().
-		CredentialContents("aws", "mycredential", true).
-		DoAndReturn(func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
-			return []jujuparams.CredentialContentResult{
-				{
-					Result: &jujuparams.ControllerCredentialInfo{
-						Content: jujuparams.CredentialContent{
-							Name:     "mycredential",
-							Cloud:    "aws",
-							AuthType: string(jujucloud.AccessKeyAuthType),
-							Attributes: map[string]string{
-								"access-key": "AKIA...",
-							},
-						},
-					},
-				},
+		CloudSpec(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (cloudspec.CloudSpec, error) {
+			return cloudspec.CloudSpec{
+				Name:       "aws",
+				Credential: &cloudCred,
+				Region:     "us-east-1",
 			}, nil
 		})
 
@@ -257,32 +242,12 @@ func TestUpgradeTo_Success(t *testing.T) {
 		Return(s.api, nil)
 
 	s.api.EXPECT().
-		ControllerModelSummary(ctx, gomock.Any()).
-		DoAndReturn(func(ctx context.Context, ms *jujuparams.ModelSummary) error {
-			*ms = jujuparams.ModelSummary{
-				CloudTag:           "cloud-aws",
-				CloudCredentialTag: "cloudcred-aws_alice_mycredential",
-				CloudRegion:        "us-east-1",
-			}
-			return nil
-		})
-
-	s.api.EXPECT().
-		CredentialContents("aws", "mycredential", true).
-		DoAndReturn(func(cloud, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
-			return []jujuparams.CredentialContentResult{
-				{
-					Result: &jujuparams.ControllerCredentialInfo{
-						Content: jujuparams.CredentialContent{
-							Name:     "mycredential",
-							Cloud:    "aws",
-							AuthType: string(jujucloud.AccessKeyAuthType),
-							Attributes: map[string]string{
-								"access-key": "AKIA...",
-							},
-						},
-					},
-				},
+		CloudSpec(gomock.Any()).
+		DoAndReturn(func(ctx context.Context) (cloudspec.CloudSpec, error) {
+			return cloudspec.CloudSpec{
+				Name:       "aws",
+				Credential: &jujucloud.Credential{},
+				Region:     "us-east-1",
 			}, nil
 		})
 
@@ -371,8 +336,10 @@ func TestMigrateModel_Success(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	s.jujuManager.EXPECT().
@@ -402,8 +369,10 @@ func TestMigrateModel_Success(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	s.jujuManager.EXPECT().
@@ -448,12 +417,14 @@ func TestMigrateModel_EndsEarly(t *testing.T) {
 	gomock.InOrder(
 		s.jujuManager.EXPECT().
 			ModelInfo(gomock.Any(), gomock.Any(), targetMt).
-			Return(&jujuparams.ModelInfo{}, nil),
+			Return(jujuclient.ModelInfo{}, nil),
 		s.jujuManager.EXPECT().
 			ModelInfo(gomock.Any(), gomock.Any(), targetMt).
-			Return(&jujuparams.ModelInfo{
-				UUID: targetMt.Id(),
-				Migration: &jujuparams.ModelMigrationStatus{
+			Return(jujuclient.ModelInfo{
+				ModelInfo: base.ModelInfo{
+					UUID: targetMt.Id(),
+				},
+				MigrationStatus: &jujuclient.ModelMigrationStatus{
 					Status: "some-status",
 					End:    &timeFailed,
 				},
@@ -488,8 +459,10 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	// Model is a different controller, so continues.
@@ -510,7 +483,7 @@ func TestMigrateModel_Retries2Times(t *testing.T) {
 	// Expect 3 because we're going to retry twice before succeeding.
 	s.jujuManager.EXPECT().
 		ModelInfo(gomock.Any(), gomock.Any(), targetMt).
-		Return(&jujuparams.ModelInfo{UUID: targetMt.Id()}, nil).
+		Return(jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: targetMt.Id()}}, nil).
 		Times(3)
 
 	// Retry 3 times.
@@ -552,8 +525,10 @@ func TestMigrateModel_IdempotencyWhenModelHasAlreadyBeenMigrated(t *testing.T) {
 			gomock.Any(),
 			targetMt,
 		).
-		Return(&jujuparams.ModelInfo{
-			UUID: targetMt.Id(),
+		Return(jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID: targetMt.Id(),
+			},
 		}, nil)
 
 	// Model is already on the target controller, so migration is a no-op.
@@ -636,10 +611,13 @@ func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {
 		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-		v := targetVersion
-		mi.AgentVersion = &v
-		return nil
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
+		return jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID:         modelUUID,
+				AgentVersion: &targetVersion,
+			},
+		}, nil
 	})
 
 	err = upgradeMgr.UpgradeModel(ctx, modelUUID, targetVersion)
@@ -676,18 +654,19 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 		Return(s.api, nil)
 
 	modelInfoCalls := 0
-	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-		c.Check(mi.UUID, qt.Equals, modelUUID)
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
+		c.Check(mt.Id(), qt.Equals, modelUUID)
+		mi := jujuclient.ModelInfo{}
 		modelInfoCalls++
 		if modelInfoCalls == 1 {
 			v := oldVersion
 			mi.AgentVersion = &v
-			return nil
+			return mi, nil
 		}
 		v := targetVersion
 		mi.AgentVersion = &v
-		return nil
-	})
+		return mi, nil
+	}).Times(2)
 
 	s.api.EXPECT().UpgradeModel(modelUUID, targetVersion, "", false, false).Return(targetVersion, nil)
 
@@ -730,10 +709,13 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
-	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mi *jujuparams.ModelInfo) error {
-		v := oldVersion
-		mi.AgentVersion = &v
-		return nil
+	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
+		return jujuclient.ModelInfo{
+			ModelInfo: base.ModelInfo{
+				UUID:         modelUUID,
+				AgentVersion: &oldVersion,
+			},
+		}, nil
 	})
 
 	s.api.EXPECT().UpgradeModel(modelUUID, targetVersion, "", false, false).Return(version.Number{}, jujuerrors.AlreadyExists)

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuclient
 
@@ -6,7 +6,6 @@ import (
 	"context"
 	"time"
 
-	jujuerrors "github.com/juju/errors"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/client/modelmanager"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -15,47 +14,82 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
-// CreateModel creates a new model as specified by the given model
-// specification. If the model is created successfully then the model
-// document passed in will be updated with the model information returned
-// from the Create model call. If there is an error returned it will be
-// of type *APIError. CreateModel uses the Create model procedure on the
-// ModelManager facade.
-func (c Connection) CreateModel(ctx context.Context, args *jujuparams.ModelCreateArgs, info *jujuparams.ModelInfo) error {
-
-	if err := c.Call(ctx, "ModelManager", 10, "", "CreateModel", args, info); err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	return nil
+// CreateModelArgs holds the arguments for creating a model.
+type CreateModelArgs struct {
+	Name               string
+	Owner              string
+	Cloud              string
+	CloudRegion        string
+	CloudCredentialTag names.CloudCredentialTag
+	Config             map[string]interface{}
 }
 
-// ModelInfo retrieves information about a model from the controller. The
-// given info structure must specify a UUID, the rest will be filled out
-// from the controller response. If an error is returned by the Juju API
-// then the resulting error response will be of type *APIError. ModelInfo
-// will use the ModelInfo procedure from the ModelManager version 9
-// facade if it is available, falling back to version 3.
-func (c Connection) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) error {
+// CreateModel creates a new model as specified by the given model
+// specification returning the model details created. CreateModel
+// uses the Create model procedure on the ModelManager facade.
+func (c Connection) CreateModel(ctx context.Context, args *CreateModelArgs) (base.ModelInfo, error) {
+	return modelmanager.NewClient(&c).CreateModel(
+		args.Name,
+		args.Owner,
+		args.Cloud,
+		args.CloudRegion,
+		args.CloudCredentialTag,
+		args.Config)
+}
 
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: names.NewModelTag(info.UUID).String(),
-		}},
-	}
+// ModelMigrationStatus holds the migration status of a model.
+type ModelMigrationStatus struct {
+	Status string
+	Start  *time.Time
+	End    *time.Time
+}
 
-	resp := jujuparams.ModelInfoResults{
-		Results: []jujuparams.ModelInfoResult{{
-			Result: info,
-		}},
-	}
-	err := c.Call(ctx, "ModelManager", 10, "", "ModelInfo", &args, &resp)
+// SupportedFeature represents jujuparams.SupportedFeature.
+type SupportedFeature struct {
+	Name        string
+	Description string
+	Version     string
+}
+
+// SecretBackend represents jujuparams.SecretBackend.
+type SecretBackend struct {
+	Name                string
+	BackendType         string
+	TokenRotateInterval *time.Duration
+	Config              map[string]interface{}
+}
+
+// SecretBackendResult represents jujuparams.SecretBackendResult.
+type SecretBackendResult struct {
+	Result     SecretBackend
+	ID         string
+	NumSecrets int
+	Status     string
+	Message    string
+	Error      error
+}
+
+// ModelInfo holds information about a model.
+// It combines the base.ModelInfo returned by the Juju client in other API methods with additional
+// information that is contained in the params.ModelInfo returned by the ModelInfo API call.
+type ModelInfo struct {
+	base.ModelInfo
+	MigrationStatus         *ModelMigrationStatus
+	CloudCredentialValidity *bool
+	SupportedFeatures       []SupportedFeature
+	SecretBackends          []SecretBackendResult
+}
+
+// ModelInfo retrieves information about a model from the controller.
+func (c Connection) ModelInfo(ctx context.Context, model names.ModelTag) (ModelInfo, error) {
+	res, err := modelmanager.NewClient(&c).ModelInfo([]names.ModelTag{model})
 	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
+		return ModelInfo{}, err
 	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
+	if res[0].Error != nil {
+		return ModelInfo{}, errors.E(res[0].Error)
 	}
-	return nil
+	return convertParamsModelInfo(*res[0].Result)
 }
 
 // GrantJIMMModelAdmin ensures that the JIMM user is an admin level user
@@ -65,209 +99,55 @@ func (c Connection) ModelInfo(ctx context.Context, info *jujuparams.ModelInfo) e
 // GrantJIMMModelAdmin uses the ModifyModelAccess procedure on the
 // ModelManager facade.
 func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error {
-
-	args := jujuparams.ModifyModelAccessRequest{
-		Changes: []jujuparams.ModifyModelAccess{{
-			UserTag:  c.user.ResourceTag().String(),
-			Action:   jujuparams.GrantModelAccess,
-			Access:   jujuparams.ModelAdminAccess,
-			ModelTag: tag.String(),
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	if err := c.Call(ctx, "ModelManager", 10, "", "ModifyModelAccess", &args, &resp); err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
+	userID := c.user.ResourceTag().Id()
+	access := string(jujuparams.ModelAdminAccess)
+	return modelmanager.NewClient(&c).GrantModel(userID, access, tag.Id())
 }
 
 // DumpModel dumps debugging details for the given model. If the simplied
 // dump is requested then a simplified dump is returned. DumpModel uses the
 // DumpModels method on the ModelManager facade.
-func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (string, error) {
-
-	args := jujuparams.DumpModelRequest{
-		Entities: []jujuparams.Entity{{
-			Tag: tag.String(),
-		}},
-		Simplified: simplified,
-	}
-
-	resp := jujuparams.StringResults{
-		Results: make([]jujuparams.StringResult, 1),
-	}
-	if err := c.Call(ctx, "ModelManager", 10, "", "DumpModels", &args, &resp); err != nil {
-		return "", errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return "", errors.E(resp.Results[0].Error)
-	}
-	return resp.Results[0].Result, nil
+func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
+	return modelmanager.NewClient(&c).DumpModel(tag, simplified)
 }
 
 // DumpModelDB dumps the controller database entry given model.
 // DumpModelDB uses the DumpModelsDB method on the ModelManager facade..
 func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
-
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: tag.String(),
-		}},
-	}
-
-	resp := jujuparams.MapResults{
-		Results: make([]jujuparams.MapResult, 1),
-	}
-	if err := c.Call(ctx, "ModelManager", 10, "", "DumpModelsDB", &args, &resp); err != nil {
-		return nil, errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return nil, errors.E(resp.Results[0].Error)
-	}
-	return resp.Results[0].Result, nil
-}
-
-// ControllerModelSummary retrieves the ModelSummary for the controller
-// model. ControllerModelSummary uses the ListModelSummaries procedure on
-// the ModelManager facade.
-func (c Connection) ControllerModelSummary(ctx context.Context, ms *jujuparams.ModelSummary) error {
-
-	args := jujuparams.ModelSummariesRequest{
-		UserTag: c.user.ResourceTag().String(),
-		All:     true,
-	}
-	var resp jujuparams.ModelSummaryResults
-	err := c.Call(ctx, "ModelManager", 10, "", "ListModelSummaries", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	for _, r := range resp.Results {
-		if r.Result != nil && r.Result.IsController {
-			*ms = *r.Result
-			return nil
-		}
-	}
-	return errors.E("controller model not found", errors.CodeNotFound)
+	return modelmanager.NewClient(&c).DumpModelDB(tag)
 }
 
 // ListModelSummaries retrieves the list of model summaries from the controler
-func (c Connection) ListModelSummaries(ctx context.Context, ms jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error) {
-
-	args := jujuparams.ModelSummariesRequest{
-		UserTag: c.user.ResourceTag().String(),
-		All:     ms.All,
-	}
-	var resp jujuparams.ModelSummaryResults
-	err := c.Call(ctx, "ModelManager", 10, "", "ListModelSummaries", &args, &resp)
-	if err != nil {
-		return jujuparams.ModelSummaryResults{}, errors.E(jujuerrors.Cause(err))
-	}
-
-	return resp, nil
+func (c Connection) ListModelSummaries(ctx context.Context, ms jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error) {
+	return modelmanager.NewClient(&c).ListModelSummaries(c.user.ResourceTag().String(), ms.All)
 }
 
 // ValidateModelUpgrade validates if a model is allowed to perform an upgrade. It
 // uses ValidateModelUpgrades on the ModelManager facade.
 func (c Connection) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
-
-	args := jujuparams.ValidateModelUpgradeParams{
-		Models: []jujuparams.ModelParam{{
-			ModelTag: model.String(),
-		}},
-		Force: force,
-	}
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.Call(ctx, "ModelManager", 10, "", "ValidateModelUpgrades", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
+	return modelmanager.NewClient(&c).ValidateModelUpgrade(model, force)
 }
 
-// DestroyModel starts the destruction of the given model. This method uses
-// the highest available method from:
-//
-//   - ModelManager(10).DestroyModels
+// DestroyModel starts the destruction of the given model.
 func (c Connection) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
-
-	args := jujuparams.DestroyModelsParams{
-		Models: []jujuparams.DestroyModelParams{{
-			ModelTag:       tag.String(),
-			DestroyStorage: destroyStorage,
-			Force:          force,
-			MaxWait:        maxWait,
-			Timeout:        timeout,
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.Call(ctx, "ModelManager", 10, "", "DestroyModels", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
+	return modelmanager.NewClient(&c).DestroyModel(tag, destroyStorage, force, maxWait, timeout)
 }
 
-// ModelStatus retrieves the status of a model from the controller. The
-// given status structure must specify a ModelTag, the rest will be filled
-// out from the controller response. If an error is returned by the Juju
-// API then the resulting error response will be of type *APIError.
-// ModelStatus will use the ModelStatus procedure from the ModelManager
-// version 4 facade if it is available, falling back to version 2.
-func (c Connection) ModelStatus(ctx context.Context, status *jujuparams.ModelStatus) error {
-
-	args := jujuparams.Entities{
-		Entities: []jujuparams.Entity{{
-			Tag: status.ModelTag,
-		}},
-	}
-
-	resp := jujuparams.ModelStatusResults{
-		Results: make([]jujuparams.ModelStatus, 1),
-	}
-	err := c.Call(ctx, "ModelManager", 10, "", "ModelStatus", &args, &resp)
+// ModelStatus retrieves the status of a model from the controller.
+func (c Connection) ModelStatus(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+	statuses, err := modelmanager.NewClient(&c).ModelStatus(modelTag)
 	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
+		return base.ModelStatus{}, err
 	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
+	if len(statuses) == 0 {
+		return base.ModelStatus{}, errors.E("no status returned for model")
 	}
-	*status = resp.Results[0]
-	return nil
+	return statuses[0], nil
 }
 
 // ChangeModelCredential replaces cloud credential for a given model with the provided one.
 func (c Connection) ChangeModelCredential(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
-
-	var out jujuparams.ErrorResults
-	args := jujuparams.ChangeModelCredentialsParams{
-		Models: []jujuparams.ChangeModelCredentialParams{{
-			ModelTag:           model.String(),
-			CloudCredentialTag: credential.String(),
-		}},
-	}
-
-	err := c.Call(ctx, "ModelManager", 10, "", "ChangeModelCredential", &args, &out)
-	if err != nil {
-		return errors.E(err)
-	}
-	return out.OneError()
+	return modelmanager.NewClient(&c).ChangeModelCredential(model, credential)
 }
 
 // ListModels returns UserModel's for the user that is logged in. If the user logged

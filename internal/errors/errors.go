@@ -101,13 +101,13 @@ func E(args ...interface{}) error {
 	// extract the details is compatible with both the Error type and juju
 	// API Error types.
 	if !setCode {
-		if ec, ok := e.Err.(interface{ ErrorCode() string }); ok {
-			e.Code = Code(ec.ErrorCode())
+		if code := ErrorCode(e.Err); code != "" {
+			e.Code = code
 		}
 	}
 	if !setInfo {
-		if ei, ok := e.Err.(interface{ ErrorInfo() map[string]any }); ok {
-			e.Info = ei.ErrorInfo()
+		if info := ErrorInfo(e.Err); info != nil {
+			e.Info = info
 		}
 	}
 	return &e

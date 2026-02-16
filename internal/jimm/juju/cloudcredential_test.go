@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju_test
 
@@ -11,6 +11,8 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/core/instance"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -20,6 +22,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -704,7 +707,6 @@ func TestUpdateCloudCredential(t *testing.T) {
 			checkErrors := test.checkCredentialErrors
 			updateErrors := test.updateCredentialErrors
 			api := &jimmtest.API{
-				SupportsCheckCredentialModels_: true,
 				CheckCredentialModels_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
 					if len(checkErrors) > 0 {
 						var err error
@@ -761,35 +763,28 @@ func TestUpdateCloudCredential(t *testing.T) {
 						}}, nil
 					}
 				},
-				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+				GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
 					return nil
 				},
-				CreateModel_: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+				CreateModel_: func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+					mi := base.ModelInfo{}
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-					mi.CloudTag = args.CloudTag
-					mi.CloudCredentialTag = args.CloudCredentialTag
+					mi.Cloud = args.Cloud
+					mi.CloudCredential = args.CloudCredentialTag.Id()
 					mi.CloudRegion = args.CloudRegion
-					mi.OwnerTag = args.OwnerTag
-					mi.Status = jujuparams.EntityStatus{
+					mi.Owner = args.Owner
+					mi.Status = base.Status{
 						Status: status.Started,
 						Info:   "running a test",
 					}
 					mi.Life = life.Alive
-					mi.Users = []jujuparams.ModelUserInfo{{
-						UserName: "alice@canonical.com",
-						Access:   jujuparams.ModelAdminAccess,
-					}, {
-						// "bob" is a local user
-						UserName: "bob",
-						Access:   jujuparams.ModelReadAccess,
-					}}
-					mi.Machines = []jujuparams.ModelMachineInfo{{
+					mi.Machines = []base.Machine{{
 						Id: "test-machine-id",
-						Hardware: &jujuparams.MachineHardware{
-							Arch:  &arch,
-							Mem:   &mem,
-							Cores: &cores,
+						Hardware: &instance.HardwareCharacteristics{
+							Arch:     &arch,
+							Mem:      &mem,
+							CpuCores: &cores,
 						},
 						DisplayName: "a test machine",
 						Status:      "running",
@@ -797,7 +792,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 						HasVote:     true,
 						WantsVote:   false,
 					}}
-					return nil
+					return mi, nil
 				},
 			}
 
@@ -1236,35 +1231,28 @@ func TestRevokeCloudCredential(t *testing.T) {
 						ModelName: "test-model",
 					}}, nil
 				},
-				GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+				GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
 					return nil
 				},
-				CreateModel_: func(ctx context.Context, args *jujuparams.ModelCreateArgs, mi *jujuparams.ModelInfo) error {
+				CreateModel_: func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
+					mi := base.ModelInfo{}
 					mi.Name = args.Name
 					mi.UUID = "00000001-0000-0000-0000-0000-000000000001"
-					mi.CloudTag = args.CloudTag
-					mi.CloudCredentialTag = args.CloudCredentialTag
+					mi.Cloud = args.Cloud
+					mi.CloudCredential = args.CloudCredentialTag.Id()
 					mi.CloudRegion = args.CloudRegion
-					mi.OwnerTag = args.OwnerTag
-					mi.Status = jujuparams.EntityStatus{
+					mi.Owner = args.Owner
+					mi.Status = base.Status{
 						Status: status.Started,
 						Info:   "running a test",
 					}
 					mi.Life = life.Alive
-					mi.Users = []jujuparams.ModelUserInfo{{
-						UserName: "alice@canonical.com",
-						Access:   jujuparams.ModelAdminAccess,
-					}, {
-						// "bob" is a local user
-						UserName: "bob",
-						Access:   jujuparams.ModelReadAccess,
-					}}
-					mi.Machines = []jujuparams.ModelMachineInfo{{
+					mi.Machines = []base.Machine{{
 						Id: "test-machine-id",
-						Hardware: &jujuparams.MachineHardware{
-							Arch:  &arch,
-							Mem:   &mem,
-							Cores: &cores,
+						Hardware: &instance.HardwareCharacteristics{
+							Arch:     &arch,
+							Mem:      &mem,
+							CpuCores: &cores,
 						},
 						DisplayName: "a test machine",
 						Status:      "running",
@@ -1272,7 +1260,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 						HasVote:     true,
 						WantsVote:   false,
 					}}
-					return nil
+					return mi, nil
 				},
 			}
 

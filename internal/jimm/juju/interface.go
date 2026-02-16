@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package juju
 
@@ -12,11 +12,13 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/core/migration"
+	"github.com/juju/juju/environs/cloudspec"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -38,7 +40,7 @@ type API interface {
 	base.APICallCloser
 
 	// Abort aborts a model migration.
-	Abort(modelUUID string) error
+	Abort(string) error
 
 	// Activate activates a model on the controller.
 	// It is used to activate a model that has been migrated from another controller.
@@ -50,7 +52,7 @@ type API interface {
 	// AdoptResources adopts resources from a model with the given UUID
 	// and controller version. This is used to adopt resources from a
 	// model that is being migrated.
-	AdoptResources(modelUUID string, controllerVersion version.Number) error
+	AdoptResources(string, version.Number) error
 
 	// ChangeModelCredential replaces cloud credential for a given model with the provided one.
 	ChangeModelCredential(context.Context, names.ModelTag, names.CloudCredentialTag) error
@@ -61,10 +63,10 @@ type API interface {
 
 	// CheckMachines compares the machines in state with the ones
 	// reported by the provider and reports any discrepancies.
-	CheckMachines(modelUUID string) ([]error, error)
+	CheckMachines(string) ([]error, error)
 
 	// Import imports a model from a serialized format.
-	Import(bytes []byte) error
+	Import([]byte) error
 
 	// Close closes the API connection.
 	Close() error
@@ -75,27 +77,26 @@ type API interface {
 	// Clouds returns the set of clouds supported by the controller.
 	Clouds() (map[names.CloudTag]jujucloud.Cloud, error)
 
-	// ControllerModelSummary fetches the model summary of the model on the
-	// controller that hosts the controller machines.
-	ControllerModelSummary(context.Context, *jujuparams.ModelSummary) error
+	// CloudSpec fetches the cloud spec of the model connected to.
+	CloudSpec(context.Context) (cloudspec.CloudSpec, error)
 
 	// ControllerConfig fetches the controller configuration.
 	ControllerConfig(context.Context) (jujuparams.ControllerConfigResult, error)
 
 	// CreateModel creates a new model.
-	CreateModel(context.Context, *jujuparams.ModelCreateArgs, *jujuparams.ModelInfo) error
+	CreateModel(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 
 	// DestroyApplicationOffer destroys an application offer.
 	DestroyApplicationOffer(context.Context, string, bool) error
 
 	// DestroyModel destroys a model.
-	DestroyModel(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
+	DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error
 
 	// ConnectStream creates a new connection to a streaming endpoint.
 	ConnectStream(string, url.Values) (base.Stream, error)
 
 	// DumpModel collects a database-agnostic dump of a model.
-	DumpModel(context.Context, names.ModelTag, bool) (string, error)
+	DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error)
 
 	// DumpModelDB collects a database dump of a model.
 	DumpModelDB(context.Context, names.ModelTag) (map[string]interface{}, error)
@@ -131,13 +132,13 @@ type API interface {
 	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 
 	// ListModelSummaries lists models summaries
-	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) (jujuparams.ModelSummaryResults, error)
+	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
 
 	// ModelInfo fetches a model's ModelInfo.
-	ModelInfo(context.Context, *jujuparams.ModelInfo) error
+	ModelInfo(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 
 	// ModelStatus fetches a model's ModelStatus.
-	ModelStatus(context.Context, *jujuparams.ModelStatus) error
+	ModelStatus(context.Context, names.ModelTag) (base.ModelStatus, error)
 
 	// ModelSummaryWatcherNext returns the next set of model summaries from
 	// the watcher.
@@ -148,9 +149,6 @@ type API interface {
 
 	// Offer creates a new application-offer.
 	Offer(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
-
-	// Ping tests the connection is working.
-	Ping(context.Context) error
 
 	// PreChecks runs pre-checks for a model migration.
 	Prechecks(model jujuparams.MigrationModelInfo) error
@@ -179,7 +177,7 @@ type API interface {
 	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 
 	// ValidateModelUpgrade validates that a model can be upgraded.
-	ValidateModelUpgrade(context.Context, names.ModelTag, bool) error
+	ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error
 
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
 	WatchAllModelSummaries(context.Context) (string, error)
@@ -193,10 +191,10 @@ type API interface {
 	ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 
 	// ListStorageDetails lists all storage.
-	ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error)
+	ListStorageDetails(context.Context) ([]jujuparams.StorageDetails, error)
 
 	// ListModels returns all UserModel's on the controller.
-	ListModels(ctx context.Context) ([]base.UserModel, error)
+	ListModels(context.Context) ([]base.UserModel, error)
 
 	// CredentialContents returns contents of the credential values for the specified
 	// cloud and credential name. Secrets will be included if requested.

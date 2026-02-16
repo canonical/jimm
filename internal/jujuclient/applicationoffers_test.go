@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2025 Canonical.
 
 package jujuclient_test
 
@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/testing/factory"
@@ -15,13 +16,14 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 type applicationoffersSuite struct {
 	jujuclientSuite
 
-	modelInfo jujuparams.ModelInfo
+	modelInfo base.ModelInfo
 }
 
 var _ = gc.Suite(&applicationoffersSuite{})
@@ -29,11 +31,11 @@ var _ = gc.Suite(&applicationoffersSuite{})
 func (s *applicationoffersSuite) SetUpTest(c *gc.C) {
 	s.jujuclientSuite.SetUpTest(c)
 
-	ctx := context.Background()
-	err := s.API.CreateModel(ctx, &jujuparams.ModelCreateArgs{
-		Name:     "test-model",
-		OwnerTag: names.NewUserTag("test-user@canonical.com").String(),
-	}, &s.modelInfo)
+	var err error
+	s.modelInfo, err = s.API.CreateModel(context.Background(), &jujuclient.CreateModelArgs{
+		Name:  "test-model",
+		Owner: "test-user@canonical.com",
+	})
 	c.Assert(err, gc.Equals, nil)
 }
 
@@ -117,10 +119,8 @@ func (s *applicationoffersSuite) TestListApplicationOffersError(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestListApplicationOffersNoOffers(c *gc.C) {
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.ListApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
-		OwnerName: owner.Id(),
+		OwnerName: s.modelInfo.Owner,
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -169,10 +169,8 @@ func (s *applicationoffersSuite) TestListApplicationOffersMatching(c *gc.C) {
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: owner.Id(),
+		OwnerName: s.modelInfo.Owner,
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -216,10 +214,8 @@ func (s *applicationoffersSuite) TestListApplicationOffersNoMatch(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName:       owner.Id(),
+		OwnerName:       s.modelInfo.Owner,
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "no-such-app",
 	}})
@@ -233,10 +229,8 @@ func (s *applicationoffersSuite) TestFindApplicationOffersError(c *gc.C) {
 }
 
 func (s *applicationoffersSuite) TestFindApplicationOffersNoOffers(c *gc.C) {
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.FindApplicationOffers(context.Background(), []jujuparams.OfferFilter{{
-		OwnerName: owner.Id(),
+		OwnerName: s.modelInfo.Owner,
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -285,10 +279,8 @@ func (s *applicationoffersSuite) TestFindApplicationOffersMatching(c *gc.C) {
 	err = s.API.GetApplicationOffer(ctx, &info)
 	c.Assert(err, gc.Equals, nil)
 
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.FindApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: owner.Id(),
+		OwnerName: s.modelInfo.Owner,
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -332,10 +324,8 @@ func (s *applicationoffersSuite) TestFindApplicationOffersNoMatch(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.FindApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName:       owner.Id(),
+		OwnerName:       s.modelInfo.Owner,
 		ModelName:       s.modelInfo.Name,
 		ApplicationName: "no-such-app",
 	}})
@@ -677,10 +667,8 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 	)
 	c.Assert(err, gc.Equals, nil)
 
-	owner, err := names.ParseUserTag(s.modelInfo.OwnerTag)
-	c.Assert(err, gc.Equals, nil)
 	offers, err := s.API.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: owner.Id(),
+		OwnerName: s.modelInfo.Owner,
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)
@@ -690,7 +678,7 @@ func (s *applicationoffersSuite) TestDestroyApplicationOffer(c *gc.C) {
 	c.Assert(err, gc.Equals, nil)
 
 	offers, err = s.API.ListApplicationOffers(ctx, []jujuparams.OfferFilter{{
-		OwnerName: owner.Id(),
+		OwnerName: s.modelInfo.Owner,
 		ModelName: s.modelInfo.Name,
 	}})
 	c.Assert(err, gc.Equals, nil)

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuapi
 
@@ -187,7 +187,7 @@ func (r *controllerRoot) AllModels(ctx context.Context) (jujuparams.UserModelLis
 func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelList, error) {
 
 	var models []jujuparams.UserModel
-	err := r.jimm.JujuManager().ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
+	err := r.jimm.JujuManager().ForEachUserModel(ctx, r.user, func(m *dbmodel.Model, _ string) error {
 		// TODO(Kian) CSS-6040 Refactor the below to use a better abstraction for Postgres/OpenFGA to Juju types.
 		var um jujuparams.UserModel
 		um.Model = m.ToJujuModel()
@@ -219,7 +219,7 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 			results[i].Error = r.mapError(ctx, errors.E(err))
 			continue
 		}
-		results[i] = *status
+		results[i] = toModelStatusParams(status)
 	}
 	return jujuparams.ModelStatusResults{
 		Results: results,

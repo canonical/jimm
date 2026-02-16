@@ -18,18 +18,38 @@ import (
 	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
-
-	"github.com/canonical/jimm/v3/internal/jimm/juju"
 )
 
 const (
 	defaultScheme = "https"
 )
 
+// ConnectionDetails holds the details required to connect to a Juju controller.
+type ConnectionDetails struct {
+	// CACertificate is the CA certificate required to access this
+	// controller. This is only set if the controller endpoint's
+	// certificate is not signed by a public CA.
+	CACertificate string
+	// PublicAddress is the public address registered with the controller
+	// when it was added. This address will normally be a resolvable DNS
+	// name and port.
+	PublicAddress string
+	// TLSHostname provides a hostname that should be used for TLS verfication.
+	// Useful for local dev to avoid TLS issues.
+	TLSHostname string
+	// Addresses holds the known addresses on which the controller is
+	// listening.
+	Addresses []network.MachineHostPorts
+	// Username used to authentica with the controller.
+	Username string
+	// Password used to authenticate with the controller.
+	Password string
+}
+
 // ProxyHTTP handles HTTP requests by proxying them to the Juju controller.
 // It retrieves the controller's addresses, sets up TLS if necessary,
 // and acts as a reverse proxy to forward the request.
-func ProxyHTTP(ctx context.Context, ctl juju.ControllerConnectionDetails, w http.ResponseWriter, req *http.Request) {
+func ProxyHTTP(ctx context.Context, ctl ConnectionDetails, w http.ResponseWriter, req *http.Request) {
 	urls, err := getControllerAddresses(ctl)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get controller addresses", zap.Error(err))
@@ -75,12 +95,12 @@ func ProxyHTTP(ctx context.Context, ctl juju.ControllerConnectionDetails, w http
 		return
 	}
 
-	adminUsername := names.NewUserTag(ctl.Credentials.AdminIdentityName).String()
+	adminUsername := names.NewUserTag(ctl.Username).String()
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			// The multiBackendTransport will handle URL selection and failover
 			// We just need to set up basic auth here
-			pr.Out.SetBasicAuth(adminUsername, ctl.Credentials.AdminPassword)
+			pr.Out.SetBasicAuth(adminUsername, ctl.Password)
 		},
 		Transport: multiBackendTransport,
 		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us
@@ -95,7 +115,7 @@ func (pl *proxyErrorLogger) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func getControllerAddresses(ctl juju.ControllerConnectionDetails) ([]*url.URL, error) {
+func getControllerAddresses(ctl ConnectionDetails) ([]*url.URL, error) {
 	urls := make([]*url.URL, 0, 1)
 	if ctl.PublicAddress != "" {
 		address := ctl.PublicAddress
