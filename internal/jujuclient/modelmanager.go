@@ -139,6 +139,9 @@ func (c Connection) ModelStatus(ctx context.Context, modelTag names.ModelTag) (b
 	if err != nil {
 		return base.ModelStatus{}, err
 	}
+	if len(statuses) == 0 {
+		return base.ModelStatus{}, errors.E("no status returned for model")
+	}
 	return statuses[0], nil
 }
 
