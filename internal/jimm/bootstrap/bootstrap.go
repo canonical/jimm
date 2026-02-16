@@ -145,20 +145,20 @@ func NewBootstrapManager(
 // GetJobInfo retrieves the status and logs of a bootstrap job.
 // It requires the user to be an admin and returns the status, error message, logs,
 // and a watermark for pagination.
-func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobId int64, offset int) (params.GetJobInfoResponse, error) {
+func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error) {
 	job, err := b.jobQueue.GetJobInfo(ctx, jobId)
 	if err != nil {
-		return params.GetJobInfoResponse{}, fmt.Errorf("failed to get job info: %w", err)
+		return params.GetBootstrapInfoResponse{}, fmt.Errorf("failed to get job info: %w", err)
 	}
 	logs, newOffset, err := b.store.QueryJobLog(ctx, jobId, offset)
 	if err != nil {
-		return params.GetJobInfoResponse{}, fmt.Errorf("failed to query job logs: %w", err)
+		return params.GetBootstrapInfoResponse{}, fmt.Errorf("failed to query job logs: %w", err)
 	}
 	var errorMsg strings.Builder
 	for i, attemptErr := range job.Errors {
 		fmt.Fprintf(&errorMsg, "attempt %d: %s\n", i, attemptErr.Error)
 	}
-	return params.GetJobInfoResponse{
+	return params.GetBootstrapInfoResponse{
 		Status:    toParamsJobState(ctx, job.State),
 		Error:     errorMsg.String(),
 		Logs:      logs,

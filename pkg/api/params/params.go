@@ -602,16 +602,17 @@ const (
 	StatusUnknown    JobStatus = "unknown"
 )
 
-// GetJobInfoRequest holds the request to get the status of a job.
-type GetJobInfoRequest struct {
+// GetBootstrapInfoRequest holds the request to get the status
+// of a bootstrap operation.
+type GetBootstrapInfoRequest struct {
 	// JobID is the ID of the job to get the status for.
 	JobID string `json:"job-id"`
 	// Watermark is the line number to start reading logs from.
 	Watermark int `json:"watermark"`
 }
 
-// GetJobInfoResponse holds the response for a job status.
-type GetJobInfoResponse struct {
+// GetBootstrapInfoResponse holds the status of a bootstrap job.
+type GetBootstrapInfoResponse struct {
 	// Status is the status of the job.
 	Status JobStatus `json:"status"`
 	// Logs are the logs for the job.
@@ -622,15 +623,15 @@ type GetJobInfoResponse struct {
 	Error string `json:"error,omitempty"`
 }
 
-// StopJobRequest holds the request to stop a job.
-type StopJobRequest struct {
+// StopBootstrapRequest holds the request to stop a bootstrap operation.
+type StopBootstrapRequest struct {
 	// JobID is the ID of the job to stop.
 	JobID string `json:"job-id"`
 }
 
-// StartJobResponse holds the response for starting
-// a controller job.
-type StartJobResponse struct {
+// StartBootstrapResponse holds the response for starting
+// a bootstrap job.
+type StartBootstrapResponse struct {
 	// JobID is the ID of the job that was started.
 	JobID string `json:"job-id"`
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -91,10 +91,10 @@ func TestBootstrapWithPublicCloud(t *testing.T) {
 		},
 	}, nil)
 
-	s.client.EXPECT().StartBootstrapJob(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartJobResponse, error) {
+	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
 		// If the cloud is public, the Cloud field should be empty.
 		c.Check(bsp.Cloud, qt.DeepEquals, jujuparams.Cloud{})
-		return &params.StartJobResponse{JobID: "test-job-id"}, nil
+		return &params.StartBootstrapResponse{JobID: "test-job-id"}, nil
 	})
 	s.client.EXPECT().Close().Return(nil)
 
@@ -146,7 +146,7 @@ func TestBootstrapApiParams(t *testing.T) {
 			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
 		},
 	}, nil)
-	s.client.EXPECT().StartBootstrapJob(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartJobResponse, error) {
+	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
 		expected := &params.BootstrapParams{
 			ControllerName: "controller-name",
 			CloudName:      cloudName,
@@ -175,7 +175,7 @@ func TestBootstrapApiParams(t *testing.T) {
 		c.Check(bsp.Config, qt.DeepEquals, expected.Config)
 		c.Check(bsp.ControllerVersion, qt.Equals, expected.ControllerVersion)
 
-		return &params.StartJobResponse{
+		return &params.StartBootstrapResponse{
 			JobID: "test-job-id",
 		}, nil
 	})
@@ -211,7 +211,7 @@ func TestBootstrapRunDetached(t *testing.T) {
 			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
 		},
 	}, nil)
-	s.client.EXPECT().StartBootstrapJob(gomock.Any()).Return(&params.StartJobResponse{
+	s.client.EXPECT().StartBootstrap(gomock.Any()).Return(&params.StartBootstrapResponse{
 		JobID: "test-job-id",
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
@@ -244,12 +244,12 @@ func TestBootstrapWatchLogs(t *testing.T) {
 			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
 		},
 	}, nil)
-	s.client.EXPECT().StartBootstrapJob(gomock.Any()).Return(&params.StartJobResponse{
+	s.client.EXPECT().StartBootstrap(gomock.Any()).Return(&params.StartBootstrapResponse{
 		JobID: "test-job-id",
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status:    params.StatusSuccessful,
 		Logs:      []string{"log-line", "log-line"},
 		Watermark: 2,
@@ -327,12 +327,12 @@ func TestBootstrapMultipleCredentials(t *testing.T) {
 		"--credential", "cred-2",
 	)
 
-	s.client.EXPECT().StartBootstrapJob(gomock.Any()).Return(&params.StartJobResponse{
+	s.client.EXPECT().StartBootstrap(gomock.Any()).Return(&params.StartBootstrapResponse{
 		JobID: "test-job-id",
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status:    params.StatusSuccessful,
 		Logs:      []string{"log-line", "log-line"},
 		Watermark: 2,
@@ -356,7 +356,7 @@ func TestBootstrapWithDefaultCredential(t *testing.T) {
 		},
 	}, nil)
 
-	s.client.EXPECT().StartBootstrapJob(gomock.Any()).Return(&params.StartJobResponse{JobID: "test-job-id"}, nil)
+	s.client.EXPECT().StartBootstrap(gomock.Any()).Return(&params.StartBootstrapResponse{JobID: "test-job-id"}, nil)
 	s.client.EXPECT().Close().Return(nil)
 
 	command := &bootstrapCommand{}

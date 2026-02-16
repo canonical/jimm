@@ -306,7 +306,7 @@ type JujuManager interface {
 // BootstrapManager provides methods to manage bootstrap jobs.
 type BootstrapManager interface {
 	// GetJobInfo retrieves the status and logs of a job.
-	GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetJobInfoResponse, error)
+	GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error)
 	// StopJob stops a job.
 	StopJob(ctx context.Context, user *openfga.User, jobId int64) error
 	// WaitForJobCompletion waits for a job to complete.

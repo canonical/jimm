@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"strings"
 
-	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	"github.com/juju/cmd/v3"
 	"github.com/juju/gnuflag"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
 	"github.com/juju/juju/jujuclient"
+
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 const (

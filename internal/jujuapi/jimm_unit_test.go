@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuapi_test
 
@@ -273,11 +273,11 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jimm.BootstrapManager {
 			return &mocks.BootstapManager{
-				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId int64, offset int) (apiparams.GetJobInfoResponse, error) {
+				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId int64, offset int) (apiparams.GetBootstrapInfoResponse, error) {
 					if jobId != expectedJobID {
-						return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeNotFound, "job not found")
+						return apiparams.GetBootstrapInfoResponse{}, errors.E(errors.CodeNotFound, "job not found")
 					}
-					return apiparams.GetJobInfoResponse{
+					return apiparams.GetBootstrapInfoResponse{
 						Status: "running",
 						Logs:   []string{"bootstrap logs"},
 					}, nil
@@ -287,7 +287,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	}
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
-	response, err := root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
+	response, err := root.GetBootstrapInfo(ctx, apiparams.GetBootstrapInfoRequest{
 		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
@@ -297,7 +297,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	c.Assert(response.Logs, gc.DeepEquals, []string{"bootstrap logs"})
 
 	// Test job not found
-	_, err = root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
+	_, err = root.GetBootstrapInfo(ctx, apiparams.GetBootstrapInfoRequest{
 		JobID:     "999",
 		Watermark: 0,
 	})
@@ -305,7 +305,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 
 	// Test unauthorized user
 	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
-	_, err = root.GetJobInfo(ctx, apiparams.GetJobInfoRequest{
+	_, err = root.GetBootstrapInfo(ctx, apiparams.GetBootstrapInfoRequest{
 		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
@@ -322,7 +322,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStart_RejectsBuiltinClouds(c *gc.C) {
 		CloudName: "localhost",
 	}
 
-	_, err := root.StartBootstrapJob(ctx, params)
+	_, err := root.StartBootstrap(ctx, params)
 	c.Assert(err, gc.ErrorMatches, `.*bootstrap via JIMM does not support built-in clouds like "localhost"`)
 }
 
@@ -354,20 +354,20 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 		ControllerVersion: "3.6.9",
 	}
 
-	response, err := root.StartBootstrapJob(ctx, params)
+	response, err := root.StartBootstrap(ctx, params)
 	c.Assert(err, gc.IsNil)
 	c.Assert(response.JobID, gc.Not(gc.Equals), "")
 
 	// Test start bootstrap fails
 	startBootstrapErr = errors.E("foo")
-	_, err = root.StartBootstrapJob(ctx, params)
+	_, err = root.StartBootstrap(ctx, params)
 	c.Assert(err, gc.NotNil)
 	c.Assert(err.Error(), gc.Matches, "failed to start bootstrap job: foo")
 
 	startBootstrapErr = nil
 	// Test unauthorized user
 	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
-	_, err = root.StartBootstrapJob(ctx, params)
+	_, err = root.StartBootstrap(ctx, params)
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }
 
@@ -389,26 +389,26 @@ func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	}
 	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
 	// Test stop bootstrap job unauthorized user
-	err := root.StopJob(ctx, apiparams.StopJobRequest{
+	err := root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 
 	// Test stop bootstrap job
 	root = newTestControllerRoot(jimm, "alice@canonical.com", true)
-	err = root.StopJob(ctx, apiparams.StopJobRequest{
+	err = root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
 	c.Assert(err, gc.IsNil)
 
 	// Test job not found
-	err = root.StopJob(ctx, apiparams.StopJobRequest{
+	err = root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: "999",
 	})
 	c.Assert(err, gc.ErrorMatches, ".*job not found.*")
 
 	// Test stop bootstrap not valid job ID
-	err = root.StopJob(ctx, apiparams.StopJobRequest{
+	err = root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: "random-string",
 	})
 	c.Assert(err, gc.NotNil)
@@ -451,12 +451,12 @@ func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
 	req := apiparams.DestroyControllerRequest{}
 
 	// OK to destroy controller without models
-	_, err := root.StartDestroyControllerJob(ctx, req)
+	_, err := root.StartDestroyController(ctx, req)
 	c.Assert(err, gc.IsNil)
 
 	// Refuse to destroy controller with models
 	ctrlInfo.Models = append(ctrlInfo.Models, dbmodel.Model{})
-	_, err = root.StartDestroyControllerJob(ctx, req)
+	_, err = root.StartDestroyController(ctx, req)
 	c.Assert(err, gc.ErrorMatches, "cannot destroy controller with models")
 }
 

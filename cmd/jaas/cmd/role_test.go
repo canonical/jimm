@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -6,9 +6,10 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/canonical/jimm/v3/pkg/api/params"
 	qt "github.com/frankban/quicktest"
 	"go.uber.org/mock/gomock"
+
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestAddRole(t *testing.T) {

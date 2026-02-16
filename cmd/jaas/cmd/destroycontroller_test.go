@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -64,13 +64,13 @@ func TestRunDetached(t *testing.T) {
 
 	s := setupCmdMocks(c)
 
-	s.client.EXPECT().StartDestroyControllerJob(gomock.Any()).DoAndReturn(func(bsp *params.DestroyControllerRequest) (*params.StartJobResponse, error) {
+	s.client.EXPECT().StartDestroyController(gomock.Any()).DoAndReturn(func(bsp *params.DestroyControllerRequest) (*params.StartBootstrapResponse, error) {
 		expected := &params.DestroyControllerRequest{
 			ControllerName: "controller-name",
 		}
 		c.Assert(bsp.ControllerName, qt.Equals, expected.ControllerName)
 
-		return &params.StartJobResponse{
+		return &params.StartBootstrapResponse{
 			JobID: "test-job-id",
 		}, nil
 	})
@@ -92,12 +92,12 @@ func TestWatchLogs(t *testing.T) {
 
 	s := setupCmdMocks(c)
 
-	s.client.EXPECT().StartDestroyControllerJob(gomock.Any()).Return(&params.StartJobResponse{
+	s.client.EXPECT().StartDestroyController(gomock.Any()).Return(&params.StartBootstrapResponse{
 		JobID: "test-job-id",
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status:    params.StatusSuccessful,
 		Logs:      []string{"log-line", "log-line"},
 		Watermark: 2,

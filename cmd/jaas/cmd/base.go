@@ -1,10 +1,13 @@
+// Copyright 2026 Canonical.
+
 package cmd
 
 import (
 	"fmt"
 
-	"github.com/canonical/jimm/v3/pkg/api"
 	"github.com/juju/juju/cmd/modelcmd"
+
+	"github.com/canonical/jimm/v3/pkg/api"
 )
 
 type jaasCommandBase struct {

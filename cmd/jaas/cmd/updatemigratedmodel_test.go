@@ -1,12 +1,13 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
 import (
 	"testing"
 
-	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 	qt "github.com/frankban/quicktest"
+
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestUpdateMigratedModel(t *testing.T) {

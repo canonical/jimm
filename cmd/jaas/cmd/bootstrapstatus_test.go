@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -13,14 +13,14 @@ import (
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type jobStatusSuite struct {
+type bootstrapStatusSuite struct {
 	client *mocks.MockJIMMAPI
 	writer *mocks.MockWriter
 }
 
-var _ = gc.Suite(&jobStatusSuite{})
+var _ = gc.Suite(&bootstrapStatusSuite{})
 
-func (s *jobStatusSuite) SetupMocks(c *gc.C) *gomock.Controller {
+func (s *bootstrapStatusSuite) SetupMocks(c *gc.C) *gomock.Controller {
 	ctrl := gomock.NewController(c)
 	s.client = mocks.NewMockJIMMAPI(ctrl)
 	s.writer = mocks.NewMockWriter(ctrl)
@@ -28,17 +28,17 @@ func (s *jobStatusSuite) SetupMocks(c *gc.C) *gomock.Controller {
 	return ctrl
 }
 
-func (s *jobStatusSuite) TestJobStatus(c *gc.C) {
+func (s *bootstrapStatusSuite) TestBootstrapStatus(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status: params.StatusSuccessful,
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("Job completed successfully.\n"))
 
-	command := &jobStatusCommand{
+	command := &bootstrapStatusCommand{
 		jobId:               "test-job-id",
 		sleepBetweenGetLogs: 0,
 		follow:              true,
@@ -52,18 +52,18 @@ func (s *jobStatusSuite) TestJobStatus(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *jobStatusSuite) TestJobStatus_Failed(c *gc.C) {
+func (s *bootstrapStatusSuite) TestBootstrapStatus_Failed(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status: params.StatusFailed,
 		Error:  "Job failed",
 	}, nil)
 	s.client.EXPECT().Close().Return(nil)
 	s.writer.EXPECT().Write([]byte("Job failed: Job failed\n"))
 
-	command := &jobStatusCommand{
+	command := &bootstrapStatusCommand{
 		jobId:               "test-job-id",
 		sleepBetweenGetLogs: 0,
 		follow:              true,
@@ -77,11 +77,11 @@ func (s *jobStatusSuite) TestJobStatus_Failed(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *jobStatusSuite) TestJobStatus_Running(c *gc.C) {
+func (s *bootstrapStatusSuite) TestBootstrapStatus_Running(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status:    params.StatusRunning,
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
@@ -91,11 +91,11 @@ func (s *jobStatusSuite) TestJobStatus_Running(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
 	s.client.EXPECT().
-		GetJobInfo(&params.GetJobInfoRequest{
+		BootstrapInfo(&params.GetBootstrapInfoRequest{
 			JobID:     "test-job-id",
 			Watermark: 2,
 		}).
-		Return(params.GetJobInfoResponse{
+		Return(params.GetBootstrapInfoResponse{
 			Status:    params.StatusRunning,
 			Logs:      []string{"log3"},
 			Watermark: 3,
@@ -103,16 +103,16 @@ func (s *jobStatusSuite) TestJobStatus_Running(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log3\n"))
 
 	s.client.EXPECT().
-		GetJobInfo(&params.GetJobInfoRequest{
+		BootstrapInfo(&params.GetBootstrapInfoRequest{
 			JobID:     "test-job-id",
 			Watermark: 3,
 		}).
-		Return(params.GetJobInfoResponse{
+		Return(params.GetBootstrapInfoResponse{
 			Status: params.StatusSuccessful,
 		}, nil)
 	s.writer.EXPECT().Write([]byte("Job completed successfully.\n"))
 
-	command := &jobStatusCommand{
+	command := &bootstrapStatusCommand{
 		jobId:               "test-job-id",
 		sleepBetweenGetLogs: 0,
 		follow:              true,
@@ -126,11 +126,11 @@ func (s *jobStatusSuite) TestJobStatus_Running(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *jobStatusSuite) TestJobStatus_NoFollow(c *gc.C) {
+func (s *bootstrapStatusSuite) TestBootstrapStatus_NoFollow(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status:    params.StatusRunning,
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
@@ -139,7 +139,7 @@ func (s *jobStatusSuite) TestJobStatus_NoFollow(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log1\n"))
 	s.writer.EXPECT().Write([]byte("log2\n"))
 
-	command := &jobStatusCommand{
+	command := &bootstrapStatusCommand{
 		jobId:               "test-job-id",
 		sleepBetweenGetLogs: 0,
 		follow:              false,
@@ -155,11 +155,11 @@ func (s *jobStatusSuite) TestJobStatus_NoFollow(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 }
 
-func (s *jobStatusSuite) TestJobStatus_AfterCompletion(c *gc.C) {
+func (s *bootstrapStatusSuite) TestBootstrapStatus_AfterCompletion(c *gc.C) {
 	ctrl := s.SetupMocks(c)
 	defer ctrl.Finish()
 
-	s.client.EXPECT().GetJobInfo(gomock.Any()).Return(params.GetJobInfoResponse{
+	s.client.EXPECT().BootstrapInfo(gomock.Any()).Return(params.GetBootstrapInfoResponse{
 		Status:    params.StatusSuccessful,
 		Logs:      []string{"log1", "log2"},
 		Watermark: 2,
@@ -169,7 +169,7 @@ func (s *jobStatusSuite) TestJobStatus_AfterCompletion(c *gc.C) {
 	s.writer.EXPECT().Write([]byte("log2\n"))
 	s.writer.EXPECT().Write([]byte("Job completed successfully.\n"))
 
-	command := &jobStatusCommand{
+	command := &bootstrapStatusCommand{
 		jobId:               "test-job-id",
 		sleepBetweenGetLogs: 0,
 		follow:              true,

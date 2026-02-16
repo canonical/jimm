@@ -1,12 +1,13 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
 import (
-	"github.com/canonical/jimm/v3/pkg/api/params"
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+
+	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 // JIMMAPI is an interface that defines the methods required for JIMM client operations.
@@ -14,10 +15,10 @@ type JIMMAPI interface {
 	Close() error
 
 	// Job operations
-	GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error)
-	StopJob(req *params.StopJobRequest) error
-	StartBootstrapJob(req *params.BootstrapParams) (*params.StartJobResponse, error)
-	StartDestroyControllerJob(req *params.DestroyControllerRequest) (*params.StartJobResponse, error)
+	BootstrapInfo(req *params.GetBootstrapInfoRequest) (params.GetBootstrapInfoResponse, error)
+	StopBootstrap(req *params.StopBootstrapRequest) error
+	StartBootstrap(req *params.BootstrapParams) (*params.StartBootstrapResponse, error)
+	StartDestroyController(req *params.DestroyControllerRequest) (*params.StartBootstrapResponse, error)
 
 	// Cloud operations
 	ListUserClouds(req *params.ListUserCloudsRequest) (map[names.CloudTag]jujucloud.Cloud, error)

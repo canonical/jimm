@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -232,26 +232,26 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	}
 	defer client.Close()
 
-	resp, err := client.StartBootstrapJob(&req)
+	resp, err := client.StartBootstrap(&req)
 	if err != nil {
 		return err
 	}
 
 	if c.detach {
 		fmt.Printf(`
-Bootstrap job started.
-You can track the progress via job-status with the job ID:
-	juju [jaas] job-status %s
+Bootstrap started.
+You can track the progress via bootstrap-status with the job ID:
+	juju [jaas] bootstrap-status %s
 
 	`,
 			resp.JobID,
 		)
 	} else {
 		fmt.Printf(`
-Starting bootstrap job.
+Starting bootstrap.
 
-Should you cancel this process, you can track the progress via job-status with the job ID:
-	juju [jaas] job-status %s
+Should you cancel this process, you can track the progress via bootstrap-status with the job ID:
+	juju [jaas] bootstrap-status %s
 
 	`,
 			resp.JobID,
@@ -265,7 +265,7 @@ Should you cancel this process, you can track the progress via job-status with t
 	// Don't use c.out for the logs since c.out
 	// attempts to format the output.
 
-	poller := logPoller{
+	poller := bootstrapLogPoller{
 		client:              client,
 		jobId:               resp.JobID,
 		sleepBetweenGetLogs: sleepBetweenGetLogs,
@@ -273,7 +273,7 @@ Should you cancel this process, you can track the progress via job-status with t
 		follow:              true,
 	}
 
-	return poller.watchJobLogs()
+	return poller.watchBootstrapLogs()
 }
 
 // CloudToParams converts a jujucloud.Cloud to a jujuparams.Cloud.

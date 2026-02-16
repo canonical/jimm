@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -118,7 +118,7 @@ func (c *destroyControllerCommand) Run(ctxt *cmd.Context) error {
 	}
 	defer client.Close()
 
-	resp, err := client.StartDestroyControllerJob(&params.DestroyControllerRequest{
+	resp, err := client.StartDestroyController(&params.DestroyControllerRequest{
 		ControllerName: c.controllerName,
 	})
 	if err != nil {
@@ -127,9 +127,9 @@ func (c *destroyControllerCommand) Run(ctxt *cmd.Context) error {
 
 	if c.detach {
 		fmt.Printf(`
-destroy-controller job started.
-You can track the progress via job-status with the job ID:
-	juju [jaas] job-status %s
+destroy-controller started.
+You can track the progress via destroy-status with the job ID:
+	juju [jaas] destroy-status %s
 
 	`,
 			resp.JobID,
@@ -138,8 +138,8 @@ You can track the progress via job-status with the job ID:
 		fmt.Printf(`
 Starting destroy-controller job.
 
-Should you cancel this process, you can track the progress via job-status with the job ID:
-	juju [jaas] job-status %s
+Should you cancel this process, you can track the progress via destroy-status with the job ID:
+	juju [jaas] destroy-status %s
 
 	`,
 			resp.JobID,
@@ -153,7 +153,7 @@ Should you cancel this process, you can track the progress via job-status with t
 	// Don't use c.out for the logs since c.out
 	// attempts to format the output.
 
-	poller := logPoller{
+	poller := bootstrapLogPoller{
 		client:              client,
 		jobId:               resp.JobID,
 		sleepBetweenGetLogs: sleepBetweenGetLogs,
@@ -161,5 +161,5 @@ Should you cancel this process, you can track the progress via job-status with t
 		follow:              true,
 	}
 
-	return poller.watchJobLogs()
+	return poller.watchBootstrapLogs()
 }

@@ -284,29 +284,30 @@ func (c *Client) ListMigrationTargets(req *params.ListMigrationTargetsRequest) (
 	return response.Controllers, err
 }
 
-// GetJobInfo retrieves the status and logs of a job.
-func (c *Client) GetJobInfo(req *params.GetJobInfoRequest) (params.GetJobInfoResponse, error) {
-	var response params.GetJobInfoResponse
-	err := c.caller.APICall("JIMM", 4, "", "GetJobInfo", req, &response)
+// BootstrapInfo retrieves the status and logs of a
+// bootstrap or destroy-controller job.
+func (c *Client) BootstrapInfo(req *params.GetBootstrapInfoRequest) (params.GetBootstrapInfoResponse, error) {
+	var response params.GetBootstrapInfoResponse
+	err := c.caller.APICall("JIMM", 4, "", "BootstrapInfo", req, &response)
 	return response, err
 }
 
-// StopJob stops a job on the JIMM server.
-func (c *Client) StopJob(req *params.StopJobRequest) error {
-	return c.caller.APICall("JIMM", 4, "", "StopJob", req, nil)
+// StopBootstrap stops a bootstrap job on the JIMM server.
+func (c *Client) StopBootstrap(req *params.StopBootstrapRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "StopBootstrap", req, nil)
 }
 
-// StartBootstrapJob starts a bootstrap operation on the JIMM server.
-func (c *Client) StartBootstrapJob(req *params.BootstrapParams) (*params.StartJobResponse, error) {
-	var response params.StartJobResponse
-	err := c.caller.APICall("JIMM", 4, "", "StartBootstrapJob", req, &response)
+// StartBootstrap starts a bootstrap operation on the JIMM server.
+func (c *Client) StartBootstrap(req *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
+	var response params.StartBootstrapResponse
+	err := c.caller.APICall("JIMM", 4, "", "StartBootstrap", req, &response)
 	return &response, err
 }
 
-// StartDestroyControllerJob starts a destroy-controller operation on the JIMM server.
-func (c *Client) StartDestroyControllerJob(req *params.DestroyControllerRequest) (*params.StartJobResponse, error) {
-	var response params.StartJobResponse
-	err := c.caller.APICall("JIMM", 4, "", "StartDestroyControllerJob", req, &response)
+// StartDestroyController starts a destroy-controller operation on the JIMM server.
+func (c *Client) StartDestroyController(req *params.DestroyControllerRequest) (*params.StartBootstrapResponse, error) {
+	var response params.StartBootstrapResponse
+	err := c.caller.APICall("JIMM", 4, "", "StartDestroyController", req, &response)
 	return &response, err
 }
 

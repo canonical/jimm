@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -17,27 +17,28 @@ import (
 )
 
 const (
-	jobStatusCommandDoc = `
-Displays logs for a job.
+	bootstrapStatusCommandDoc = `
+Displays logs for a bootstrap or destroy-controller job.
 `
-	jobStatusCommandExample = `
-    juju job-status 2cb433a6-04eb-4ec4-9567-90426d20a004
+	bootstrapStatusCommandExample = `
+    juju bootstrap-status <id>
+	juju destroy-status <id>
 `
 )
 
 // sleepBetweenGetLogs is the duration to wait between successive calls to get logs for a job.
 const sleepBetweenGetLogs = 1 * time.Second
 
-// NewJobStatusCommand returns a command to display logs for a job.
-func NewJobStatusCommand() cmd.Command {
-	cmd := &jobStatusCommand{}
+// NewBootstrapStatusCommand returns a command to display logs for a job.
+func NewBootstrapStatusCommand() cmd.Command {
+	cmd := &bootstrapStatusCommand{}
 	cmd.SetClientStore(jujuclient.NewFileClientStore())
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// jobStatusCommand displays logs for a job.
-type jobStatusCommand struct {
+// bootstrapStatusCommand displays logs for a job.
+type bootstrapStatusCommand struct {
 	jaasCommandBase
 
 	jobId string
@@ -47,24 +48,25 @@ type jobStatusCommand struct {
 }
 
 // Info implements cmd.Info interface.
-func (c *jobStatusCommand) Info() *cmd.Info {
+func (c *bootstrapStatusCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "job-status",
-		Args:     "<job uuid>",
-		Purpose:  "Displays logs for a job",
-		Doc:      jobStatusCommandDoc,
-		Examples: jobStatusCommandExample,
+		Name:     "bootstrap-status",
+		Aliases:  []string{"destroy-status"},
+		Args:     "<job id>",
+		Purpose:  "Displays logs for a bootstrap/destroy job",
+		Doc:      bootstrapStatusCommandDoc,
+		Examples: bootstrapStatusCommandExample,
 	})
 }
 
 // SetFlags implements cmd.SetFlags interface.
-func (c *jobStatusCommand) SetFlags(f *gnuflag.FlagSet) {
+func (c *bootstrapStatusCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
-	f.BoolVar(&c.follow, "f", false, "follow the logs of the job")
+	f.BoolVar(&c.follow, "f", false, "follow the logs")
 }
 
 // Init implements the cmd.Command interface.
-func (c *jobStatusCommand) Init(args []string) error {
+func (c *bootstrapStatusCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("missing job id")
 	}
@@ -78,24 +80,24 @@ func (c *jobStatusCommand) Init(args []string) error {
 }
 
 // Run implements cmd.Command.Run interface.
-func (c *jobStatusCommand) Run(ctxt *cmd.Context) error {
+func (c *bootstrapStatusCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.getJIMMAPI()
 	if err != nil {
 		return fmt.Errorf("failed to create JIMM client: %v", err)
 	}
 	defer client.Close()
 
-	poller := logPoller{
+	poller := bootstrapLogPoller{
 		client:              client,
 		jobId:               c.jobId,
 		sleepBetweenGetLogs: c.sleepBetweenGetLogs,
 		out:                 ctxt.Stdout,
 		follow:              c.follow,
 	}
-	return poller.watchJobLogs()
+	return poller.watchBootstrapLogs()
 }
 
-type logPoller struct {
+type bootstrapLogPoller struct {
 	client              JIMMAPI
 	jobId               string
 	sleepBetweenGetLogs time.Duration
@@ -103,21 +105,21 @@ type logPoller struct {
 	follow              bool
 }
 
-func (p logPoller) watchJobLogs() error {
+func (p bootstrapLogPoller) watchBootstrapLogs() error {
 	watermark := 0
 
 	for {
-		response, err := p.client.GetJobInfo(&params.GetJobInfoRequest{
+		response, err := p.client.BootstrapInfo(&params.GetBootstrapInfoRequest{
 			JobID:     p.jobId,
 			Watermark: watermark,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to get job info: %w", err)
+			return fmt.Errorf("failed to get info: %w", err)
 		}
 		for _, log := range response.Logs {
 			_, err = p.out.Write([]byte(log + "\n"))
 			if err != nil {
-				return fmt.Errorf("failed to write job log: %w", err)
+				return fmt.Errorf("failed to write log: %w", err)
 			}
 		}
 		watermark = response.Watermark
@@ -127,19 +129,19 @@ func (p logPoller) watchJobLogs() error {
 		case params.StatusSuccessful:
 			_, err = p.out.Write([]byte("Job completed successfully.\n"))
 			if err != nil {
-				return fmt.Errorf("failed to write job success message: %w", err)
+				return fmt.Errorf("failed to write success message: %w", err)
 			}
 			return nil
 		case params.StatusFailed:
 			_, err = p.out.Write([]byte("Job failed: " + response.Error + "\n"))
 			if err != nil {
-				return fmt.Errorf("failed to write job error: %w", err)
+				return fmt.Errorf("failed to write error: %w", err)
 			}
 			return nil
 		case params.StatusPending:
 			_, err := p.out.Write([]byte("Job is pending...\n"))
 			if err != nil {
-				return fmt.Errorf("failed to write job pending message: %w", err)
+				return fmt.Errorf("failed to write pending message: %w", err)
 			}
 		default:
 			return fmt.Errorf("unknown job status: %s", response.Status)

@@ -67,10 +67,10 @@ func init() {
 		version := rpc.Method(r.Version)
 		prepareModelMigration := rpc.Method(r.PrepareModelMigration)
 		listMigrationTargetsMethod := rpc.Method(r.ListMigrationTargets)
-		getJobInfo := rpc.Method(r.GetJobInfo)
-		stopJob := rpc.Method(r.StopJob)
-		startBootstrapJob := rpc.Method(r.StartBootstrapJob)
-		startDestroyControllerJob := rpc.Method(r.StartDestroyControllerJob)
+		getBootstrapInfo := rpc.Method(r.GetBootstrapInfo)
+		stopBootstrap := rpc.Method(r.StopBootstrap)
+		startBootstrap := rpc.Method(r.StartBootstrap)
+		startDestroyController := rpc.Method(r.StartDestroyController)
 		upgradeToMethod := rpc.Method(r.UpgradeTo)
 		listUserCloudsMethod := rpc.Method(r.ListUserClouds)
 		modelControllerInfoMethod := rpc.Method(r.ModelControllerInfo)
@@ -118,10 +118,10 @@ func init() {
 		r.AddMethod("JIMM", 4, "ListMigrationTargets", listMigrationTargetsMethod)
 		r.AddMethod("JIMM", 4, "PrepareModelMigration", prepareModelMigration)
 		// JIMM Bootstrap
-		r.AddMethod("JIMM", 4, "GetJobInfo", getJobInfo)
-		r.AddMethod("JIMM", 4, "StartBootstrapJob", startBootstrapJob)
-		r.AddMethod("JIMM", 4, "StartDestroyControllerJob", startDestroyControllerJob)
-		r.AddMethod("JIMM", 4, "StopJob", stopJob)
+		r.AddMethod("JIMM", 4, "BootstrapInfo", getBootstrapInfo)
+		r.AddMethod("JIMM", 4, "StartBootstrap", startBootstrap)
+		r.AddMethod("JIMM", 4, "StartDestroyController", startDestroyController)
+		r.AddMethod("JIMM", 4, "StopBootstrap", stopBootstrap)
 		// JIMM Upgrades
 		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
 
@@ -604,24 +604,24 @@ func (r *controllerRoot) ListMigrationTargets(ctx context.Context, req apiparams
 	}, nil
 }
 
-// GetJobInfo retrieves the status of a job, its logs and the watermark
+// GetBootstrapInfo retrieves the status of a bootstrap job, its logs and the watermark
 // for the logs.
-func (r *controllerRoot) GetJobInfo(ctx context.Context, req apiparams.GetJobInfoRequest) (apiparams.GetJobInfoResponse, error) {
+func (r *controllerRoot) GetBootstrapInfo(ctx context.Context, req apiparams.GetBootstrapInfoRequest) (apiparams.GetBootstrapInfoResponse, error) {
 
 	if !r.user.JimmAdmin {
-		return apiparams.GetJobInfoResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return apiparams.GetBootstrapInfoResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
 	if err != nil {
-		return apiparams.GetJobInfoResponse{}, errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
+		return apiparams.GetBootstrapInfoResponse{}, errors.E(fmt.Sprintf("invalid job ID: %s", req.JobID), errors.CodeBadRequest)
 	}
 
 	return r.jimm.BootstrapManager().GetJobInfo(ctx, r.user, jobID, req.Watermark)
 }
 
-// StopJob stops a job.
-func (r *controllerRoot) StopJob(ctx context.Context, req apiparams.StopJobRequest) error {
+// StopBootstrap stops a bootstrap job.
+func (r *controllerRoot) StopBootstrap(ctx context.Context, req apiparams.StopBootstrapRequest) error {
 
 	if !r.user.JimmAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -639,21 +639,21 @@ func (r *controllerRoot) StopJob(ctx context.Context, req apiparams.StopJobReque
 	return nil
 }
 
-// StartBootstrapJob starts a bootstrap job.
-func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.BootstrapParams) (apiparams.StartJobResponse, error) {
+// StartBootstrap starts a bootstrap job.
+func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.BootstrapParams) (apiparams.StartBootstrapResponse, error) {
 
 	if !r.user.JimmAdmin {
-		return apiparams.StartJobResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	// Check built in clouds like localhost (lxd).
 	builtinClouds, err := common.BuiltInClouds()
 	if err != nil {
-		return apiparams.StartJobResponse{}, errors.E(errors.CodeIncompatibleClouds, "unauthorized")
+		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeIncompatibleClouds, "unauthorized")
 	}
 
 	if _, isABuiltinCloud := builtinClouds[req.CloudName]; isABuiltinCloud {
-		return apiparams.StartJobResponse{},
+		return apiparams.StartBootstrapResponse{},
 			errors.E(errors.CodeIncompatibleClouds, fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", req.CloudName))
 	}
 
@@ -682,27 +682,27 @@ func (r *controllerRoot) StartBootstrapJob(ctx context.Context, req apiparams.Bo
 
 	jobID, err := r.jimm.BootstrapManager().StartBootstrapJob(ctx, r.user, params)
 	if err != nil {
-		return apiparams.StartJobResponse{}, errors.E(fmt.Errorf("failed to start bootstrap job: %v", err))
+		return apiparams.StartBootstrapResponse{}, errors.E(fmt.Errorf("failed to start bootstrap job: %v", err))
 	}
-	return apiparams.StartJobResponse{
+	return apiparams.StartBootstrapResponse{
 		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
 }
 
-// StartDestroyControllerJob starts a destroy-controller job.
-func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apiparams.DestroyControllerRequest) (apiparams.StartJobResponse, error) {
+// StartDestroyController starts a destroy-controller job.
+func (r *controllerRoot) StartDestroyController(ctx context.Context, req apiparams.DestroyControllerRequest) (apiparams.StartBootstrapResponse, error) {
 
 	if !r.user.JimmAdmin {
-		return apiparams.StartJobResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	ctrl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.ControllerName)
 	if err != nil {
-		return apiparams.StartJobResponse{}, errors.E(fmt.Errorf("failed to fetch controller info: %w", err))
+		return apiparams.StartBootstrapResponse{}, errors.E(fmt.Errorf("failed to fetch controller info: %w", err))
 	}
 
 	if len(ctrl.Models) != 0 {
-		return apiparams.StartJobResponse{}, errors.E(errors.CodeBadRequest, "cannot destroy controller with models")
+		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeBadRequest, "cannot destroy controller with models")
 	}
 
 	jobID, err := r.jimm.BootstrapManager().StartDestroyControllerJob(ctx, r.user, bootstrap.DestroyControllerParams{
@@ -716,10 +716,10 @@ func (r *controllerRoot) StartDestroyControllerJob(ctx context.Context, req apip
 		CACertificate:  ctrl.CACertificate,
 	})
 	if err != nil {
-		return apiparams.StartJobResponse{}, errors.E(fmt.Errorf("failed to start destroy-controller job: %v", err))
+		return apiparams.StartBootstrapResponse{}, errors.E(fmt.Errorf("failed to start destroy-controller job: %v", err))
 	}
 
-	return apiparams.StartJobResponse{
+	return apiparams.StartBootstrapResponse{
 		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
 }

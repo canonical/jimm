@@ -12,7 +12,7 @@ import (
 )
 
 type BootstapManager struct {
-	GetJobInfo_                func(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetJobInfoResponse, error)
+	GetJobInfo_                func(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error)
 	StopJob_                   func(ctx context.Context, user *openfga.User, jobId int64) error
 	StartBootstrapJob_         func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error)
 	StartDestroyControllerJob_ func(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error)
@@ -21,9 +21,9 @@ type BootstapManager struct {
 	DestroyController_         func(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
 }
 
-func (b *BootstapManager) GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetJobInfoResponse, error) {
+func (b *BootstapManager) GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error) {
 	if b.GetJobInfo_ == nil {
-		return params.GetJobInfoResponse{}, errors.E(errors.CodeNotImplemented)
+		return params.GetBootstrapInfoResponse{}, errors.E(errors.CodeNotImplemented)
 	}
 	return b.GetJobInfo_(ctx, user, jobId, offset)
 }

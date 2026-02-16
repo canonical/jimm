@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package cmd
 
@@ -15,41 +15,41 @@ import (
 
 const (
 	jobStopCommandDoc = `
-Stop a job.
+Stop a bootstrap job.
 `
 	jobStopCommandExample = `
-    juju job-stop 2cb433a6-04eb-4ec4-9567-90426d20a004
+    juju bootstrap-stop <id>
 `
 )
 
-// NewJobStopCommand returns a command to stop a job.
-func NewJobStopCommand() cmd.Command {
-	cmd := &jobStopCommand{}
+// NewBootstrapStopCommand returns a command to stop an in-progress bootstrap job.
+func NewBootstrapStopCommand() cmd.Command {
+	cmd := &bootstrapStopCommand{}
 	cmd.SetClientStore(jujuclient.NewFileClientStore())
 
 	return modelcmd.WrapBase(cmd)
 }
 
-// jobStopCommand to stop a job.
-type jobStopCommand struct {
+// bootstrapStopCommand to stop a job.
+type bootstrapStopCommand struct {
 	jaasCommandBase
 
 	jobId string
 }
 
 // Info implements cmd.Info interface.
-func (c *jobStopCommand) Info() *cmd.Info {
+func (c *bootstrapStopCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
-		Name:     "job-stop",
-		Args:     "<job uuid>",
-		Purpose:  "Stop a job",
+		Name:     "bootstrap-stop",
+		Args:     "<job id>",
+		Purpose:  "Stop an in-progress bootstrap job",
 		Doc:      jobStopCommandDoc,
 		Examples: jobStopCommandExample,
 	})
 }
 
 // Init implements the cmd.Command interface.
-func (c *jobStopCommand) Init(args []string) error {
+func (c *bootstrapStopCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("missing job id")
 	}
@@ -62,19 +62,19 @@ func (c *jobStopCommand) Init(args []string) error {
 }
 
 // Run implements cmd.Command.Run interface.
-func (c *jobStopCommand) Run(ctxt *cmd.Context) error {
+func (c *bootstrapStopCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.getJIMMAPI()
 	if err != nil {
 		return fmt.Errorf("failed to create JIMM client: %v", err)
 	}
 
-	err = client.StopJob(&params.StopJobRequest{
+	err = client.StopBootstrap(&params.StopBootstrapRequest{
 		JobID: c.jobId,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to stop job: %v", err)
+		return fmt.Errorf("failed to stop bootstrap: %v", err)
 	}
-	_, err = fmt.Fprintf(ctxt.Stdout, "Job %s has been stopped.\n", c.jobId)
+	_, err = fmt.Fprintf(ctxt.Stdout, "Bootstrap job with ID %q has been stopped.\n", c.jobId)
 	if err != nil {
 		return fmt.Errorf("failed to write output: %v", err)
 	}

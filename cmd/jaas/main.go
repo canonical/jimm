@@ -59,8 +59,8 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jaasCmd.Register(cmd.NewUnregisterControllerCommand())
 	jaasCmd.Register(cmd.NewUpdateMigratedModelCommand())
 	jaasCmd.Register(cmd.NewUpgradeToCommand())
-	jaasCmd.Register(cmd.NewJobStatusCommand())
-	jaasCmd.Register(cmd.NewJobStopCommand())
+	jaasCmd.Register(cmd.NewBootstrapStatusCommand())
+	jaasCmd.Register(cmd.NewBootstrapStopCommand())
 	jaasCmd.Register(cmd.NewBootstrapStartCommand())
 	jaasCmd.Register(cmd.NewDestroyControllerStartCommand())
 	return jaasCmd
