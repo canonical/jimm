@@ -6,21 +6,10 @@ package jimm
 
 import (
 	"context"
-	"net/http"
 	"time"
 
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	"github.com/juju/juju/api/base"
-	jujucloud "github.com/juju/juju/cloud"
-	jujucontroller "github.com/juju/juju/controller"
-	coremigration "github.com/juju/juju/core/migration"
-	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/juju/version/v2"
-	gossh "golang.org/x/crypto/ssh"
-	"golang.org/x/oauth2"
 
-	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -44,296 +33,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/jujuclistore"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
 	"github.com/canonical/jimm/v3/internal/river"
-	"github.com/canonical/jimm/v3/pkg/api/params"
 )
-
-// RoleManager provides a means to manage roles within JIMM.
-type RoleManager interface {
-	// AddRole adds a role to JIMM.
-	AddRole(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.RoleEntry, error)
-	// GetRoleByUUID returns a role based on the provided UUID.
-	GetRoleByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error)
-	// GetRoleByName returns a role based on the provided name.
-	GetRoleByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.RoleEntry, error)
-	// RemoveRole removes the role from JIMM in both the store and authorisation store.
-	RemoveRole(ctx context.Context, user *openfga.User, roleName string) error
-	// RenameRole renames a role in JIMM's DB.
-	RenameRole(ctx context.Context, user *openfga.User, uuid, newName string) error
-	// ListRoles returns a list of roles known to JIMM.
-	// `match` will filter the list fuzzy matching role's name or uuid.
-	ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error)
-	// CountRoles returns the number of roles that exist.
-	CountRoles(ctx context.Context, user *openfga.User) (int, error)
-}
-
-// GroupManager provides a means to manage groups within JIMM.
-type GroupManager interface {
-	// AddGroup adds a role to JIMM.
-	AddGroup(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.GroupEntry, error)
-	// GetGroupByUUID returns a role based on the provided UUID.
-	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
-	// GetGroupByName returns a role based on the provided name.
-	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
-	// RemoveGroup removes the role from JIMM in both the store and authorisation store.
-	RemoveGroup(ctx context.Context, user *openfga.User, roleName string) error
-	// RenameGroup renames a role in JIMM's DB.
-	RenameGroup(ctx context.Context, user *openfga.User, uuid, newName string) error
-	// ListGroups returns a list of roles known to JIMM.
-	// `match` will filter the list fuzzy matching role's name or uuid.
-	ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
-	// CountGroups returns the number of roles that exist.
-	CountGroups(ctx context.Context, user *openfga.User) (int, error)
-}
-
-// IdentityManager provides a means to fetch identities in JIMM.
-// Identities cannot be created here, that can only be done via login.
-type IdentityManager interface {
-	FetchIdentity(ctx context.Context, id string) (*openfga.User, error)
-	ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error)
-	CountIdentities(ctx context.Context, user *openfga.User) (int, error)
-}
-
-// LoginManager provides methods for login/authentication and creates identities (users).
-type LoginManager interface {
-	// AuthenticateBrowserSession authenticates a browser login.
-	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
-	// LoginDevice starts the device login flow.
-	LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error)
-	// GetDeviceSessionToken returns a session token scoped to the user's identity.
-	GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error)
-	// LoginClientCredentials logs in a user with client credentials.
-	LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error)
-	// LoginWithSessionToken logs in a user with a session token.
-	LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error)
-	// LoginWithSessionCookie logs in a user assuming cookie auth was done previously.
-	LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error)
-	// UserLogin creates/fetches an identity based on the identity provided and returns an openfga user object.
-	UserLogin(ctx context.Context, identity string) (*openfga.User, error)
-}
-
-// PermissionManager provides a way to manage permissions within JIMM.
-type PermissionManager interface {
-	// These methods handle generic permission management through manipulation of OpenFGA tuples.
-
-	// AddRelation creates the provided slice of tuples.
-	AddRelation(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error
-	// RemoveRelation removes the provided slice of tuples.
-	RemoveRelation(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error
-	// CheckRelation checks whether the provided tuple provides access.
-	CheckRelation(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, trace bool) (bool, error)
-	// CheckRelations checks whether the provided tuples provide access.
-	CheckRelations(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) ([]openfga.CheckResult, error)
-	// ListRelationshipTuples lists a page of tuples based on the provided tuple constraints.
-	ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error)
-	// ListObjectRelations lists all the tuples that an object has a direct relation with.
-	ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error)
-	// ListResources lists all resources known to JIMM.
-	ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error)
-
-	// GetJimmControllerAccess returns the user's level of access to JIMM.
-	GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error)
-	// GetUserCloudAccess returns the user's level of access to a cloud.
-	GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error)
-	// GetUserModelAccess returns the user's level of access to a model.
-	GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error)
-
-	// GrantAuditLogAccess grants a user access to read audit logs.
-	GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
-	// GrantCloudAccess grants the user the specified access to a cloud.
-	GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
-	// GrantModelAccess grants the user the specified access to a model.
-	GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
-	// GrantOfferAccess grants the user the specified access to an offer.
-	GrantOfferAccess(ctx context.Context, u *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error
-
-	// RevokeAuditLogAccess revokes a user's access to read audit logs.
-	RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error
-	// RevokeCloudAccess revokes the specified access to a cloud.
-	RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error
-	// RevokeModelAccess revokes the specified access to a model.
-	RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error
-	// RevokeOfferAccess revokes the specified access to an offer.
-	RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error)
-
-	// OpenFGACleanup removes tuples that are no longer valid.
-	OpenFGACleanup(ctx context.Context) error
-	// ToJAASTag converts a tag used in OpenFGA authorization model to a tag used in JAAS.
-	ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error)
-}
-
-// AuditLogManager provides methods to add/find/cleanup audit logs.
-type AuditLogManager interface {
-	// AddAuditLogEntry saves an audit log entry.
-	AddAuditLogEntry(ale *dbmodel.AuditLogEntry)
-	// FindAuditEvents queries for audit log entries that match the specified filter(s).
-	FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error)
-	// PurgeLogs removes logs older than the specified date.
-	PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error)
-	// StartCleanup removes log older than the retention period.
-	StartCleanup(ctx context.Context)
-}
-
-// SSHKeyManager provides a means to manage SSH keys within JIMM.
-type SSHKeyManager interface {
-	// AddUserPublicKey saves a user's public key.
-	AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
-	// ListUserPublicKeys lists a user's public keys.
-	ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
-	// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error
-	// RemoveUserKeyByFingerprint removes a user's public key(s) by the key fingerprint.
-	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
-	// VerifyPublicKey lists the key for a user and compares the key to find a match.
-	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
-}
-
-// SSHManager is the interface to enable the ssh server to operate. Performing public key verification and
-// resolving addresses from model uuids.
-type SSHManager interface {
-	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
-	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
-
-	// DialInfo resolves the address of the controller to contact given the model UUID and
-	// returns a struct with parameters to connect and authenticate to the controller.
-	DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (ssh.DialInfo, error)
-
-	// DialController dials a controller's SSH server using the provided details.
-	DialController(ctx context.Context, ctrlInfo ssh.DialInfo, user *openfga.User) (*gossh.Client, error)
-}
-
-// ConfigManager provides a means to retrieve the JIMM controller config to expose via facade method.
-type ConfigManager interface {
-	// GetConfig returns the configuration for the JIMM controller.
-	GetConfig() (config.ControllerConfig, error)
-}
-
-// OfferAuthorizer provides methods to check if a user is a consumer of an application offer.
-type OfferAuthorizer interface {
-	// IsUserConsumerForOffer checks if a user is a consumer of an application offer.
-	IsUserConsumerForOffer(ctx context.Context, userTag names.UserTag, offerTag names.ApplicationOfferTag) (bool, error)
-}
-
-// JujuManager is the interface to manage all Juju related operations.
-type JujuManager interface {
-	// Controller related methods
-
-	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
-	ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error)
-	EarliestControllerVersion(ctx context.Context) (version.Number, error)
-	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
-	RemoveController(ctx context.Context, user *openfga.User, controllerName string, force bool) error
-	SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
-	ControllerConfig(ctx context.Context, controllerName string) (jujucontroller.Config, error)
-
-	// Model related methods
-
-	AddModel(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (_ base.ModelInfo, err error)
-	ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
-	DestroyModel(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
-	DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error)
-	DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
-	ForEachModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
-	ForEachUserModel(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, string) error) error
-	FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
-	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
-	ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
-	ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
-	ModelInfo(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
-	ModelControllerInfo(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*params.ModelControllerInfo, error)
-	ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) ([]base.UserModelSummary, error)
-	ModelStatus(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelStatus, error)
-	QueryModelsJq(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
-	SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
-	UnsetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
-	UpdateMigratedModel(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
-	ValidateModelUpgrade(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
-
-	// Migration related methods
-
-	// ControllerDetailsForIncomingModel retrieves details about the
-	// target controller for a model that is being migrated.
-	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-
-	// The remaining migration methods below are sorted roughly in the order they are expected to be called.
-	// Please MAINTAIN this order as it is helpful to understand the migration flow and which methods
-	// can use the IncomingModelMigration table versus which must use the plain Models table.
-
-	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
-	Prechecks(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error
-	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
-	Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
-	Activate(ctx context.Context, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error
-	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion version.Number) error
-	LatestLogTime(ctx context.Context, modelUUID string) (time.Time, error)
-	AbortMigration(ctx context.Context, user *openfga.User, modelUUID string) error
-	CleanupPartialModelMigrations(ctx context.Context) error
-	ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
-
-	// Other methods
-	AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
-	AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error
-	CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error)
-	DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error
-	FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
-	ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error
-	ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error
-	GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*jujuparams.ApplicationOfferAdminDetailsV5, error)
-	GetApplicationOfferConsumeDetails(ctx context.Context, user *openfga.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error
-	GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error)
-	GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
-	GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
-	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-	GrantOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
-	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
-	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
-	ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error)
-	Offer(ctx context.Context, user *openfga.User, offer juju.AddApplicationOfferParams) error
-	RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error
-	RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error
-	RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error
-	RevokeOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
-	UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujucloud.Cloud) error
-	UpdateCloudCredential(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error)
-
-	// These are methods on the Juju manager that don't need to be mocked and can be removed from this interface later.
-	UpdateMetrics(ctx context.Context)
-	PollModels(ctx context.Context) error
-}
-
-// BootstrapManager provides methods to manage bootstrap jobs.
-type BootstrapManager interface {
-	// GetJobInfo retrieves the status and logs of a job.
-	GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error)
-	// StopJob stops a job.
-	StopJob(ctx context.Context, user *openfga.User, jobId int64) error
-	// WaitForJobCompletion waits for a job to complete.
-	WaitForJobCompletion(ctx context.Context, jobId int64, config bootstrap.WaitConfig) error
-	// StartBootstrapJob starts a bootstrap job and returns the job ID.
-	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error)
-	// StartDestroyControllerJob starts a destroy-controller job and returns the job ID.
-	StartDestroyControllerJob(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error)
-	// BootstrapController bootstraps a new Juju controller.
-	BootstrapController(ctx context.Context, p bootstrap.RunBootstrapArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
-	// DestroyController destroys a Juju controller.
-	DestroyController(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
-}
-
-// UpgradeManager provides methods to manage controller cloning and model automated upgrades.
-type UpgradeManager interface {
-	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error)
-	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
-	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
-}
-
-// JobManager provides methods to manage long-running jobs such as bootstrapping and upgrading.
-type JobManager interface {
-	GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error)
-}
 
 // Parameters holds the services and static fields passed to the jimm.New() constructor.
 // You can provide mock implementations of certain services where necessary for dependency injection.
@@ -464,38 +166,38 @@ func New(p Parameters) (*JIMM, error) {
 	if err != nil {
 		return nil, err
 	}
-	j.roleManager = roleManager
+	j.RoleManager = roleManager
 
 	groupManager, err := group.NewGroupManager(j.Database, j.OpenFGAClient)
 	if err != nil {
 		return nil, err
 	}
-	j.groupManager = groupManager
+	j.GroupManager = groupManager
 
 	identityManager, err := identity.NewIdentityManager(j.Database, j.OpenFGAClient)
 	if err != nil {
 		return nil, err
 	}
-	j.identityManager = identityManager
+	j.IdentityManager = identityManager
 
 	loginManager, err := login.NewLoginManager(j.Database, j.OpenFGAClient, j.OAuthAuthenticator, jimmResourceTag)
 	if err != nil {
 		return nil, err
 	}
-	j.loginManager = loginManager
+	j.LoginManager = loginManager
 
 	permissionManager, err := permissions.NewManager(j.Database, j.OpenFGAClient, j.UUID, jimmResourceTag)
 	if err != nil {
 		return nil, err
 	}
-	j.permissionManager = permissionManager
+	j.PermissionManager = permissionManager
 
-	j.jujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
+	j.JujuAuthFactory = jujuauth.NewFactory(j.Database, j.JWTService, permissionManager)
 	jujuManager, err := juju.NewJujuManager(
 		j.Database,
 		j.OpenFGAClient,
 		j.CredentialStore,
-		j.permissionManager,
+		j.PermissionManager,
 		jimmResourceTag,
 		p.ReservedCloudNames,
 		j.Dialer,
@@ -505,44 +207,44 @@ func New(p Parameters) (*JIMM, error) {
 	if err != nil {
 		return nil, err
 	}
-	j.jujuManager = jujuManager
+	j.JujuManager = jujuManager
 
 	auditLogManager, err := auditlog.NewAuditLogManager(j.Database, j.OpenFGAClient, jimmResourceTag, p.AuditLogRetentionDays)
 	if err != nil {
 		return nil, err
 	}
-	j.auditLogManager = auditLogManager
+	j.AuditLogManager = auditLogManager
 
 	sshKeyManager, err := sshkeys.NewSSHKeyManager(j.Database)
 	if err != nil {
 		return nil, err
 	}
-	j.sshKeyManager = sshKeyManager
+	j.SSHKeyManager = sshKeyManager
 
 	sshParams := ssh.SSHManagerParams{
-		IdentityManager: j.identityManager,
-		JujuManager:     j.jujuManager,
-		SSHKeyManager:   j.sshKeyManager,
-		JWTFactory:      j.jujuAuthFactory,
+		IdentityManager: j.IdentityManager,
+		JujuManager:     j.JujuManager,
+		SSHKeyManager:   j.SSHKeyManager,
+		JWTFactory:      j.JujuAuthFactory,
 		Dialer:          &ssh.BasicDialer{},
 	}
 	sshManager, err := ssh.NewSSHManager(sshParams)
 	if err != nil {
 		return nil, err
 	}
-	j.sshManager = sshManager
+	j.SSHManager = sshManager
 
 	configManager, err := config.NewConfigManager(p.ControllerConfig)
 	if err != nil {
 		return nil, err
 	}
-	j.configManager = configManager
+	j.ConfigManager = configManager
 
 	offerAuthorizer, err := offer.NewOfferAuthorizer(j.Database, j.OpenFGAClient)
 	if err != nil {
 		return nil, err
 	}
-	j.offerAuthorizer = offerAuthorizer
+	j.OfferAuthorizer = offerAuthorizer
 
 	binaryStore, err := jujuclistore.NewJujuCLIStore(jujuclistore.Config{})
 	if err != nil {
@@ -552,7 +254,7 @@ func New(p Parameters) (*JIMM, error) {
 	bootstrapManager, err := bootstrap.NewBootstrapManager(
 		j.Database,
 		p.RiverClient,
-		j.jujuManager,
+		j.JujuManager,
 		binaryStore,
 		p.BootstrapLoginTokenRefreshURL,
 		j.CredentialStore,
@@ -561,21 +263,21 @@ func New(p Parameters) (*JIMM, error) {
 		return nil, err
 	}
 
-	j.bootstrapManager = bootstrapManager
+	j.BootstrapManager = bootstrapManager
 
-	upgradeManager, err := upgrade.NewUpgradeManager(j.bootstrapManager, j.jujuManager, j.Database, j.Dialer, j.RiverClient)
+	upgradeManager, err := upgrade.NewUpgradeManager(j.BootstrapManager, j.JujuManager, j.Database, j.Dialer, j.RiverClient)
 	if err != nil {
 		return nil, err
 	}
 
-	j.upgradeManager = upgradeManager
+	j.UpgradeManager = upgradeManager
 
 	jobManager, err := jobs.NewJobManager(j.RiverClient)
 	if err != nil {
 		return nil, err
 	}
 
-	j.jobManager = jobManager
+	j.JobManager = jobManager
 
 	return j, nil
 }
@@ -587,48 +289,48 @@ func New(p Parameters) (*JIMM, error) {
 type JIMM struct {
 	Parameters
 
-	// roleManager provides a means to manage roles within JIMM.
-	roleManager RoleManager
+	// RoleManager provides a means to manage roles within JIMM.
+	RoleManager *role.RoleManager
 
-	// groupManager provides a means to manage groups within JIMM.
-	groupManager GroupManager
+	// GroupManager provides a means to manage groups within JIMM.
+	GroupManager *group.GroupManager
 
-	// identityManager provides a means to manage identities within JIMM.
-	identityManager IdentityManager
+	// IdentityManager provides a means to manage identities within JIMM.
+	IdentityManager *identity.IdentityManager
 
-	// loginManager provides a means to authenticate and login/create users/identities within JIMM.
-	loginManager LoginManager
+	// LoginManager provides a means to authenticate and login/create users/identities within JIMM.
+	LoginManager *login.LoginManager
 
-	permissionManager PermissionManager
+	PermissionManager *permissions.PermissionManager
 
-	jujuAuthFactory *jujuauth.Factory
+	JujuAuthFactory *jujuauth.Factory
 
-	// auditLogManager provides a means to manage audit logs within JIMM.
-	auditLogManager AuditLogManager
+	// AuditLogManager provides a means to manage audit logs within JIMM.
+	AuditLogManager *auditlog.AuditLogManager
 
-	// sshKeyManager provides a means to manage SSH keys within JIMM.
-	sshKeyManager SSHKeyManager
+	// SSHKeyManager provides a means to manage SSH keys within JIMM.
+	SSHKeyManager *sshkeys.SSHKeyManager
 
-	// sshManager provides a means to manage SSH operations withing JIMM.
-	sshManager SSHManager
+	// SSHManager provides a means to manage SSH operations withing JIMM.
+	SSHManager *ssh.SSHManager
 
-	// configManager provides a means to retrieve the controller config to expose via facade method.
-	configManager ConfigManager
+	// ConfigManager provides a means to retrieve the controller config to expose via facade method.
+	ConfigManager *config.ConfigManager
 
-	// jujuManager provides a means to manage Juju resources within JIMM.
-	jujuManager JujuManager
+	// JujuManager provides a means to manage Juju resources within JIMM.
+	JujuManager *juju.JujuManager
 
-	// offerAuthorizer provides a means to check if a user is a consumer of an application offer.
-	offerAuthorizer OfferAuthorizer
+	// OfferAuthorizer provides a means to check if a user is a consumer of an application offer.
+	OfferAuthorizer *offer.OfferAuthorizer
 
-	// bootstrapManager provides a means to manage bootstrap jobs.
-	bootstrapManager BootstrapManager
+	// BootstrapManager provides a means to manage bootstrap jobs.
+	BootstrapManager *bootstrap.BootstrapManager
 
-	// upgradeManager provides a means to manage controller cloning and model automated upgrades.
-	upgradeManager UpgradeManager
+	// UpgradeManager provides a means to manage controller cloning and model automated upgrades.
+	UpgradeManager *upgrade.UpgradeManager
 
-	// jobManager provides a means to manage long-running jobs.
-	jobManager JobManager
+	// JobManager provides a means to manage long-running jobs.
+	JobManager *jobs.JobManager
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.
@@ -636,84 +338,10 @@ func (j *JIMM) ResourceTag() names.ControllerTag {
 	return names.NewControllerTag(j.UUID)
 }
 
-// PubsubHub returns the pub-sub hub used for buffering model summaries.
-func (j *JIMM) PubSubHub() *pubsub.Hub {
-	return j.Pubsub
-}
-
-// RoleManager returns a manager that enables role management.
-func (j *JIMM) RoleManager() RoleManager {
-	return j.roleManager
-}
-
-// GroupManager returns a manager that enables group management.
-func (j *JIMM) GroupManager() GroupManager {
-	return j.groupManager
-}
-
-// IdentityManager returns a manager that enables identity management.
-func (j *JIMM) IdentityManager() IdentityManager {
-	return j.identityManager
-}
-
-// LoginManager returns a manager that enables login and authentication.
-func (j *JIMM) LoginManager() LoginManager {
-	return j.loginManager
-}
-
-// PermissionManager returns a manager that enables permission checks and
-// permissions grants/revocations.
-func (j *JIMM) PermissionManager() PermissionManager {
-	return j.permissionManager
-}
-
 // NewJujuAuthenticator returns a new token generator for authenticating
 // requests to a Juju controller.
 func (j *JIMM) NewJujuAuthenticator() jujuauth.LoginTokenGenerator {
-	return j.jujuAuthFactory.NewLoginGenerator()
-}
-
-// AuditLogManager returns a manager that handles audit logging.
-func (j *JIMM) AuditLogManager() AuditLogManager {
-	return j.auditLogManager
-}
-
-// SSHManager returns a manager that enables operations
-// related to ssh.
-func (j *JIMM) SSHManager() SSHManager {
-	return j.sshManager
-}
-
-// JujuManager returns a manager that enables operations
-// related to Juju resources.
-func (j *JIMM) JujuManager() JujuManager {
-	return j.jujuManager
-}
-
-// ConfigManager returns a manager that exposes the controller config.
-// This is used to expose the config via the ControllerConfig facade.
-func (j *JIMM) ConfigManager() ConfigManager {
-	return j.configManager
-}
-
-// OfferAuthorizer returns an authorizer that enables checking if a user is a consumer of an application offer.
-func (j *JIMM) OfferAuthorizer() OfferAuthorizer {
-	return j.offerAuthorizer
-}
-
-// BootstrapManager returns a manager that enables operations related to bootstrap jobs.
-func (j *JIMM) BootstrapManager() BootstrapManager {
-	return j.bootstrapManager
-}
-
-// UpgradeManager returns a manager that enables operations related to controller cloning and model automated upgrades.
-func (j *JIMM) UpgradeManager() UpgradeManager {
-	return j.upgradeManager
-}
-
-// JobManager returns a manager that enables operations related to long-running jobs.
-func (j *JIMM) JobManager() JobManager {
-	return j.jobManager
+	return j.JujuAuthFactory.NewLoginGenerator()
 }
 
 // DialerAdapter is an adapter that implements the juju.Dialer interface

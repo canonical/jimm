@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // The group package provides business logic for handling group related methods..
 package group
@@ -13,26 +13,26 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// groupManager provides a means to manage groups within JIMM.
-type groupManager struct {
+// GroupManager provides a means to manage groups within JIMM.
+type GroupManager struct {
 	store   *db.Database
 	authSvc *openfga.OFGAClient
 }
 
 // NewGroupManager returns a new group manager that provides group
 // creation, modification, and removal.
-func NewGroupManager(store *db.Database, authSvc *openfga.OFGAClient) (*groupManager, error) {
+func NewGroupManager(store *db.Database, authSvc *openfga.OFGAClient) (*GroupManager, error) {
 	if store == nil {
 		return nil, errors.E("group store cannot be nil")
 	}
 	if authSvc == nil {
 		return nil, errors.E("group authorisation service cannot be nil")
 	}
-	return &groupManager{store, authSvc}, nil
+	return &GroupManager{store, authSvc}, nil
 }
 
 // AddGroup creates a group within JIMMs DB for reference by OpenFGA.
-func (j *groupManager) AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
+func (j *GroupManager) AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 
 	if !user.JimmAdmin {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -46,7 +46,7 @@ func (j *groupManager) AddGroup(ctx context.Context, user *openfga.User, name st
 }
 
 // CountGroups returns the number of groups that exist.
-func (j *groupManager) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
+func (j *GroupManager) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
 
 	if !user.JimmAdmin {
 		return 0, errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -59,7 +59,7 @@ func (j *groupManager) CountGroups(ctx context.Context, user *openfga.User) (int
 }
 
 // getGroup returns a group based on the provided UUID or name.
-func (j *groupManager) getGroup(ctx context.Context, user *openfga.User, group *dbmodel.GroupEntry) (*dbmodel.GroupEntry, error) {
+func (j *GroupManager) getGroup(ctx context.Context, user *openfga.User, group *dbmodel.GroupEntry) (*dbmodel.GroupEntry, error) {
 
 	if !user.JimmAdmin {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -71,17 +71,17 @@ func (j *groupManager) getGroup(ctx context.Context, user *openfga.User, group *
 }
 
 // GetGroupByUUID returns a group based on the provided UUID.
-func (j *groupManager) GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+func (j *GroupManager) GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
 	return j.getGroup(ctx, user, &dbmodel.GroupEntry{UUID: uuid})
 }
 
 // GetGroupByName returns a group based on the provided name.
-func (j *groupManager) GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
+func (j *GroupManager) GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	return j.getGroup(ctx, user, &dbmodel.GroupEntry{Name: name})
 }
 
 // RenameGroup renames a group in JIMM's DB.
-func (j *groupManager) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
+func (j *GroupManager) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
 
 	if !user.JimmAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -110,7 +110,7 @@ func (j *groupManager) RenameGroup(ctx context.Context, user *openfga.User, oldN
 }
 
 // RemoveGroup removes a group within JIMMs DB for reference by OpenFGA.
-func (j *groupManager) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {
+func (j *GroupManager) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {
 
 	if !user.JimmAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -142,7 +142,7 @@ func (j *groupManager) RemoveGroup(ctx context.Context, user *openfga.User, name
 
 // ListGroups returns a list of groups known to JIMM.
 // `match` will filter the list fuzzy matching group's name or uuid.
-func (j *groupManager) ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
+func (j *GroupManager) ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
 
 	if !user.JimmAdmin {
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")

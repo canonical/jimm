@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -13,8 +13,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -28,7 +28,7 @@ func TestListResources(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}

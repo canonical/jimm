@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -17,8 +17,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	jimmm_errors "github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -37,7 +37,7 @@ func TestGetIdentity(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
 	}
@@ -80,7 +80,7 @@ func TestListIdentities(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
 	}
@@ -181,13 +181,13 @@ func TestGetIdentityGroups(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
 	}
@@ -233,10 +233,10 @@ func TestPatchIdentityGroups(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -297,13 +297,13 @@ func TestGetIdentityRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
-		RoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jujuapi.RoleManager {
 			return roleManager
 		},
 	}
@@ -349,10 +349,10 @@ func TestPatchIdentityRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}

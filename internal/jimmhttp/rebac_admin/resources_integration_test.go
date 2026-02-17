@@ -1,4 +1,5 @@
-// Copyright 2024 Canonical.
+// Copyright 2026 Canonical.
+
 package rebac_admin_test
 
 import (
@@ -11,6 +12,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
@@ -64,7 +66,7 @@ models:
 func (s *resourcesSuite) TestListResources(c *gc.C) {
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	resourcesSvc := rebac_admin.NewResourcesService(s.JIMM)
+	resourcesSvc := rebac_admin.NewResourcesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	tester := jimmtest.GocheckTester{C: c}
 	env := jimmtest.ParseEnvironment(tester, resourcesTestEnv)
 	env.PopulateDB(tester, s.JIMM.Database)

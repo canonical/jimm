@@ -253,12 +253,12 @@ func (s *Service) StartJWKSRotator(ctx context.Context, checkRotateRequired <-ch
 
 // MonitorResources periodically updates metrics.
 func (s *Service) MonitorResources(ctx context.Context) {
-	s.jimm.JujuManager().UpdateMetrics(ctx)
+	s.jimm.JujuManager.UpdateMetrics(ctx)
 	ticker := time.NewTicker(5 * time.Minute)
 	for {
 		select {
 		case <-ticker.C:
-			s.jimm.JujuManager().UpdateMetrics(ctx)
+			s.jimm.JujuManager.UpdateMetrics(ctx)
 		case <-ctx.Done():
 			zapctx.Info(ctx, "exiting resource monitor polling")
 			return
@@ -271,7 +271,7 @@ func (s *Service) OpenFGACleanup(ctx context.Context, trigger <-chan time.Time) 
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.PermissionManager().OpenFGACleanup(ctx)
+			err := s.jimm.PermissionManager.OpenFGACleanup(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "openfga cleanup", zap.Error(err))
 				continue
@@ -288,7 +288,7 @@ func (s *Service) CleanupNotFoundModels(ctx context.Context, trigger <-chan time
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.JujuManager().PollModels(ctx)
+			err := s.jimm.JujuManager.PollModels(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "dying models cleanup", zap.Error(err))
 				continue
@@ -305,7 +305,7 @@ func (s *Service) CleanupPartialModelMigrations(ctx context.Context, trigger <-c
 	for {
 		select {
 		case <-trigger:
-			err := s.jimm.JujuManager().CleanupPartialModelMigrations(ctx)
+			err := s.jimm.JujuManager.CleanupPartialModelMigrations(ctx)
 			if err != nil {
 				zapctx.Error(ctx, "partial model migrations cleanup", zap.Error(err))
 				continue
@@ -481,12 +481,12 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	s.mux.Mount("/metrics", promhttp.Handler())
 
-	rebacBackend, err := rebac_admin.SetupBackend(ctx, s.jimm)
+	rebacBackend, err := rebac_admin.SetupBackend(ctx, jujuapi.NewJIMMAdapter(s.jimm))
 	if err != nil {
 		return nil, errors.E(err)
 	}
 
-	s.mux.Mount("/rebac", middleware.AuthenticateRebac("/rebac", rebacBackend.Handler(""), s.jimm.LoginManager()))
+	s.mux.Mount("/rebac", middleware.AuthenticateRebac("/rebac", rebacBackend.Handler(""), s.jimm.LoginManager))
 
 	mountHandler(
 		"/debug",
@@ -577,7 +577,7 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 	if s.isLeader {
 		// audit log cleanup routine
 		svc.Go(func() error {
-			s.jimm.AuditLogManager().StartCleanup(ctx)
+			s.jimm.AuditLogManager.StartCleanup(ctx)
 			return nil
 		})
 
@@ -626,7 +626,7 @@ func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, err
 		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
 		ControllerUUID:         p.ControllerUUID,
 	}
-	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, s.jimm.Database, s.jimm.OfferAuthorizer())
+	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, s.jimm.Database, s.jimm.OfferAuthorizer)
 	if err != nil {
 		return nil, errors.E(err)
 	}

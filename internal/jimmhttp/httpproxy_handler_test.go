@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmhttp_test
 
@@ -59,9 +59,8 @@ users:
 func (s *httpProxySuite) SetUpTest(c *gc.C) {
 	s.JIMMSuite.SetUpTest(c)
 	ctx := context.Background()
-	tester := jimmtest.GocheckTester{C: c}
-	env := jimmtest.ParseEnvironment(tester, testEnv)
-	env.PopulateDB(tester, s.JIMM.Database)
+	env := jimmtest.ParseEnvironment(c, testEnv)
+	env.PopulateDB(c, s.JIMM.Database)
 	model := &dbmodel.Model{UUID: sql.NullString{String: env.Models[0].UUID, Valid: true}}
 	err := s.JIMM.Database.GetModel(ctx, model)
 	c.Assert(err, gc.IsNil)

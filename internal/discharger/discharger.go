@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package discharger
 
@@ -19,7 +19,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 )
 
 var defaultDischargeExpiry = 15 * time.Minute
@@ -31,8 +30,14 @@ type MacaroonDischargerConfig struct {
 	ControllerUUID         string
 }
 
+// OfferAuthorizer provides methods to check if a user is a consumer of an application offer.
+type OfferAuthorizer interface {
+	// IsUserConsumerForOffer checks if a user is a consumer of an application offer.
+	IsUserConsumerForOffer(ctx context.Context, userTag names.UserTag, offerTag names.ApplicationOfferTag) (bool, error)
+}
+
 // NewMacaroonDischarger creates a new MacaroonDischarger instance with the provided configuration, database, and offer authorizer.
-func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, offerAuthorizer jimm.OfferAuthorizer) (*MacaroonDischarger, error) {
+func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, offerAuthorizer OfferAuthorizer) (*MacaroonDischarger, error) {
 	var kp bakery.KeyPair
 	if cfg.PublicKey == "" || cfg.PrivateKey == "" {
 		return nil, errors.E("missing bakery private/public key")
@@ -73,7 +78,7 @@ func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, offerA
 type MacaroonDischarger struct {
 	bakery          *bakery.Bakery
 	kp              bakery.KeyPair
-	offerAuthorizer jimm.OfferAuthorizer
+	offerAuthorizer OfferAuthorizer
 }
 
 // GetDischargerMux returns a mux that can handle macaroon bakery requests for the provided discharger.

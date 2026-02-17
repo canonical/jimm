@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package permissions
 
@@ -14,9 +14,6 @@ var (
 	BatchSizeOpenfga               = BATCH_SIZE_OPENFGA
 )
 
-// PermissionManager is a type alias to export PermissionManager for use in tests.
-type PermissionManager = permissionManager
-
-func (j *permissionManager) ParseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+func (j *PermissionManager) ParseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
 	return j.parseAndValidateTag(ctx, key)
 }

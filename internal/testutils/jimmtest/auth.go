@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmtest
 
@@ -80,7 +80,7 @@ type mockOAuthAuthenticator struct {
 // NewMockOAuthAuthenticator creates a mock authenticator for tests. An channel can be passed in
 // when testing the device flow to simulate polling an OIDC server. Provide a nil channel
 // if the device flow will not be used in the test.
-func NewMockOAuthAuthenticator(c SimpleTester, testChan <-chan string) mockOAuthAuthenticator {
+func newMockOAuthAuthenticator(c SimpleTester, testChan <-chan string) mockOAuthAuthenticator {
 	return mockOAuthAuthenticator{c: c, PollingChan: testChan}
 }
 

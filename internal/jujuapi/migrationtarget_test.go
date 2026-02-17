@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuapi_test
 
@@ -15,7 +15,6 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -41,7 +40,7 @@ func (s *migrationTargetUnitSuite) TestAbort(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -87,7 +86,7 @@ func (s *migrationTargetUnitSuite) TestCheckMachines(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -138,7 +137,7 @@ func (s *migrationTargetUnitSuite) TestPreChecks(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -200,7 +199,7 @@ func (s *migrationTargetUnitSuite) TestAdoptResources(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -239,7 +238,7 @@ func (s *migrationTargetUnitSuite) TestActivateUnauthorized(c *gc.C) {
 
 	jujuManager := mocks.JujuManager{}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -278,7 +277,7 @@ func (s *migrationTargetUnitSuite) TestActivateValid(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -309,7 +308,7 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidModelTag(c *gc.C) {
 
 	jujuManager := mocks.JujuManager{}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -339,7 +338,7 @@ func (s *migrationTargetUnitSuite) TestActivateInvalidControllerTag(c *gc.C) {
 
 	jujuManager := mocks.JujuManager{}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -376,7 +375,7 @@ func (s *migrationTargetUnitSuite) TestActivateMissingControllerTag(c *gc.C) {
 		},
 	}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -412,7 +411,7 @@ func (s *migrationTargetUnitSuite) TestLatestLogTime(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -458,7 +457,7 @@ func (s *migrationTargetUnitSuite) TestImportValid(c *gc.C) {
 			},
 		}}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}
@@ -482,7 +481,7 @@ func (s *migrationTargetUnitSuite) TestImportUnauthorized(c *gc.C) {
 
 	jujuManager := mocks.JujuManager{}
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &jujuManager
 		},
 	}

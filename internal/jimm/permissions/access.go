@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package permissions
 
@@ -126,25 +126,25 @@ func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
 }
 
 // GetUserControllerAccess returns the user's level of access to the desired controller.
-func (j *permissionManager) GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
+func (j *PermissionManager) GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
 	accessLevel := user.GetControllerAccess(ctx, controller)
 	return ToControllerAccessString(accessLevel), nil
 }
 
 // GetUserCloudAccess returns users access level for the specified cloud.
-func (j *permissionManager) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
+func (j *PermissionManager) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	accessLevel := user.GetCloudAccess(ctx, cloud)
 	return ToCloudAccessString(accessLevel), nil
 }
 
 // GetUserModelAccess returns the access level a user has against a specific model.
-func (j *permissionManager) GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
+func (j *PermissionManager) GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
 	accessLevel := user.GetModelAccess(ctx, model)
 	return ToModelAccessString(accessLevel), nil
 }
 
 // GrantAuditLogAccess grants audit log access for the target user.
-func (j *permissionManager) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
+func (j *PermissionManager) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 
 	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
@@ -166,7 +166,7 @@ func (j *permissionManager) GrantAuditLogAccess(ctx context.Context, user *openf
 }
 
 // RevokeAuditLogAccess revokes audit log access for the target user.
-func (j *permissionManager) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
+func (j *PermissionManager) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 
 	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
@@ -191,7 +191,7 @@ func (j *permissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 // to cachedPerms if they exist. If the user does not have any of the desired permissions then an
 // error is returned.
 // Note that cachedPerms map is modified and returned.
-func (j *permissionManager) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
+func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
 
 	for key, val := range desiredPerms {
 		if _, ok := cachedPerms[key]; !ok {
@@ -222,7 +222,7 @@ func (j *permissionManager) CheckPermission(ctx context.Context, user *openfga.U
 
 // GetJimmControllerAccess returns the JIMM controller access level for the
 // requested user.
-func (j *permissionManager) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
+func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
 
 	// If the authenticated user is requesting the access level
 	// for him/her-self then we return that - either the user
@@ -262,7 +262,7 @@ func (j *permissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
 // returned.
-func (j *permissionManager) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
+func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 
 	targetRelation, err := ToCloudRelation(access)
 	if err != nil {
@@ -330,7 +330,7 @@ func (j *permissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the cloud then an error with the code CodeUnauthorized is
 // returned.
-func (j *permissionManager) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
+func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 
 	targetRelation, err := ToCloudRelation(access)
 	if err != nil {
@@ -409,7 +409,7 @@ func (j *permissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 // CodeNotFound is returned. If the authenticated user does not have
 // admin access to the model then an error with the code CodeUnauthorized
 // is returned.
-func (j *permissionManager) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
 		zapctx.Debug(
@@ -481,7 +481,7 @@ func (j *permissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 // CodeNotFound is returned. If the authenticated user does not have admin
 // access to the model, and is not attempting to revoke their own access,
 // then an error with the code CodeUnauthorized is returned.
-func (j *permissionManager) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
+func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
 		zapctx.Debug(
@@ -566,7 +566,7 @@ func (j *permissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 }
 
 // GrantOfferAccess grants rights for an application offer.
-func (j *permissionManager) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
+func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 
 	identity, err := dbmodel.NewIdentity(ut.Id())
 	if err != nil {
@@ -636,7 +636,7 @@ func determineAccessLevelAfterGrant(currentAccessLevel, grantAccessLevel string)
 }
 
 // RevokeOfferAccess revokes rights for an application offer.
-func (j *permissionManager) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
+func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 
 	identity, err := dbmodel.NewIdentity(ut.Id())
 	if err != nil {
@@ -703,7 +703,7 @@ func (j *permissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 //
 // This approach to cleaning up tuples is intended to be temporary while we implement
 // a better approach to eventual consistency of JIMM's database objects and OpenFGA tuples.
-func (j *permissionManager) OpenFGACleanup(ctx context.Context) error {
+func (j *PermissionManager) OpenFGACleanup(ctx context.Context) error {
 	var (
 		continuationToken string
 		err               error
@@ -735,7 +735,7 @@ func (j *permissionManager) OpenFGACleanup(ctx context.Context) error {
 	}
 }
 
-func (j *permissionManager) orphanedTuples(ctx context.Context, tuples ...openfga.Tuple) []openfga.Tuple {
+func (j *PermissionManager) orphanedTuples(ctx context.Context, tuples ...openfga.Tuple) []openfga.Tuple {
 	orphanedTuples := []openfga.Tuple{}
 	for _, tuple := range tuples {
 		_, err := j.ToJAASTag(ctx, tuple.Object, true)

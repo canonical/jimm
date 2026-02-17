@@ -1,22 +1,26 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package login_test
 
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwt"
+	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -50,11 +54,67 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 	s.ofgaClient = ofgaClient
 
 	s.deviceFlowChan = make(chan string, 1)
-	mockAuthenticator := jimmtest.NewMockOAuthAuthenticator(c, s.deviceFlowChan)
 
 	s.jimmTag = names.NewControllerTag("foo")
 
-	s.manager, err = login.NewLoginManager(db, ofgaClient, &mockAuthenticator, s.jimmTag)
+	ctrl := gomock.NewController(c)
+	mockAuthenticator := NewMockOAuthAuthenticator(ctrl)
+	c.Cleanup(ctrl.Finish)
+
+	mockAuthenticator.EXPECT().Device(gomock.Any()).Return(&oauth2.DeviceAuthResponse{
+		DeviceCode:              "test-device-code",
+		UserCode:                "test-user-code",
+		VerificationURI:         "http://no-such-uri.canonical.com",
+		VerificationURIComplete: "http://no-such-uri.canonical.com",
+		Interval:                int64(time.Minute.Seconds()),
+	}, nil).AnyTimes()
+
+	mockAuthenticator.EXPECT().DeviceAccessToken(gomock.Any(), gomock.Any()).Return(&oauth2.Token{}, nil).AnyTimes()
+	mockAuthenticator.EXPECT().ExtractAndVerifyIDToken(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+	mockAuthenticator.EXPECT().Email(gomock.Any()).DoAndReturn(func(_ *oidc.IDToken) (string, error) {
+		emailPrefix := "user-foo"
+		select {
+		case candidate := <-s.deviceFlowChan:
+			emailPrefix = candidate
+		default:
+		}
+		return fmt.Sprintf("%s@canonical.com", emailPrefix), nil
+	}).AnyTimes()
+	mockAuthenticator.EXPECT().UpdateIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockAuthenticator.EXPECT().MintSessionToken(gomock.Any()).DoAndReturn(func(email string) (string, error) {
+		token, err := jwt.NewBuilder().
+			Subject(email).
+			Build()
+		if err != nil {
+			return "", err
+		}
+		serializedToken, err := jwt.NewSerializer().Serialize(token)
+		if err != nil {
+			return "", err
+		}
+		return base64.StdEncoding.EncodeToString(serializedToken), nil
+	}).AnyTimes()
+
+	mockAuthenticator.EXPECT().VerifyClientCredentials(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, clientID string, clientSecret string) error {
+		if clientID == "my-svc-acc" && clientSecret == "foo-secret" {
+			return nil
+		}
+		return fmt.Errorf("invalid client credentials")
+	}).AnyTimes()
+
+	mockAuthenticator.EXPECT().VerifySessionToken(gomock.Any()).DoAndReturn(func(token string) (jwt.Token, error) {
+		decodedToken, err := base64.StdEncoding.DecodeString(token)
+		if err != nil {
+			return nil, errors.E(errors.CodeSessionTokenInvalid, "failed to decode token")
+		}
+		parsedToken, err := jwt.ParseInsecure(decodedToken)
+		if err != nil {
+			return nil, errors.E(errors.CodeSessionTokenInvalid, "failed to parse token")
+		}
+		return parsedToken, nil
+	}).AnyTimes()
+
+	s.manager, err = login.NewLoginManager(db, ofgaClient, mockAuthenticator, s.jimmTag)
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity

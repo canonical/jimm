@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -12,6 +12,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -25,7 +26,7 @@ type roleSuite struct {
 
 func (s *roleSuite) SetUpTest(c *gc.C) {
 	s.JIMMSuite.SetUpTest(c)
-	s.roleSvc = rebac_admin.NewRoleService(s.JIMM)
+	s.roleSvc = rebac_admin.NewRoleService(jujuapi.NewJIMMAdapter(s.JIMM))
 }
 
 var _ = gc.Suite(&roleSuite{})
@@ -33,7 +34,7 @@ var _ = gc.Suite(&roleSuite{})
 func (s roleSuite) TestListRolesWithFilterIntegration(c *gc.C) {
 	ctx := context.Background()
 	for i := range 10 {
-		_, err := s.JIMM.RoleManager().AddRole(ctx, s.AdminUser, fmt.Sprintf("test-role-filter-%d", i))
+		_, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, fmt.Sprintf("test-role-filter-%d", i))
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -63,7 +64,7 @@ func (s roleSuite) TestListRolesWithFilterIntegration(c *gc.C) {
 
 func (s roleSuite) TestGetRoleEntitlementsIntegration(c *gc.C) {
 	ctx := context.Background()
-	role, err := s.JIMM.RoleManager().AddRole(ctx, s.AdminUser, "test-role")
+	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, "test-role")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(role.UUID), ofganames.AssigneeRelation),
@@ -169,7 +170,7 @@ func (s roleSuite) TestPatchRoleEntitlementsIntegration(c *gc.C) {
 	oldModels := []string{env.Models[0].UUID, env.Models[1].UUID}
 	newModels := []string{env.Models[2].UUID, env.Models[3].UUID}
 
-	role, err := s.JIMM.RoleManager().AddRole(ctx, s.AdminUser, "test-role")
+	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, "test-role")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(role.UUID), ofganames.AssigneeRelation),

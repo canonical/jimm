@@ -92,7 +92,7 @@ type CommandFactory interface {
 	New(binaryPath, jujuDataDir string) JujuCommands
 }
 
-type bootstrapManager struct {
+type BootstrapManager struct {
 	store                     Store
 	jujuManager               JujuManager
 	binaryStore               BinaryStore
@@ -109,7 +109,7 @@ func NewBootstrapManager(
 	binaryStore BinaryStore,
 	jimmWellknownJWKSEndpoint string,
 	credentialStore CredentialStore,
-) (*bootstrapManager, error) {
+) (*BootstrapManager, error) {
 	if store == nil {
 		return nil, errors.E("store cannot be nil")
 	}
@@ -132,7 +132,7 @@ func NewBootstrapManager(
 	if jobQueue == nil {
 		return nil, errors.E("job queue cannot be nil")
 	}
-	return &bootstrapManager{
+	return &BootstrapManager{
 		store:                     store,
 		jujuManager:               jujuManager,
 		binaryStore:               binaryStore,
@@ -145,7 +145,7 @@ func NewBootstrapManager(
 // GetJobInfo retrieves the status and logs of a bootstrap job.
 // It requires the user to be an admin and returns the status, error message, logs,
 // and a watermark for pagination.
-func (b *bootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error) {
+func (b *BootstrapManager) GetJobInfo(ctx context.Context, _ *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error) {
 	job, err := b.jobQueue.GetJobInfo(ctx, jobId)
 	if err != nil {
 		return params.GetBootstrapInfoResponse{}, fmt.Errorf("failed to get job info: %w", err)
@@ -191,7 +191,7 @@ func toParamsJobState(ctx context.Context, state rivertype.JobState) params.JobS
 }
 
 // StopJob stops a bootstrap job by its ID.
-func (b *bootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobID int64) error {
+func (b *BootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobID int64) error {
 
 	if user == nil {
 		return errors.E("user cannot be nil")
@@ -208,7 +208,7 @@ func (b *bootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobI
 // WaitForJobCompletion waits for a bootstrap job to complete by polling its status.
 // It returns an error if the job ID is nil, or if the job fails.
 // It returns nil on successful completion.
-func (b *bootstrapManager) WaitForJobCompletion(ctx context.Context, jobId int64, config WaitConfig) error {
+func (b *BootstrapManager) WaitForJobCompletion(ctx context.Context, jobId int64, config WaitConfig) error {
 	maxDuration := config.MaxJobDuration
 	if maxDuration == 0 {
 		maxDuration = maxJobDuration
@@ -239,7 +239,7 @@ func (b *bootstrapManager) WaitForJobCompletion(ctx context.Context, jobId int64
 }
 
 // StartBootstrap starts a bootstrap job with the provided parameters.
-func (b *bootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params BootstrapParams) (int64, error) {
+func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params BootstrapParams) (int64, error) {
 
 	if b.jimmWellknownJWKSEndpoint == "" {
 		return 0, errors.E("bootstrap login token refresh URL is not configured. Cannot proceed with bootstrap. Please configure it and try again.")
@@ -322,7 +322,7 @@ func (h JujuCLI) RunWrapper(
 
 // BootstrapController bootstraps a new Juju controller and adds it to JIMM.
 // It fetches a copy of the Juju CLI and uses that to execute bootstrap command.
-func (b *bootstrapManager) BootstrapController(
+func (b *BootstrapManager) BootstrapController(
 	ctx context.Context,
 	p RunBootstrapArgs,
 	cmdFactory CommandFactory,
@@ -381,7 +381,7 @@ func (b *bootstrapManager) BootstrapController(
 // when the job is stopped or cancelled. The ctx is NOT expected to be used for
 // any store operations, or other operations that should continue even if the job
 // is cancelled.
-func (b *bootstrapManager) runBootstrap(
+func (b *BootstrapManager) runBootstrap(
 	ctx context.Context,
 	p RunBootstrapArgs,
 	executor JujuCommands,
@@ -490,7 +490,7 @@ func (b *bootstrapManager) runBootstrap(
 	return nil
 }
 
-func (b *bootstrapManager) tryCleanupController(ctx context.Context, jujuCmd JujuCommands, jobID int64, controllerName string) error {
+func (b *BootstrapManager) tryCleanupController(ctx context.Context, jujuCmd JujuCommands, jobID int64, controllerName string) error {
 	outputCh, err := jujuCmd.DestroyController(
 		ctx,
 		jujucommands.DestroyControllerCmdParams{
@@ -509,7 +509,7 @@ func (b *bootstrapManager) tryCleanupController(ctx context.Context, jujuCmd Juj
 	return nil
 }
 
-func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-chan jujucommands.OutputLine, jobId int64) error {
+func (b *BootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-chan jujucommands.OutputLine, jobId int64) error {
 	for output := range outputCh {
 		if output.Err != nil {
 			b.writeJobLog(ctx, jobId, output.Err.Error())
@@ -523,7 +523,7 @@ func (b *bootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-
 
 // writeJobLog writes logs to the store to eventually be displayed to users.
 // Errors are masked but logged to avoid failing the bootstrap process.
-func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId int64, logLine string) {
+func (b *BootstrapManager) writeJobLog(ctx context.Context, jobId int64, logLine string) {
 	// Avoid storing empty log lines.
 	if logLine == "" {
 		return
@@ -534,7 +534,7 @@ func (b *bootstrapManager) writeJobLog(ctx context.Context, jobId int64, logLine
 }
 
 // StartDestroyControllerJob inserts a destroy-controller job into the database.
-func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *openfga.User, params DestroyControllerParams) (int64, error) {
+func (b *BootstrapManager) StartDestroyControllerJob(ctx context.Context, user *openfga.User, params DestroyControllerParams) (int64, error) {
 	destroyArgs := rivertypes.DestroyControllerArgs{
 		Username:       user.Name,
 		ControllerName: params.ControllerName,
@@ -560,7 +560,7 @@ func (b *bootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 
 // DestroyController destroys a Juju controller and removes it from JIMM.
 // It fetches a copy of the Juju CLI and uses that to execute destroy-controller command.
-func (b *bootstrapManager) DestroyController(
+func (b *BootstrapManager) DestroyController(
 	ctx context.Context,
 	p RunDestroyControllerArgs,
 	cmdFactory CommandFactory,

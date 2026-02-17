@@ -1,3 +1,5 @@
+// Copyright 2026 Canonical.
+
 package jobs
 
 import (
@@ -15,7 +17,7 @@ import (
 )
 
 type testDeps struct {
-	jobManager *jobManager
+	jobManager *JobManager
 	jobQuerier *MockJobQuerier
 }
 

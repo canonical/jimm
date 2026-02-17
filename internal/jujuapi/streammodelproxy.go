@@ -63,7 +63,7 @@ func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.C
 		}
 	}
 
-	user, err := s.jimm.LoginManager().UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
+	user, err := s.jimm.LoginManager.UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
 	if err != nil {
 		zapctx.Error(ctx, "user login error", zap.Error(err))
 		writeError(err.Error(), errors.CodeUnauthorized)
@@ -92,7 +92,7 @@ func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.C
 		return
 	}
 
-	model, err := s.jimm.JujuManager().GetModel(ctx, uuid)
+	model, err := s.jimm.JujuManager.GetModel(ctx, uuid)
 	if err != nil {
 		writeError(err.Error(), errors.CodeModelNotFound)
 		return

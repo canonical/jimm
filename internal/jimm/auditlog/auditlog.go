@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 // The auditlog package provides business logic for handling audit log related methods.
 package auditlog
@@ -20,8 +20,8 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
-// auditLogManager provides a means to manage audit logs within JIMM.
-type auditLogManager struct {
+// AuditLogManager provides a means to manage audit logs within JIMM.
+type AuditLogManager struct {
 	store                 *db.Database
 	authSvc               *openfga.OFGAClient
 	jimmTag               names.ControllerTag
@@ -30,7 +30,7 @@ type auditLogManager struct {
 
 // NewAuditLogManager returns a new auditLog manager that provides audit Log
 // creation, and removal.
-func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag names.ControllerTag, retentionDays int) (*auditLogManager, error) {
+func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag names.ControllerTag, retentionDays int) (*AuditLogManager, error) {
 	if store == nil {
 		return nil, errors.E("auditlog store cannot be nil")
 	}
@@ -40,11 +40,11 @@ func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag
 	if jimmTag.String() == "" {
 		return nil, errors.E("auditlog jimm tag cannot be empty")
 	}
-	return &auditLogManager{store, authSvc, jimmTag, retentionDays}, nil
+	return &AuditLogManager{store, authSvc, jimmTag, retentionDays}, nil
 }
 
 // addAuditLogEntry causes an entry to be added the the audit log.
-func (j *auditLogManager) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
+func (j *AuditLogManager) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 	ctx := context.Background()
 	redactSensitiveParams(ale)
 	if err := j.store.AddAuditLogEntry(ctx, ale); err != nil {
@@ -77,7 +77,7 @@ func redactSensitiveParams(ale *dbmodel.AuditLogEntry) {
 }
 
 // FindAuditEvents returns audit events matching the given filter.
-func (j *auditLogManager) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
+func (j *AuditLogManager) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 
 	access := user.GetAuditLogViewerAccess(ctx, j.jimmTag)
 	if access != ofganames.AuditLogViewerRelation {
@@ -99,7 +99,7 @@ func (j *auditLogManager) FindAuditEvents(ctx context.Context, user *openfga.Use
 // PurgeLogs removes all audit logs before the given timestamp. Only JIMM
 // administrators can perform this operation. The number of logs purged is
 // returned.
-func (j *auditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
+func (j *AuditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	if !user.JimmAdmin {
 		return 0, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}

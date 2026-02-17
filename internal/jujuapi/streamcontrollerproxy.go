@@ -70,7 +70,7 @@ func (s streamControllerProxier) ServeWS(ctx context.Context, clientConn *websoc
 		}
 	}
 
-	user, err := s.jimm.LoginManager().UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
+	user, err := s.jimm.LoginManager.UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
 	if err != nil {
 		zapctx.Error(ctx, "user login error", zap.Error(err))
 		writeError(err.Error(), errors.CodeUnauthorized)
@@ -91,7 +91,7 @@ func (s streamControllerProxier) ServeWS(ctx context.Context, clientConn *websoc
 	// meaning that we have removed the model from the IncomingModelMigration table as
 	// migration was successful and we can now treat the UUID as one for a regular model.
 	modelUUID := jimmhttp.MigratingModelUUIDFromContext(ctx)
-	model, err := s.jimm.JujuManager().GetModel(ctx, modelUUID)
+	model, err := s.jimm.JujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			zapctx.Error(ctx, "model not found", zap.String("modelUUID", modelUUID))

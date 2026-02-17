@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmhttp_test
 
@@ -46,12 +46,11 @@ controllers:
 func (s *migrationHTTPProxySuite) SetUpTest(c *gc.C) {
 	s.JIMMSuite.SetUpTest(c)
 	ctx := context.Background()
-	tester := jimmtest.GocheckTester{C: c}
-	env := jimmtest.ParseEnvironment(tester, migrationTestEnv)
-	env.PopulateDB(tester, s.JIMM.Database)
+	env := jimmtest.ParseEnvironment(c, migrationTestEnv)
+	env.PopulateDB(c, s.JIMM.Database)
 
 	incomingModel := &dbmodel.IncomingModelMigration{
-		TargetControllerID: env.Controllers[0].DBObject(tester, s.JIMM.Database).ID,
+		TargetControllerID: env.Controllers[0].DBObject(c, s.JIMM.Database).ID,
 		ModelUUID:          sql.NullString{String: incomingModelUUID, Valid: true},
 		UserMapping:        map[string]string{"bob": "alice@canonical.com"},
 	}

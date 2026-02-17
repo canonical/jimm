@@ -253,7 +253,7 @@ func start(ctx context.Context, s *service.Service) error {
 		Port:                     sshPort,
 		HostKey:                  []byte(hostKeyRaw),
 		MaxConcurrentConnections: maxConcurrentConnections,
-	}, jimmsvc.JIMM().SSHManager())
+	}, jimmsvc.JIMM().SSHManager)
 
 	s.OnShutdown(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -283,8 +283,8 @@ func start(ctx context.Context, s *service.Service) error {
 		ctx,
 		jimmsvc.JIMM().Database,
 		jimmsvc.JIMM().OpenFGAClient,
-		jimmsvc.JIMM().UpgradeManager(),
-		jimmsvc.JIMM().BootstrapManager(),
+		jimmsvc.JIMM().UpgradeManager,
+		jimmsvc.JIMM().BootstrapManager,
 	)
 	if err != nil {
 		return err

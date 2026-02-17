@@ -80,8 +80,8 @@ type OAuthAuthenticator interface {
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
 }
 
-// loginManager provides a means to manage identities within JIMM.
-type loginManager struct {
+// LoginManager provides a means to manage identities within JIMM.
+type LoginManager struct {
 	store              *db.Database
 	authSvc            *openfga.OFGAClient
 	oAuthAuthenticator OAuthAuthenticator
@@ -89,7 +89,7 @@ type loginManager struct {
 }
 
 // NewLoginManager returns a new loginManager that persists the roles in the provided store.
-func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthenticator OAuthAuthenticator, jimmTag names.ControllerTag) (*loginManager, error) {
+func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthenticator OAuthAuthenticator, jimmTag names.ControllerTag) (*LoginManager, error) {
 	if store == nil {
 		return nil, errors.E("login store cannot be nil")
 	}
@@ -102,11 +102,11 @@ func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthe
 	if jimmTag.Id() == "" {
 		return nil, errors.E("invalid jimm controller tag")
 	}
-	return &loginManager{store, authSvc, oAuthAuthenticator, jimmTag}, nil
+	return &LoginManager{store, authSvc, oAuthAuthenticator, jimmTag}, nil
 }
 
 // LoginDevice starts the device login flow.
-func (j *loginManager) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
+func (j *LoginManager) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthResponse, error) {
 	resp, err := j.oAuthAuthenticator.Device(ctx)
 
 	if err != nil {
@@ -117,12 +117,12 @@ func (j *loginManager) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthRespo
 }
 
 // AuthenticateBrowserSession authenticates a browser login.
-func (j *loginManager) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error) {
+func (j *LoginManager) AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, r *http.Request) (context.Context, error) {
 	return j.oAuthAuthenticator.AuthenticateBrowserSession(ctx, w, r)
 }
 
 // GetDeviceSessionToken polls an OIDC server while a user logs in and returns a session token scoped to the user's identity.
-func (j *loginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error) {
+func (j *LoginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthResponse *oauth2.DeviceAuthResponse) (string, error) {
 
 	token, err := j.oAuthAuthenticator.DeviceAccessToken(ctx, deviceOAuthResponse)
 	if err != nil {
@@ -152,7 +152,7 @@ func (j *loginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthRes
 }
 
 // LoginClientCredentials verifies a user's client ID and secret before the user is logged in.
-func (j *loginManager) LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error) {
+func (j *LoginManager) LoginClientCredentials(ctx context.Context, clientID string, clientSecret string) (*openfga.User, error) {
 
 	// We expect the client to send the service account ID "as-is" and because we know that this is a clientCredentials login,
 	// we can append the @serviceaccount domain to the clientID (if not already present).
@@ -177,7 +177,7 @@ func (j *loginManager) LoginClientCredentials(ctx context.Context, clientID stri
 }
 
 // LoginWithSessionToken verifies a user's session token before the user is logged in.
-func (j *loginManager) LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error) {
+func (j *LoginManager) LoginWithSessionToken(ctx context.Context, sessionToken string) (*openfga.User, error) {
 	jwtToken, err := j.oAuthAuthenticator.VerifySessionToken(sessionToken)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeSessionTokenInvalid {
@@ -204,7 +204,7 @@ func (j *loginManager) LoginWithSessionToken(ctx context.Context, sessionToken s
 // [WSHandler.ServerHTTP] during the upgrade from an HTTP connection to a websocket. The user's identity is stored
 // and passed to this function with the assumption that the cookie contained a valid session. This function is far from
 // the session cookie logic due to the separation between the HTTP layer and Juju's RPC mechanism.
-func (j *loginManager) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
+func (j *LoginManager) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
 
 	if identityID == "" {
 		return nil, errors.E("missing cookie identity")
@@ -222,9 +222,9 @@ func (j *loginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 // and returns an openfga User that can be used to verify permissions.
 // It will create a new identity if one does not exist.
 // The identity's last login time is updated.
-func (j *loginManager) UserLogin(ctx context.Context, identifier string) (*openfga.User, error) {
+func (j *LoginManager) UserLogin(ctx context.Context, identifier string) (*openfga.User, error) {
 
-	ofgaUser, err := j.getOrCreateIdentity(ctx, identifier)
+	ofgaUser, err := j.GetOrCreateIdentity(ctx, identifier)
 	if err != nil {
 		return nil, errors.E(err, errors.CodeUnauthorized)
 	}
@@ -235,7 +235,7 @@ func (j *loginManager) UserLogin(ctx context.Context, identifier string) (*openf
 	return ofgaUser, nil
 }
 
-func (j *loginManager) getOrCreateIdentity(ctx context.Context, identifier string) (*openfga.User, error) {
+func (j *LoginManager) GetOrCreateIdentity(ctx context.Context, identifier string) (*openfga.User, error) {
 
 	identity, err := dbmodel.NewIdentity(identifier)
 	if err != nil {
@@ -256,7 +256,7 @@ func (j *loginManager) getOrCreateIdentity(ctx context.Context, identifier strin
 	return ofgaUser, nil
 }
 
-func (j *loginManager) updateLastLogin(ctx context.Context, identity *dbmodel.Identity) error {
+func (j *LoginManager) updateLastLogin(ctx context.Context, identity *dbmodel.Identity) error {
 	identity.LastLogin = sql.NullTime{
 		Time:  j.store.DB.NowFunc(),
 		Valid: true,

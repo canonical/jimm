@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
@@ -35,7 +34,7 @@ var _ = gc.Suite(&jimmUnitTestSuite{})
 func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
 	ctx := context.Background()
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 	}
@@ -49,7 +48,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) 
 func (s *jimmUnitTestSuite) TestAddController_UnauthorizedUser(c *gc.C) {
 	ctx := context.Background()
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 	}
@@ -66,7 +65,7 @@ func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
 
 	called := false
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ControllerService: mocks.ControllerService{
 					AddController_: func(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error {
@@ -135,7 +134,7 @@ func (s *jimmUnitTestSuite) TestRemoveController_Success(c *gc.C) {
 	testControllerName := "test-controller"
 	jimm := &jimmtest.JIMM{
 
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ControllerService: mocks.ControllerService{
 					ControllerInfo_: func(ctx context.Context, name string) (*dbmodel.Controller, error) {
@@ -180,7 +179,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 	}
@@ -197,7 +196,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidControllerName(c *g
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 	}
@@ -215,7 +214,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_EmptyExternalUser(c *gc.C)
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				PrepareModelMigration_: func(ctx context.Context, user *openfga.User, modelUUID, targetControllerName string, userMapping map[string]string) (string, error) {
 					return "foo", nil
@@ -238,7 +237,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 	}
@@ -273,7 +272,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 	ctx := context.Background()
 	expectedJobID := int64(1)
 	jimm := &jimmtest.JIMM{
-		BootstapManager_: func() jimm.BootstrapManager {
+		BootstapManager_: func() jujuapi.BootstrapManager {
 			return &mocks.BootstapManager{
 				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId int64, offset int) (apiparams.GetBootstrapInfoResponse, error) {
 					if jobId != expectedJobID {
@@ -333,7 +332,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	var startBootstrapErr error
 
 	jimm := &jimmtest.JIMM{
-		BootstapManager_: func() jimm.BootstrapManager {
+		BootstapManager_: func() jujuapi.BootstrapManager {
 			return &mocks.BootstapManager{
 				StartBootstrapJob_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
 					if startBootstrapErr != nil {
@@ -378,7 +377,7 @@ func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	expectedJobID := int64(1)
 
 	jimm := &jimmtest.JIMM{
-		BootstapManager_: func() jimm.BootstrapManager {
+		BootstapManager_: func() jujuapi.BootstrapManager {
 			return &mocks.BootstapManager{
 				StopJob_: func(ctx context.Context, user *openfga.User, jobId int64) error {
 					if jobId != expectedJobID {
@@ -432,14 +431,14 @@ func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
 	}
 
 	jimm := &jimmtest.JIMM{
-		BootstapManager_: func() jimm.BootstrapManager {
+		BootstapManager_: func() jujuapi.BootstrapManager {
 			return &mocks.BootstapManager{
 				StartDestroyControllerJob_: func(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error) {
 					return 1, nil
 				},
 			}
 		},
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ControllerService: mocks.ControllerService{
 					ControllerInfo_: func(ctx context.Context, name string) (*dbmodel.Controller, error) {
@@ -466,7 +465,7 @@ func (s *jimmUnitTestSuite) TestAddModelToController(c *gc.C) {
 	ctx := context.Background()
 
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelManager: mocks.ModelManager{
 					AddModel_: func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (base.ModelInfo, error) {
@@ -572,14 +571,14 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about          string
 		admin          bool
 		modelQualifier string
-		jujuManager    func(*gc.C) jimm.JujuManager
+		jujuManager    func(*gc.C) jujuapi.JujuManager
 		expectedInfo   apiparams.ModelControllerInfo
 		expectedError  string
 	}{{
 		about:          "non-admin user with model uuid",
 		admin:          false,
 		modelQualifier: "12345678-1234-1234-1234-123456789abc",
-		jujuManager: func(c *gc.C) jimm.JujuManager {
+		jujuManager: func(c *gc.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 		expectedError: "unauthorized",
@@ -587,7 +586,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "invalid model uuid",
 		admin:          true,
 		modelQualifier: "invalid-model-uuid",
-		jujuManager: func(c *gc.C) jimm.JujuManager {
+		jujuManager: func(c *gc.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 		expectedError: `invalid model UUID: invalid UUID length: 18`,
@@ -595,7 +594,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "model not found with model tag",
 		admin:          true,
 		modelQualifier: "12345678-1234-1234-1234-123456789abc",
-		jujuManager: func(c *gc.C) jimm.JujuManager {
+		jujuManager: func(c *gc.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 					return nil, errors.E("model not found")
@@ -607,7 +606,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "success with model tag",
 		admin:          true,
 		modelQualifier: "12345678-1234-1234-1234-123456789abc",
-		jujuManager: func(c *gc.C) jimm.JujuManager {
+		jujuManager: func(c *gc.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 					c.Assert(user.JimmAdmin, gc.Equals, true)
@@ -630,7 +629,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "success with owner and model name",
 		admin:          true,
 		modelQualifier: "alice@canonical.com/test-model",
-		jujuManager: func(c *gc.C) jimm.JujuManager {
+		jujuManager: func(c *gc.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 					c.Assert(user.JimmAdmin, gc.Equals, true)
@@ -653,25 +652,25 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "error with a partial model qualifier (only owner provided)",
 		admin:          true,
 		modelQualifier: "alice@canonical.com/",
-		jujuManager:    func(c *gc.C) jimm.JujuManager { return &mocks.JujuManager{} },
+		jujuManager:    func(c *gc.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
 		expectedError:  `invalid model UUID: invalid UUID length: 20`,
 	}, {
 		about:          "error with a partial model qualifier (only model name provided)",
 		admin:          true,
 		modelQualifier: "/test-model",
-		jujuManager:    func(c *gc.C) jimm.JujuManager { return &mocks.JujuManager{} },
+		jujuManager:    func(c *gc.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
 		expectedError:  `invalid model UUID: invalid UUID length: 11`,
 	}, {
 		about:          "non-admin user with owner and model name",
 		admin:          false,
 		modelQualifier: "alice@canonical.com/test-model",
-		jujuManager:    func(c *gc.C) jimm.JujuManager { return &mocks.JujuManager{} },
+		jujuManager:    func(c *gc.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
 		expectedError:  "unauthorized",
 	}, {
 		about:          "model not found with owner and model name",
 		admin:          true,
 		modelQualifier: "bob@canonical.com/non-existent",
-		jujuManager: func(c *gc.C) jimm.JujuManager {
+		jujuManager: func(c *gc.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 					return nil, errors.E("model not found")
@@ -684,7 +683,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 	for _, test := range testCases {
 		c.Log(test.about)
 		jimm := &jimmtest.JIMM{
-			JujuManager_: func() jimm.JujuManager {
+			JujuManager_: func() jujuapi.JujuManager {
 				return test.jujuManager(c)
 			},
 		}
@@ -707,7 +706,7 @@ func (s *jimmUnitTestSuite) TestJobInfo(c *gc.C) {
 
 	finishedTime := time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC)
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jimm.JujuManager {
+		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				JobInfo_: func(ctx context.Context, jobID string) (jobs.JobInfo, error) {
 					if jobID != "1" {

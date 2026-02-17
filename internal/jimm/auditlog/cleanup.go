@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package auditlog
 
@@ -19,7 +19,7 @@ var auditLogCleanupTime = pollTimeOfDay{
 // that need to be cleaned up. This method should be run
 // in a separate Go routine to avoid blocking, it will terminate
 // when the provided context is cancelled.
-func (j *auditLogManager) StartCleanup(ctx context.Context) {
+func (j *AuditLogManager) StartCleanup(ctx context.Context) {
 	if j.retentionPeriodInDays == 0 {
 		return
 	}
@@ -41,7 +41,7 @@ type pollTimeOfDay struct {
 	Seconds int
 }
 
-func (j *auditLogManager) cleanup(ctx context.Context) {
+func (j *AuditLogManager) cleanup(ctx context.Context) {
 	retentionDate := time.Now().AddDate(0, 0, -(j.retentionPeriodInDays))
 	deleted, err := j.store.DeleteAuditLogsBefore(ctx, retentionDate)
 	if err != nil {

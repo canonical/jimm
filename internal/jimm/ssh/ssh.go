@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package ssh
 
@@ -94,11 +94,11 @@ func (p *SSHManagerParams) validate() error {
 }
 
 // NewSSHManager returns a new SSHManager that offers domain functionality to the SSHJumpServer.
-func NewSSHManager(p SSHManagerParams) (*sshManager, error) {
+func NewSSHManager(p SSHManagerParams) (*SSHManager, error) {
 	if err := p.validate(); err != nil {
 		return nil, err
 	}
-	return &sshManager{
+	return &SSHManager{
 		jujuManager:     p.JujuManager,
 		identityManager: p.IdentityManager,
 		sshKeyManager:   p.SSHKeyManager,
@@ -107,8 +107,8 @@ func NewSSHManager(p SSHManagerParams) (*sshManager, error) {
 	}, nil
 }
 
-// sshManager provides a means to manage ssh server within JIMM.
-type sshManager struct {
+// SSHManager provides a means to manage ssh server within JIMM.
+type SSHManager struct {
 	jujuManager     JujuManager
 	identityManager IdentityManager
 	sshKeyManager   SSHKeyManager
@@ -118,7 +118,7 @@ type sshManager struct {
 
 // PublicKeyHandler is the method to verify the public key of the user. It first checks for the public key and then fetches the user.
 // It returns a user if successful.
-func (s *sshManager) PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error) {
+func (s *SSHManager) PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error) {
 	zapctx.Info(ctx, "PublicKeyHandler")
 	if ok, err := s.sshKeyManager.VerifyPublicKey(ctx, claimUser, key); !ok || err != nil {
 		return nil, fmt.Errorf("cannot verify key for user %s: %v", claimUser, err)
@@ -135,7 +135,7 @@ func (s *sshManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 // model UUID and returns a struct with parameters to connect and authenticate
 // to the controller. The context should contain the public key the user
 // used to authenticate.
-func (s *sshManager) DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (DialInfo, error) {
+func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (DialInfo, error) {
 	zapctx.Info(ctx, "SSHDialInfo")
 	model, err := s.jujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
@@ -190,7 +190,7 @@ func (s *sshManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 
 // DialController dials a controller's SSH
 // server and returns an SSH connection.
-func (s *sshManager) DialController(ctx context.Context, dialInfo DialInfo, user *openfga.User) (*gossh.Client, error) {
+func (s *SSHManager) DialController(ctx context.Context, dialInfo DialInfo, user *openfga.User) (*gossh.Client, error) {
 	var client *gossh.Client
 	var err error
 	var errs []error

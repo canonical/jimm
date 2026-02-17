@@ -709,7 +709,7 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 
 	user := openfga.NewUser(u, s.OFGAClient)
 
-	cloud, err := s.JIMM.JujuManager().GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
+	cloud, err := s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cloud.Name, gc.DeepEquals, cloudName)
 	c.Assert(cloud.Type, gc.DeepEquals, "kubernetes")
@@ -756,19 +756,19 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
 	user := openfga.NewUser(u, s.OFGAClient)
-	cloud, err := s.JIMM.JujuManager().GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
+	cloud, err := s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cloud.Name, gc.DeepEquals, cloudName)
 	c.Assert(cloud.Type, gc.DeepEquals, "MAAS")
 	// Simulate the cloud being present on the Juju controller but not in JIMM.
 	err = s.JIMM.Database.DeleteCloud(ctx, &cloud)
 	c.Assert(err, gc.IsNil)
-	cloud, err = s.JIMM.JujuManager().GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
+	cloud, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.NotNil)
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
 	c.Assert(err, gc.Equals, nil)
-	cloud, err = s.JIMM.JujuManager().GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
+	cloud, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.IsNil)
 	c.Assert(cloud.Name, gc.DeepEquals, cloudName)
 	c.Assert(cloud.Type, gc.DeepEquals, "MAAS")
@@ -816,7 +816,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 
 	user := openfga.NewUser(u, s.OFGAClient)
 
-	_, err = s.JIMM.JujuManager().GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
+	_, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.Equals, nil)
 
 	req1 := apiparams.RemoveCloudFromControllerRequest{
@@ -826,7 +826,7 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 	err = conn.APICall("JIMM", 4, "", "RemoveCloudFromController", &req1, nil)
 	c.Assert(err, gc.Equals, nil)
 
-	_, err = s.JIMM.JujuManager().GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
+	_, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.ErrorMatches, `cloud "`+cloudName+`" not found`)
 }
 

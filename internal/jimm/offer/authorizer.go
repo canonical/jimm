@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package offer
 
@@ -14,27 +14,27 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-type offerAuthorizer struct {
+type OfferAuthorizer struct {
 	store   *db.Database
 	authSvc *openfga.OFGAClient
 }
 
 // NewOfferAuthorizer returns a new OfferAuthorizer that provides methods to
 // check if a user is a consumer of an application offer.
-func NewOfferAuthorizer(store *db.Database, authSvc *openfga.OFGAClient) (*offerAuthorizer, error) {
+func NewOfferAuthorizer(store *db.Database, authSvc *openfga.OFGAClient) (*OfferAuthorizer, error) {
 	if store == nil {
 		return nil, errors.E("group store cannot be nil")
 	}
 	if authSvc == nil {
 		return nil, errors.E("group authorisation service cannot be nil")
 	}
-	return &offerAuthorizer{store, authSvc}, nil
+	return &OfferAuthorizer{store, authSvc}, nil
 }
 
 // IsUserConsumerForOffer checks if a user is a consumer of an application offer.
 // If the user is local, it is mapped to its corresponding external user
 // based on the model migration user mapping.
-func (offerAuth *offerAuthorizer) IsUserConsumerForOffer(ctx context.Context, userTag names.UserTag, offerTag names.ApplicationOfferTag) (bool, error) {
+func (offerAuth *OfferAuthorizer) IsUserConsumerForOffer(ctx context.Context, userTag names.UserTag, offerTag names.ApplicationOfferTag) (bool, error) {
 	var userIdentifier string
 	var err error
 	if userTag.IsLocal() {
@@ -56,7 +56,7 @@ func (offerAuth *offerAuthorizer) IsUserConsumerForOffer(ctx context.Context, us
 	return user.IsApplicationOfferConsumer(ctx, offerTag)
 }
 
-func (offerAuth *offerAuthorizer) resolveLocalUserToExternalUser(ctx context.Context, localUsername string, offerTag names.ApplicationOfferTag) (string, error) {
+func (offerAuth *OfferAuthorizer) resolveLocalUserToExternalUser(ctx context.Context, localUsername string, offerTag names.ApplicationOfferTag) (string, error) {
 	offer := dbmodel.ApplicationOffer{
 		UUID: offerTag.Id(),
 	}

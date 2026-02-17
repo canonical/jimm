@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmhttp
 
@@ -49,7 +49,7 @@ func (hph *MigrationHTTPProxyHandler) Routes() chi.Router {
 // SetupMiddleware applies authn and authz middlewares.
 func (hph *MigrationHTTPProxyHandler) SetupMiddleware() {
 	hph.Router.Use(func(h http.Handler) http.Handler {
-		return middleware.AuthenticateViaBasicAuth(h, hph.jimm.LoginManager())
+		return middleware.AuthenticateViaBasicAuth(h, hph.jimm.LoginManager)
 	})
 	hph.Router.Use(middleware.AuthorizeUserAsJIMMAdmin)
 }
@@ -66,7 +66,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	controllerDetails, err := hph.jimm.JujuManager().ControllerDetailsForIncomingModel(ctx, modelUUID)
+	controllerDetails, err := hph.jimm.JujuManager.ControllerDetailsForIncomingModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "migrating model not found")

@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -12,6 +12,7 @@ import (
 	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -25,7 +26,7 @@ type rebacAdminSuite struct {
 
 func (s *rebacAdminSuite) SetUpTest(c *gc.C) {
 	s.JIMMSuite.SetUpTest(c)
-	s.groupSvc = rebac_admin.NewGroupService(s.JIMM)
+	s.groupSvc = rebac_admin.NewGroupService(jujuapi.NewJIMMAdapter(s.JIMM))
 }
 
 var _ = gc.Suite(&rebacAdminSuite{})
@@ -33,7 +34,7 @@ var _ = gc.Suite(&rebacAdminSuite{})
 func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
 	ctx := context.Background()
 	for i := range 10 {
-		_, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, fmt.Sprintf("test-group-filter-%d", i))
+		_, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, fmt.Sprintf("test-group-filter-%d", i))
 		c.Assert(err, gc.IsNil)
 	}
 
@@ -63,7 +64,7 @@ func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
 
 func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Relation: ofganames.MemberRelation,
@@ -111,7 +112,7 @@ func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 
 func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Relation: ofganames.MemberRelation,
@@ -214,7 +215,7 @@ func (s rebacAdminSuite) TestPatchGroupRolesIntegration(c *gc.C) {
 
 func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
@@ -320,7 +321,7 @@ func (s rebacAdminSuite) TestPatchGroupEntitlementsIntegration(c *gc.C) {
 	oldModels := []string{env.Models[0].UUID, env.Models[1].UUID}
 	newModels := []string{env.Models[2].UUID, env.Models[3].UUID}
 
-	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, "test-group")
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
 	c.Assert(err, gc.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),

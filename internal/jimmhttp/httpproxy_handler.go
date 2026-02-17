@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmhttp
 
@@ -42,7 +42,7 @@ func (hph *HTTPProxyHandler) Routes() chi.Router {
 // SetupMiddleware applies authn and authz middlewares.
 func (hph *HTTPProxyHandler) SetupMiddleware() {
 	hph.Router.Use(func(h http.Handler) http.Handler {
-		return middleware.AuthenticateViaBasicAuth(h, hph.jimm.LoginManager())
+		return middleware.AuthenticateViaBasicAuth(h, hph.jimm.LoginManager)
 	})
 	hph.Router.Use(func(h http.Handler) http.Handler {
 		return middleware.AuthorizeUserForModelAccess(h, ofganames.WriterRelation)
@@ -66,7 +66,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	controllerDetails, err := hph.jimm.JujuManager().ControllerDetailsForModel(ctx, modelUUID)
+	controllerDetails, err := hph.jimm.JujuManager.ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "model not found")

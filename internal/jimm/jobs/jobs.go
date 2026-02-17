@@ -18,21 +18,21 @@ type JobQuerier interface {
 	CancelJob(ctx context.Context, jobID int64) (*rivertype.JobRow, error)
 }
 
-type jobManager struct {
+type JobManager struct {
 	jobQuerier JobQuerier
 }
 
 // NewJobManager returns a new job manager that provides management
 // abilities for asynchronous jobs within JIMM.
-func NewJobManager(jobQuerier JobQuerier) (*jobManager, error) {
+func NewJobManager(jobQuerier JobQuerier) (*JobManager, error) {
 	if jobQuerier == nil {
 		return nil, errors.E("job querier cannot be nil")
 
 	}
-	return &jobManager{jobQuerier}, nil
+	return &JobManager{jobQuerier}, nil
 }
 
-func (j *jobManager) GetJobInfo(ctx context.Context, jobID int64) (JobInfo, error) {
+func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (JobInfo, error) {
 	jobRow, err := j.jobQuerier.GetJobInfo(ctx, jobID)
 	if err != nil {
 		return JobInfo{}, errors.E(err)

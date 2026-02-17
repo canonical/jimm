@@ -147,7 +147,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		authenticator = s.realAuthenticationService(c, database)
 	} else {
 		s.deviceFlowChan = make(chan string, 1)
-		a := NewMockOAuthAuthenticator(c, s.deviceFlowChan)
+		a := newMockOAuthAuthenticator(c, s.deviceFlowChan)
 		authenticator = &a
 	}
 
@@ -197,7 +197,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	})
 	c.Assert(err, gc.IsNil)
 
-	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.JIMM.OfferAuthorizer())
+	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.JIMM.OfferAuthorizer)
 	localDischargePath := "/macaroons"
 	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 	s.Server = httptest.NewServer(mux)
@@ -304,7 +304,7 @@ func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.Au
 	return authSvc
 }
 
-func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, offerAuthorizer jimm.OfferAuthorizer) *discharger.MacaroonDischarger {
+func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, offerAuthorizer discharger.OfferAuthorizer) *discharger.MacaroonDischarger {
 	cfg := discharger.MacaroonDischargerConfig{
 		MacaroonExpiryDuration: 1 * time.Hour,
 		ControllerUUID:         uuid,
@@ -366,7 +366,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) *dbmodel
 		}})
 	}
 	ctl.TLSHostname = "juju-apiserver"
-	err := s.JIMM.JujuManager().AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
+	err := s.JIMM.JujuManager.AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
 	c.Assert(err, gc.Equals, nil)
 	return ctl
 }
@@ -379,7 +379,7 @@ func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag,
 	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
 	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, gc.Equals, nil)
-	_, err = s.JIMM.JujuManager().UpdateCloudCredential(ctx, user, juju.UpdateCloudCredentialArgs{
+	_, err = s.JIMM.JujuManager.UpdateCloudCredential(ctx, user, juju.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred,
 		SkipCheck:     true,
@@ -415,7 +415,7 @@ func (s *JIMMSuite) AddModel(c *gc.C, args addModelArgs) names.ModelTag {
 		modelCreateArgs.ControllerName = args.targetControllerName
 	}
 
-	mi, err := s.JIMM.JujuManager().AddModel(ctx, s.NewUser(u), modelCreateArgs)
+	mi, err := s.JIMM.JujuManager.AddModel(ctx, s.NewUser(u), modelCreateArgs)
 	c.Assert(err, gc.Equals, nil, gc.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", args.name, args.owner.String(), args.cloud.String(), args.region, args.cred.String(), err))
 	return names.NewModelTag(mi.UUID)
 }
@@ -424,7 +424,7 @@ func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.Mo
 	ctx := context.Background()
 
 	// Call Juju DestroyModel API and set the model to dying state.
-	err := s.JIMM.JujuManager().DestroyModel(ctx, s.AdminUser, modelTag, nil, nil, nil, nil)
+	err := s.JIMM.JujuManager.DestroyModel(ctx, s.AdminUser, modelTag, nil, nil, nil, nil)
 	c.Assert(err, gc.Equals, nil)
 
 	// Poll until the model is destroyed with a timeout
@@ -437,7 +437,7 @@ func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.Mo
 		case <-timeout:
 			c.Fatalf("timeout waiting for model to be destroyed")
 		case <-ticker.C:
-			_, err := s.JIMM.JujuManager().ModelInfo(ctx, s.AdminUser, modelTag)
+			_, err := s.JIMM.JujuManager.ModelInfo(ctx, s.AdminUser, modelTag)
 			if errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeUnauthorized {
 				return
 			}
@@ -448,20 +448,20 @@ func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.Mo
 
 // RemoveCloud removes a cloud from JIMM and the backing controller.
 func (s *JIMMSuite) RemoveCloud(c *gc.C, cloudName string) {
-	err := s.JIMM.JujuManager().RemoveCloud(context.Background(), s.AdminUser, names.NewCloudTag(cloudName))
+	err := s.JIMM.JujuManager.RemoveCloud(context.Background(), s.AdminUser, names.NewCloudTag(cloudName))
 	c.Assert(err, gc.Equals, nil)
 }
 
 func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {
 	ctx := context.Background()
-	group, err := s.JIMM.GroupManager().AddGroup(ctx, s.AdminUser, groupName)
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, groupName)
 	c.Assert(err, gc.Equals, nil)
 	return *group
 }
 
 func (s *JIMMSuite) AddRole(c *gc.C, roleName string) dbmodel.RoleEntry {
 	ctx := context.Background()
-	role, err := s.JIMM.RoleManager().AddRole(ctx, s.AdminUser, roleName)
+	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, roleName)
 	c.Assert(err, gc.Equals, nil)
 	return *role
 }

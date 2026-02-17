@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -15,8 +15,8 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -32,7 +32,7 @@ func TestCreateRole(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		RoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jujuapi.RoleManager {
 			return roleManager
 		},
 	}
@@ -65,7 +65,7 @@ func TestUpdateRole(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		RoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jujuapi.RoleManager {
 			return roleManager
 		},
 	}
@@ -100,7 +100,7 @@ func TestListRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		RoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jujuapi.RoleManager {
 			return roleManager
 		},
 	}
@@ -140,7 +140,7 @@ func TestDeleteRole(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		RoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jujuapi.RoleManager {
 			return roleManager
 		},
 	}
@@ -171,7 +171,7 @@ func TestGetRoleEntitlements(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -218,7 +218,7 @@ func TestPatchRoleEntitlements(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}

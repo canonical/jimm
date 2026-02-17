@@ -1,12 +1,12 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package config
 
-// configManager exposes the configuration of the JIMM controller when
+// ConfigManager exposes the configuration of the JIMM controller when
 // the ControllerConfig facade is called on the controller root.
 // At the moment it only exposes a map, but in the future we could fetch
 // the configuration from the database or other sources.
-type configManager struct {
+type ConfigManager struct {
 	config ControllerConfig
 }
 
@@ -28,13 +28,13 @@ type ControllerConfig struct {
 }
 
 // NewConfigManager creates a new config manager with the given configuration.
-func NewConfigManager(config ControllerConfig) (*configManager, error) {
-	return &configManager{
+func NewConfigManager(config ControllerConfig) (*ConfigManager, error) {
+	return &ConfigManager{
 		config: config,
 	}, nil
 }
 
 // GetConfig returns the configuration for the controller converted in the jujuparams format.
-func (c *configManager) GetConfig() (ControllerConfig, error) {
+func (c *ConfigManager) GetConfig() (ControllerConfig, error) {
 	return c.config, nil
 }

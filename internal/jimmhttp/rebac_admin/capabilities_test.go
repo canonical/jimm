@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -12,8 +12,8 @@ import (
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -28,7 +28,7 @@ func TestCapabilities(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		IdentityManager_: func() jimm.IdentityManager {
+		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
 		},
 	}

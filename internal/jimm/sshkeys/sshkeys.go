@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package sshkeys
 
@@ -15,20 +15,20 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-type sshKeyManager struct {
+type SSHKeyManager struct {
 	store *db.Database
 }
 
 // NewSSHKeyManager returns a new sshKeyManager that handles ssh keys.
-func NewSSHKeyManager(store *db.Database) (*sshKeyManager, error) {
+func NewSSHKeyManager(store *db.Database) (*SSHKeyManager, error) {
 	if store == nil {
 		return nil, errors.E("role store cannot be nil")
 	}
-	return &sshKeyManager{store}, nil
+	return &SSHKeyManager{store}, nil
 }
 
 // AddUserPublicKey saves a user's public key.
-func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey PublicKey) error {
+func (sm *SSHKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey PublicKey) error {
 
 	if ok, reason := publicKey.valid(); !ok {
 		return errors.E(errors.CodeBadRequest, reason)
@@ -49,7 +49,7 @@ func (sm *sshKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.Use
 }
 
 // VerifyPublicKey lists the key for a user and compares the key to find a match.
-func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
+func (sm *SSHKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {
 
 	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, claimUser, db.SSHKeyModelFilter{All: true})
 	if err != nil {
@@ -73,7 +73,7 @@ func (sm *sshKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, 
 }
 
 // ListUserPublicKeys lists a user's public keys.
-func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]PublicKey, error) {
+func (sm *SSHKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]PublicKey, error) {
 
 	dbKeys, err := sm.store.ListSSHKeysForUser(ctx, user.Name, model)
 	if err != nil {
@@ -91,7 +91,7 @@ func (sm *sshKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.U
 }
 
 // RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
+func (sm *SSHKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
 
 	err := sm.store.RemoveSSHKeyByComment(ctx, user.Name, model, comment)
 	if err != nil {
@@ -101,7 +101,7 @@ func (sm *sshKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openf
 }
 
 // RemoveUserKeyByFingerprint removes a user's public key by the key fingerprint.
-func (sm *sshKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
+func (sm *SSHKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
 
 	err := sm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, model, fingerprint)
 	if err != nil {

@@ -1,4 +1,5 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
+
 package rebac_admin_test
 
 import (
@@ -12,6 +13,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -28,7 +30,7 @@ var _ = gc.Suite(&identitiesSuite{})
 func (s *identitiesSuite) TestIdentitiesList(c *gc.C) {
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	for i := range 5 {
 		user := names.NewUserTag(fmt.Sprintf("test-user-match-%d@canonical.com", i))
 		s.AddUser(c, user.Id())
@@ -60,7 +62,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	// initialization
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	groupName := "group-test1"
 	username := s.AdminUser.Name
 	group := s.AddGroup(c, groupName)
@@ -74,9 +76,9 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	c.Assert(changed, gc.Equals, true)
 
 	// test user added to groups
-	objUser, err := s.JIMM.IdentityManager().FetchIdentity(ctx, username)
+	objUser, err := s.JIMM.IdentityManager.FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
-	tuples, _, err := s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err := s.JIMM.PermissionManager.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: group.ResourceTag().String(),
@@ -92,7 +94,7 @@ func (s *identitiesSuite) TestIdentityPatchGroups(c *gc.C) {
 	}})
 	c.Assert(err, gc.IsNil)
 	c.Assert(changed, gc.Equals, true)
-	tuples, _, err = s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err = s.JIMM.PermissionManager.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.MemberRelation.String(),
 		TargetObject: group.ResourceTag().String(),
@@ -105,7 +107,7 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 	// initialization
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	username := s.AdminUser.Name
 	groupsSize := 10
 	groupsToAdd := make([]resources.IdentityGroupsPatchItem, groupsSize)
@@ -153,7 +155,7 @@ func (s *identitiesSuite) TestIdentityGetGroups(c *gc.C) {
 func (s *identitiesSuite) TestGetIdentityGroupsWithDeletedDbGroup(c *gc.C) {
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	username := s.AdminUser.Name
 
 	group1 := s.AddGroup(c, "group1")
@@ -190,7 +192,7 @@ func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
 	// initialization
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	roleName := "role-test1"
 	username := s.AdminUser.Name
 	role := s.AddRole(c, roleName)
@@ -204,9 +206,9 @@ func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
 	c.Assert(changed, gc.Equals, true)
 
 	// test user added to roles
-	objUser, err := s.JIMM.IdentityManager().FetchIdentity(ctx, username)
+	objUser, err := s.JIMM.IdentityManager.FetchIdentity(ctx, username)
 	c.Assert(err, gc.IsNil)
-	tuples, _, err := s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err := s.JIMM.PermissionManager.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.AssigneeRelation.String(),
 		TargetObject: role.ResourceTag().String(),
@@ -222,7 +224,7 @@ func (s *identitiesSuite) TestIdentityPatchRoles(c *gc.C) {
 	}})
 	c.Assert(err, gc.IsNil)
 	c.Assert(changed, gc.Equals, true)
-	tuples, _, err = s.JIMM.PermissionManager().ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+	tuples, _, err = s.JIMM.PermissionManager.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
 		Object:       objUser.ResourceTag().String(),
 		Relation:     ofganames.AssigneeRelation.String(),
 		TargetObject: role.ResourceTag().String(),
@@ -235,7 +237,7 @@ func (s *identitiesSuite) TestIdentityGetRoles(c *gc.C) {
 	// initialization
 	ctx := context.Background()
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	username := s.AdminUser.Name
 	rolesSize := 10
 	rolesToAdd := make([]resources.IdentityRolesPatchItem, rolesSize)
@@ -282,7 +284,7 @@ func (s *identitiesSuite) TestIdentityGetRoles(c *gc.C) {
 func (s *identitiesSuite) TestIdentityEntitlements(c *gc.C) {
 	// initialization
 	ctx := context.Background()
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	group := s.AddGroup(c, "test-group")
 	user := names.NewUserTag("test-user@canonical.com")
 	s.AddUser(c, user.Id())
@@ -401,7 +403,7 @@ models:
 func (s *identitiesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 	// initialization
 	ctx := context.Background()
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	tester := jimmtest.GocheckTester{C: c}
 	env := jimmtest.ParseEnvironment(tester, patchIdentitiesEntitlementTestEnv)
 	env.PopulateDB(tester, s.JIMM.Database)
@@ -473,7 +475,7 @@ func (s *identitiesSuite) TestPatchIdentityEntitlements(c *gc.C) {
 func (s *identitiesSuite) TestPatchIdentityEntitlementsForCloudAccess(c *gc.C) {
 	// initialization
 	ctx := context.Background()
-	identitySvc := rebac_admin.NewidentitiesService(s.JIMM)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
 	tester := jimmtest.GocheckTester{C: c}
 	env := jimmtest.ParseEnvironment(tester, patchIdentitiesEntitlementTestEnv)
 	env.PopulateDB(tester, s.JIMM.Database)

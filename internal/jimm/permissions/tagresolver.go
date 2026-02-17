@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package permissions
 
@@ -49,7 +49,7 @@ var (
 
 // ToJAASTag converts a tag used in OpenFGA authorization model to a
 // tag used in JAAS.
-func (j *permissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
+func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	if !resolveUUIDs {
 		res := tag.Kind.String() + "-" + tag.ID
 		if tag.Relation.String() != "" {
@@ -344,7 +344,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 // ensuring the resource exists for said tag.
 //
 // This key may be in the form of either a JIMM tag string or Juju tag string.
-func (j *permissionManager) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
+func (j *PermissionManager) parseAndValidateTag(ctx context.Context, key string) (*ofganames.Tag, error) {
 	tupleKeySplit := strings.SplitN(key, "-", 2)
 	if len(tupleKeySplit) == 1 {
 		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])

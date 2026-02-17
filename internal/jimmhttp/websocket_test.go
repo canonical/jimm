@@ -1,4 +1,4 @@
-// Copyright 2024 Canonical.
+// Copyright 2026 Canonical.
 
 package jimmhttp_test
 
@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
 func TestWSHandler(t *testing.T) {
@@ -111,7 +110,7 @@ func TestWSHandlerNilServer(t *testing.T) {
 	defer resp.Body.Close()
 }
 
-type authFailServer struct{ c jimmtest.SimpleTester }
+type authFailServer struct{}
 
 func (s authFailServer) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
 	return ctx, errors.E("authentication failed")
@@ -123,7 +122,7 @@ func TestWSHandlerAuthFailsServer(t *testing.T) {
 	c := qt.New(t)
 
 	hnd := &jimmhttp.WSHandler{
-		Server: authFailServer{c: c},
+		Server: authFailServer{},
 	}
 
 	srv := httptest.NewServer(hnd)

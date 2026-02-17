@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package rebac_admin_test
 
@@ -16,8 +16,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	jimmerr "github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -34,7 +34,7 @@ func TestCreateGroup(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
 	}
@@ -67,7 +67,7 @@ func TestUpdateGroup(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
 	}
@@ -102,7 +102,7 @@ func TestListGroups(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
 	}
@@ -142,7 +142,7 @@ func TestDeleteGroup(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
 	}
@@ -179,10 +179,10 @@ func TestGetGroupIdentities(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -230,7 +230,7 @@ func TestPatchGroupIdentities(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -290,13 +290,13 @@ func TestGetGroupRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		RoleManager_: func() jimm.RoleManager {
+		RoleManager_: func() jujuapi.RoleManager {
 			return roleManager
 		},
-		GroupManager_: func() jimm.GroupManager {
+		GroupManager_: func() jujuapi.GroupManager {
 			return &groupManager
 		},
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -355,7 +355,7 @@ func TestPatchGroupRoles(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -402,7 +402,7 @@ func TestGetGroupEntitlements(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}
@@ -449,7 +449,7 @@ func TestPatchGroupEntitlements(t *testing.T) {
 		},
 	}
 	jimm := jimmtest.JIMM{
-		PermissionManager_: func() jimm.PermissionManager {
+		PermissionManager_: func() jujuapi.PermissionManager {
 			return &permissionManager
 		},
 	}

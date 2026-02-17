@@ -83,7 +83,7 @@ func (s *apiServer) Authenticate(ctx context.Context, w http.ResponseWriter, req
 // ServeWS implements jimmhttp.WSServer.
 func (s *apiServer) ServeWS(ctx context.Context, conn *websocket.Conn) {
 	identityId := auth.SessionIdentityFromContext(ctx)
-	controllerRoot := newControllerRoot(s.jimm, s.params, identityId)
+	controllerRoot := newControllerRoot(&JIMMAdapter{j: s.jimm}, s.params, identityId)
 	s.cleanup = controllerRoot.cleanup
 	Dblogger := controllerRoot.newAuditLogger()
 	serveRoot(ctx, controllerRoot, Dblogger, conn)
@@ -188,7 +188,7 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 	redirectInfo := redirectInfoAdapter{jimm: s.jimm}
 	jwtGenerator := s.jimm.NewJujuAuthenticator()
 	connectionFunc := controllerConnectionFunc(s, &jwtGenerator)
-	auditLogger := s.jimm.AuditLogManager().AddAuditLogEntry
+	auditLogger := s.jimm.AuditLogManager.AddAuditLogEntry
 
 	zapctx.Debug(ctx, "Starting proxier")
 	proxyHelpers := rpcproxy.ProxyHelpers{
@@ -196,7 +196,7 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 		TokenGen:                &jwtGenerator,
 		ConnectController:       connectionFunc,
 		AuditLog:                auditLogger,
-		LoginService:            s.jimm.LoginManager(),
+		LoginService:            s.jimm.LoginManager,
 		AuthenticatedIdentityID: auth.SessionIdentityFromContext(ctx),
 		RedirectInfo:            redirectInfo,
 	}
@@ -261,7 +261,7 @@ func (r redirectInfoAdapter) GetRedirectInfo(ctx context.Context) (rpcproxy.Cont
 		zapctx.Error(ctx, "error parsing path", zap.Error(err))
 		return rpcproxy.ControllerDetails{}, err
 	}
-	model, err := r.jimm.JujuManager().GetModel(ctx, uuid)
+	model, err := r.jimm.JujuManager.GetModel(ctx, uuid)
 	if err != nil {
 		zapctx.Error(ctx, "failed to get model", zap.String("uuid", uuid), zap.Error(err))
 		return rpcproxy.ControllerDetails{}, err

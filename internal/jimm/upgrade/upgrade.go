@@ -59,8 +59,8 @@ type UpgradeEnqueuer interface {
 	EnqueueUpgradeTo(ctx context.Context, args rivertypes.UpgradeToArgs) (*rivertype.JobInsertResult, error)
 }
 
-// upgradeManager provides a means to manage controller upgrades within JIMM.
-type upgradeManager struct {
+// UpgradeManager provides a means to manage controller upgrades within JIMM.
+type UpgradeManager struct {
 	bootstrapManager BootstrapManager
 	jujuManager      JujuManager
 	store            Store
@@ -75,7 +75,7 @@ func NewUpgradeManager(
 	store Store,
 	dialer juju.Dialer,
 	enqueuer UpgradeEnqueuer,
-) (*upgradeManager, error) {
+) (*UpgradeManager, error) {
 	if bootstrapManager == nil {
 		return nil, errors.E("bootstrap manager cannot be nil")
 	}
@@ -91,7 +91,7 @@ func NewUpgradeManager(
 	if enqueuer == nil {
 		return nil, errors.E("enqueuer cannot be nil")
 	}
-	return &upgradeManager{
+	return &UpgradeManager{
 		bootstrapManager: bootstrapManager,
 		jujuManager:      jujumanager,
 		store:            store,
@@ -106,7 +106,7 @@ func NewUpgradeManager(
 //
 // It returns the cloud and credential to be used for bootstrapping
 // the new controller.
-func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, jujucloud.Credential, error) {
+func (u *UpgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, jujucloud.Credential, error) {
 	var bootstrapCloud jujucloud.Cloud
 	var bootstrapCloudRegion string
 
@@ -156,7 +156,7 @@ func (u *upgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string,
 
 // CloneController upgrades a controller by fetching its configuration and initiating
 // a bootstrap job with that configuration, then waits for the bootstrap to complete.
-func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User, params CloneControllerParams) error {
+func (u *UpgradeManager) CloneController(ctx context.Context, user *openfga.User, params CloneControllerParams) error {
 	if user == nil {
 		return errors.E("user cannot be nil")
 	}
@@ -185,7 +185,7 @@ func (u *upgradeManager) CloneController(ctx context.Context, user *openfga.User
 }
 
 // UpgradeModel upgrades the model to the provided agent version.
-func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error {
+func (u *UpgradeManager) UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error {
 	ctx = zapctx.WithFields(ctx, zap.String("model_uuid", modelUUID), zap.String("target_version", targetVersion.String()))
 
 	// Forbid a zero target version as this complicates checking for whether
@@ -254,7 +254,7 @@ func (u *upgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 // It returns the River job ID.
 //
 // This currently only works with non-kubernetes clouds.
-func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error) {
+func (u *UpgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error) {
 	var newControllerName = fmt.Sprintf("controller-%d", time.Now().Unix())
 
 	if targetVersion == version.Zero {
@@ -302,7 +302,7 @@ func (u *upgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 // MigrateModel migrates a model to a new controller without upgrading the model's agent.
 //
 // If the model is already on the target controller, no action is taken and nil is returned.
-func (u *upgradeManager) MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error {
+func (u *UpgradeManager) MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error {
 	ctx = zapctx.WithFields(ctx, zap.String("model_uuid", modelUUID), zap.String("target_controller_name", targetControllerName))
 
 	if !names.IsValidModel(modelUUID) {

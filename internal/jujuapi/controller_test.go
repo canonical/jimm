@@ -1,4 +1,4 @@
-// Copyright 2025 Canonical.
+// Copyright 2026 Canonical.
 
 package jujuapi_test
 
@@ -12,7 +12,6 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -76,7 +75,7 @@ func TestInitiateMigration(t *testing.T) {
 				InitiateMigration_: test.initiateMigration,
 			}
 			jimm := &jimmtest.JIMM{
-				JujuManager_: func() jimm.JujuManager {
+				JujuManager_: func() jujuapi.JujuManager {
 					return &jujuManager
 				},
 			}

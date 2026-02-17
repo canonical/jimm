@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/juju/names/v5"
 
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/pubsub"
 )
 
@@ -15,65 +15,65 @@ import (
 // will delegate to the requested funcion or if the funcion is nil return
 // a NotImplemented error.
 type JIMM struct {
-	AuditLogManager_   func() jimm.AuditLogManager
-	GroupManager_      func() jimm.GroupManager
-	IdentityManager_   func() jimm.IdentityManager
-	LoginManager_      func() jimm.LoginManager
-	RoleManager_       func() jimm.RoleManager
-	PermissionManager_ func() jimm.PermissionManager
-	JujuManager_       func() jimm.JujuManager
+	AuditLogManager_   func() jujuapi.AuditLogManager
+	GroupManager_      func() jujuapi.GroupManager
+	IdentityManager_   func() jujuapi.IdentityManager
+	LoginManager_      func() jujuapi.LoginManager
+	RoleManager_       func() jujuapi.RoleManager
+	PermissionManager_ func() jujuapi.PermissionManager
+	JujuManager_       func() jujuapi.JujuManager
 	PubSubHub_         func() *pubsub.Hub
 	ResourceTag_       func() names.ControllerTag
-	ConfigManager_     func() jimm.ConfigManager
-	OfferAuthorizer_   func() jimm.OfferAuthorizer
-	BootstapManager_   func() jimm.BootstrapManager
-	UpgradeManager_    func() jimm.UpgradeManager
-	JobManager_        func() jimm.JobManager
+	ConfigManager_     func() jujuapi.ConfigManager
+	OfferAuthorizer_   func() jujuapi.OfferAuthorizer
+	BootstapManager_   func() jujuapi.BootstrapManager
+	UpgradeManager_    func() jujuapi.UpgradeManager
+	JobManager_        func() jujuapi.JobManager
 }
 
-func (j *JIMM) RoleManager() jimm.RoleManager {
+func (j *JIMM) RoleManager() jujuapi.RoleManager {
 	if j.RoleManager_ == nil {
 		return nil
 	}
 	return j.RoleManager_()
 }
 
-func (j *JIMM) GroupManager() jimm.GroupManager {
+func (j *JIMM) GroupManager() jujuapi.GroupManager {
 	if j.GroupManager_ == nil {
 		return nil
 	}
 	return j.GroupManager_()
 }
 
-func (j *JIMM) IdentityManager() jimm.IdentityManager {
+func (j *JIMM) IdentityManager() jujuapi.IdentityManager {
 	if j.IdentityManager_ == nil {
 		return nil
 	}
 	return j.IdentityManager_()
 }
 
-func (j *JIMM) LoginManager() jimm.LoginManager {
+func (j *JIMM) LoginManager() jujuapi.LoginManager {
 	if j.LoginManager_ == nil {
 		return nil
 	}
 	return j.LoginManager_()
 }
 
-func (j *JIMM) PermissionManager() jimm.PermissionManager {
+func (j *JIMM) PermissionManager() jujuapi.PermissionManager {
 	if j.PermissionManager_ == nil {
 		return nil
 	}
 	return j.PermissionManager_()
 }
 
-func (j *JIMM) AuditLogManager() jimm.AuditLogManager {
+func (j *JIMM) AuditLogManager() jujuapi.AuditLogManager {
 	if j.AuditLogManager_ == nil {
 		return nil
 	}
 	return j.AuditLogManager_()
 }
 
-func (j *JIMM) JujuManager() jimm.JujuManager {
+func (j *JIMM) JujuManager() jujuapi.JujuManager {
 	if j.JujuManager_ == nil {
 		return nil
 	}
@@ -94,35 +94,35 @@ func (j *JIMM) PubSubHub() *pubsub.Hub {
 	return j.PubSubHub_()
 }
 
-func (j *JIMM) ConfigManager() jimm.ConfigManager {
+func (j *JIMM) ConfigManager() jujuapi.ConfigManager {
 	if j.ConfigManager_ == nil {
 		return nil
 	}
 	return j.ConfigManager_()
 }
 
-func (j *JIMM) OfferAuthorizer() jimm.OfferAuthorizer {
+func (j *JIMM) OfferAuthorizer() jujuapi.OfferAuthorizer {
 	if j.OfferAuthorizer_ == nil {
 		return nil
 	}
 	return j.OfferAuthorizer_()
 }
 
-func (j *JIMM) BootstrapManager() jimm.BootstrapManager {
+func (j *JIMM) BootstrapManager() jujuapi.BootstrapManager {
 	if j.BootstapManager_ == nil {
 		return nil
 	}
 	return j.BootstapManager_()
 }
 
-func (j *JIMM) UpgradeManager() jimm.UpgradeManager {
+func (j *JIMM) UpgradeManager() jujuapi.UpgradeManager {
 	if j.UpgradeManager_ == nil {
 		return nil
 	}
 	return j.UpgradeManager_()
 }
 
-func (j *JIMM) JobManager() jimm.JobManager {
+func (j *JIMM) JobManager() jujuapi.JobManager {
 	if j.JobManager_ == nil {
 		return nil
 	}
