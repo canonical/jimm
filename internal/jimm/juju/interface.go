@@ -178,14 +178,14 @@ type API interface {
 
 	// ListFilesystems lists filesystems for desired machines.
 	// If no machines provided, a list of all filesystems is returned.
-	ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
+	ListFilesystems(machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
 
 	// ListVolumes lists volumes for desired machines.
 	// If no machines provided, a list of all volumes is returned.
-	ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
+	ListVolumes(machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 
 	// ListStorageDetails lists all storage.
-	ListStorageDetails(context.Context) ([]jujuparams.StorageDetails, error)
+	ListStorageDetails() ([]jujuparams.StorageDetails, error)
 
 	// ListModels returns all UserModel's on the controller.
 	ListModels(context.Context) ([]base.UserModel, error)

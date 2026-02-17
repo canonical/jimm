@@ -1363,18 +1363,18 @@ func (c *MockAPIListApplicationOffersCall) DoAndReturn(f func(context.Context, [
 }
 
 // ListFilesystems mocks base method.
-func (m *MockAPI) ListFilesystems(ctx context.Context, machines []string) ([]params.FilesystemDetailsListResult, error) {
+func (m *MockAPI) ListFilesystems(machines []string) ([]params.FilesystemDetailsListResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListFilesystems", ctx, machines)
+	ret := m.ctrl.Call(m, "ListFilesystems", machines)
 	ret0, _ := ret[0].([]params.FilesystemDetailsListResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListFilesystems indicates an expected call of ListFilesystems.
-func (mr *MockAPIMockRecorder) ListFilesystems(ctx, machines any) *MockAPIListFilesystemsCall {
+func (mr *MockAPIMockRecorder) ListFilesystems(machines any) *MockAPIListFilesystemsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFilesystems", reflect.TypeOf((*MockAPI)(nil).ListFilesystems), ctx, machines)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListFilesystems", reflect.TypeOf((*MockAPI)(nil).ListFilesystems), machines)
 	return &MockAPIListFilesystemsCall{Call: call}
 }
 
@@ -1390,13 +1390,13 @@ func (c *MockAPIListFilesystemsCall) Return(arg0 []params.FilesystemDetailsListR
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIListFilesystemsCall) Do(f func(context.Context, []string) ([]params.FilesystemDetailsListResult, error)) *MockAPIListFilesystemsCall {
+func (c *MockAPIListFilesystemsCall) Do(f func([]string) ([]params.FilesystemDetailsListResult, error)) *MockAPIListFilesystemsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIListFilesystemsCall) DoAndReturn(f func(context.Context, []string) ([]params.FilesystemDetailsListResult, error)) *MockAPIListFilesystemsCall {
+func (c *MockAPIListFilesystemsCall) DoAndReturn(f func([]string) ([]params.FilesystemDetailsListResult, error)) *MockAPIListFilesystemsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1480,18 +1480,18 @@ func (c *MockAPIListModelsCall) DoAndReturn(f func(context.Context) ([]base.User
 }
 
 // ListStorageDetails mocks base method.
-func (m *MockAPI) ListStorageDetails(arg0 context.Context) ([]params.StorageDetails, error) {
+func (m *MockAPI) ListStorageDetails() ([]params.StorageDetails, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListStorageDetails", arg0)
+	ret := m.ctrl.Call(m, "ListStorageDetails")
 	ret0, _ := ret[0].([]params.StorageDetails)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListStorageDetails indicates an expected call of ListStorageDetails.
-func (mr *MockAPIMockRecorder) ListStorageDetails(arg0 any) *MockAPIListStorageDetailsCall {
+func (mr *MockAPIMockRecorder) ListStorageDetails() *MockAPIListStorageDetailsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListStorageDetails", reflect.TypeOf((*MockAPI)(nil).ListStorageDetails), arg0)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListStorageDetails", reflect.TypeOf((*MockAPI)(nil).ListStorageDetails))
 	return &MockAPIListStorageDetailsCall{Call: call}
 }
 
@@ -1507,30 +1507,30 @@ func (c *MockAPIListStorageDetailsCall) Return(arg0 []params.StorageDetails, arg
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIListStorageDetailsCall) Do(f func(context.Context) ([]params.StorageDetails, error)) *MockAPIListStorageDetailsCall {
+func (c *MockAPIListStorageDetailsCall) Do(f func() ([]params.StorageDetails, error)) *MockAPIListStorageDetailsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIListStorageDetailsCall) DoAndReturn(f func(context.Context) ([]params.StorageDetails, error)) *MockAPIListStorageDetailsCall {
+func (c *MockAPIListStorageDetailsCall) DoAndReturn(f func() ([]params.StorageDetails, error)) *MockAPIListStorageDetailsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // ListVolumes mocks base method.
-func (m *MockAPI) ListVolumes(ctx context.Context, machines []string) ([]params.VolumeDetailsListResult, error) {
+func (m *MockAPI) ListVolumes(machines []string) ([]params.VolumeDetailsListResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListVolumes", ctx, machines)
+	ret := m.ctrl.Call(m, "ListVolumes", machines)
 	ret0, _ := ret[0].([]params.VolumeDetailsListResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListVolumes indicates an expected call of ListVolumes.
-func (mr *MockAPIMockRecorder) ListVolumes(ctx, machines any) *MockAPIListVolumesCall {
+func (mr *MockAPIMockRecorder) ListVolumes(machines any) *MockAPIListVolumesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVolumes", reflect.TypeOf((*MockAPI)(nil).ListVolumes), ctx, machines)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVolumes", reflect.TypeOf((*MockAPI)(nil).ListVolumes), machines)
 	return &MockAPIListVolumesCall{Call: call}
 }
 
@@ -1546,13 +1546,13 @@ func (c *MockAPIListVolumesCall) Return(arg0 []params.VolumeDetailsListResult, a
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIListVolumesCall) Do(f func(context.Context, []string) ([]params.VolumeDetailsListResult, error)) *MockAPIListVolumesCall {
+func (c *MockAPIListVolumesCall) Do(f func([]string) ([]params.VolumeDetailsListResult, error)) *MockAPIListVolumesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIListVolumesCall) DoAndReturn(f func(context.Context, []string) ([]params.VolumeDetailsListResult, error)) *MockAPIListVolumesCall {
+func (c *MockAPIListVolumesCall) DoAndReturn(f func([]string) ([]params.VolumeDetailsListResult, error)) *MockAPIListVolumesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -331,7 +331,7 @@ func TestQueryModelsJq(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model1, nil
 					},
-					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+					ListFilesystems_: func(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 						return []jujuparams.FilesystemDetailsListResult{
 							{
 								Result: []jujuparams.FilesystemDetails{
@@ -362,10 +362,10 @@ func TestQueryModelsJq(t *testing.T) {
 							},
 						}, nil
 					},
-					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+					ListVolumes_: func(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil
 					},
-					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+					ListStorageDetails_: func() ([]jujuparams.StorageDetails, error) {
 						return []jujuparams.StorageDetails{}, nil
 					},
 				},
@@ -375,13 +375,13 @@ func TestQueryModelsJq(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model2, nil
 					},
-					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+					ListFilesystems_: func(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 						return []jujuparams.FilesystemDetailsListResult{}, nil
 					},
-					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+					ListVolumes_: func(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil
 					},
-					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+					ListStorageDetails_: func() ([]jujuparams.StorageDetails, error) {
 						return []jujuparams.StorageDetails{}, nil
 					},
 				},
@@ -391,13 +391,13 @@ func TestQueryModelsJq(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model3, nil
 					},
-					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+					ListFilesystems_: func(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 						return []jujuparams.FilesystemDetailsListResult{}, nil
 					},
-					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+					ListVolumes_: func(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil
 					},
-					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+					ListStorageDetails_: func() ([]jujuparams.StorageDetails, error) {
 						return []jujuparams.StorageDetails{}, nil
 					},
 				},
@@ -407,13 +407,13 @@ func TestQueryModelsJq(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model5, nil
 					},
-					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+					ListFilesystems_: func(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 						return []jujuparams.FilesystemDetailsListResult{}, errors.E("forcing an error on model 5")
 					},
-					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+					ListVolumes_: func(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil
 					},
-					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+					ListStorageDetails_: func() ([]jujuparams.StorageDetails, error) {
 						return []jujuparams.StorageDetails{}, nil
 					},
 				},
@@ -770,13 +770,13 @@ func TestQueryModelsJqInfiniteRangeQueryTimesOut(t *testing.T) {
 					Status_: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 						return &model1, nil
 					},
-					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+					ListFilesystems_: func(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 						return []jujuparams.FilesystemDetailsListResult{}, nil
 					},
-					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+					ListVolumes_: func(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil
 					},
-					ListStorageDetails_: func(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+					ListStorageDetails_: func() ([]jujuparams.StorageDetails, error) {
 						return []jujuparams.StorageDetails{}, nil
 					},
 				},

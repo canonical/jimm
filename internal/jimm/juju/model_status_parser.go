@@ -145,7 +145,7 @@ func (f *formatterParamsRetriever) GetParams(ctx context.Context, model dbmodel.
 		return nil, err
 	}
 
-	combinedStorage, err := f.getCombinedStorageInfo(ctx)
+	combinedStorage, err := f.getCombinedStorageInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -183,51 +183,17 @@ func (f *formatterParamsRetriever) getModelStatus(ctx context.Context) (*jujupar
 	return modelStatus, err
 }
 
-func (f *formatterParamsRetriever) getCombinedStorageInfo(ctx context.Context) (*storage.CombinedStorage, error) {
-	storageAPI := newStorageListAPI(ctx, f.api)
-
+func (f *formatterParamsRetriever) getCombinedStorageInfo() (*storage.CombinedStorage, error) {
 	// We use cmdCtx lightly, it's simply passed to the params but is only used for some
 	// logging.
 	cmdCtx, _ := jujucmd.DefaultContext()
 
 	return storage.GetCombinedStorageInfo(storage.GetCombinedStorageInfoParams{
 		Context:         cmdCtx,
-		APIClient:       &storageAPI,
+		APIClient:       f.api,
 		Ids:             []string{},
 		WantStorage:     true,
 		WantVolumes:     true,
 		WantFilesystems: true,
 	})
-}
-
-// storageListAPI acts as a wrapper over our implementation of the juju client, seen in ./internal/jujuclient.
-// This enables us to use storage.GetCombinedStorageInfo without having to c/p the logic we require.
-type storageListAPI struct {
-	ctx context.Context
-	api API
-}
-
-// newStorageListAPI returns a new storageListAPI.
-func newStorageListAPI(ctx context.Context, api API) storageListAPI {
-	return storageListAPI{ctx, api}
-}
-
-// ListStorageDetails implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) ListStorageDetails() ([]jujuparams.StorageDetails, error) {
-	return s.api.ListStorageDetails(s.ctx)
-}
-
-// ListFilesystems implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) ListFilesystems(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
-	return s.api.ListFilesystems(s.ctx, machines)
-}
-
-// ListVolumes implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) ListVolumes(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
-	return s.api.ListVolumes(s.ctx, machines)
-}
-
-// Close implements storage.StorageListAPI. (From Juju)
-func (s *storageListAPI) Close() error {
-	return s.api.Close()
 }

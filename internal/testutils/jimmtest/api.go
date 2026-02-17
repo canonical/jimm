@@ -169,9 +169,9 @@ type API struct {
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
 	WatchAllModelSummaries_            func(context.Context) (jujuclient.SummaryWatcher, error)
-	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
-	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
-	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
+	ListFilesystems_                   func(machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
+	ListVolumes_                       func(machines []string) ([]jujuparams.VolumeDetailsListResult, error)
+	ListStorageDetails_                func() ([]jujuparams.StorageDetails, error)
 	ListModels_                        func(context.Context) ([]base.UserModel, error)
 	CredentialContents_                func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
 	UpgradeModel_                      func(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error)
@@ -452,25 +452,25 @@ func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, c
 	return a.ChangeModelCredential_(ctx, model, credential)
 }
 
-func (a *API) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
+func (a *API) ListFilesystems(machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 	if a.ListFilesystems_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ListFilesystems_(ctx, machines)
+	return a.ListFilesystems_(machines)
 }
 
-func (a *API) ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
+func (a *API) ListVolumes(machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 	if a.ListVolumes_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ListVolumes_(ctx, machines)
+	return a.ListVolumes_(machines)
 }
 
-func (a *API) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error) {
+func (a *API) ListStorageDetails() ([]jujuparams.StorageDetails, error) {
 	if a.ListStorageDetails_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.ListStorageDetails_(ctx)
+	return a.ListStorageDetails_()
 }
 
 func (a *API) ListModels(ctx context.Context) ([]base.UserModel, error) {
