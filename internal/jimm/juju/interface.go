@@ -10,6 +10,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
+	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/core/migration"
 	"github.com/juju/juju/environs/cloudspec"
@@ -81,7 +82,7 @@ type API interface {
 	CloudSpec(context.Context) (cloudspec.CloudSpec, error)
 
 	// ControllerConfig fetches the controller configuration.
-	ControllerConfig(context.Context) (jujuparams.ControllerConfigResult, error)
+	ControllerConfig(context.Context) (jujucontroller.Config, error)
 
 	// CreateModel creates a new model.
 	CreateModel(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)

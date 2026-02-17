@@ -20,6 +20,7 @@ import (
 	bakery "github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	base "github.com/juju/juju/api/base"
 	cloud "github.com/juju/juju/cloud"
+	controller "github.com/juju/juju/controller"
 	crossmodel "github.com/juju/juju/core/crossmodel"
 	migration "github.com/juju/juju/core/migration"
 	cloudspec "github.com/juju/juju/environs/cloudspec"
@@ -707,10 +708,10 @@ func (c *MockAPIContextCall) DoAndReturn(f func() context.Context) *MockAPIConte
 }
 
 // ControllerConfig mocks base method.
-func (m *MockAPI) ControllerConfig(arg0 context.Context) (params.ControllerConfigResult, error) {
+func (m *MockAPI) ControllerConfig(arg0 context.Context) (controller.Config, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ControllerConfig", arg0)
-	ret0, _ := ret[0].(params.ControllerConfigResult)
+	ret0, _ := ret[0].(controller.Config)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -728,19 +729,19 @@ type MockAPIControllerConfigCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIControllerConfigCall) Return(arg0 params.ControllerConfigResult, arg1 error) *MockAPIControllerConfigCall {
+func (c *MockAPIControllerConfigCall) Return(arg0 controller.Config, arg1 error) *MockAPIControllerConfigCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIControllerConfigCall) Do(f func(context.Context) (params.ControllerConfigResult, error)) *MockAPIControllerConfigCall {
+func (c *MockAPIControllerConfigCall) Do(f func(context.Context) (controller.Config, error)) *MockAPIControllerConfigCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIControllerConfigCall) DoAndReturn(f func(context.Context) (params.ControllerConfigResult, error)) *MockAPIControllerConfigCall {
+func (c *MockAPIControllerConfigCall) DoAndReturn(f func(context.Context) (controller.Config, error)) *MockAPIControllerConfigCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/controller/controller"
 	jujucloud "github.com/juju/juju/cloud"
+	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/environs/cloudspec"
@@ -408,12 +409,11 @@ func TestControllerConfig(t *testing.T) {
 	ctx := context.Background()
 
 	api := &jimmtest.API{
-		ControllerConfig_: func(_ context.Context) (jujuparams.ControllerConfigResult, error) {
-			return jujuparams.ControllerConfigResult{
-				Config: map[string]interface{}{
-					"controller-uuid": "00000001-0000-0000-0000-000000000001",
-				},
-			}, nil
+		ControllerConfig_: func(_ context.Context) (jujucontroller.Config, error) {
+			return jujucontroller.Config(map[string]interface{}{
+				"controller-uuid": "00000001-0000-0000-0000-000000000001",
+			},
+			), nil
 		},
 	}
 

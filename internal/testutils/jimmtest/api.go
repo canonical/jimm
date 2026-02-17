@@ -11,6 +11,7 @@ import (
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
+	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/crossmodel"
 	coremigration "github.com/juju/juju/core/migration"
 	"github.com/juju/juju/environs/cloudspec"
@@ -138,7 +139,7 @@ type API struct {
 	Cloud_                             func(names.CloudTag, *jujucloud.Cloud) error
 	Clouds_                            func() (map[names.CloudTag]jujucloud.Cloud, error)
 	CloudSpec_                         func(context.Context) (cloudspec.CloudSpec, error)
-	ControllerConfig_                  func(context.Context) (jujuparams.ControllerConfigResult, error)
+	ControllerConfig_                  func(context.Context) (jujucontroller.Config, error)
 	CreateModel_                       func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	DestroyApplicationOffer_           func(context.Context, string, bool) error
 	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
@@ -249,9 +250,9 @@ func (a *API) CloudSpec(ctx context.Context) (cloudspec.CloudSpec, error) {
 	return a.CloudSpec_(ctx)
 }
 
-func (a *API) ControllerConfig(ctx context.Context) (jujuparams.ControllerConfigResult, error) {
+func (a *API) ControllerConfig(ctx context.Context) (jujucontroller.Config, error) {
 	if a.ControllerConfig_ == nil {
-		return jujuparams.ControllerConfigResult{}, errors.E(errors.CodeNotImplemented)
+		return jujucontroller.Config{}, errors.E(errors.CodeNotImplemented)
 	}
 	return a.ControllerConfig_(ctx)
 }

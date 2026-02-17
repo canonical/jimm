@@ -738,9 +738,9 @@ func (j *JujuManager) ControllerConfig(ctx context.Context, controllerName strin
 
 	cfg, err := api.ControllerConfig(ctx)
 	if err != nil {
-		return jujucontroller.Config(cfg.Config), errors.E(err)
+		return cfg, errors.E(err)
 	}
-	return jujucontroller.Config(cfg.Config), nil
+	return cfg, nil
 }
 
 // ControllerDetailsForModel returns the controller details for the specified model
