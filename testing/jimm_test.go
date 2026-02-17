@@ -1239,5 +1239,5 @@ func (s *jimmSuite) TestJobInfo(c *gc.C) {
 
 	req := apiparams.JobInfoRequest{JobID: "123"}
 	_, err := client.JobInfo(&req)
-	c.Assert(err, gc.ErrorMatches, `failed to get job info`)
+	c.Assert(err, gc.ErrorMatches, `failed to get job info: not found`)
 }

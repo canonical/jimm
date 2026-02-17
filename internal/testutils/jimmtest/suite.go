@@ -39,6 +39,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/pubsub"
+	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
@@ -175,6 +176,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		JWTService:                 jwtService,
 	}
 
+	riverClient, err := river.NewRiverClient(database)
+	c.Assert(err, gc.IsNil)
+	err = river.MigrateRiver(ctx, database)
+	c.Assert(err, gc.IsNil)
+
 	s.JIMM, err = jimm.New(jimm.Parameters{
 		UUID:                          ControllerUUID,
 		Database:                      database,
@@ -182,6 +188,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		CredentialStore:               credentialStore,
 		Pubsub:                        &pubsub.Hub{MaxConcurrency: 10},
 		OpenFGAClient:                 s.OFGAClient,
+		RiverClient:                   riverClient,
 		OAuthAuthenticator:            authenticator,
 		MigrationTokenGenerator:       mockMigrationTokenGenerator{},
 		JWTService:                    jwtService,
