@@ -1,4 +1,4 @@
-// Copyright 2026 Canonical.
+// Copyright 2025 Canonical.
 
 // The auditlog package provides business logic for handling audit log related methods.
 package auditlog

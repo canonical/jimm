@@ -1,4 +1,4 @@
-// Copyright 2026 Canonical.
+// Copyright 2025 Canonical.
 
 // bootstrap package provides functionality to manage the bootstrap process
 // for controllers in JIMM.

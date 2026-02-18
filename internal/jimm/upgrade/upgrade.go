@@ -1,4 +1,4 @@
-// Copyright 2026 Canonical.
+// Copyright 2025 Canonical.
 
 // upgrade package provides functionality to manage the upgrade process
 // for controllers in JIMM.
