@@ -326,9 +326,7 @@ type BootstrapManager interface {
 
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.
 type UpgradeManager interface {
-	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error)
-	MigrateModel(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) error
-	UpgradeModel(ctx context.Context, modelUUID string, targetVersion version.Number) error
+	UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetController string) (int64, error)
 }
 
 // JobManager provides methods to manage long-running jobs such as bootstrapping and upgrading.

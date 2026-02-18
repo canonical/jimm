@@ -13,7 +13,6 @@ import (
 
 	"github.com/juju/clock"
 	jujuerrors "github.com/juju/errors"
-	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/retry"
@@ -24,7 +23,6 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -35,14 +33,9 @@ var (
 	AlreadyUpgradedError = jujuerrors.New("model has already been upgraded")
 )
 
-// BootstrapManager defines the bootstrap manager methods required by the upgrade manager.
-type BootstrapManager interface {
-	WaitForJobCompletion(ctx context.Context, jobId int64, config bootstrap.WaitConfig) error
-	StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error)
-}
-
 // JujuManager defines the juju manager methods required by the upgrade manager.
 type JujuManager interface {
+	ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
@@ -50,7 +43,6 @@ type JujuManager interface {
 
 // Store defines the store methods required by the upgrade manager.
 type Store interface {
-	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
 	GetModel(ctx context.Context, model *dbmodel.Model) (err error)
 }
 
@@ -61,24 +53,19 @@ type UpgradeEnqueuer interface {
 
 // UpgradeManager provides a means to manage controller upgrades within JIMM.
 type UpgradeManager struct {
-	bootstrapManager BootstrapManager
-	jujuManager      JujuManager
-	store            Store
-	dialer           juju.Dialer
-	enqueuer         UpgradeEnqueuer
+	jujuManager JujuManager
+	store       Store
+	dialer      juju.Dialer
+	enqueuer    UpgradeEnqueuer
 }
 
 // NewUpgradeManager creates a new UpgradeManager instance.
 func NewUpgradeManager(
-	bootstrapManager BootstrapManager,
 	jujumanager JujuManager,
 	store Store,
 	dialer juju.Dialer,
 	enqueuer UpgradeEnqueuer,
 ) (*UpgradeManager, error) {
-	if bootstrapManager == nil {
-		return nil, errors.E("bootstrap manager cannot be nil")
-	}
 	if jujumanager == nil {
 		return nil, errors.E("juju manager cannot be nil")
 	}
@@ -92,96 +79,11 @@ func NewUpgradeManager(
 		return nil, errors.E("enqueuer cannot be nil")
 	}
 	return &UpgradeManager{
-		bootstrapManager: bootstrapManager,
-		jujuManager:      jujumanager,
-		store:            store,
-		dialer:           dialer,
-		enqueuer:         enqueuer,
+		jujuManager: jujumanager,
+		store:       store,
+		dialer:      dialer,
+		enqueuer:    enqueuer,
 	}, nil
-}
-
-// PrepareUpgradeTo prepares the necessary cloud and credential information
-// to perform a controller upgrade to the specified target version and validates
-// the target version is greater than the current controller version.
-//
-// It returns the cloud and credential to be used for bootstrapping
-// the new controller.
-func (u *UpgradeManager) PrepareUpgradeTo(ctx context.Context, modelUUID string, targetVersion version.Number) (jujucloud.Cloud, string, jujucloud.Credential, error) {
-	var bootstrapCloud jujucloud.Cloud
-	var bootstrapCloudRegion string
-
-	m, err := u.jujuManager.GetModel(ctx, modelUUID)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E(err)
-	}
-
-	currentVersion, err := version.Parse(m.Controller.AgentVersion)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E(err)
-	}
-
-	if currentVersion.Compare(targetVersion) == 1 {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E(errors.CodeBadRequest, "target version must be greater than or equal to current version")
-	}
-
-	api, err := u.dialer.Dial(ctx, &m.Controller, names.ModelTag{}, nil, nil)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E(fmt.Errorf("failed to dial the controller: %w", err))
-	}
-
-	ctrlModelSummary, err := api.CloudSpec(ctx)
-	if err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E(fmt.Errorf("failed to get controller model summary: %w", err))
-	}
-
-	// TODO(ale8k): Handle K8S clouds here in future. (HostCloudRegion field.)
-	bootstrapCloudRegion = ctrlModelSummary.Region
-	ctrlCloud := ctrlModelSummary.Name
-	var ctrlCloudCred jujucloud.Credential
-	// The credential may be nil if the cloud doesn't require it.
-	if ctrlModelSummary.Credential != nil {
-		ctrlCloudCred = *ctrlModelSummary.Credential
-	}
-
-	if err := api.Cloud(names.NewCloudTag(ctrlCloud), &bootstrapCloud); err != nil {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E(fmt.Errorf("failed to get cloud from controller model summary: %w", err))
-	}
-
-	if !bootstrapCloud.IsControllerCloud {
-		return bootstrapCloud, bootstrapCloudRegion, jujucloud.Credential{}, errors.E("controller cloud is not marked as a controller cloud")
-	}
-
-	return bootstrapCloud, bootstrapCloudRegion, ctrlCloudCred, nil
-}
-
-// CloneController upgrades a controller by fetching its configuration and initiating
-// a bootstrap job with that configuration, then waits for the bootstrap to complete.
-func (u *UpgradeManager) CloneController(ctx context.Context, user *openfga.User, params CloneControllerParams) error {
-	if user == nil {
-		return errors.E("user cannot be nil")
-	}
-
-	zapctx.Info(ctx, "starting controller upgrade", zap.String("controller-name", params.ControllerName))
-
-	// Start the bootstrap job
-	jobId, err := u.bootstrapManager.StartBootstrapJob(ctx, user, bootstrap.BootstrapParams{
-		CLIVersion:         params.CLIVersion,
-		CloudNameAndRegion: params.CloudNameAndRegion,
-		ControllerName:     params.ControllerName,
-		CloudCred:          params.CloudCred,
-		Cloud:              params.Cloud,
-		UserConfig:         params.UserConfig,
-	})
-	if err != nil {
-		return errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
-	}
-
-	// Wait for the bootstrap job to complete
-	if err := u.bootstrapManager.WaitForJobCompletion(ctx, jobId, bootstrap.WaitConfig{}); err != nil {
-		return errors.E(fmt.Errorf("bootstrap job failed: %w", err))
-	}
-
-	return nil
 }
 
 // UpgradeModel upgrades the model to the provided agent version.
@@ -254,44 +156,44 @@ func (u *UpgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 // It returns the River job ID.
 //
 // This currently only works with non-kubernetes clouds.
-func (u *UpgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetVersion version.Number) (int64, error) {
-	var newControllerName = fmt.Sprintf("controller-%d", time.Now().Unix())
-
-	if targetVersion == version.Zero {
-		return 0, errors.E(errors.CodeBadRequest, "target version cannot be zero")
+func (u *UpgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string) (int64, error) {
+	if !names.IsValidModel(modelUUID) {
+		return 0, errors.E(errors.CodeBadRequest, "invalid model UUID")
 	}
+	mt := names.NewModelTag(modelUUID)
 
-	bsCloud, bsCloudRegion, bsCredential, err := u.PrepareUpgradeTo(ctx, modelUUID, targetVersion)
+	// Check that the target controller is a valid target for this model.
+	validControllers, err := u.jujuManager.ListMigrationTargets(ctx, user, mt)
 	if err != nil {
-		return 0, errors.E(fmt.Errorf("failed to prepare for upgrade: %w", err))
+		return 0, fmt.Errorf("failed to list migration targets: %w", err)
 	}
 
-	cloneParams := CloneControllerParams{
-		CLIVersion:         targetVersion.String(),
-		CloudNameAndRegion: fmt.Sprintf("%s/%s", bsCloud.Name, bsCloudRegion),
-		ControllerName:     newControllerName,
-		CloudCred:          bsCredential,
+	var targetController *dbmodel.Controller
+	for _, c := range validControllers {
+		if c.Name == targetControllerName {
+			targetController = &c
+			break
+		}
+	}
+	if targetController == nil {
+		return 0, errors.E(errors.CodeBadRequest, fmt.Sprintf("target controller %s is not a valid migration target for this model", targetControllerName))
 	}
 
-	cloneParams.Cloud = bsCloud
-
-	// TODO: If K8S, override CloudNameAndRegion with HostCloudRegion from controller model summary.
-
-	// TODO: Map user config from source controller here.
-
-	if err := u.CloneController(ctx, user, cloneParams); err != nil {
-		return 0, errors.E(fmt.Errorf("failed to clone controller: %w", err))
+	targetVersion, err := version.Parse(targetController.AgentVersion)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse target controller version: %w", err)
 	}
 
 	job, err := u.enqueuer.EnqueueUpgradeTo(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            modelUUID,
 		TargetVersion:        targetVersion,
 		Username:             user.Name,
-		TargetControllerName: newControllerName,
+		TargetControllerName: targetControllerName,
 	})
 	if err != nil {
 		return 0, errors.E(fmt.Errorf("failed to enqueue model migration and upgrade job: %w", err))
 	}
+
 	if job.UniqueSkippedAsDuplicate {
 		return 0, errors.E("an upgrade job for this model is already in progress", errors.CodeInProgress)
 	}

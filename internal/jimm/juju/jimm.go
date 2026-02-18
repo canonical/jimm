@@ -325,10 +325,6 @@ func (j *JujuManager) PrepareModelMigration(
 // model could be migrated to. This includes controllers that support the model's
 // cloud region and version, but excludes the controller the model is already on.
 func (j *JujuManager) ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error) {
-	if !user.JimmAdmin {
-		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
-	}
-
 	var model dbmodel.Model
 	model.SetTag(modelTag)
 	if err := j.Database.GetModel(ctx, &model); err != nil {

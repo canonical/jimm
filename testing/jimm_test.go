@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
 	"slices"
 	"time"
 
@@ -1050,8 +1051,8 @@ func (s *jimmSuite) TestUpgradeTo_Unauthorized(c *gc.C) {
 
 	client := api.NewClient(conn)
 	req := apiparams.UpgradeToRequest{
-		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetControllerVersion: s.Model.Controller.AgentVersion,
+		ModelTag:             names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetControllerName: s.Model.Controller.Name,
 	}
 	_, err := client.UpgradeTo(&req)
 	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -1065,40 +1066,25 @@ func (s *jimmSuite) TestUpgradeTo_InvalidModelTag(c *gc.C) {
 
 	client := api.NewClient(conn)
 	req := apiparams.UpgradeToRequest{
-		ModelTag:                "invalid-model-tag",
-		TargetControllerVersion: s.Model.Controller.AgentVersion,
+		ModelTag:             "invalid-model-tag",
+		TargetControllerName: s.Model.Controller.Name,
 	}
 	_, err := client.UpgradeTo(&req)
 	c.Assert(err, gc.ErrorMatches, `(invalid model tag "invalid-model-tag": )?"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
 
-// TestUpgradeTo_InvalidVersion verifies invalid version strings are rejected.
-func (s *jimmSuite) TestUpgradeTo_InvalidVersion(c *gc.C) {
+// TestUpgradeTo_InvalidController verifies invalid controllers are rejected.
+func (s *jimmSuite) TestUpgradeTo_InvalidController(c *gc.C) {
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	req := apiparams.UpgradeToRequest{
-		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetControllerVersion: "not-a-version",
+		ModelTag:             names.NewModelTag(s.Model2.UUID.String).String(),
+		TargetControllerName: "does-not-exist",
 	}
 	_, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.ErrorMatches, `invalid target controller version "not-a-version": .* \(bad request\)`)
-}
-
-// TestUpgradeTo_TargetVersionLowerOrEqual ensures we return a success=false response when the target is <= current.
-func (s *jimmSuite) TestUpgradeTo_TargetVersionLower(c *gc.C) {
-	conn := s.Open(c, nil, "alice", nil)
-	defer conn.Close()
-
-	client := api.NewClient(conn)
-	// Use the current controller version to guarantee target <= current.
-	req := apiparams.UpgradeToRequest{
-		ModelTag:                names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetControllerVersion: "1.0.0",
-	}
-	_, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.ErrorMatches, `failed to run upgrade to: failed to prepare for upgrade: target version must be greater than or equal to current version \(bad request\)`)
+	c.Assert(err, gc.ErrorMatches, regexp.QuoteMeta(`failed to run upgrade to: target controller does-not-exist is not a valid migration target for this model (bad request)`))
 }
 
 func (s *jimmSuite) TestCreateModelOnTargetController(c *gc.C) {

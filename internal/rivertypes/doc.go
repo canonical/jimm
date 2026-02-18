@@ -1,3 +1,5 @@
+// Copyright 2026 Canonical.
+
 // Package rivertypes defines the arguments for inserting River jobs. This is useful
 // for the domain layer to insert with River jobs.
 //

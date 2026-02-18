@@ -41,44 +41,6 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
-// GetController mocks base method.
-func (m *MockStore) GetController(ctx context.Context, controller *dbmodel.Controller) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetController", ctx, controller)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// GetController indicates an expected call of GetController.
-func (mr *MockStoreMockRecorder) GetController(ctx, controller any) *MockStoreGetControllerCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetController", reflect.TypeOf((*MockStore)(nil).GetController), ctx, controller)
-	return &MockStoreGetControllerCall{Call: call}
-}
-
-// MockStoreGetControllerCall wrap *gomock.Call
-type MockStoreGetControllerCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockStoreGetControllerCall) Return(err error) *MockStoreGetControllerCall {
-	c.Call = c.Call.Return(err)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockStoreGetControllerCall) Do(f func(context.Context, *dbmodel.Controller) error) *MockStoreGetControllerCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreGetControllerCall) DoAndReturn(f func(context.Context, *dbmodel.Controller) error) *MockStoreGetControllerCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetModel mocks base method.
 func (m *MockStore) GetModel(ctx context.Context, model *dbmodel.Model) error {
 	m.ctrl.T.Helper()

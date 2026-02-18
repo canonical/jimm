@@ -39,7 +39,9 @@ $JAAS add-model "$UPGRADING_MODEL_NAME" localhost --target-controller "$UPGRADE_
 
 echo
 echo "Fetching current model version"
-current_model_version="$(juju show-model "$UPGRADING_MODEL_NAME" | yq -r ".${UPGRADING_MODEL_NAME}.agent-version")"
+model_info="$(juju show-model "$UPGRADING_MODEL_NAME" --format json)"
+model_uuid="$(echo "$model_info" | jq -r ".[\"$UPGRADING_MODEL_NAME\"].\"model-uuid\"")"
+current_model_version="$(echo "$model_info" | jq -r ".[\"$UPGRADING_MODEL_NAME\"].\"agent-version\"")"
 echo "Current model version is $current_model_version"
 
 if [ "$current_model_version" != "$SOURCE_CONTROLLER_VERSION" ]; then
@@ -48,11 +50,26 @@ if [ "$current_model_version" != "$SOURCE_CONTROLLER_VERSION" ]; then
 fi
 
 echo
-echo "Upgrading Juju $current_model_version model to 3.6.12"
-$JAAS upgrade-to 3.6.12 "$(juju show-model "$UPGRADING_MODEL_NAME" | yq -r ".${UPGRADING_MODEL_NAME}.model-uuid")"
+echo "Listing migration targets for $UPGRADING_MODEL_NAME"
+migration_targets_yaml="$($JAAS list-migration-targets "$model_uuid" --format yaml)"
+target_controller="$(echo "$migration_targets_yaml" | yq -r '.[0].name')"
+target_controller_version="$(echo "$migration_targets_yaml" | yq -r '.[0].agentversion')"
+if [[ -z "$target_controller" || "$target_controller" == "null" ]]; then
+    echo "No valid migration target controllers found for model $UPGRADING_MODEL_NAME"
+    exit 1
+fi
+if [[ -z "$target_controller_version" || "$target_controller_version" == "null" ]]; then
+    echo "Unable to determine target controller version for $target_controller"
+    exit 1
+fi
+echo "Selected migration target controller: $target_controller (agent version: $target_controller_version)"
 
 echo
-echo "Verifying model has been upgraded from $current_model_version"
+echo "Upgrading Juju $current_model_version model to $target_controller_version on target controller $target_controller"
+$JAAS upgrade-to "$target_controller" "$model_uuid"
+
+echo
+echo "Verifying model has been upgraded and moved to $target_controller"
 echo "Waiting for upgrade to complete (timeout: 5 minutes)..."
 max_attempts=60  # 60 attempts = 5 minutes / 5 seconds
 attempt=1
@@ -63,8 +80,8 @@ while [ $attempt -le $max_attempts ]; do
         echo "Model upgrade completed to version $new_version."
         break
     fi
-    echo 
-    echo "Upgrade still in progress (attempt $attempt/$max_attempts)"
+    echo
+    echo "Upgrade still in progress (attempt $attempt/$max_attempts), current model version: $new_version"
     attempt=$((attempt + 1))
 done
 if [ $attempt -gt $max_attempts ]; then
