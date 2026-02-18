@@ -156,8 +156,6 @@ type API struct {
 	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
 	ModelInfo_                         func(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_                       func(context.Context, names.ModelTag) (base.ModelStatus, error)
-	ModelSummaryWatcherNext_           func(context.Context, string) ([]jujuparams.ModelAbstract, error)
-	ModelSummaryWatcherStop_           func(context.Context, string) error
 	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
 	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 	Ping_                              func(context.Context) error
@@ -170,7 +168,7 @@ type API struct {
 	UpdateCloud_                       func(names.CloudTag, jujucloud.Cloud) error
 	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
-	WatchAllModelSummaries_            func(context.Context) (string, error)
+	WatchAllModelSummaries_            func(context.Context) (jujuclient.SummaryWatcher, error)
 	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
 	ListVolumes_                       func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error)
 	ListStorageDetails_                func(ctx context.Context) ([]jujuparams.StorageDetails, error)
@@ -352,20 +350,6 @@ func (a *API) ModelStatus(ctx context.Context, modelTag names.ModelTag) (base.Mo
 	return a.ModelStatus_(ctx, modelTag)
 }
 
-func (a *API) ModelSummaryWatcherNext(ctx context.Context, id string) ([]jujuparams.ModelAbstract, error) {
-	if a.ModelSummaryWatcherNext_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
-	}
-	return a.ModelSummaryWatcherNext_(ctx, id)
-}
-
-func (a *API) ModelSummaryWatcherStop(ctx context.Context, id string) error {
-	if a.ModelSummaryWatcherStop_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.ModelSummaryWatcherStop_(ctx, id)
-}
-
 func (a *API) LatestLogTime(modelUUID string) (time.Time, error) {
 	if a.LatestLogTime_ == nil {
 		return time.Time{}, errors.E(errors.CodeNotImplemented)
@@ -454,9 +438,9 @@ func (a *API) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, fo
 	return a.ValidateModelUpgrade_(ctx, model, force)
 }
 
-func (a *API) WatchAllModelSummaries(ctx context.Context) (string, error) {
+func (a *API) WatchAllModelSummaries(ctx context.Context) (jujuclient.SummaryWatcher, error) {
 	if a.WatchAllModelSummaries_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.WatchAllModelSummaries_(ctx)
 }

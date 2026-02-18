@@ -141,13 +141,6 @@ type API interface {
 	// ModelStatus fetches a model's ModelStatus.
 	ModelStatus(context.Context, names.ModelTag) (base.ModelStatus, error)
 
-	// ModelSummaryWatcherNext returns the next set of model summaries from
-	// the watcher.
-	ModelSummaryWatcherNext(context.Context, string) ([]jujuparams.ModelAbstract, error)
-
-	// ModelSummaryWatcherStop stops a model summary watcher.
-	ModelSummaryWatcherStop(context.Context, string) error
-
 	// Offer creates a new application-offer.
 	Offer(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
 
@@ -181,7 +174,7 @@ type API interface {
 	ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error
 
 	// WatchAllModelSummaries creates a ModelSummaryWatcher.
-	WatchAllModelSummaries(context.Context) (string, error)
+	WatchAllModelSummaries(context.Context) (jujuclient.SummaryWatcher, error)
 
 	// ListFilesystems lists filesystems for desired machines.
 	// If no machines provided, a list of all filesystems is returned.

@@ -139,12 +139,12 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	}
 
 	// start the model summary watcher
-	id, err := api.WatchAllModelSummaries(ctx)
+	watcher, err := api.WatchAllModelSummaries(ctx)
 	if err != nil {
 		return errors.E(err)
 	}
 	defer func() {
-		if err := api.ModelSummaryWatcherStop(ctx, id); err != nil {
+		if err := watcher.Stop(); err != nil {
 			zapctx.Error(ctx, "failed to stop model summary watcher", zap.Error(err))
 		}
 	}()
@@ -156,7 +156,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 		default:
 		}
 		// wait for updates from the all model summary watcher.
-		modelSummaries, err := api.ModelSummaryWatcherNext(ctx, id)
+		modelSummaries, err := watcher.Next()
 		if err != nil {
 			return errors.E(err)
 		}

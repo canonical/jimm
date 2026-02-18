@@ -1635,83 +1635,6 @@ func (c *MockAPIModelStatusCall) DoAndReturn(f func(context.Context, names.Model
 	return c
 }
 
-// ModelSummaryWatcherNext mocks base method.
-func (m *MockAPI) ModelSummaryWatcherNext(arg0 context.Context, arg1 string) ([]params.ModelAbstract, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ModelSummaryWatcherNext", arg0, arg1)
-	ret0, _ := ret[0].([]params.ModelAbstract)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ModelSummaryWatcherNext indicates an expected call of ModelSummaryWatcherNext.
-func (mr *MockAPIMockRecorder) ModelSummaryWatcherNext(arg0, arg1 any) *MockAPIModelSummaryWatcherNextCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModelSummaryWatcherNext", reflect.TypeOf((*MockAPI)(nil).ModelSummaryWatcherNext), arg0, arg1)
-	return &MockAPIModelSummaryWatcherNextCall{Call: call}
-}
-
-// MockAPIModelSummaryWatcherNextCall wrap *gomock.Call
-type MockAPIModelSummaryWatcherNextCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIModelSummaryWatcherNextCall) Return(arg0 []params.ModelAbstract, arg1 error) *MockAPIModelSummaryWatcherNextCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIModelSummaryWatcherNextCall) Do(f func(context.Context, string) ([]params.ModelAbstract, error)) *MockAPIModelSummaryWatcherNextCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIModelSummaryWatcherNextCall) DoAndReturn(f func(context.Context, string) ([]params.ModelAbstract, error)) *MockAPIModelSummaryWatcherNextCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ModelSummaryWatcherStop mocks base method.
-func (m *MockAPI) ModelSummaryWatcherStop(arg0 context.Context, arg1 string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ModelSummaryWatcherStop", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ModelSummaryWatcherStop indicates an expected call of ModelSummaryWatcherStop.
-func (mr *MockAPIMockRecorder) ModelSummaryWatcherStop(arg0, arg1 any) *MockAPIModelSummaryWatcherStopCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModelSummaryWatcherStop", reflect.TypeOf((*MockAPI)(nil).ModelSummaryWatcherStop), arg0, arg1)
-	return &MockAPIModelSummaryWatcherStopCall{Call: call}
-}
-
-// MockAPIModelSummaryWatcherStopCall wrap *gomock.Call
-type MockAPIModelSummaryWatcherStopCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIModelSummaryWatcherStopCall) Return(arg0 error) *MockAPIModelSummaryWatcherStopCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIModelSummaryWatcherStopCall) Do(f func(context.Context, string) error) *MockAPIModelSummaryWatcherStopCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIModelSummaryWatcherStopCall) DoAndReturn(f func(context.Context, string) error) *MockAPIModelSummaryWatcherStopCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ModelTag mocks base method.
 func (m *MockAPI) ModelTag() (names.ModelTag, bool) {
 	m.ctrl.T.Helper()
@@ -2212,10 +2135,10 @@ func (c *MockAPIValidateModelUpgradeCall) DoAndReturn(f func(context.Context, na
 }
 
 // WatchAllModelSummaries mocks base method.
-func (m *MockAPI) WatchAllModelSummaries(arg0 context.Context) (string, error) {
+func (m *MockAPI) WatchAllModelSummaries(arg0 context.Context) (jujuclient.SummaryWatcher, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WatchAllModelSummaries", arg0)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(jujuclient.SummaryWatcher)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -2233,19 +2156,19 @@ type MockAPIWatchAllModelSummariesCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIWatchAllModelSummariesCall) Return(arg0 string, arg1 error) *MockAPIWatchAllModelSummariesCall {
+func (c *MockAPIWatchAllModelSummariesCall) Return(arg0 jujuclient.SummaryWatcher, arg1 error) *MockAPIWatchAllModelSummariesCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIWatchAllModelSummariesCall) Do(f func(context.Context) (string, error)) *MockAPIWatchAllModelSummariesCall {
+func (c *MockAPIWatchAllModelSummariesCall) Do(f func(context.Context) (jujuclient.SummaryWatcher, error)) *MockAPIWatchAllModelSummariesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIWatchAllModelSummariesCall) DoAndReturn(f func(context.Context) (string, error)) *MockAPIWatchAllModelSummariesCall {
+func (c *MockAPIWatchAllModelSummariesCall) DoAndReturn(f func(context.Context) (jujuclient.SummaryWatcher, error)) *MockAPIWatchAllModelSummariesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

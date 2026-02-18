@@ -6,18 +6,19 @@ import (
 	"context"
 	"database/sql"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/juju/mocks"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
@@ -130,6 +131,8 @@ var modelSummaryWatcherTests = []struct {
 
 func TestModelSummaryWatcher(t *testing.T) {
 	c := qt.New(t)
+	ctrl := gomock.NewController(c)
+	defer ctrl.Finish()
 
 	for _, test := range modelSummaryWatcherTests {
 		c.Run(test.name, func(c *qt.C) {
@@ -137,7 +140,25 @@ func TestModelSummaryWatcher(t *testing.T) {
 			defer cancel()
 
 			nextC := make(chan []jujuparams.ModelAbstract)
-			var stopped uint32
+			mockWatcher := mocks.NewMockSummaryWatcher(ctrl)
+
+			mockWatcher.EXPECT().Stop().Do(func() error {
+				return nil
+			}).AnyTimes()
+			mockWatcher.EXPECT().Next().DoAndReturn(func() ([]jujuparams.ModelAbstract, error) {
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case summaries, ok := <-nextC:
+					c.Logf("ModelSummaryWatcherNext received %#v, %v", summaries, ok)
+					if ok {
+						return summaries, nil
+					}
+					cancel()
+					<-ctx.Done()
+					return nil, ctx.Err()
+				}
+			}).AnyTimes()
 
 			publisher := &testPublisher{}
 
@@ -148,33 +169,8 @@ func TestModelSummaryWatcher(t *testing.T) {
 				},
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						WatchAllModelSummaries_: func(_ context.Context) (string, error) {
-							return test.name, nil
-						},
-						ModelSummaryWatcherNext_: func(ctx context.Context, id string) ([]jujuparams.ModelAbstract, error) {
-							if id != test.name {
-								return nil, errors.E("incorrect id")
-							}
-
-							select {
-							case <-ctx.Done():
-								return nil, ctx.Err()
-							case summaries, ok := <-nextC:
-								c.Logf("ModelSummaryWatcherNext received %#v, %v", summaries, ok)
-								if ok {
-									return summaries, nil
-								}
-								cancel()
-								<-ctx.Done()
-								return nil, ctx.Err()
-							}
-						},
-						ModelSummaryWatcherStop_: func(_ context.Context, id string) error {
-							if id != test.name {
-								return errors.E("incorrect id")
-							}
-							atomic.StoreUint32(&stopped, 1)
-							return nil
+						WatchAllModelSummaries_: func(ctx context.Context) (jujuclient.SummaryWatcher, error) {
+							return mockWatcher, nil
 						},
 						SupportsModelSummaryWatcher_: true,
 						ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
@@ -271,17 +267,24 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	ctrl := gomock.NewController(c)
+	defer ctrl.Finish()
+
+	mockWatcher := mocks.NewMockSummaryWatcher(ctrl)
+
+	mockWatcher.EXPECT().Next().Do(func() ([]jujuparams.ModelAbstract, error) {
+		cancel()
+		<-ctx.Done()
+		return nil, ctx.Err()
+	})
+	mockWatcher.EXPECT().Stop().Return(nil)
+
 	w := juju.Watcher{
 		Database: &db.Database{
 			DB: testdb.PostgresDB(c, nil),
 		},
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
-				ModelSummaryWatcherNext_: func(ctx context.Context, s string) ([]jujuparams.ModelAbstract, error) {
-					cancel()
-					<-ctx.Done()
-					return nil, ctx.Err()
-				},
 				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 					switch model.Id() {
 					default:
@@ -291,8 +294,8 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 					}
 					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
 				},
-				WatchAllModelSummaries_: func(ctx context.Context) (string, error) {
-					return "1234", nil
+				WatchAllModelSummaries_: func(ctx context.Context) (jujuclient.SummaryWatcher, error) {
+					return mockWatcher, nil
 				},
 				SupportsModelSummaryWatcher_: true,
 			},
@@ -350,9 +353,9 @@ func TestWatcherUpdatesControllerVersion(t *testing.T) {
 		&jimmtest.Dialer{
 			API: &jimmtest.API{
 				SupportsModelSummaryWatcher_: true,
-				WatchAllModelSummaries_: func(ctx context.Context) (string, error) {
+				WatchAllModelSummaries_: func(ctx context.Context) (jujuclient.SummaryWatcher, error) {
 					dialerCalled <- struct{}{}
-					return "", errors.E("some-error")
+					return nil, errors.E("some-error")
 				},
 			},
 			AgentVersion: "3.6.12",
