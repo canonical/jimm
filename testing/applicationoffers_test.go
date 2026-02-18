@@ -418,12 +418,6 @@ func (s *applicationOffersSuite) TestDestroyOffers(c *gc.C) {
 	offerURL := "bob@canonical.com/" + s.Model.Name + ".test-offer1"
 
 	// charlie will have read access
-	// TODO (alesstimec) until i implement proper grant/revoke access
-	// i need to fetch the offer so that i can manually set read
-	// permission for charlie
-	//
-	// err = client.GrantOffer("charlie@canonical.com", "read", offerURL)
-	// c.Assert(err, jc.ErrorIsNil)
 	offer := dbmodel.ApplicationOffer{
 		URL: offerURL,
 	}

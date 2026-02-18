@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
@@ -88,7 +87,7 @@ type API interface {
 	CreateModel(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 
 	// DestroyApplicationOffer destroys an application offer.
-	DestroyApplicationOffer(context.Context, string, bool) error
+	DestroyApplicationOffer(ctx context.Context, offerURL string, force bool) error
 
 	// DestroyModel destroys a model.
 	DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error
@@ -102,21 +101,15 @@ type API interface {
 	// DumpModelDB collects a database dump of a model.
 	DumpModelDB(context.Context, names.ModelTag) (map[string]interface{}, error)
 
-	// FindApplicationOffers finds application offers that match the
-	// filter.
-	FindApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	// FindApplicationOffers finds application offers that match the filter.
+	FindApplicationOffers(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
 
-	// GetApplicationOffer completes the given ApplicationOfferAdminDetails
-	// structure.
-	GetApplicationOffer(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
+	// GetApplicationOffer completes the given ApplicationOfferAdminDetails structure.
+	GetApplicationOffer(ctx context.Context, urlStr string) (*crossmodel.ApplicationOfferDetails, error)
 
 	// GetApplicationOfferConsumeDetails gets the details required to
 	// consume an application offer
-	GetApplicationOfferConsumeDetails(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
-
-	// GrantApplicationOfferAccess grants access to an application offer to
-	// a user.
-	GrantApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
+	GetApplicationOfferConsumeDetails(ctx context.Context, url string) (jujuparams.ConsumeOfferDetails, error)
 
 	// GrantJIMMModelAdmin makes the JIMM user an admin on a model.
 	GrantJIMMModelAdmin(context.Context, names.ModelTag) error
@@ -128,9 +121,8 @@ type API interface {
 	// seen by the controller for the given model.
 	LatestLogTime(string) (time.Time, error)
 
-	// ListApplicationOffers lists application offers that match the
-	// filter.
-	ListApplicationOffers(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	// ListApplicationOffers lists application offers that match the filter.
+	ListApplicationOffers(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
 
 	// ListModelSummaries lists models summaries
 	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
@@ -142,17 +134,13 @@ type API interface {
 	ModelStatus(context.Context, names.ModelTag) (base.ModelStatus, error)
 
 	// Offer creates a new application-offer.
-	Offer(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
+	Offer(context.Context, jujuclient.OfferParams) error
 
 	// PreChecks runs pre-checks for a model migration.
 	Prechecks(model jujuparams.MigrationModelInfo) error
 
 	// RemoveCloud removes a cloud.
 	RemoveCloud(names.CloudTag) error
-
-	// RevokeApplicationOfferAccess revokes access to an application offer
-	// from a user.
-	RevokeApplicationOfferAccess(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 
 	// RevokeCredential revokes a credential.
 	RevokeCredential(context.Context, names.CloudCredentialTag) error

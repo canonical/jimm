@@ -17,6 +17,7 @@ import (
 	"github.com/juju/juju/api/controller/controller"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
+	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/core/life"
 	"github.com/juju/juju/core/status"
 	"github.com/juju/juju/environs/cloudspec"
@@ -955,8 +956,32 @@ func TestImportModel(t *testing.T) {
 				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 					return test.modelInfo(model)
 				},
-				ListApplicationOffers_: func(ctx context.Context, of []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
-					return test.offers, nil
+				ListApplicationOffers_: func(ctx context.Context, of []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
+					offers := make([]*crossmodel.ApplicationOfferDetails, len(test.offers))
+					for i, offer := range test.offers {
+						offers[i] = &crossmodel.ApplicationOfferDetails{
+							OfferUUID:              offer.OfferUUID,
+							OfferName:              offer.OfferName,
+							OfferURL:               offer.OfferURL,
+							ApplicationName:        offer.ApplicationName,
+							ApplicationDescription: offer.ApplicationDescription,
+						}
+					}
+					return offers, nil
+				},
+				GetApplicationOfferConsumeDetails_: func(ctx context.Context, url string) (jujuparams.ConsumeOfferDetails, error) {
+					for _, offer := range test.offers {
+						if offer.OfferURL == url {
+							return jujuparams.ConsumeOfferDetails{
+								Offer: &jujuparams.ApplicationOfferDetailsV5{
+									OfferUUID: offer.OfferUUID,
+									OfferURL:  offer.OfferURL,
+									OfferName: offer.OfferName,
+								},
+							}, nil
+						}
+					}
+					return jujuparams.ConsumeOfferDetails{}, errors.E(errors.CodeNotFound)
 				},
 			}
 

@@ -17,7 +17,6 @@ import (
 	time "time"
 
 	jujuclient "github.com/canonical/jimm/v3/internal/jujuclient"
-	bakery "github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	base "github.com/juju/juju/api/base"
 	cloud "github.com/juju/juju/cloud"
 	controller "github.com/juju/juju/controller"
@@ -787,17 +786,17 @@ func (c *MockAPICredentialContentsCall) DoAndReturn(f func(string, string, bool)
 }
 
 // DestroyApplicationOffer mocks base method.
-func (m *MockAPI) DestroyApplicationOffer(arg0 context.Context, arg1 string, arg2 bool) error {
+func (m *MockAPI) DestroyApplicationOffer(ctx context.Context, offerURL string, force bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DestroyApplicationOffer", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "DestroyApplicationOffer", ctx, offerURL, force)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DestroyApplicationOffer indicates an expected call of DestroyApplicationOffer.
-func (mr *MockAPIMockRecorder) DestroyApplicationOffer(arg0, arg1, arg2 any) *MockAPIDestroyApplicationOfferCall {
+func (mr *MockAPIMockRecorder) DestroyApplicationOffer(ctx, offerURL, force any) *MockAPIDestroyApplicationOfferCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DestroyApplicationOffer", reflect.TypeOf((*MockAPI)(nil).DestroyApplicationOffer), arg0, arg1, arg2)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DestroyApplicationOffer", reflect.TypeOf((*MockAPI)(nil).DestroyApplicationOffer), ctx, offerURL, force)
 	return &MockAPIDestroyApplicationOfferCall{Call: call}
 }
 
@@ -941,10 +940,10 @@ func (c *MockAPIDumpModelDBCall) DoAndReturn(f func(context.Context, names.Model
 }
 
 // FindApplicationOffers mocks base method.
-func (m *MockAPI) FindApplicationOffers(arg0 context.Context, arg1 []params.OfferFilter) ([]params.ApplicationOfferAdminDetailsV5, error) {
+func (m *MockAPI) FindApplicationOffers(arg0 context.Context, arg1 []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindApplicationOffers", arg0, arg1)
-	ret0, _ := ret[0].([]params.ApplicationOfferAdminDetailsV5)
+	ret0, _ := ret[0].([]*crossmodel.ApplicationOfferDetails)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -962,35 +961,36 @@ type MockAPIFindApplicationOffersCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIFindApplicationOffersCall) Return(arg0 []params.ApplicationOfferAdminDetailsV5, arg1 error) *MockAPIFindApplicationOffersCall {
+func (c *MockAPIFindApplicationOffersCall) Return(arg0 []*crossmodel.ApplicationOfferDetails, arg1 error) *MockAPIFindApplicationOffersCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIFindApplicationOffersCall) Do(f func(context.Context, []params.OfferFilter) ([]params.ApplicationOfferAdminDetailsV5, error)) *MockAPIFindApplicationOffersCall {
+func (c *MockAPIFindApplicationOffersCall) Do(f func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)) *MockAPIFindApplicationOffersCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIFindApplicationOffersCall) DoAndReturn(f func(context.Context, []params.OfferFilter) ([]params.ApplicationOfferAdminDetailsV5, error)) *MockAPIFindApplicationOffersCall {
+func (c *MockAPIFindApplicationOffersCall) DoAndReturn(f func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)) *MockAPIFindApplicationOffersCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetApplicationOffer mocks base method.
-func (m *MockAPI) GetApplicationOffer(arg0 context.Context, arg1 *params.ApplicationOfferAdminDetailsV5) error {
+func (m *MockAPI) GetApplicationOffer(ctx context.Context, urlStr string) (*crossmodel.ApplicationOfferDetails, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetApplicationOffer", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "GetApplicationOffer", ctx, urlStr)
+	ret0, _ := ret[0].(*crossmodel.ApplicationOfferDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetApplicationOffer indicates an expected call of GetApplicationOffer.
-func (mr *MockAPIMockRecorder) GetApplicationOffer(arg0, arg1 any) *MockAPIGetApplicationOfferCall {
+func (mr *MockAPIMockRecorder) GetApplicationOffer(ctx, urlStr any) *MockAPIGetApplicationOfferCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApplicationOffer", reflect.TypeOf((*MockAPI)(nil).GetApplicationOffer), arg0, arg1)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApplicationOffer", reflect.TypeOf((*MockAPI)(nil).GetApplicationOffer), ctx, urlStr)
 	return &MockAPIGetApplicationOfferCall{Call: call}
 }
 
@@ -1000,35 +1000,36 @@ type MockAPIGetApplicationOfferCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIGetApplicationOfferCall) Return(arg0 error) *MockAPIGetApplicationOfferCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockAPIGetApplicationOfferCall) Return(arg0 *crossmodel.ApplicationOfferDetails, arg1 error) *MockAPIGetApplicationOfferCall {
+	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIGetApplicationOfferCall) Do(f func(context.Context, *params.ApplicationOfferAdminDetailsV5) error) *MockAPIGetApplicationOfferCall {
+func (c *MockAPIGetApplicationOfferCall) Do(f func(context.Context, string) (*crossmodel.ApplicationOfferDetails, error)) *MockAPIGetApplicationOfferCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIGetApplicationOfferCall) DoAndReturn(f func(context.Context, *params.ApplicationOfferAdminDetailsV5) error) *MockAPIGetApplicationOfferCall {
+func (c *MockAPIGetApplicationOfferCall) DoAndReturn(f func(context.Context, string) (*crossmodel.ApplicationOfferDetails, error)) *MockAPIGetApplicationOfferCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
 // GetApplicationOfferConsumeDetails mocks base method.
-func (m *MockAPI) GetApplicationOfferConsumeDetails(arg0 context.Context, arg1 names.UserTag, arg2 *params.ConsumeOfferDetails, arg3 bakery.Version) error {
+func (m *MockAPI) GetApplicationOfferConsumeDetails(ctx context.Context, arg1 string) (params.ConsumeOfferDetails, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetApplicationOfferConsumeDetails", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "GetApplicationOfferConsumeDetails", ctx, arg1)
+	ret0, _ := ret[0].(params.ConsumeOfferDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetApplicationOfferConsumeDetails indicates an expected call of GetApplicationOfferConsumeDetails.
-func (mr *MockAPIMockRecorder) GetApplicationOfferConsumeDetails(arg0, arg1, arg2, arg3 any) *MockAPIGetApplicationOfferConsumeDetailsCall {
+func (mr *MockAPIMockRecorder) GetApplicationOfferConsumeDetails(ctx, arg1 any) *MockAPIGetApplicationOfferConsumeDetailsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApplicationOfferConsumeDetails", reflect.TypeOf((*MockAPI)(nil).GetApplicationOfferConsumeDetails), arg0, arg1, arg2, arg3)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetApplicationOfferConsumeDetails", reflect.TypeOf((*MockAPI)(nil).GetApplicationOfferConsumeDetails), ctx, arg1)
 	return &MockAPIGetApplicationOfferConsumeDetailsCall{Call: call}
 }
 
@@ -1038,57 +1039,19 @@ type MockAPIGetApplicationOfferConsumeDetailsCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIGetApplicationOfferConsumeDetailsCall) Return(arg0 error) *MockAPIGetApplicationOfferConsumeDetailsCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockAPIGetApplicationOfferConsumeDetailsCall) Return(arg0 params.ConsumeOfferDetails, arg1 error) *MockAPIGetApplicationOfferConsumeDetailsCall {
+	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIGetApplicationOfferConsumeDetailsCall) Do(f func(context.Context, names.UserTag, *params.ConsumeOfferDetails, bakery.Version) error) *MockAPIGetApplicationOfferConsumeDetailsCall {
+func (c *MockAPIGetApplicationOfferConsumeDetailsCall) Do(f func(context.Context, string) (params.ConsumeOfferDetails, error)) *MockAPIGetApplicationOfferConsumeDetailsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIGetApplicationOfferConsumeDetailsCall) DoAndReturn(f func(context.Context, names.UserTag, *params.ConsumeOfferDetails, bakery.Version) error) *MockAPIGetApplicationOfferConsumeDetailsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GrantApplicationOfferAccess mocks base method.
-func (m *MockAPI) GrantApplicationOfferAccess(arg0 context.Context, arg1 string, arg2 names.UserTag, arg3 params.OfferAccessPermission) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GrantApplicationOfferAccess", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// GrantApplicationOfferAccess indicates an expected call of GrantApplicationOfferAccess.
-func (mr *MockAPIMockRecorder) GrantApplicationOfferAccess(arg0, arg1, arg2, arg3 any) *MockAPIGrantApplicationOfferAccessCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GrantApplicationOfferAccess", reflect.TypeOf((*MockAPI)(nil).GrantApplicationOfferAccess), arg0, arg1, arg2, arg3)
-	return &MockAPIGrantApplicationOfferAccessCall{Call: call}
-}
-
-// MockAPIGrantApplicationOfferAccessCall wrap *gomock.Call
-type MockAPIGrantApplicationOfferAccessCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIGrantApplicationOfferAccessCall) Return(arg0 error) *MockAPIGrantApplicationOfferAccessCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIGrantApplicationOfferAccessCall) Do(f func(context.Context, string, names.UserTag, params.OfferAccessPermission) error) *MockAPIGrantApplicationOfferAccessCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIGrantApplicationOfferAccessCall) DoAndReturn(f func(context.Context, string, names.UserTag, params.OfferAccessPermission) error) *MockAPIGrantApplicationOfferAccessCall {
+func (c *MockAPIGetApplicationOfferConsumeDetailsCall) DoAndReturn(f func(context.Context, string) (params.ConsumeOfferDetails, error)) *MockAPIGetApplicationOfferConsumeDetailsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1286,10 +1249,10 @@ func (c *MockAPILatestLogTimeCall) DoAndReturn(f func(string) (time.Time, error)
 }
 
 // ListApplicationOffers mocks base method.
-func (m *MockAPI) ListApplicationOffers(arg0 context.Context, arg1 []params.OfferFilter) ([]params.ApplicationOfferAdminDetailsV5, error) {
+func (m *MockAPI) ListApplicationOffers(arg0 context.Context, arg1 []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListApplicationOffers", arg0, arg1)
-	ret0, _ := ret[0].([]params.ApplicationOfferAdminDetailsV5)
+	ret0, _ := ret[0].([]*crossmodel.ApplicationOfferDetails)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1307,19 +1270,19 @@ type MockAPIListApplicationOffersCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIListApplicationOffersCall) Return(arg0 []params.ApplicationOfferAdminDetailsV5, arg1 error) *MockAPIListApplicationOffersCall {
+func (c *MockAPIListApplicationOffersCall) Return(arg0 []*crossmodel.ApplicationOfferDetails, arg1 error) *MockAPIListApplicationOffersCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIListApplicationOffersCall) Do(f func(context.Context, []params.OfferFilter) ([]params.ApplicationOfferAdminDetailsV5, error)) *MockAPIListApplicationOffersCall {
+func (c *MockAPIListApplicationOffersCall) Do(f func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)) *MockAPIListApplicationOffersCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIListApplicationOffersCall) DoAndReturn(f func(context.Context, []params.OfferFilter) ([]params.ApplicationOfferAdminDetailsV5, error)) *MockAPIListApplicationOffersCall {
+func (c *MockAPIListApplicationOffersCall) DoAndReturn(f func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)) *MockAPIListApplicationOffersCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1637,17 +1600,17 @@ func (c *MockAPIModelTagCall) DoAndReturn(f func() (names.ModelTag, bool)) *Mock
 }
 
 // Offer mocks base method.
-func (m *MockAPI) Offer(arg0 context.Context, arg1 crossmodel.OfferURL, arg2 params.AddApplicationOffer) error {
+func (m *MockAPI) Offer(arg0 context.Context, arg1 jujuclient.OfferParams) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Offer", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "Offer", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Offer indicates an expected call of Offer.
-func (mr *MockAPIMockRecorder) Offer(arg0, arg1, arg2 any) *MockAPIOfferCall {
+func (mr *MockAPIMockRecorder) Offer(arg0, arg1 any) *MockAPIOfferCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Offer", reflect.TypeOf((*MockAPI)(nil).Offer), arg0, arg1, arg2)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Offer", reflect.TypeOf((*MockAPI)(nil).Offer), arg0, arg1)
 	return &MockAPIOfferCall{Call: call}
 }
 
@@ -1663,13 +1626,13 @@ func (c *MockAPIOfferCall) Return(arg0 error) *MockAPIOfferCall {
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIOfferCall) Do(f func(context.Context, crossmodel.OfferURL, params.AddApplicationOffer) error) *MockAPIOfferCall {
+func (c *MockAPIOfferCall) Do(f func(context.Context, jujuclient.OfferParams) error) *MockAPIOfferCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIOfferCall) DoAndReturn(f func(context.Context, crossmodel.OfferURL, params.AddApplicationOffer) error) *MockAPIOfferCall {
+func (c *MockAPIOfferCall) DoAndReturn(f func(context.Context, jujuclient.OfferParams) error) *MockAPIOfferCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1746,44 +1709,6 @@ func (c *MockAPIRemoveCloudCall) Do(f func(names.CloudTag) error) *MockAPIRemove
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAPIRemoveCloudCall) DoAndReturn(f func(names.CloudTag) error) *MockAPIRemoveCloudCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// RevokeApplicationOfferAccess mocks base method.
-func (m *MockAPI) RevokeApplicationOfferAccess(arg0 context.Context, arg1 string, arg2 names.UserTag, arg3 params.OfferAccessPermission) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RevokeApplicationOfferAccess", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RevokeApplicationOfferAccess indicates an expected call of RevokeApplicationOfferAccess.
-func (mr *MockAPIMockRecorder) RevokeApplicationOfferAccess(arg0, arg1, arg2, arg3 any) *MockAPIRevokeApplicationOfferAccessCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeApplicationOfferAccess", reflect.TypeOf((*MockAPI)(nil).RevokeApplicationOfferAccess), arg0, arg1, arg2, arg3)
-	return &MockAPIRevokeApplicationOfferAccessCall{Call: call}
-}
-
-// MockAPIRevokeApplicationOfferAccessCall wrap *gomock.Call
-type MockAPIRevokeApplicationOfferAccessCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIRevokeApplicationOfferAccessCall) Return(arg0 error) *MockAPIRevokeApplicationOfferAccessCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIRevokeApplicationOfferAccessCall) Do(f func(context.Context, string, names.UserTag, params.OfferAccessPermission) error) *MockAPIRevokeApplicationOfferAccessCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIRevokeApplicationOfferAccessCall) DoAndReturn(f func(context.Context, string, names.UserTag, params.OfferAccessPermission) error) *MockAPIRevokeApplicationOfferAccessCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

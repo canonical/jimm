@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/api/base"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
@@ -145,23 +144,21 @@ type API struct {
 	DestroyModel_                      func(context.Context, names.ModelTag, *bool, *bool, *time.Duration, *time.Duration) error
 	DumpModel_                         func(context.Context, names.ModelTag, bool) (map[string]interface{}, error)
 	DumpModelDB_                       func(context.Context, names.ModelTag) (map[string]interface{}, error)
-	FindApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
-	GetApplicationOffer_               func(context.Context, *jujuparams.ApplicationOfferAdminDetailsV5) error
-	GetApplicationOfferConsumeDetails_ func(context.Context, names.UserTag, *jujuparams.ConsumeOfferDetails, bakery.Version) error
-	GrantApplicationOfferAccess_       func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
+	FindApplicationOffers_             func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
+	GetApplicationOffer_               func(context.Context, string) (*crossmodel.ApplicationOfferDetails, error)
+	GetApplicationOfferConsumeDetails_ func(context.Context, string) (jujuparams.ConsumeOfferDetails, error)
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
 	Import_                            func(bytes []byte) error
 	IsBroken_                          bool
 	LatestLogTime_                     func(string) (time.Time, error)
-	ListApplicationOffers_             func(context.Context, []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error)
+	ListApplicationOffers_             func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
 	ModelInfo_                         func(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_                       func(context.Context, names.ModelTag) (base.ModelStatus, error)
 	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
-	Offer_                             func(context.Context, crossmodel.OfferURL, jujuparams.AddApplicationOffer) error
+	Offer_                             func(context.Context, jujuclient.OfferParams) error
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(names.CloudTag) error
 	Prechecks_                         func(jujuparams.MigrationModelInfo) error
-	RevokeApplicationOfferAccess_      func(context.Context, string, names.UserTag, jujuparams.OfferAccessPermission) error
 	RevokeCredential_                  func(context.Context, names.CloudCredentialTag) error
 	SupportsModelSummaryWatcher_       bool
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
@@ -290,32 +287,25 @@ func (a *API) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]i
 	return a.DumpModelDB_(ctx, tag)
 }
 
-func (a *API) FindApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+func (a *API) FindApplicationOffers(ctx context.Context, f []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	if a.FindApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
 	return a.FindApplicationOffers_(ctx, f)
 }
 
-func (a *API) GetApplicationOffer(ctx context.Context, offer *jujuparams.ApplicationOfferAdminDetailsV5) error {
+func (a *API) GetApplicationOffer(ctx context.Context, urlStr string) (*crossmodel.ApplicationOfferDetails, error) {
 	if a.GetApplicationOffer_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.GetApplicationOffer_(ctx, offer)
+	return a.GetApplicationOffer_(ctx, urlStr)
 }
 
-func (a *API) GetApplicationOfferConsumeDetails(ctx context.Context, tag names.UserTag, cod *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
+func (a *API) GetApplicationOfferConsumeDetails(ctx context.Context, url string) (jujuparams.ConsumeOfferDetails, error) {
 	if a.GetApplicationOfferConsumeDetails_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return jujuparams.ConsumeOfferDetails{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.GetApplicationOfferConsumeDetails_(ctx, tag, cod, v)
-}
-
-func (a *API) GrantApplicationOfferAccess(ctx context.Context, offerURL string, tag names.UserTag, p jujuparams.OfferAccessPermission) error {
-	if a.GrantApplicationOfferAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.GrantApplicationOfferAccess_(ctx, offerURL, tag, p)
+	return a.GetApplicationOfferConsumeDetails_(ctx, url)
 }
 
 func (a *API) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error {
@@ -329,7 +319,7 @@ func (a *API) IsBroken() bool {
 	return a.IsBroken_
 }
 
-func (a *API) ListApplicationOffers(ctx context.Context, f []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
+func (a *API) ListApplicationOffers(ctx context.Context, f []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	if a.ListApplicationOffers_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
@@ -364,11 +354,11 @@ func (a *API) ListModelSummaries(ctx context.Context, ms jujuparams.ModelSummari
 	return a.ListModelSummaries_(ctx, ms)
 }
 
-func (a *API) Offer(ctx context.Context, offerURL crossmodel.OfferURL, aao jujuparams.AddApplicationOffer) error {
+func (a *API) Offer(ctx context.Context, offer jujuclient.OfferParams) error {
 	if a.Offer_ == nil {
 		return errors.E(errors.CodeNotImplemented)
 	}
-	return a.Offer_(ctx, offerURL, aao)
+	return a.Offer_(ctx, offer)
 }
 
 func (a *API) Ping(ctx context.Context) error {
@@ -390,13 +380,6 @@ func (a *API) RemoveCloud(tag names.CloudTag) error {
 		return errors.E(errors.CodeNotImplemented)
 	}
 	return a.RemoveCloud_(tag)
-}
-
-func (a *API) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, tag names.UserTag, p jujuparams.OfferAccessPermission) error {
-	if a.RevokeApplicationOfferAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
-	}
-	return a.RevokeApplicationOfferAccess_(ctx, offerURL, tag, p)
 }
 
 func (a *API) RevokeCredential(ctx context.Context, tag names.CloudCredentialTag) error {
