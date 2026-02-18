@@ -41,16 +41,16 @@ func TestRPC(t *testing.T) {
 		B: 2,
 	}
 	var res AddResult
-	err := cl.Call(req, params, &res)
+	err := cl.Call(t.Context(), req, params, &res)
 	c.Assert(err, qt.ErrorMatches, `no such request - method Calc\(1\).Add is not implemented \(not implemented\)`)
 
 	r.AddMethod("Calc", 1, "Add", rpc.Method(add))
-	err = cl.Call(req, params, &res)
+	err = cl.Call(t.Context(), req, params, &res)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res.Sum, qt.Equals, 3)
 
 	r.RemoveMethod("Calc", 1, "Add")
-	err = cl.Call(req, params, &res)
+	err = cl.Call(t.Context(), req, params, &res)
 	c.Assert(err, qt.ErrorMatches, `no such request - method Calc\(1\).Add is not implemented \(not implemented\)`)
 }
 
@@ -87,7 +87,7 @@ func TestKill(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer wg.Done()
-			err := cl.Call(req, nil, nil)
+			err := cl.Call(t.Context(), req, nil, nil)
 			c.Check(err, qt.Equals, nil)
 		}()
 	}

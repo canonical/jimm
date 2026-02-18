@@ -669,44 +669,6 @@ func (c *MockAPIConnectStreamCall) DoAndReturn(f func(string, url.Values) (base.
 	return c
 }
 
-// Context mocks base method.
-func (m *MockAPI) Context() context.Context {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Context")
-	ret0, _ := ret[0].(context.Context)
-	return ret0
-}
-
-// Context indicates an expected call of Context.
-func (mr *MockAPIMockRecorder) Context() *MockAPIContextCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Context", reflect.TypeOf((*MockAPI)(nil).Context))
-	return &MockAPIContextCall{Call: call}
-}
-
-// MockAPIContextCall wrap *gomock.Call
-type MockAPIContextCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAPIContextCall) Return(arg0 context.Context) *MockAPIContextCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAPIContextCall) Do(f func() context.Context) *MockAPIContextCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIContextCall) DoAndReturn(f func() context.Context) *MockAPIContextCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ControllerConfig mocks base method.
 func (m *MockAPI) ControllerConfig(arg0 context.Context) (controller.Config, error) {
 	m.ctrl.T.Helper()
