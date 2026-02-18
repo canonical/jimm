@@ -27,7 +27,7 @@ func (c Connection) Offer(ctx context.Context, offer OfferParams) error {
 	if err != nil {
 		return err
 	}
-	if len(res) > 0 {
+	if len(res) > 0 && res[0].Error != nil {
 		return res[0].Error
 	}
 	return nil
