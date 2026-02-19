@@ -1378,10 +1378,10 @@ externally to a different JAAS controller.
 # jaas upgrade-to
 
 ## Summary
-Upgrades a controller to a specified version
+Upgrades a model
 
 ## Usage
-```jaas upgrade-to [options] <version> <model-uuid>```
+```jaas upgrade-to [options] <controller-name> <model-uuid>```
 
 ### Options
 | Flag | Default | Usage |
@@ -1392,11 +1392,12 @@ Upgrades a controller to a specified version
 
 ## Examples
 
-    juju upgrade-to 3.6.11 2cb433a6-04eb-4ec4-9567-90426d20a004
+    juju upgrade-to myController 2cb433a6-04eb-4ec4-9567-90426d20a004
 
 
 ## Details
 
-Upgrades a controller to a specified version.
+Upgrades a model by migrating it to a specific controller
+and upgrades the model to the controller's version.
 
 
