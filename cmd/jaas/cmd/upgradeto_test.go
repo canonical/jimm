@@ -99,21 +99,14 @@ func TestUpgradeToFailsWithMissingArgs(t *testing.T) {
 	c := qt.New(t)
 	upgradeToCmd := &upgradeToCommand{}
 	err := initCommandWithError(upgradeToCmd)
-	c.Assert(err, qt.ErrorMatches, "missing required arguments: version and model UUID")
+	c.Assert(err, qt.ErrorMatches, "missing required arguments: controller name and model UUID")
 }
 
 func TestUpgradeToFailsWithOnlyOneArg(t *testing.T) {
 	c := qt.New(t)
 	upgradeToCmd := &upgradeToCommand{}
 	err := initCommandWithError(upgradeToCmd, "3.5.0")
-	c.Assert(err, qt.ErrorMatches, "missing required arguments: version and model UUID")
-}
-
-func TestUpgradeToFailsWithInvalidVersion(t *testing.T) {
-	c := qt.New(t)
-	upgradeToCmd := &upgradeToCommand{}
-	err := initCommandWithError(upgradeToCmd, "invalid-version", "93608db4-f1cb-4da5-9926-8233981aef0a")
-	c.Assert(err, qt.ErrorMatches, "invalid version format: invalid-version")
+	c.Assert(err, qt.ErrorMatches, "missing required arguments: controller name and model UUID")
 }
 
 func TestUpgradeToFailsWithInvalidModelUUID(t *testing.T) {
