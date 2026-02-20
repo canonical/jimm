@@ -26,8 +26,6 @@ linters:
   settings:
     gocognit:
       min-complexity: 30
-    goheader:
-      template: Copyright {{MOD-YEAR}} Canonical.
     gosec:
       excludes:
         - G601

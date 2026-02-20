@@ -12,6 +12,7 @@ import (
 	"github.com/juju/juju/api/controller/controller"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
+	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -335,7 +336,7 @@ type modelImporter struct {
 	// newOwner may be nil if the user wants to keep the original owner.
 	newOwner      *names.UserTag
 	originalOwner names.UserTag
-	offersToAdd   []jujuparams.ApplicationOfferAdminDetailsV5
+	offersToAdd   []*crossmodel.ApplicationOfferDetails
 }
 
 func newModelImporter(jimm *JujuManager, newOwner string) (modelImporter, error) {
@@ -373,7 +374,7 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 
 	m.originalOwner = names.NewUserTag(m.modelInfo.Owner)
 
-	m.offersToAdd, err = api.ListApplicationOffers(ctx, []jujuparams.OfferFilter{
+	listedOffers, err := api.ListApplicationOffers(ctx, []crossmodel.ApplicationOfferFilter{
 		{
 			OwnerName: m.originalOwner.Id(),
 			ModelName: m.modelInfo.Name,
@@ -382,6 +383,8 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, controllerName strin
 	if err != nil {
 		return err
 	}
+
+	m.offersToAdd = append(m.offersToAdd, listedOffers...)
 
 	// fill in data from model info
 	err = m.model.FromJujuModelInfo(m.modelInfo)

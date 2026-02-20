@@ -21,11 +21,11 @@ func TestUpgradeTo(t *testing.T) {
 
 	testModelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 	testModelTag := "model-93608db4-f1cb-4da5-9926-8233981aef0a"
-	testTargetVersion := "3.5.0"
+	testTargetController := "test-controller"
 
 	upgradeToParams := &apiparams.UpgradeToRequest{
-		TargetControllerVersion: testTargetVersion,
-		ModelTag:                testModelTag,
+		TargetControllerName: testTargetController,
+		ModelTag:             testModelTag,
 	}
 
 	s.client.EXPECT().UpgradeTo(upgradeToParams).Return(apiparams.UpgradeToResponse{
@@ -36,7 +36,7 @@ func TestUpgradeTo(t *testing.T) {
 	upgradeToCmd := &upgradeToCommand{}
 	upgradeToCmd.setJIMMAPI(s.client)
 	upgradeToCmd.SetClientStore(s.store)
-	initCommand(c, upgradeToCmd, testTargetVersion, testModelUUID)
+	initCommand(c, upgradeToCmd, testTargetController, testModelUUID)
 
 	ctx := newTestContext(c)
 	err := upgradeToCmd.Run(ctx)
@@ -49,12 +49,12 @@ func TestUpgradeToWithFailureResponse(t *testing.T) {
 
 	testModelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 	testModelTag := "model-93608db4-f1cb-4da5-9926-8233981aef0a"
-	testTargetVersion := "3.5.0"
+	testTargetController := "test-controller"
 	testErrorMessage := "upgrade failed: controller not ready"
 
 	upgradeToParams := &apiparams.UpgradeToRequest{
-		TargetControllerVersion: testTargetVersion,
-		ModelTag:                testModelTag,
+		TargetControllerName: testTargetController,
+		ModelTag:             testModelTag,
 	}
 
 	// Now the error is returned directly by UpgradeTo instead of embedded in the response.
@@ -63,7 +63,7 @@ func TestUpgradeToWithFailureResponse(t *testing.T) {
 
 	upgradeToCmd := &upgradeToCommand{}
 	upgradeToCmd.setJIMMAPI(s.client)
-	initCommand(c, upgradeToCmd, testTargetVersion, testModelUUID)
+	initCommand(c, upgradeToCmd, testTargetController, testModelUUID)
 
 	ctx := newTestContext(c)
 	err := upgradeToCmd.Run(ctx)
@@ -76,11 +76,11 @@ func TestUpgradeToWithError(t *testing.T) {
 
 	testModelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 	testModelTag := "model-93608db4-f1cb-4da5-9926-8233981aef0a"
-	testTargetVersion := "3.5.0"
+	testTargetController := "test-controller"
 
 	upgradeToParams := &apiparams.UpgradeToRequest{
-		TargetControllerVersion: testTargetVersion,
-		ModelTag:                testModelTag,
+		TargetControllerName: testTargetController,
+		ModelTag:             testModelTag,
 	}
 	errorToReturn := errors.New("failed to initiate upgrade")
 	s.client.EXPECT().UpgradeTo(upgradeToParams).Return(apiparams.UpgradeToResponse{}, errorToReturn)
@@ -88,7 +88,7 @@ func TestUpgradeToWithError(t *testing.T) {
 
 	upgradeToCmd := &upgradeToCommand{}
 	upgradeToCmd.setJIMMAPI(s.client)
-	initCommand(c, upgradeToCmd, testTargetVersion, testModelUUID)
+	initCommand(c, upgradeToCmd, testTargetController, testModelUUID)
 
 	ctx := newTestContext(c)
 	err := upgradeToCmd.Run(ctx)
@@ -99,21 +99,14 @@ func TestUpgradeToFailsWithMissingArgs(t *testing.T) {
 	c := qt.New(t)
 	upgradeToCmd := &upgradeToCommand{}
 	err := initCommandWithError(upgradeToCmd)
-	c.Assert(err, qt.ErrorMatches, "missing required arguments: version and model UUID")
+	c.Assert(err, qt.ErrorMatches, "missing required arguments: controller name and model UUID")
 }
 
 func TestUpgradeToFailsWithOnlyOneArg(t *testing.T) {
 	c := qt.New(t)
 	upgradeToCmd := &upgradeToCommand{}
 	err := initCommandWithError(upgradeToCmd, "3.5.0")
-	c.Assert(err, qt.ErrorMatches, "missing required arguments: version and model UUID")
-}
-
-func TestUpgradeToFailsWithInvalidVersion(t *testing.T) {
-	c := qt.New(t)
-	upgradeToCmd := &upgradeToCommand{}
-	err := initCommandWithError(upgradeToCmd, "invalid-version", "93608db4-f1cb-4da5-9926-8233981aef0a")
-	c.Assert(err, qt.ErrorMatches, "invalid version format: invalid-version")
+	c.Assert(err, qt.ErrorMatches, "missing required arguments: controller name and model UUID")
 }
 
 func TestUpgradeToFailsWithInvalidModelUUID(t *testing.T) {
@@ -129,11 +122,11 @@ func TestUpgradeToWithPositionalArgs(t *testing.T) {
 
 	testModelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
 	testModelTag := "model-93608db4-f1cb-4da5-9926-8233981aef0a"
-	testTargetVersion := "3.5.0"
+	testTargetController := "test-controller"
 
 	upgradeToParams := &apiparams.UpgradeToRequest{
-		TargetControllerVersion: testTargetVersion,
-		ModelTag:                testModelTag,
+		TargetControllerName: testTargetController,
+		ModelTag:             testModelTag,
 	}
 
 	s.client.EXPECT().UpgradeTo(upgradeToParams).Return(apiparams.UpgradeToResponse{
@@ -144,7 +137,7 @@ func TestUpgradeToWithPositionalArgs(t *testing.T) {
 	upgradeToCmd := &upgradeToCommand{}
 	upgradeToCmd.setJIMMAPI(s.client)
 	upgradeToCmd.SetClientStore(s.store)
-	initCommand(c, upgradeToCmd, testTargetVersion, testModelUUID)
+	initCommand(c, upgradeToCmd, testTargetController, testModelUUID)
 
 	ctx := newTestContext(c)
 	err := upgradeToCmd.Run(ctx)

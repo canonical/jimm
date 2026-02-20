@@ -16,7 +16,6 @@ import (
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	jujuversion "github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -587,6 +586,9 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 // model could be migrated to. This includes controllers that support the model's
 // cloud region and version, but excludes the controller the model is already on.
 func (r *controllerRoot) ListMigrationTargets(ctx context.Context, req apiparams.ListMigrationTargetsRequest) (apiparams.ListControllersResponse, error) {
+	if !r.user.JimmAdmin {
+		return apiparams.ListControllersResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	}
 
 	mt, err := names.ParseModelTag(req.ModelTag)
 	if err != nil {
@@ -739,12 +741,7 @@ func (r *controllerRoot) UpgradeTo(ctx context.Context, req apiparams.UpgradeToR
 		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeBadRequest, fmt.Errorf("invalid model tag %q: %w", req.ModelTag, err))
 	}
 
-	targetControllerVersion, err := jujuversion.Parse(req.TargetControllerVersion)
-	if err != nil {
-		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeBadRequest, fmt.Errorf("invalid target controller version %q: %w", req.TargetControllerVersion, err))
-	}
-
-	_, err = r.jimm.UpgradeManager().UpgradeTo(ctx, r.user, mt.Id(), targetControllerVersion)
+	_, err = r.jimm.UpgradeManager().UpgradeTo(ctx, r.user, mt.Id(), req.TargetControllerName)
 	if err != nil {
 		return apiparams.UpgradeToResponse{}, errors.E(errors.CodeBadRequest, fmt.Errorf("failed to run upgrade to: %w", err))
 	}

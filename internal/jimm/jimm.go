@@ -265,7 +265,7 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.BootstrapManager = bootstrapManager
 
-	upgradeManager, err := upgrade.NewUpgradeManager(j.BootstrapManager, j.JujuManager, j.Database, j.Dialer, j.RiverClient)
+	upgradeManager, err := upgrade.NewUpgradeManager(j.JujuManager, j.Database, j.Dialer, j.RiverClient)
 	if err != nil {
 		return nil, err
 	}

@@ -5,58 +5,30 @@ package jujuclient
 import (
 	"context"
 
-	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
-	jujuerrors "github.com/juju/errors"
+	"github.com/juju/juju/api/client/applicationoffers"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
-
-	"github.com/canonical/jimm/v3/internal/errors"
 )
+
+type OfferParams struct {
+	ModelUUID   string
+	Application string
+	Endpoints   []string
+	Owner       string
+	OfferName   string
+	Desc        string
+}
 
 // Offer creates a new ApplicationOffer on the controller. Offer uses the
 // Offer procedure on the ApplicationOffers facade.
-func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, offer jujuparams.AddApplicationOffer) error {
-
-	args := jujuparams.AddApplicationOffers{
-		Offers: []jujuparams.AddApplicationOffer{offer},
+func (c Connection) Offer(ctx context.Context, offer OfferParams) error {
+	appOfferAPI := applicationoffers.NewClient(&c)
+	res, err := appOfferAPI.Offer(offer.ModelUUID, offer.Application, offer.Endpoints, offer.Owner, offer.OfferName, offer.Desc)
+	if err != nil {
+		return err
 	}
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	if c.hasFacadeVersion("ApplicationOffers", 4) {
-		// Facade call version 4 will grant owner admin access to the
-		// created offer
-		err := c.Call(ctx, "ApplicationOffers", 4, "", "Offer", &args, &resp)
-		if err != nil {
-			return errors.E(jujuerrors.Cause(err))
-		}
-		if resp.Results[0].Error != nil {
-			return errors.E(resp.Results[0].Error)
-		}
-	} else {
-		ownerTag, err := names.ParseUserTag(offer.OwnerTag)
-		if err != nil {
-			return errors.E(errors.CodeBadRequest, err)
-		}
-
-		// Facade call version 2 will not grant owner admin access, so
-		// we have to do it ourselves.
-		err = c.Call(ctx, "ApplicationOffers", 2, "", "Offer", &args, &resp)
-		if err != nil {
-			return errors.E(jujuerrors.Cause(err))
-		}
-		if len(resp.Results) == 0 {
-			return errors.E("unknown error - no results returned")
-		}
-		if resp.Results[0].Error != nil {
-			return errors.E(resp.Results[0].Error)
-		}
-
-		// Ensure the user creating the offer is an admin for the offer.
-		if err := c.GrantApplicationOfferAccess(ctx, offerURL.String(), ownerTag, jujuparams.OfferAdminAccess); err != nil {
-			return errors.E(err)
-		}
+	if len(res) > 0 && res[0].Error != nil {
+		return res[0].Error
 	}
 	return nil
 }
@@ -64,35 +36,17 @@ func (c Connection) Offer(ctx context.Context, offerURL crossmodel.OfferURL, off
 // ListApplicationOffers lists ApplicationOffers on the controller matching
 // the given filters. ListApplicationOffers uses the ListApplicationOffers
 // procedure on the ApplicationOffers facade.
-func (c Connection) ListApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
-
-	args := jujuparams.OfferFilters{
-		Filters: filters,
-	}
-
-	var resp jujuparams.QueryApplicationOffersResultsV5
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "ListApplicationOffers", &args, &resp)
-	if err != nil {
-		return nil, errors.E(jujuerrors.Cause(err))
-	}
-	return resp.Results, nil
+func (c Connection) ListApplicationOffers(ctx context.Context, filters []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
+	appOfferAPI := applicationoffers.NewClient(&c)
+	return appOfferAPI.ListOffers(filters...)
 }
 
 // FindApplicationOffers finds ApplicationOffers on the controller matching
 // the given filters. FindApplicationOffers uses the FindApplicationOffers
 // procedure on the ApplicationOffers facade.
-func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujuparams.OfferFilter) ([]jujuparams.ApplicationOfferAdminDetailsV5, error) {
-
-	args := jujuparams.OfferFilters{
-		Filters: filters,
-	}
-
-	var resp jujuparams.QueryApplicationOffersResultsV5
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "FindApplicationOffers", &args, &resp)
-	if err != nil {
-		return nil, errors.E(jujuerrors.Cause(err))
-	}
-	return resp.Results, nil
+func (c Connection) FindApplicationOffers(ctx context.Context, filters []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
+	appOfferAPI := applicationoffers.NewClient(&c)
+	return appOfferAPI.FindApplicationOffers(filters...)
 }
 
 // GetApplicationOffer retrives the details of the specified
@@ -100,101 +54,17 @@ func (c Connection) FindApplicationOffers(ctx context.Context, filters []jujupar
 // OfferURL the rest of the structure will be filled in by the API request.
 // GetApplicationOffer uses the ApplicationOffers procedure on the
 // ApplicationOffers facade.
-func (c Connection) GetApplicationOffer(ctx context.Context, info *jujuparams.ApplicationOfferAdminDetailsV5) error {
-
-	args := jujuparams.OfferURLs{
-		OfferURLs: []string{info.OfferURL},
-	}
-
-	resp := jujuparams.ApplicationOffersResults{
-		Results: make([]jujuparams.ApplicationOfferResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "ApplicationOffers", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	*info = *resp.Results[0].Result
-	return nil
-}
-
-// GrantApplicationOfferAccess grants the specified permission to the
-// given user on the given application offer. GrantApplicationOfferAccess
-// uses the ModifyOfferAccess procedure on the ApplicationOffers facade..
-func (c Connection) GrantApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
-
-	args := jujuparams.ModifyOfferAccessRequest{
-		Changes: []jujuparams.ModifyOfferAccess{{
-			UserTag:  user.String(),
-			Action:   jujuparams.GrantOfferAccess,
-			Access:   access,
-			OfferURL: offerURL,
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "ModifyOfferAccess", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
-}
-
-// RevokeApplicationOfferAccess revokes the specified permission from the
-// given user on the given application offer. RevokeApplicationOfferAccess
-// uses the ModifyOfferAccess procedure on the ApplicationOffers facade.
-func (c Connection) RevokeApplicationOfferAccess(ctx context.Context, offerURL string, user names.UserTag, access jujuparams.OfferAccessPermission) error {
-
-	args := jujuparams.ModifyOfferAccessRequest{
-		Changes: []jujuparams.ModifyOfferAccess{{
-			UserTag:  user.String(),
-			Action:   jujuparams.RevokeOfferAccess,
-			Access:   access,
-			OfferURL: offerURL,
-		}},
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "ModifyOfferAccess", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
+func (c Connection) GetApplicationOffer(ctx context.Context, urlStr string) (*crossmodel.ApplicationOfferDetails, error) {
+	appOfferAPI := applicationoffers.NewClient(&c)
+	return appOfferAPI.ApplicationOffer(urlStr)
 }
 
 // DestroyApplicationOffer destroys the given application offer.
 // DestroyApplicationOffer uses the DestroyOffers procedure
 // from the ApplicationOffers facade.
-func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, force bool) error {
-
-	args := jujuparams.DestroyApplicationOffers{
-		OfferURLs: []string{offer},
-		Force:     force,
-	}
-
-	resp := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "DestroyOffers", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	return nil
+func (c Connection) DestroyApplicationOffer(ctx context.Context, offerURL string, force bool) error {
+	appOfferAPI := applicationoffers.NewClient(&c)
+	return appOfferAPI.DestroyOffers(force, offerURL)
 }
 
 // GetApplicationOfferConsumeDetails retrieves the details needed to
@@ -202,27 +72,7 @@ func (c Connection) DestroyApplicationOffer(ctx context.Context, offer string, f
 // must include an Offer.OfferURL and the rest of the structure will be
 // filled in by the API call. GetApplicationOfferConsumeDetails uses the
 // GetConsumeDetails procedure on the ApplicationOffers facade.
-func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, user names.UserTag, info *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
-
-	args := jujuparams.ConsumeOfferDetailsArg{
-		OfferURLs: jujuparams.OfferURLs{
-			OfferURLs:     []string{info.Offer.OfferURL},
-			BakeryVersion: v,
-		},
-		// As we now dial as the user we no longer specify the UserTag.
-		// UserTag: user.String(),
-	}
-
-	resp := jujuparams.ConsumeOfferDetailsResults{
-		Results: make([]jujuparams.ConsumeOfferDetailsResult, 1),
-	}
-	err := c.CallHighestFacadeVersion(ctx, "ApplicationOffers", []int{5}, "", "GetConsumeDetails", &args, &resp)
-	if err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-	if resp.Results[0].Error != nil {
-		return errors.E(resp.Results[0].Error)
-	}
-	*info = resp.Results[0].ConsumeOfferDetails
-	return nil
+func (c Connection) GetApplicationOfferConsumeDetails(ctx context.Context, url string) (jujuparams.ConsumeOfferDetails, error) {
+	appOfferAPI := applicationoffers.NewClient(&c)
+	return appOfferAPI.GetConsumeDetails(url)
 }

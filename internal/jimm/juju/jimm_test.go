@@ -1035,39 +1035,25 @@ func TestListMigrationTargets(t *testing.T) {
 	tests := []struct {
 		about               string
 		user                dbmodel.Identity
-		jimmAdmin           bool
 		expectedControllers []dbmodel.Controller
 		expectedError       string
 		modelTag            names.ModelTag
 	}{{
-		about:     "superuser can list migratable controllers",
-		user:      env.User("alice@canonical.com").DBObject(c, j.Database),
-		jimmAdmin: true,
-		modelTag:  names.NewModelTag(env.Models[0].UUID),
+		about:    "list migratable controllers",
+		user:     env.User("alice@canonical.com").DBObject(c, j.Database),
+		modelTag: names.NewModelTag(env.Models[0].UUID),
 		expectedControllers: []dbmodel.Controller{
 			env.Controller("test3").DBObject(c, j.Database),
 			env.Controller("test5").DBObject(c, j.Database),
 		},
 	}, {
-		about:         "add-model user can not list controllers",
-		user:          env.User("bob@canonical.com").DBObject(c, j.Database),
-		modelTag:      names.NewModelTag(env.Models[0].UUID),
-		expectedError: "unauthorized",
-	}, {
-		about:         "user without access rights cannot list controllers",
-		user:          env.User("eve@canonical.com").DBObject(c, j.Database),
-		modelTag:      names.NewModelTag(env.Models[0].UUID),
-		expectedError: "unauthorized",
-	}, {
-		about:         "superuser fails to list controllers for missing model",
+		about:         "fails to list controllers for missing model",
 		user:          env.User("alice@canonical.com").DBObject(c, j.Database),
-		jimmAdmin:     true,
 		modelTag:      names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		expectedError: `model not found`,
 	}, {
-		about:               "superuser gets empty list of controllers for too-new model",
+		about:               "empty list of controllers for too-new model",
 		user:                env.User("alice@canonical.com").DBObject(c, j.Database),
-		jimmAdmin:           true,
 		modelTag:            names.NewModelTag(env.Models[1].UUID),
 		expectedControllers: nil,
 	}}
@@ -1075,7 +1061,6 @@ func TestListMigrationTargets(t *testing.T) {
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			user := openfga.NewUser(&test.user, j.OpenFGAClient)
-			user.JimmAdmin = test.jimmAdmin
 			controllers, err := j.ListMigrationTargets(ctx, user, test.modelTag)
 			if test.expectedError != "" {
 				c.Assert(err, qt.ErrorMatches, test.expectedError)

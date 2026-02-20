@@ -250,8 +250,8 @@ type SetControllerDeprecatedRequest struct {
 type UpgradeToRequest struct {
 	// ModelTag is the tag of the model to upgrade.
 	ModelTag string `json:"model-tag"`
-	// TargetControllerVersion is the target controller version to upgrade to.
-	TargetControllerVersion string `json:"target-controller-version"`
+	// TargetControllerName is the target controller's name to upgrade to.
+	TargetControllerName string `json:"target-controller-name"`
 }
 
 // UpgradeToResponse holds the response for phase 1 of an automated upgrade.

@@ -765,3 +765,14 @@ func (s *jimmUnitTestSuite) TestJobInfo_RequiresAdmin(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "unauthorized")
 	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
 }
+
+func (s *jimmUnitTestSuite) TestListMigrationTargets_Unauthorized(c *gc.C) {
+	ctx := context.Background()
+
+	root := newTestControllerRoot(nil, "alice@canonical.com", false)
+	req := apiparams.ListMigrationTargetsRequest{ModelTag: "123"}
+
+	_, err := root.ListMigrationTargets(ctx, req)
+	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+}

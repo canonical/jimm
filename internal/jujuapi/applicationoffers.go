@@ -5,10 +5,10 @@ package jujuapi
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/core/crossmodel"
+	jujustatus "github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
@@ -127,12 +127,13 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
 
 	results := jujuparams.QueryApplicationOffersResultsV5{}
+	filters := filtersToCrossmodel(args.Filters)
 
-	offers, err := r.jimm.JujuManager().ListApplicationOffers(ctx, r.user, args.Filters...)
+	offers, err := r.jimm.JujuManager().ListApplicationOffers(ctx, r.user, filters...)
 	if err != nil {
 		return results, errors.E(err)
 	}
-	results.Results = offers
+	results.Results = offersToParams(offers)
 
 	return results, nil
 }
@@ -143,12 +144,13 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
 
 	results := jujuparams.QueryApplicationOffersResultsV5{}
+	filters := filtersToCrossmodel(args.Filters)
 
-	offers, err := r.jimm.JujuManager().FindApplicationOffers(ctx, r.user, args.Filters...)
+	offers, err := r.jimm.JujuManager().FindApplicationOffers(ctx, r.user, filters...)
 	if err != nil {
 		return results, errors.E(err)
 	}
-	results.Results = offers
+	results.Results = offersToParams(offers)
 
 	return results, nil
 }
@@ -173,23 +175,12 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
-		// We grant access on the controller because pre 3.6.6 controllers are consulting their database to check if
-		// user has access to the offer when getting consume details. This is a bug and will be fixed in the following
-		// releases of Juju.
-		if err := r.jimm.JujuManager().GrantOfferAccessOnController(ctx, r.user, ut, change.OfferURL, change.Access); err != nil {
-			if !strings.Contains(err.Error(), "user already has") {
-				return errors.E(err)
-			}
-		}
 		if err := r.jimm.PermissionManager().GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
 			return errors.E(err)
 		}
 		return nil
 	case jujuparams.RevokeOfferAccess:
 		if err := r.jimm.PermissionManager().RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
-			return errors.E(err)
-		}
-		if err := r.jimm.JujuManager().RevokeOfferAccessOnController(ctx, r.user, ut, change.OfferURL, change.Access); err != nil {
 			return errors.E(err)
 		}
 		return nil
@@ -216,11 +207,111 @@ func (r *controllerRoot) ApplicationOffers(ctx context.Context, args jujuparams.
 	}
 	for i, offerURL := range args.OfferURLs {
 		details, err := r.jimm.JujuManager().GetApplicationOffer(ctx, r.user, offerURL)
+		if err != nil {
+			result.Results[i].Error = r.mapError(ctx, err)
+			continue
+		}
+		res := offerToParams(details)
 		result.Results[i] = jujuparams.ApplicationOfferResult{
-			Result: details,
-			Error:  r.mapError(ctx, err),
+			Result: &res,
 		}
 	}
 
 	return result, nil
+}
+
+func filtersToCrossmodel(filters []jujuparams.OfferFilter) []crossmodel.ApplicationOfferFilter {
+	result := make([]crossmodel.ApplicationOfferFilter, len(filters))
+	for i, f := range filters {
+		result[i] = crossmodel.ApplicationOfferFilter{
+			OwnerName:              f.OwnerName,
+			ModelName:              f.ModelName,
+			OfferName:              f.OfferName,
+			ApplicationName:        f.ApplicationName,
+			ApplicationDescription: f.ApplicationDescription,
+			Endpoints:              make([]crossmodel.EndpointFilterTerm, len(f.Endpoints)),
+			ConnectedUsers:         make([]string, 0, len(f.ConnectedUserTags)),
+			AllowedConsumers:       make([]string, 0, len(f.AllowedConsumerTags)),
+		}
+		for j, endpoint := range f.Endpoints {
+			result[i].Endpoints[j] = crossmodel.EndpointFilterTerm{
+				Name:      endpoint.Name,
+				Interface: endpoint.Interface,
+				Role:      endpoint.Role,
+			}
+		}
+		for _, userTag := range f.ConnectedUserTags {
+			if user, err := names.ParseUserTag(userTag); err == nil {
+				result[i].ConnectedUsers = append(result[i].ConnectedUsers, user.Id())
+				continue
+			}
+			result[i].ConnectedUsers = append(result[i].ConnectedUsers, userTag)
+		}
+		for _, userTag := range f.AllowedConsumerTags {
+			if user, err := names.ParseUserTag(userTag); err == nil {
+				result[i].AllowedConsumers = append(result[i].AllowedConsumers, user.Id())
+				continue
+			}
+			result[i].AllowedConsumers = append(result[i].AllowedConsumers, userTag)
+		}
+	}
+	return result
+}
+
+func offersToParams(offers []*crossmodel.ApplicationOfferDetails) []jujuparams.ApplicationOfferAdminDetailsV5 {
+	result := make([]jujuparams.ApplicationOfferAdminDetailsV5, len(offers))
+	for i, offer := range offers {
+		result[i] = offerToParams(offer)
+	}
+	return result
+}
+
+func offerToParams(offer *crossmodel.ApplicationOfferDetails) jujuparams.ApplicationOfferAdminDetailsV5 {
+	endpoints := make([]jujuparams.RemoteEndpoint, len(offer.Endpoints))
+	for i, endpoint := range offer.Endpoints {
+		endpoints[i] = jujuparams.RemoteEndpoint{
+			Name:      endpoint.Name,
+			Role:      endpoint.Role,
+			Interface: endpoint.Interface,
+			Limit:     endpoint.Limit,
+		}
+	}
+
+	users := make([]jujuparams.OfferUserDetails, len(offer.Users))
+	for i, user := range offer.Users {
+		users[i] = jujuparams.OfferUserDetails{
+			UserName:    user.UserName,
+			DisplayName: user.DisplayName,
+			Access:      string(user.Access),
+		}
+	}
+
+	connections := make([]jujuparams.OfferConnection, len(offer.Connections))
+	for i, connection := range offer.Connections {
+		connections[i] = jujuparams.OfferConnection{
+			SourceModelTag: names.NewModelTag(connection.SourceModelUUID).String(),
+			RelationId:     connection.RelationId,
+			Username:       connection.Username,
+			Endpoint:       connection.Endpoint,
+			Status: jujuparams.EntityStatus{
+				Status: jujustatus.Status(connection.Status),
+				Info:   connection.Message,
+				Since:  connection.Since,
+			},
+			IngressSubnets: connection.IngressSubnets,
+		}
+	}
+
+	return jujuparams.ApplicationOfferAdminDetailsV5{
+		ApplicationOfferDetailsV5: jujuparams.ApplicationOfferDetailsV5{
+			OfferName:              offer.OfferName,
+			OfferURL:               offer.OfferURL,
+			ApplicationDescription: offer.ApplicationDescription,
+			Endpoints:              endpoints,
+			Users:                  users,
+		},
+		ApplicationName: offer.ApplicationName,
+		CharmURL:        offer.CharmURL,
+		Connections:     connections,
+	}
 }

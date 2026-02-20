@@ -123,6 +123,45 @@ func (c *MockJujuManagerInitiateInternalMigrationCall) DoAndReturn(f func(contex
 	return c
 }
 
+// ListMigrationTargets mocks base method.
+func (m *MockJujuManager) ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListMigrationTargets", ctx, user, modelTag)
+	ret0, _ := ret[0].([]dbmodel.Controller)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListMigrationTargets indicates an expected call of ListMigrationTargets.
+func (mr *MockJujuManagerMockRecorder) ListMigrationTargets(ctx, user, modelTag any) *MockJujuManagerListMigrationTargetsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMigrationTargets", reflect.TypeOf((*MockJujuManager)(nil).ListMigrationTargets), ctx, user, modelTag)
+	return &MockJujuManagerListMigrationTargetsCall{Call: call}
+}
+
+// MockJujuManagerListMigrationTargetsCall wrap *gomock.Call
+type MockJujuManagerListMigrationTargetsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJujuManagerListMigrationTargetsCall) Return(arg0 []dbmodel.Controller, arg1 error) *MockJujuManagerListMigrationTargetsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJujuManagerListMigrationTargetsCall) Do(f func(context.Context, *openfga.User, names.ModelTag) ([]dbmodel.Controller, error)) *MockJujuManagerListMigrationTargetsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJujuManagerListMigrationTargetsCall) DoAndReturn(f func(context.Context, *openfga.User, names.ModelTag) ([]dbmodel.Controller, error)) *MockJujuManagerListMigrationTargetsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ModelInfo mocks base method.
 func (m *MockJujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error) {
 	m.ctrl.T.Helper()
