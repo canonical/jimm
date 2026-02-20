@@ -5,9 +5,9 @@ package jujuclient_test
 import (
 	"testing"
 
-	jujutesting "github.com/juju/juju/testing"
+	gc "gopkg.in/check.v1"
 )
 
 func TestPackage(t *testing.T) {
-	jujutesting.MgoTestPackage(t)
+	gc.TestingT(t)
 }

@@ -256,8 +256,10 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	if s.Server != nil {
 		s.Server.Close()
 	}
-	if err := s.JIMM.Database.Close(); err != nil {
-		c.Logf("failed to close database connections at tear down: %s", err)
+	if s.JIMM != nil && s.JIMM.Database != nil {
+		if err := s.JIMM.Database.Close(); err != nil {
+			c.Logf("failed to close database connections at tear down: %s", err)
+		}
 	}
 
 	for _, cleanup := range s.databaseCleanup {
