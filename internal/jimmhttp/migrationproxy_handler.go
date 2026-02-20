@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -28,13 +27,18 @@ import (
 // migration state before proxying the request to the controller.
 // 3. Requires the user to be a JIMM admin, rather than just a model writer.
 type MigrationHTTPProxyHandler struct {
-	Router *chi.Mux
-	jimm   *jimm.JIMM
+	Router          *chi.Mux
+	authenicator    middleware.Authenticator
+	credentialStore CredentialStore
 }
 
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
-func NewMigrationHTTPProxyHandler(jimm *jimm.JIMM) *MigrationHTTPProxyHandler {
-	return &MigrationHTTPProxyHandler{Router: chi.NewRouter(), jimm: jimm}
+func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore) *MigrationHTTPProxyHandler {
+	return &MigrationHTTPProxyHandler{
+		Router:          chi.NewRouter(),
+		authenicator:    authenticator,
+		credentialStore: credentialStore,
+	}
 }
 
 // Routes returns the grouped routers routes with group specific middlewares.
@@ -49,7 +53,7 @@ func (hph *MigrationHTTPProxyHandler) Routes() chi.Router {
 // SetupMiddleware applies authn and authz middlewares.
 func (hph *MigrationHTTPProxyHandler) SetupMiddleware() {
 	hph.Router.Use(func(h http.Handler) http.Handler {
-		return middleware.AuthenticateViaBasicAuth(h, hph.jimm.LoginManager)
+		return middleware.AuthenticateViaBasicAuth(h, hph.authenicator)
 	})
 	hph.Router.Use(middleware.AuthorizeUserAsJIMMAdmin)
 }
@@ -66,7 +70,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	controllerDetails, err := hph.jimm.JujuManager.ControllerDetailsForIncomingModel(ctx, modelUUID)
+	controllerDetails, err := hph.credentialStore.ControllerDetailsForIncomingModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "migrating model not found")

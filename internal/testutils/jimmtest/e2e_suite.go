@@ -174,7 +174,7 @@ func (s *WebsocketE2ESuite) SetUpTest(c *gc.C) {
 	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
 	mountHandler(
 		"/model/{uuid}/{type:charms|applications}",
-		jimmhttp.NewHTTPProxyHandler(s.JIMM),
+		jimmhttp.NewHTTPProxyHandler(s.JIMM.LoginManager, s.JIMM.JujuManager),
 	)
 	mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.JIMM, s.Params)))
 	jwks := jimmhttp.NewWellKnownHandler(s.JIMM.CredentialStore)

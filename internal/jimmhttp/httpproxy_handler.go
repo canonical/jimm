@@ -3,23 +3,30 @@
 package jimmhttp
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
+type CredentialStore interface {
+	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
+	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
+}
+
 // HTTPProxyHandler is an handler that provides proxying capabilities.
 // It uses the uuid in the path to proxy requests to model's controller.
 type HTTPProxyHandler struct {
-	Router *chi.Mux
-	jimm   *jimm.JIMM
+	Router          *chi.Mux
+	authenicator    middleware.Authenticator
+	credentialStore CredentialStore
 }
 
 const (
@@ -28,8 +35,12 @@ const (
 )
 
 // NewHTTPProxyHandler creates a proxy http handler.
-func NewHTTPProxyHandler(jimm *jimm.JIMM) *HTTPProxyHandler {
-	return &HTTPProxyHandler{Router: chi.NewRouter(), jimm: jimm}
+func NewHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore) *HTTPProxyHandler {
+	return &HTTPProxyHandler{
+		Router:          chi.NewRouter(),
+		authenicator:    authenticator,
+		credentialStore: credentialStore,
+	}
 }
 
 // Routes returns the grouped routers routes with group specific middlewares.
@@ -42,7 +53,7 @@ func (hph *HTTPProxyHandler) Routes() chi.Router {
 // SetupMiddleware applies authn and authz middlewares.
 func (hph *HTTPProxyHandler) SetupMiddleware() {
 	hph.Router.Use(func(h http.Handler) http.Handler {
-		return middleware.AuthenticateViaBasicAuth(h, hph.jimm.LoginManager)
+		return middleware.AuthenticateViaBasicAuth(h, hph.authenicator)
 	})
 	hph.Router.Use(func(h http.Handler) http.Handler {
 		return middleware.AuthorizeUserForModelAccess(h, ofganames.WriterRelation)
@@ -66,7 +77,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	controllerDetails, err := hph.jimm.JujuManager.ControllerDetailsForModel(ctx, modelUUID)
+	controllerDetails, err := hph.credentialStore.ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "model not found")

@@ -541,9 +541,9 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
 	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
 	// Uploading local charms
-	mountHandler("/model/{uuid}/{type:charms|applications}", jimmhttp.NewHTTPProxyHandler(s.jimm))
+	mountHandler("/model/{uuid}/{type:charms|applications}", jimmhttp.NewHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager))
 	// HTTP Migration endpoints
-	mountHandler("/migrate", jimmhttp.NewMigrationHTTPProxyHandler(s.jimm))
+	mountHandler("/migrate", jimmhttp.NewMigrationHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager))
 	// Log transfer endpoint
 	s.mux.Handle("/migrate/logtransfer", jujuapi.LogTransferHandler(ctx, s.jimm, params))
 
