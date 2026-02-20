@@ -7,6 +7,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -37,6 +38,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/config"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
@@ -224,6 +226,67 @@ type Service struct {
 	cleanups []func() error
 }
 
+// ServiceDependencies contains initialized services and parameters used to construct a fully functional Service.
+// It allows callers to override specific dependencies (e.g. auth) before creating the service.
+type ServiceDependencies struct {
+	// Params
+	AuditLogRetentionDays         int
+	BootstrapLoginTokenRefreshURL string
+	ControllerConfig              config.ControllerConfig
+	ControllerUUID                string
+	CorsAllowedOrigins            []string
+	CrossModelQueryTimeout        time.Duration
+	DischargerPrivateKey          string
+	DischargerPublicKey           string
+	HostKeyFingerprints           map[string]string
+	IsLeader                      bool
+	MacaroonExpiryDuration        time.Duration
+	PublicDNSName                 string
+	PublicDNSHost                 string
+	// Clients/Services
+	Client                  juju.Dialer
+	CredentialStore         jimmcreds.CredentialStore
+	Database                *db.Database
+	RiverClient             *river.Client
+	MigrationTokenGenerator juju.MigrationTokenGenerator
+	JWKSService             *jimmjwx.JWKSService
+	JWTService              *jimmjwx.JWTService
+	OAuthAuthenticator      login.OAuthAuthenticator
+	OAuthHandler            *jimmhttp.OAuthHandler
+	OpenFGAClient           *openfga.OFGAClient
+	// Cleanup
+	cleanupFuncs []func() error
+}
+
+// Validate checks that all required dependencies are present and returns an error if any are missing.
+func (s *ServiceDependencies) Validate() error {
+	if s.Database == nil {
+		return errors.E("missing database")
+	}
+	if s.RiverClient == nil {
+		return errors.E("missing river client")
+	}
+	if s.OpenFGAClient == nil {
+		return errors.E("missing openfga client")
+	}
+	if s.CredentialStore == nil {
+		return errors.E("missing credential store")
+	}
+	if s.JWTService == nil {
+		return errors.E("missing jwt service")
+	}
+	if s.JWKSService == nil {
+		return errors.E("missing jwks service")
+	}
+	if s.OAuthAuthenticator == nil {
+		return errors.E("missing oauth authenticator")
+	}
+	if s.MigrationTokenGenerator == nil {
+		return errors.E("missing migration token generator")
+	}
+	return nil
+}
+
 func (s *Service) JIMM() *jimm.JIMM {
 	return s.jimm
 }
@@ -333,24 +396,14 @@ func (s *Service) AddCleanup(f func() error) {
 	s.cleanups = append(s.cleanups, f)
 }
 
-// NewService creates a new Service using the given params.
-//
-//nolint:gocognit // NewService function to be ignored.
-func NewService(ctx context.Context, p Params) (*Service, error) {
-
-	s := new(Service)
-
-	jimmParameters := jimm.Parameters{
-		UUID:                   p.ControllerUUID,
-		Pubsub:                 &pubsub.Hub{MaxConcurrency: 50},
-		ControllerConfig:       p.ControllerConfig,
-		CrossModelQueryTimeout: p.CrossModelQueryTimeout,
-	}
-	// Setup all dependency services
-	if jimmParameters.UUID == "" {
-		jimmParameters.UUID = uuid.NewString()
+// NewServiceDependencies creates the default dependency set used by NewService.
+func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies, error) {
+	controllerUUID := p.ControllerUUID
+	if controllerUUID == "" {
+		controllerUUID = uuid.NewString()
 	}
 
+	auditLogRetentionDays := 0
 	if p.AuditLogRetentionPeriodInDays != "" {
 		retentionPeriod, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
 		if err != nil {
@@ -359,7 +412,16 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		if retentionPeriod < 0 {
 			return nil, errors.E("retention period cannot be less than 0")
 		}
-		jimmParameters.AuditLogRetentionDays = retentionPeriod
+		auditLogRetentionDays = retentionPeriod
+	}
+
+	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
+		return nil, errors.E(err, "failed to parse final redirect url for the dashboard")
+	}
+
+	publicDNS, err := parseURLWithOptionalScheme(p.PublicDNSName)
+	if err != nil {
+		return nil, errors.E(fmt.Errorf("failed to parse public DNS name: %v", err))
 	}
 
 	if p.DSN == "" {
@@ -370,42 +432,71 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	if err != nil {
 		return nil, errors.E(err)
 	}
-	db := &db.Database{
-		DB: database,
-	}
-	jimmParameters.Database = db
+	db := &db.Database{DB: database}
 
 	riverClient, err := river.NewRiverClient(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create river client: %w", err)
 	}
 
-	jimmParameters.RiverClient = riverClient
-
 	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {
 		return nil, errors.E(err)
 	}
-	jimmParameters.OpenFGAClient = openFGAclient
 
-	if err := ensureControllerAdministrators(ctx, openFGAclient, p.ControllerUUID, p.ControllerAdmins); err != nil {
+	if err := ensureControllerAdministrators(ctx, openFGAclient, controllerUUID, p.ControllerAdmins); err != nil {
 		return nil, errors.E(err, "failed to ensure controller admins")
 	}
 
-	credentialStore, err := s.setupCredentialStore(ctx, p, db)
+	credentialStore, err := setupCredentialStore(ctx, p, db)
 	if err != nil {
 		return nil, errors.E(err)
 	}
-	jimmParameters.CredentialStore = credentialStore
 
-	sessionStore, err := s.setupSessionStore(ctx, p.CookieSessionKey, db)
+	jwtExpiry := p.JWTExpiryDuration
+	if jwtExpiry == 0 {
+		jwtExpiry = 24 * time.Hour
+	}
+
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   p.PublicDNSName,
+		Store:  credentialStore,
+		Expiry: jwtExpiry,
+	})
+
+	dialer := &jujuclient.Dialer{
+		ControllerCredentialsStore: credentialStore,
+		JWTService:                 jwtService,
+	}
+
+	deps := &ServiceDependencies{
+		ControllerUUID:                controllerUUID,
+		PublicDNSName:                 p.PublicDNSName,
+		PublicDNSHost:                 publicDNS.Host,
+		CorsAllowedOrigins:            append([]string(nil), p.CorsAllowedOrigins...),
+		HostKeyFingerprints:           maps.Clone(p.HostKeyFingerprints),
+		ControllerConfig:              p.ControllerConfig,
+		CrossModelQueryTimeout:        p.CrossModelQueryTimeout,
+		BootstrapLoginTokenRefreshURL: p.BootstrapLoginTokenRefreshURL,
+		AuditLogRetentionDays:         auditLogRetentionDays,
+		IsLeader:                      p.IsLeader,
+		MacaroonExpiryDuration:        p.MacaroonExpiryDuration,
+		DischargerPrivateKey:          p.PrivateKey,
+		DischargerPublicKey:           p.PublicKey,
+		Database:                      db,
+		Client:                        jimm.NewDialerAdapter(dialer),
+		RiverClient:                   riverClient,
+		OpenFGAClient:                 openFGAclient,
+		CredentialStore:               credentialStore,
+		JWTService:                    jwtService,
+		JWKSService:                   jimmjwx.NewJWKSService(credentialStore),
+	}
+
+	sessionStore, cleanupFuncs, err := setupSessionStore(p.CookieSessionKey, db)
 	if err != nil {
 		return nil, errors.E(err)
 	}
-	s.AddCleanup(func() error {
-		sessionStore.Close()
-		return nil
-	})
+	deps.cleanupFuncs = append(deps.cleanupFuncs, cleanupFuncs...)
 
 	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
 	if !strings.HasPrefix(redirectUrl, "https://") && !strings.HasPrefix(redirectUrl, "http://") {
@@ -429,34 +520,61 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 			RedirectURL:         redirectUrl,
 		},
 	)
-	jimmParameters.OAuthAuthenticator = authSvc
 	if err != nil {
 		return nil, errors.E(fmt.Errorf("failed to setup authentication service: %w", err))
 	}
-
-	if p.JWTExpiryDuration == 0 {
-		p.JWTExpiryDuration = 24 * time.Hour
+	deps.OAuthAuthenticator = authSvc
+	deps.MigrationTokenGenerator = authSvc
+	deps.OAuthHandler = nil
+	if p.DashboardFinalRedirectURL != "" {
+		var err error
+		deps.OAuthHandler, err = jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+			Authenticator:             authSvc,
+			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+		})
+		if err != nil {
+			return nil, errors.E(fmt.Errorf("failed to setup authentication handler: %w", err))
+		}
+	} else {
+		zapctx.Warn(ctx, "Dashboard final redirect URL not set, OAuth HTTP handler will not be configured")
 	}
 
-	s.jwkService = jimmjwx.NewJWKSService(credentialStore)
-	jimmParameters.JWTService = jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:   p.PublicDNSName,
-		Store:  credentialStore,
-		Expiry: p.JWTExpiryDuration,
-	})
-	dialer := &jujuclient.Dialer{
-		ControllerCredentialsStore: credentialStore,
-		JWTService:                 jimmParameters.JWTService,
-	}
-	jimmParameters.MigrationTokenGenerator = authSvc
-	jimmParameters.Dialer = jimm.NewDialerAdapter(dialer)
+	return deps, nil
+}
 
-	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
-		return nil, errors.E(err, "failed to parse final redirect url for the dashboard")
+// NewServiceFromDependencies creates a Service from a provided dependency set.
+// Callers can use this to inject mock dependencies while keeping handler setup identical.
+func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) (*Service, error) {
+	if deps == nil {
+		return nil, errors.E("missing service dependencies")
+	}
+	if err := deps.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid service dependencies: %w", err)
 	}
 
-	jimmParameters.BootstrapLoginTokenRefreshURL = p.BootstrapLoginTokenRefreshURL
+	s := &Service{
+		jwkService: deps.JWKSService,
+		cleanups:   append([]func() error(nil), deps.cleanupFuncs...),
+	}
 
+	jimmParameters := jimm.Parameters{
+		UUID:                          deps.ControllerUUID,
+		Database:                      deps.Database,
+		Dialer:                        deps.Client,
+		CredentialStore:               deps.CredentialStore,
+		Pubsub:                        &pubsub.Hub{MaxConcurrency: 50},
+		OpenFGAClient:                 deps.OpenFGAClient,
+		RiverClient:                   deps.RiverClient,
+		OAuthAuthenticator:            deps.OAuthAuthenticator,
+		MigrationTokenGenerator:       deps.MigrationTokenGenerator,
+		JWTService:                    deps.JWTService,
+		ControllerConfig:              deps.ControllerConfig,
+		CrossModelQueryTimeout:        deps.CrossModelQueryTimeout,
+		BootstrapLoginTokenRefreshURL: deps.BootstrapLoginTokenRefreshURL,
+	}
+	jimmParameters.AuditLogRetentionDays = deps.AuditLogRetentionDays
+
+	var err error
 	s.jimm, err = jimm.New(jimmParameters)
 	if err != nil {
 		return nil, errors.E(err)
@@ -468,7 +586,7 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 
 	// Setup CORS middleware
 	corsOpts := cors.New(cors.Options{
-		AllowedOrigins:   p.CorsAllowedOrigins,
+		AllowedOrigins:   deps.CorsAllowedOrigins,
 		AllowedMethods:   []string{"GET"},
 		AllowCredentials: true,
 	})
@@ -497,46 +615,33 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 		),
 	)
 
-	wellKnownPath := "/.well-known"
-	mountHandler(
-		wellKnownPath,
-		jimmhttp.NewWellKnownHandler(s.jimm.CredentialStore),
-	)
+	mountHandler("/.well-known", jimmhttp.NewWellKnownHandler(s.jimm.CredentialStore))
 
-	if p.DashboardFinalRedirectURL == "" {
-		zapctx.Warn(ctx, "OAuth handler not enabled, due to unset dashboard redirect URL")
+	if deps.OAuthHandler == nil {
+		zapctx.Warn(ctx, "OAuth HTTP handler not enabled, browser flow login disabled")
 	} else {
-		oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
-			Authenticator:             authSvc,
-			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
-		})
-		if err != nil {
-			return nil, errors.E(fmt.Errorf("failed to setup authentication handler: %w", err))
-		}
-		mountHandler(
-			jimmhttp.AuthResourceBasePath,
-			oauthHandler,
-		)
+		mountHandler(jimmhttp.AuthResourceBasePath, deps.OAuthHandler)
 	}
 
-	macaroonDischarger, err := s.setupDischarger(p)
+	macaroonDischarger, err := discharger.NewMacaroonDischarger(discharger.MacaroonDischargerConfig{
+		PublicKey:              deps.DischargerPublicKey,
+		PrivateKey:             deps.DischargerPrivateKey,
+		MacaroonExpiryDuration: deps.MacaroonExpiryDuration,
+		ControllerUUID:         deps.ControllerUUID,
+	}, deps.Database, s.jimm.OfferAuthorizer)
 	if err != nil {
 		return nil, errors.E(fmt.Errorf("failed to set up discharger: %v", err))
 	}
 	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
-	publicDNS, err := parseURLWithOptionalScheme(p.PublicDNSName)
-	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to parse public DNS name: %v", err))
-	}
 	params := jujuapi.Params{
-		ControllerUUID: p.ControllerUUID,
-		PublicDNSName:  publicDNS.Host,
+		ControllerUUID: deps.ControllerUUID,
+		PublicDNSName:  deps.PublicDNSHost,
 	}
 
 	// Websockets require extra care when cookies are used for authentication
 	// to avoid CSRF attacks. https://portswigger.net/web-security/websockets/cross-site-websocket-hijacking
-	websocketCors := middleware.NewWebsocketCors(p.CorsAllowedOrigins)
+	websocketCors := middleware.NewWebsocketCors(deps.CorsAllowedOrigins)
 	// Juju API handlers
 	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
 	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
@@ -548,11 +653,20 @@ func NewService(ctx context.Context, p Params) (*Service, error) {
 	s.mux.Handle("/migrate/logtransfer", jujuapi.LogTransferHandler(ctx, s.jimm, params))
 
 	// serve the ssh public key fingerprint
-	s.mux.Get("/ssh/public-key-fingerprints", jimmhttp.WriteFingerprints(p.HostKeyFingerprints))
+	s.mux.Get("/ssh/public-key-fingerprints", jimmhttp.WriteFingerprints(deps.HostKeyFingerprints))
 
-	s.isLeader = p.IsLeader
+	s.isLeader = deps.IsLeader
 
 	return s, nil
+}
+
+// NewService creates a new Service using the given params.
+func NewService(ctx context.Context, p Params) (*Service, error) {
+	deps, err := NewServiceDependencies(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return NewServiceFromDependencies(ctx, deps)
 }
 
 // parseURLWithOptionalScheme parses an input string
@@ -616,42 +730,30 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 	svc.Go(func() error { return s.WatchModelSummaries(ctx) })
 }
 
-// setupDischarger set JIMM up as a discharger of 3rd party caveats addressed to it. This is intended
-// to enable Juju controllers to check for permissions using a macaroon-based workflow (atm only
-// for cross model relations).
-func (s *Service) setupDischarger(p Params) (*discharger.MacaroonDischarger, error) {
-	cfg := discharger.MacaroonDischargerConfig{
-		PublicKey:              p.PublicKey,
-		PrivateKey:             p.PrivateKey,
-		MacaroonExpiryDuration: p.MacaroonExpiryDuration,
-		ControllerUUID:         p.ControllerUUID,
-	}
-	MacaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, s.jimm.Database, s.jimm.OfferAuthorizer)
-	if err != nil {
-		return nil, errors.E(err)
-	}
-	return MacaroonDischarger, nil
-}
-
-func (s *Service) setupSessionStore(ctx context.Context, sessionSecret []byte, db *db.Database) (*pgstore.PGStore, error) {
-
+func setupSessionStore(sessionSecret []byte, db *db.Database) (*pgstore.PGStore, []func() error, error) {
 	sqlDb, err := db.DB.DB()
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, nil, errors.E(err)
 	}
 
 	store, err := pgstore.NewPGStoreFromPool(sqlDb, sessionSecret)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to create session store: %w", err))
+		return nil, nil, errors.E(fmt.Errorf("failed to create session store: %w", err))
 	}
 
 	// Cleanup expired session every 30 minutes
 	cleanupQuit, cleanupDone := store.Cleanup(time.Minute * 30)
-	s.AddCleanup(func() error {
-		store.StopCleanup(cleanupQuit, cleanupDone)
-		return nil
-	})
-	return store, nil
+	cleanups := []func() error{
+		func() error {
+			store.StopCleanup(cleanupQuit, cleanupDone)
+			return nil
+		},
+		func() error {
+			store.Close()
+			return nil
+		},
+	}
+	return store, cleanups, nil
 }
 
 func openDB(ctx context.Context, dsn string, logSQL bool) (*gorm.DB, error) {
@@ -675,7 +777,7 @@ func openDB(ctx context.Context, dsn string, logSQL bool) (*gorm.DB, error) {
 	})
 }
 
-func (s *Service) setupCredentialStore(ctx context.Context, p Params, db *db.Database) (jimmcreds.CredentialStore, error) {
+func setupCredentialStore(ctx context.Context, p Params, db *db.Database) (jimmcreds.CredentialStore, error) {
 
 	// Only enable Postgres storage for secrets if explicitly enabled.
 	if p.InsecureSecretStorage {

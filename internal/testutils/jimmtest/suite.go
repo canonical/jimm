@@ -8,14 +8,12 @@ import (
 	_ "embed"
 	"encoding/pem"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-chi/chi/v5"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	corejujutesting "github.com/juju/juju/juju/testing"
@@ -24,21 +22,21 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	gc "gopkg.in/check.v1"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
+	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/discharger"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/login"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
-	"github.com/canonical/jimm/v3/internal/pubsub"
 	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
@@ -86,11 +84,11 @@ type JIMMSuite struct {
 	COFGAClient *cofga.Client
 	COFGAParams *cofga.OpenFGAParams
 
-	Server          *httptest.Server
-	cancel          context.CancelFunc
-	deviceFlowChan  chan string
-	databaseName    string
-	databaseCleanup []func()
+	Server         *httptest.Server
+	cancel         context.CancelFunc
+	deviceFlowChan chan string
+	cleanup        []func()
+	service        *jimmsvc.Service
 
 	modifiers jimmModifiers
 }
@@ -108,67 +106,42 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	gct := &GocheckTester{
 		C: c,
 		AddCleanup: func(f func()) {
-			s.databaseCleanup = append(s.databaseCleanup, f)
+			s.cleanup = append(s.cleanup, f)
 		},
 	}
 
-	pgdb, databaseName := testdb.PostgresDBWithDbName(gct, nil)
-	s.databaseName = databaseName
+	dsn := testdb.CreateEmptyDatabase(gct)
 
-	database := &db.Database{
-		DB: pgdb,
+	params := jimmsvc.Params{
+		ControllerUUID:                ControllerUUID,
+		PrivateKey:                    "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:                     "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+		MacaroonExpiryDuration:        time.Hour,
+		JWTExpiryDuration:             time.Minute,
+		PublicDNSName:                 "127.0.0.1",
+		CrossModelQueryTimeout:        time.Second * 5,
+		BootstrapLoginTokenRefreshURL: "https://jimm.localhost/.well-known/jwks.json",
+		DashboardFinalRedirectURL:     "localhost", // Can be any URL.
 	}
-	err = database.Migrate(ctx)
-	c.Assert(err, gc.Equals, nil)
 
-	alice, err := dbmodel.NewIdentity("alice@canonical.com")
+	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	c.Assert(err, gc.IsNil)
-	alice.LastLogin = db.Now()
+	database := &db.Database{DB: gormDB}
 
-	err = database.GetIdentity(ctx, alice)
-	c.Assert(err, gc.Equals, nil)
-
-	s.AdminUser = openfga.NewUser(alice, s.OFGAClient)
-	s.AdminUser.JimmAdmin = true
+	riverClient, err := river.NewRiverClient(database)
+	c.Assert(err, gc.IsNil)
 
 	credentialStore := NewInMemoryCredentialStore()
-	if s.modifiers.useHardcodedJWKS {
-		set, privateKey, err := jwkSetFromPrivateKeyFile()
-		c.Assert(err, gc.IsNil)
-		err = credentialStore.PutJWKS(ctx, set)
-		c.Assert(err, gc.IsNil)
-		err = credentialStore.PutJWKSPrivateKey(ctx, privateKey)
-		c.Assert(err, gc.IsNil)
-		err = credentialStore.PutJWKSExpiry(ctx, time.Now().UTC().AddDate(10, 0, 0))
-		c.Assert(err, gc.IsNil)
-	}
-	var authenticator login.OAuthAuthenticator
-	if s.modifiers.useRealAuthN {
-		authenticator = s.realAuthenticationService(c, database)
-	} else {
-		s.deviceFlowChan = make(chan string, 1)
-		a := newMockOAuthAuthenticator(c, s.deviceFlowChan)
-		authenticator = &a
-	}
 
-	mux := chi.NewRouter()
-	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
-		mux.Mount(path, h.Routes())
+	jwtExpiry := params.JWTExpiryDuration
+	if jwtExpiry == 0 {
+		jwtExpiry = 24 * time.Hour
 	}
-
-	mountHandler(
-		"/.well-known",
-		jimmhttp.NewWellKnownHandler(credentialStore),
-	)
-
-	jwksService := jimmjwx.NewJWKSService(credentialStore)
-	err = jwksService.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-	c.Assert(err, gc.Equals, nil)
 
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:   "127.0.0.1",
+		Host:   params.PublicDNSName,
 		Store:  credentialStore,
-		Expiry: time.Minute,
+		Expiry: jwtExpiry,
 	})
 
 	dialer := &jujuclient.Dialer{
@@ -176,31 +149,74 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		JWTService:                 jwtService,
 	}
 
-	riverClient, err := river.NewRiverClient(database)
-	c.Assert(err, gc.IsNil)
-	err = river.MigrateRiver(ctx, database)
-	c.Assert(err, gc.IsNil)
-
-	s.JIMM, err = jimm.New(jimm.Parameters{
-		UUID:                          ControllerUUID,
+	deps := &jimmsvc.ServiceDependencies{
+		ControllerUUID:                params.ControllerUUID,
+		PublicDNSName:                 params.PublicDNSName,
+		PublicDNSHost:                 params.PublicDNSName,
+		CrossModelQueryTimeout:        params.CrossModelQueryTimeout,
+		BootstrapLoginTokenRefreshURL: params.BootstrapLoginTokenRefreshURL,
+		MacaroonExpiryDuration:        params.MacaroonExpiryDuration,
+		DischargerPrivateKey:          params.PrivateKey,
+		DischargerPublicKey:           params.PublicKey,
 		Database:                      database,
-		Dialer:                        jimm.NewDialerAdapter(dialer),
-		CredentialStore:               credentialStore,
-		Pubsub:                        &pubsub.Hub{MaxConcurrency: 10},
-		OpenFGAClient:                 s.OFGAClient,
+		Client:                        jimm.NewDialerAdapter(dialer),
 		RiverClient:                   riverClient,
-		OAuthAuthenticator:            authenticator,
-		MigrationTokenGenerator:       mockMigrationTokenGenerator{},
+		OpenFGAClient:                 s.OFGAClient,
+		CredentialStore:               credentialStore,
 		JWTService:                    jwtService,
-		CrossModelQueryTimeout:        time.Second * 5,
-		BootstrapLoginTokenRefreshURL: "https://jimm.localhost/.well-known/jwks.json",
-	})
+		JWKSService:                   jimmjwx.NewJWKSService(credentialStore),
+	}
+
+	if s.modifiers.useRealAuthN {
+		authSvc := s.realAuthenticationService(c, database)
+		deps.OAuthAuthenticator = authSvc
+		deps.MigrationTokenGenerator = authSvc
+
+		oauthHandler, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+			Authenticator:             authSvc,
+			DashboardFinalRedirectURL: params.DashboardFinalRedirectURL,
+		})
+		c.Assert(err, gc.IsNil)
+		deps.OAuthHandler = oauthHandler
+		s.deviceFlowChan = nil
+	} else {
+		s.deviceFlowChan = make(chan string, 1)
+		a := newMockOAuthAuthenticator(c, s.deviceFlowChan)
+		deps.OAuthAuthenticator = &a
+		deps.MigrationTokenGenerator = mockMigrationTokenGenerator{}
+		deps.OAuthHandler = nil // This field can be nil to disable browser auth.
+	}
+
+	s.service, err = jimmsvc.NewServiceFromDependencies(ctx, deps)
+	c.Assert(err, gc.IsNil)
+	s.JIMM = s.service.JIMM()
+	s.OFGAClient = s.JIMM.OpenFGAClient
+
+	err = river.MigrateRiver(ctx, s.JIMM.Database)
 	c.Assert(err, gc.IsNil)
 
-	macaroonDischarger := setupMacaroonDischarger(c, ControllerUUID, database, s.JIMM.OfferAuthorizer)
-	localDischargePath := "/macaroons"
-	mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
-	s.Server = httptest.NewServer(mux)
+	if s.modifiers.useHardcodedJWKS {
+		set, privateKey, err := jwkSetFromPrivateKeyFile()
+		c.Assert(err, gc.IsNil)
+		err = s.JIMM.CredentialStore.PutJWKS(ctx, set)
+		c.Assert(err, gc.IsNil)
+		err = s.JIMM.CredentialStore.PutJWKSPrivateKey(ctx, privateKey)
+		c.Assert(err, gc.IsNil)
+		err = s.JIMM.CredentialStore.PutJWKSExpiry(ctx, time.Now().UTC().AddDate(10, 0, 0))
+		c.Assert(err, gc.IsNil)
+	} else {
+		err = s.service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
+		c.Assert(err, gc.IsNil)
+	}
+
+	alice, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, gc.IsNil)
+	err = s.JIMM.Database.GetIdentity(ctx, alice)
+	c.Assert(err, gc.Equals, nil)
+
+	s.AdminUser = openfga.NewUser(alice, s.OFGAClient)
+	s.AdminUser.JimmAdmin = true
+	s.Server = httptest.NewServer(s.service)
 
 	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, gc.Equals, nil)
@@ -256,24 +272,19 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 	if s.Server != nil {
 		s.Server.Close()
 	}
+	if s.service != nil {
+		s.service.Cleanup()
+	}
 	if s.JIMM != nil && s.JIMM.Database != nil {
 		if err := s.JIMM.Database.Close(); err != nil {
 			c.Logf("failed to close database connections at tear down: %s", err)
 		}
 	}
 
-	for _, cleanup := range s.databaseCleanup {
+	for _, cleanup := range s.cleanup {
 		cleanup()
 	}
 
-	// Only delete the DB after closing connections to it.
-	_, skipCleanup := os.LookupEnv("NO_DB_CLEANUP")
-	if !skipCleanup {
-		err := testdb.DeleteDatabase(s.databaseName)
-		if err != nil {
-			c.Logf("failed to delete database (%s): %s", s.databaseName, err)
-		}
-	}
 }
 
 func (s *JIMMSuite) UseRealAuthentication(c *gc.C) {
@@ -286,7 +297,7 @@ func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.Au
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, gc.IsNil)
-	s.databaseCleanup = append(s.databaseCleanup, func() {
+	s.cleanup = append(s.cleanup, func() {
 		sessionStore.Close()
 	})
 
@@ -304,18 +315,6 @@ func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.Au
 	})
 	c.Assert(err, gc.IsNil)
 	return authSvc
-}
-
-func setupMacaroonDischarger(c *gc.C, uuid string, db *db.Database, offerAuthorizer discharger.OfferAuthorizer) *discharger.MacaroonDischarger {
-	cfg := discharger.MacaroonDischargerConfig{
-		MacaroonExpiryDuration: 1 * time.Hour,
-		ControllerUUID:         uuid,
-		PrivateKey:             "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-		PublicKey:              "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-	}
-	macaroonDischarger, err := discharger.NewMacaroonDischarger(cfg, db, offerAuthorizer)
-	c.Assert(err, gc.IsNil)
-	return macaroonDischarger
 }
 
 func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {

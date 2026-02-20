@@ -331,6 +331,7 @@ func getOrCreateTemplateDatabase() (string, string, error) {
 }
 
 // CreateEmptyDatabase creates an empty Postgres database and returns the DSN.
+// Schedules the DB to be deleted when the test finishes.
 func CreateEmptyDatabase(t Tester) string {
 	databaseName, dsn, err := createEmptyDatabase("jimm_test_" + t.Name())
 	if err != nil {

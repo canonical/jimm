@@ -17,7 +17,6 @@ import (
 
 	cofga "github.com/canonical/ofga"
 	petname "github.com/dustinkirkland/golang-petname"
-	"github.com/go-chi/chi/v5"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/client/application"
 	"github.com/juju/juju/cloud"
@@ -31,7 +30,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -166,22 +164,7 @@ func (s *WebsocketE2ESuite) SetUpTest(c *gc.C) {
 	s.E2ESuite.SetUpTest(c)
 
 	s.Params.ControllerUUID = ControllerUUID
-
-	mux := chi.NewRouter()
-	mountHandler := func(path string, h jimmhttp.JIMMHttpHandler) {
-		mux.Mount(path, h.Routes())
-	}
-	mux.Handle("/api", jujuapi.APIHandler(ctx, s.JIMM, s.Params))
-	mountHandler(
-		"/model/{uuid}/{type:charms|applications}",
-		jimmhttp.NewHTTPProxyHandler(s.JIMM.LoginManager, s.JIMM.JujuManager),
-	)
-	mux.Handle("/model/*", http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.JIMM, s.Params)))
-	jwks := jimmhttp.NewWellKnownHandler(s.JIMM.CredentialStore)
-	mux.HandleFunc("/.well-known/jwks.json", jwks.JWKS)
-	mux.Handle("/migrate/logtransfer", jujuapi.LogTransferHandler(ctx, s.JIMM, s.Params))
-
-	s.APIHandler = mux
+	s.APIHandler = s.service
 	s.HTTP = httptest.NewTLSServer(s.APIHandler)
 
 	s.AddAdminUser(c, "alice@canonical.com")

@@ -1,9 +1,5 @@
 // Copyright 2025 Canonical.
 
-// Note that this file is not an integration test
-// because of limitations with the JujuConnSuite
-// so it is placed under the cmd package.
-
 package cmd
 
 import (
