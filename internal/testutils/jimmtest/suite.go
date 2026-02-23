@@ -16,7 +16,6 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
-	corejujutesting "github.com/juju/juju/juju/testing"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwa"
@@ -475,41 +474,6 @@ func (s *JIMMSuite) AddRole(c *gc.C, roleName string) dbmodel.RoleEntry {
 // This is necessary as the mock authenticator simulates polling an external OIDC server.
 func (s *JIMMSuite) EnableDeviceFlow(username string) {
 	s.deviceFlowChan <- username
-}
-
-// A JujuSuite is a suite that intialises a JIMM and adds the testing juju
-// controller.
-type JujuSuite struct {
-	JIMMSuite
-	corejujutesting.JujuConnSuite
-	LoggingSuite
-}
-
-func (s *JujuSuite) SetUpSuite(c *gc.C) {
-	s.JujuConnSuite.SetUpSuite(c)
-	s.LoggingSuite.SetUpSuite(c)
-}
-
-func (s *JujuSuite) TearDownSuite(c *gc.C) {
-	s.LoggingSuite.TearDownSuite(c)
-	s.JujuConnSuite.TearDownSuite(c)
-}
-
-func (s *JujuSuite) SetUpTest(c *gc.C) {
-	s.JIMMSuite.SetUpTest(c)
-	s.ControllerConfigAttrs = map[string]interface{}{
-		"login-token-refresh-url": s.Server.URL + "/.well-known/jwks.json",
-	}
-	s.JujuConnSuite.SetUpTest(c)
-	s.LoggingSuite.SetUpTest(c)
-
-	s.AddController(c, "controller-1", s.APIInfo(c))
-}
-
-func (s *JujuSuite) TearDownTest(c *gc.C) {
-	s.LoggingSuite.TearDownTest(c)
-	s.JujuConnSuite.TearDownTest(c)
-	s.JIMMSuite.TearDownTest(c)
 }
 
 type mockMigrationTokenGenerator struct{}
