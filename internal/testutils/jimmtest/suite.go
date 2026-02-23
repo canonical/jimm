@@ -35,6 +35,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
+	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/river"
@@ -95,6 +96,7 @@ type JIMMSuite struct {
 
 func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	var err error
+	s.cleanup = nil
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
@@ -124,7 +126,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		DashboardFinalRedirectURL:     "localhost", // Can be any URL.
 	}
 
-	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.NewGormTestLogger(gct)})
 	c.Assert(err, gc.IsNil)
 	database := &db.Database{DB: gormDB}
 
@@ -281,10 +283,10 @@ func (s *JIMMSuite) TearDownTest(c *gc.C) {
 		}
 	}
 
-	for _, cleanup := range s.cleanup {
-		cleanup()
+	for i := len(s.cleanup) - 1; i >= 0; i-- {
+		s.cleanup[i]()
 	}
-
+	s.cleanup = nil
 }
 
 func (s *JIMMSuite) UseRealAuthentication(c *gc.C) {
