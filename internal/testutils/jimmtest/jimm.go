@@ -56,7 +56,6 @@ type JIMMEnv struct {
 	AdminUser   *openfga.User
 	OFGAClient  *openfga.OFGAClient
 	COFGAClient *cofga.Client
-	COFGAParams *cofga.OpenFGAParams
 
 	Server         *httptest.Server
 	deviceFlowChan chan string
@@ -64,15 +63,15 @@ type JIMMEnv struct {
 }
 
 func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
+	// TODO: We can't modify the context on the *testing.T that is embedded in the *qt.C,
+	// so callers won't have the test logger in their context.
+	ctx := SetupTestLogger(c)
 	o := applySetupOptions(opts)
 	s := JIMMEnv{}
-	var err error
-	s.cleanup = nil
-
-	ctx := c.Context()
 
 	// Setup OpenFGA.
-	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.Name())
+	var err error
+	s.OFGAClient, s.COFGAClient, _, err = SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
 	dsn := testdb.CreateEmptyDatabase(c)
