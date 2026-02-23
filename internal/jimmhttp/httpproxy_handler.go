@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
+// CredentialStore provides the necessary credentials to connect to a model's controller.
 type CredentialStore interface {
 	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
