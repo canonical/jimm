@@ -3,12 +3,12 @@
 package rebac_admin_test
 
 import (
-	"context"
 	"strings"
+	"testing"
 
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
@@ -16,11 +16,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type resourcesSuite struct {
-	jimmtest.JIMMSuite
+func SetupResourcesTest(c *qt.C) (s jimmtest.JIMMEnv) {
+	return jimmtest.SetupJimmEnv(c)
 }
-
-var _ = gc.Suite(&resourcesSuite{})
 
 // resourcesTestEnv is used to create entries in JIMM's database.
 // The rebacAdminSuite does not spin up a Juju controller so we cannot use
@@ -63,13 +61,15 @@ models:
   owner: alice@canonical.com
 `
 
-func (s *resourcesSuite) TestListResources(c *gc.C) {
-	ctx := context.Background()
+func TestListResourcesIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupResourcesTest(c)
+	ctx := c.Context()
+
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	resourcesSvc := rebac_admin.NewResourcesService(jujuapi.NewJIMMAdapter(s.JIMM))
-	tester := jimmtest.GocheckTester{C: c}
-	env := jimmtest.ParseEnvironment(tester, resourcesTestEnv)
-	env.PopulateDB(tester, s.JIMM.Database)
+	env := jimmtest.ParseEnvironment(c, resourcesTestEnv)
+	env.PopulateDB(c, s.JIMM.Database)
 	type testEntity struct {
 		Id       string
 		Name     string
@@ -225,18 +225,18 @@ func (s *resourcesSuite) TestListResources(c *gc.C) {
 			EntityName: &t.nameFilter,
 			EntityType: &t.typeFilter,
 		})
-		c.Assert(err, gc.IsNil)
-		c.Assert(*resources.Meta.Page, gc.Equals, t.wantPage)
-		c.Assert(resources.Meta.Size, gc.Equals, t.wantSize)
+		c.Assert(err, qt.IsNil)
+		c.Assert(*resources.Meta.Page, qt.Equals, t.wantPage)
+		c.Assert(resources.Meta.Size, qt.Equals, t.wantSize)
 		if t.wantNextpage == nil {
-			c.Assert(resources.Next.Page, gc.IsNil)
+			c.Assert(resources.Next.Page, qt.IsNil)
 		} else {
-			c.Assert(*resources.Next.Page, gc.Equals, *t.wantNextpage)
+			c.Assert(*resources.Next.Page, qt.Equals, *t.wantNextpage)
 		}
 		for i := range len(t.ids) {
-			c.Assert(resources.Data[i].Entity.Id, gc.Equals, t.ids[i].Id)
+			c.Assert(resources.Data[i].Entity.Id, qt.Equals, t.ids[i].Id)
 			if t.ids[i].ParentId != "" {
-				c.Assert(resources.Data[i].Parent.Id, gc.Equals, t.ids[i].ParentId)
+				c.Assert(resources.Data[i].Parent.Id, qt.Equals, t.ids[i].ParentId)
 			}
 		}
 	}

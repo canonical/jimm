@@ -4,9 +4,11 @@ package testing
 
 import (
 	"context"
+	"testing"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/client/modelmanager"
@@ -16,8 +18,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -25,13 +25,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type modelE2EManagerSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
+func TestListModelSummaries(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 
-var _ = gc.Suite(&modelE2EManagerSuite{})
-
-func (s *modelE2EManagerSuite) TestListModelSummaries(c *gc.C) {
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -43,8 +40,8 @@ func (s *modelE2EManagerSuite) TestListModelSummaries(c *gc.C) {
 	})
 
 	models, err := client.ListModelSummaries("bob@canonical.com", true)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, jimmtest.CmpEquals(
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(models, qt.CmpEquals(
 		cmpopts.IgnoreTypes(&time.Time{}),
 		cmpopts.IgnoreFields(base.UserModelSummary{}, "DefaultSeries", "AgentVersion"),
 		// Ignore machine counts as they depend on timing
@@ -101,11 +98,14 @@ func (s *modelE2EManagerSuite) TestListModelSummaries(c *gc.C) {
 	}})
 }
 
-func (s *modelE2EManagerSuite) TestListModelSummariesWithoutControllerUUIDMasking(c *gc.C) {
+func TestListModelSummariesWithoutControllerUUIDMasking(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn1 := s.Open(c, nil, "charlie", nil)
 	defer conn1.Close()
 	err := conn1.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
 	// we need to make bob jimm admin to disable controller UUID masking
 	err = s.OFGAClient.AddRelation(context.Background(),
 		openfga.Tuple{
@@ -114,13 +114,13 @@ func (s *modelE2EManagerSuite) TestListModelSummariesWithoutControllerUUIDMaskin
 			Target:   ofganames.ConvertTag(s.JIMM.ResourceTag()),
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	err = conn.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// now that UUID masking has been disabled for the duration of this
 	// connection, we can make bob a regular user again.
@@ -131,27 +131,30 @@ func (s *modelE2EManagerSuite) TestListModelSummariesWithoutControllerUUIDMaskin
 			Target:   ofganames.ConvertTag(s.JIMM.ResourceTag()),
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModelSummaries("bob@canonical.com", false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(len(models), gc.Equals, 2)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(len(models), qt.Equals, 2)
 	for _, model := range models {
-		c.Assert(model.ControllerUUID, gc.Not(gc.Equals), jimmtest.ControllerUUID)
+		c.Assert(model.ControllerUUID, qt.Not(qt.Equals), jimmtest.ControllerUUID)
 	}
 }
 
-func (s *modelE2EManagerSuite) TestListModels(c *gc.C) {
+func TestListModels(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "charlie@canonical.com", nil)
 	defer conn.Close()
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ListModels("charlie@canonical.com")
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	c.Assert(
 		models,
-		jimmtest.CmpEquals(
+		qt.CmpEquals(
 			cmpopts.IgnoreTypes(&time.Time{}),
 			cmpopts.SortSlices(func(a, b base.UserModel) bool {
 				return a.Name < b.Name
@@ -173,20 +176,23 @@ func (s *modelE2EManagerSuite) TestListModels(c *gc.C) {
 	)
 }
 
-func (s *modelE2EManagerSuite) TestModelInfo(c *gc.C) {
+func TestModelInfo(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	model4Name := petname.Generate(2, "-")
 	mt4 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), model4Name, names.NewCloudTag(jimmtest.TestE2ECloudName), jimmtest.TestE2ECloudRegionName, s.Model2.CloudCredential.ResourceTag())
 
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
 	err = bob.SetModelAccess(context.Background(), mt4, ofganames.WriterRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	model5Name := petname.Generate(2, "-")
 	mt5 := s.AddModel(c, names.NewUserTag("charlie@canonical.com"), model5Name, names.NewCloudTag(jimmtest.TestE2ECloudName), jimmtest.TestE2ECloudRegionName, s.Model2.CloudCredential.ResourceTag())
 	err = bob.SetModelAccess(context.Background(), mt5, ofganames.AdministratorRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -199,10 +205,10 @@ func (s *modelE2EManagerSuite) TestModelInfo(c *gc.C) {
 		mt5,
 		names.NewModelTag("00000000-0000-0000-0000-000000000007"),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Verify we got results for all 6 model requests
-	c.Assert(models, gc.HasLen, 6)
+	c.Assert(models, qt.HasLen, 6)
 
 	// Helper to find user access in Users slice
 	findUserAccess := func(users []jujuparams.ModelUserInfo, username string) string {
@@ -215,62 +221,65 @@ func (s *modelE2EManagerSuite) TestModelInfo(c *gc.C) {
 	}
 
 	// Model 1 (s.Model) - bob has admin access
-	c.Assert(models[0].Error, gc.IsNil)
-	c.Assert(models[0].Result.Name, gc.Equals, s.Model.Name)
-	c.Assert(models[0].Result.UUID, gc.Equals, s.Model.UUID.String)
-	c.Assert(models[0].Result.Life, gc.Equals, life.Alive)
-	c.Assert(models[0].Result.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
-	c.Assert(models[0].Result.CloudCredentialTag, gc.Equals, s.Model.CloudCredential.Tag().String())
-	c.Assert(models[0].Result.OwnerTag, gc.Equals, names.NewUserTag("bob@canonical.com").String())
+	c.Assert(models[0].Error, qt.IsNil)
+	c.Assert(models[0].Result.Name, qt.Equals, s.Model.Name)
+	c.Assert(models[0].Result.UUID, qt.Equals, s.Model.UUID.String)
+	c.Assert(models[0].Result.Life, qt.Equals, life.Alive)
+	c.Assert(models[0].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
+	c.Assert(models[0].Result.CloudCredentialTag, qt.Equals, s.Model.CloudCredential.Tag().String())
+	c.Assert(models[0].Result.OwnerTag, qt.Equals, names.NewUserTag("bob@canonical.com").String())
 	// As admin, bob can see all users
-	c.Assert(findUserAccess(models[0].Result.Users, "bob@canonical.com"), gc.Equals, "admin")
-	c.Assert(findUserAccess(models[0].Result.Users, "alice@canonical.com"), gc.Equals, "admin")
+	c.Assert(findUserAccess(models[0].Result.Users, "bob@canonical.com"), qt.Equals, "admin")
+	c.Assert(findUserAccess(models[0].Result.Users, "alice@canonical.com"), qt.Equals, "admin")
 
 	// Model 2 (s.Model2) - bob has no access
-	c.Assert(models[1].Result, gc.IsNil)
-	c.Assert(models[1].Error, gc.Not(gc.IsNil))
-	c.Assert(models[1].Error.Code, gc.Equals, jujuparams.CodeUnauthorized)
+	c.Assert(models[1].Result, qt.IsNil)
+	c.Assert(models[1].Error, qt.Not(qt.IsNil))
+	c.Assert(models[1].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
 
 	// Model 3 (s.Model3) - bob has read access
-	c.Assert(models[2].Error, gc.IsNil)
-	c.Assert(models[2].Result.Name, gc.Equals, s.Model3.Name)
-	c.Assert(models[2].Result.UUID, gc.Equals, s.Model3.UUID.String)
-	c.Assert(models[2].Result.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
-	c.Assert(models[2].Result.CloudCredentialTag, gc.Equals, s.Model3.CloudCredential.Tag().String())
-	c.Assert(models[2].Result.OwnerTag, gc.Equals, names.NewUserTag("charlie@canonical.com").String())
+	c.Assert(models[2].Error, qt.IsNil)
+	c.Assert(models[2].Result.Name, qt.Equals, s.Model3.Name)
+	c.Assert(models[2].Result.UUID, qt.Equals, s.Model3.UUID.String)
+	c.Assert(models[2].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
+	c.Assert(models[2].Result.CloudCredentialTag, qt.Equals, s.Model3.CloudCredential.Tag().String())
+	c.Assert(models[2].Result.OwnerTag, qt.Equals, names.NewUserTag("charlie@canonical.com").String())
 	// As reader, bob can only see himself in users list
-	c.Assert(findUserAccess(models[2].Result.Users, "bob@canonical.com"), gc.Equals, "read")
+	c.Assert(findUserAccess(models[2].Result.Users, "bob@canonical.com"), qt.Equals, "read")
 	// Read access means no machines visible
-	c.Assert(models[2].Result.Machines, gc.IsNil)
+	c.Assert(models[2].Result.Machines, qt.IsNil)
 
 	// Model 4 (mt4) - bob has write access
-	c.Assert(models[3].Error, gc.IsNil)
-	c.Assert(models[3].Result.Name, gc.Equals, model4Name)
-	c.Assert(models[3].Result.UUID, gc.Equals, mt4.Id())
-	c.Assert(models[3].Result.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
-	c.Assert(models[3].Result.OwnerTag, gc.Equals, names.NewUserTag("charlie@canonical.com").String())
+	c.Assert(models[3].Error, qt.IsNil)
+	c.Assert(models[3].Result.Name, qt.Equals, model4Name)
+	c.Assert(models[3].Result.UUID, qt.Equals, mt4.Id())
+	c.Assert(models[3].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
+	c.Assert(models[3].Result.OwnerTag, qt.Equals, names.NewUserTag("charlie@canonical.com").String())
 	// As writer, bob can only see himself in users list
-	c.Assert(findUserAccess(models[3].Result.Users, "bob@canonical.com"), gc.Equals, "write")
+	c.Assert(findUserAccess(models[3].Result.Users, "bob@canonical.com"), qt.Equals, "write")
 	// Write access means machines are visible (not nil, though may be empty)
 
 	// Model 5 (mt5) - bob has admin access
-	c.Assert(models[4].Error, gc.IsNil)
-	c.Assert(models[4].Result.Name, gc.Equals, model5Name)
-	c.Assert(models[4].Result.UUID, gc.Equals, mt5.Id())
-	c.Assert(models[4].Result.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
-	c.Assert(models[4].Result.OwnerTag, gc.Equals, names.NewUserTag("charlie@canonical.com").String())
+	c.Assert(models[4].Error, qt.IsNil)
+	c.Assert(models[4].Result.Name, qt.Equals, model5Name)
+	c.Assert(models[4].Result.UUID, qt.Equals, mt5.Id())
+	c.Assert(models[4].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
+	c.Assert(models[4].Result.OwnerTag, qt.Equals, names.NewUserTag("charlie@canonical.com").String())
 	// As admin, bob can see all users with access
-	c.Assert(findUserAccess(models[4].Result.Users, "bob@canonical.com"), gc.Equals, "admin")
-	c.Assert(findUserAccess(models[4].Result.Users, "alice@canonical.com"), gc.Equals, "admin")
-	c.Assert(findUserAccess(models[4].Result.Users, "charlie@canonical.com"), gc.Equals, "admin")
+	c.Assert(findUserAccess(models[4].Result.Users, "bob@canonical.com"), qt.Equals, "admin")
+	c.Assert(findUserAccess(models[4].Result.Users, "alice@canonical.com"), qt.Equals, "admin")
+	c.Assert(findUserAccess(models[4].Result.Users, "charlie@canonical.com"), qt.Equals, "admin")
 
 	// Non-existent model - unauthorized
-	c.Assert(models[5].Result, gc.IsNil)
-	c.Assert(models[5].Error, gc.Not(gc.IsNil))
-	c.Assert(models[5].Error.Code, gc.Equals, jujuparams.CodeUnauthorized)
+	c.Assert(models[5].Result, qt.IsNil)
+	c.Assert(models[5].Error, qt.Not(qt.IsNil))
+	c.Assert(models[5].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
 }
 
-func (s *modelE2EManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C) {
+func TestModelInfoDisableControllerUUIDMasking(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	// Make bob a JIMM administrator so he can disable UUID masking
 	err := s.OFGAClient.AddRelation(context.Background(),
 		openfga.Tuple{
@@ -279,28 +288,31 @@ func (s *modelE2EManagerSuite) TestModelInfoDisableControllerUUIDMasking(c *gc.C
 			Target:   ofganames.ConvertTag(s.JIMM.ResourceTag()),
 		},
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	// Disable controller UUID masking
 	err = conn.APICall("JIMM", 4, "", "DisableControllerUUIDMasking", nil, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
 	models, err := client.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(models, gc.HasLen, 1)
-	c.Assert(models[0].Error, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(models, qt.HasLen, 1)
+	c.Assert(models[0].Error, qt.IsNil)
 
 	// The controller UUID should NOT be the masked JIMM controller UUID
-	c.Assert(models[0].Result.ControllerUUID, gc.Not(gc.Equals), jimmtest.ControllerUUID)
+	c.Assert(models[0].Result.ControllerUUID, qt.Not(qt.Equals), jimmtest.ControllerUUID)
 	// It should be the actual backing controller's UUID
-	c.Assert(models[0].Result.ControllerUUID, gc.Not(gc.Equals), "")
+	c.Assert(models[0].Result.ControllerUUID, qt.Not(qt.Equals), "")
 }
 
-func (s *modelE2EManagerSuite) TestCreateModel(c *gc.C) {
+func TestCreateModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -405,33 +417,36 @@ func (s *modelE2EManagerSuite) TestCreateModel(c *gc.C) {
 			CloudCredentialTag: test.credentialTag,
 		}, &mi)
 		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Assert(err, qt.ErrorMatches, test.expectError)
 			continue
 		}
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(mi.Name, gc.Equals, test.name)
-		c.Assert(mi.UUID, gc.Not(gc.Equals), "")
-		c.Assert(mi.OwnerTag, gc.Equals, test.ownerTag)
-		c.Assert(mi.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
-		c.Assert(mi.Users, gc.Not(gc.HasLen), 0)
+		c.Assert(err, qt.Equals, nil)
+		c.Assert(mi.Name, qt.Equals, test.name)
+		c.Assert(mi.UUID, qt.Not(qt.Equals), "")
+		c.Assert(mi.OwnerTag, qt.Equals, test.ownerTag)
+		c.Assert(mi.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
+		c.Assert(mi.Users, qt.Not(qt.HasLen), 0)
 		if test.credentialTag == "" {
-			c.Assert(mi.CloudCredentialTag, gc.Not(gc.Equals), "")
+			c.Assert(mi.CloudCredentialTag, qt.Not(qt.Equals), "")
 		} else {
 			tag, err := names.ParseCloudCredentialTag(mi.CloudCredentialTag)
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(tag.String(), gc.Equals, test.credentialTag)
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(tag.String(), qt.Equals, test.credentialTag)
 		}
 		if test.cloudTag == "" {
-			c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(jimmtest.TestE2ECloudName).String())
+			c.Assert(mi.CloudTag, qt.Equals, names.NewCloudTag(jimmtest.TestE2ECloudName).String())
 		} else {
 			ct, err := names.ParseCloudTag(test.cloudTag)
-			c.Assert(err, gc.Equals, nil)
-			c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(ct.Id()).String())
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(mi.CloudTag, qt.Equals, names.NewCloudTag(ct.Id()).String())
 		}
 	}
 }
 
-func (s *modelE2EManagerSuite) TestCreateDuplicateModelsFails(c *gc.C) {
+func TestCreateDuplicateModelsFails(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -446,12 +461,15 @@ func (s *modelE2EManagerSuite) TestCreateDuplicateModelsFails(c *gc.C) {
 	}
 	var mi jujuparams.ModelInfo
 	err := createModel(mi)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	err = createModel(mi)
-	c.Assert(err, gc.ErrorMatches, `model bob@canonical\.com/`+modelName+` already exists \(already exists\)`)
+	c.Assert(err, qt.ErrorMatches, `model bob@canonical\.com/`+modelName+` already exists \(already exists\)`)
 }
 
-func (s *modelE2EManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
+func TestGrantAndRevokeModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
@@ -461,30 +479,33 @@ func (s *modelE2EManagerSuite) TestGrantAndRevokeModel(c *gc.C) {
 	client2 := modelmanager.NewClient(conn2)
 
 	res, err := client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res, gc.HasLen, 1)
-	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.HasLen, 1)
+	c.Assert(res[0].Error, qt.ErrorMatches, "unauthorized")
 
 	err = client.GrantModel("charlie@canonical.com", "write", s.Model.UUID.String)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res, gc.HasLen, 1)
-	c.Assert(res[0].Error, gc.IsNil)
-	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.HasLen, 1)
+	c.Assert(res[0].Error, qt.IsNil)
+	c.Assert(res[0].Result.UUID, qt.Equals, s.Model.UUID.String)
 
 	err = client.RevokeModel("charlie@canonical.com", "read", s.Model.UUID.String)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res, gc.HasLen, 1)
-	c.Assert(res[0].Error, gc.Not(gc.IsNil))
-	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.HasLen, 1)
+	c.Assert(res[0].Error, qt.Not(qt.IsNil))
+	c.Assert(res[0].Error, qt.ErrorMatches, "unauthorized")
 }
 
-func (s *modelE2EManagerSuite) TestUserRevokeOwnAccess(c *gc.C) {
+func TestUserRevokeOwnAccess(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
@@ -494,25 +515,28 @@ func (s *modelE2EManagerSuite) TestUserRevokeOwnAccess(c *gc.C) {
 	client2 := modelmanager.NewClient(conn2)
 
 	err := client.GrantModel("charlie@canonical.com", "read", s.Model.UUID.String)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res, gc.HasLen, 1)
-	c.Assert(res[0].Error, gc.IsNil)
-	c.Assert(res[0].Result.UUID, gc.Equals, s.Model.UUID.String)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.HasLen, 1)
+	c.Assert(res[0].Error, qt.IsNil)
+	c.Assert(res[0].Result.UUID, qt.Equals, s.Model.UUID.String)
 
 	err = client2.RevokeModel("charlie@canonical.com", "read", s.Model.UUID.String)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res, gc.HasLen, 1)
-	c.Assert(res[0].Error, gc.Not(gc.IsNil))
-	c.Assert(res[0].Error, gc.ErrorMatches, "unauthorized")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.HasLen, 1)
+	c.Assert(res[0].Error, qt.Not(qt.IsNil))
+	c.Assert(res[0].Error, qt.ErrorMatches, "unauthorized")
 }
 
-func (s *modelE2EManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
+func TestModifyModelAccessErrors(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -594,15 +618,18 @@ func (s *modelE2EManagerSuite) TestModifyModelAccessErrors(c *gc.C) {
 			},
 		}
 		err := conn.APICall("ModelManager", 10, "", "ModifyModelAccess", req, &res)
-		c.Assert(err, gc.Equals, nil)
-		c.Assert(res.Results, gc.HasLen, 1)
-		c.Assert(res.Results[0].Error, gc.ErrorMatches, test.expectError)
+		c.Assert(err, qt.Equals, nil)
+		c.Assert(res.Results, qt.HasLen, 1)
+		c.Assert(res.Results[0].Error, qt.ErrorMatches, test.expectError)
 	}
 }
 
 var zeroDuration = time.Duration(0)
 
-func (s *modelE2EManagerSuite) TestDestroyModel(c *gc.C) {
+func TestDestroyModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	// Create a new model to destroy so we don't affect other tests
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -615,70 +642,85 @@ func (s *modelE2EManagerSuite) TestDestroyModel(c *gc.C) {
 		CloudTag:           names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 		CloudCredentialTag: "cloudcred-" + jimmtest.TestE2ECloudName + "_bob@canonical.com_cred",
 	}, &mi)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	client := modelmanager.NewClient(conn)
 	tag := names.NewModelTag(mi.UUID)
 	err = client.DestroyModel(tag, nil, nil, nil, &zeroDuration)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Check the model is now dying.
 	mis, err := client.ModelInfo([]names.ModelTag{tag})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(mis, gc.HasLen, 1)
-	c.Assert(mis[0].Error, gc.Equals, (*jujuparams.Error)(nil))
-	c.Assert(mis[0].Result.Life, gc.Equals, life.Dying)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(mis, qt.HasLen, 1)
+	c.Assert(mis[0].Error, qt.Equals, (*jujuparams.Error)(nil))
+	c.Assert(mis[0].Result.Life, qt.Equals, life.Dying)
 
 	// Make sure it's not an error if you destroy a model that's not there.
 	err = client.DestroyModel(tag, nil, nil, nil, &zeroDuration)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *modelE2EManagerSuite) TestDumpModel(c *gc.C) {
+func TestDumpModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModel(tag, false)
-	c.Check(err, gc.Equals, nil)
-	c.Check(res, gc.Not(gc.HasLen), 0)
+	c.Check(err, qt.Equals, nil)
+	c.Check(res, qt.Not(qt.HasLen), 0)
 }
 
-func (s *modelE2EManagerSuite) TestDumpModelUnauthorized(c *gc.C) {
+func TestDumpModelUnauthorized(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "charlie", nil)
 	defer conn.Close()
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModel(tag, true)
-	c.Check(err, gc.ErrorMatches, `unauthorized`)
-	c.Check(res, gc.IsNil)
+	c.Check(err, qt.ErrorMatches, `unauthorized`)
+	c.Check(res, qt.IsNil)
 }
 
-func (s *modelE2EManagerSuite) TestDumpModelDB(c *gc.C) {
+func TestDumpModelDB(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModelDB(tag)
-	c.Check(err, gc.Equals, nil)
-	c.Check(res, gc.Not(gc.HasLen), 0)
+	c.Check(err, qt.Equals, nil)
+	c.Check(res, qt.Not(qt.HasLen), 0)
 }
 
-func (s *modelE2EManagerSuite) TestDumpModelDBUnauthorized(c *gc.C) {
+func TestDumpModelDBUnauthorized(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "charlie", nil)
 	defer conn.Close()
 
 	tag := s.Model.ResourceTag()
 	client := modelmanager.NewClient(conn)
 	res, err := client.DumpModelDB(tag)
-	c.Check(err, gc.ErrorMatches, `unauthorized`)
-	c.Check(res, gc.IsNil)
+	c.Check(err, qt.ErrorMatches, `unauthorized`)
+	c.Check(res, qt.IsNil)
 }
 
-func (s *modelE2EManagerSuite) TestChangeModelCredential(c *gc.C) {
+func TestChangeModelCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -688,15 +730,18 @@ func (s *modelE2EManagerSuite) TestChangeModelCredential(c *gc.C) {
 	s.UpdateCloudCredential(c, credTag, cred)
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	mir, err := client.ModelInfo([]names.ModelTag{modelTag})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(mir, gc.HasLen, 1)
-	c.Assert(mir[0].Error, gc.IsNil)
-	c.Assert(mir[0].Result.CloudCredentialTag, gc.Equals, credTag.String())
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(mir, qt.HasLen, 1)
+	c.Assert(mir[0].Error, qt.IsNil)
+	c.Assert(mir[0].Result.CloudCredentialTag, qt.Equals, credTag.String())
 }
 
-func (s *modelE2EManagerSuite) TestChangeModelCredentialUnauthorizedModel(c *gc.C) {
+func TestChangeModelCredentialUnauthorizedModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "charlie", nil)
 	defer conn.Close()
 
@@ -704,10 +749,13 @@ func (s *modelE2EManagerSuite) TestChangeModelCredentialUnauthorizedModel(c *gc.
 	credTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/bob@canonical.com/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized`)
 }
 
-func (s *modelE2EManagerSuite) TestChangeModelCredentialUnauthorizedCredential(c *gc.C) {
+func TestChangeModelCredentialUnauthorizedCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -715,10 +763,13 @@ func (s *modelE2EManagerSuite) TestChangeModelCredentialUnauthorizedCredential(c
 	credTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/alice@canonical.com/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized`)
 }
 
-func (s *modelE2EManagerSuite) TestChangeModelCredentialNotFoundModel(c *gc.C) {
+func TestChangeModelCredentialNotFoundModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -726,10 +777,13 @@ func (s *modelE2EManagerSuite) TestChangeModelCredentialNotFoundModel(c *gc.C) {
 	credTag := s.Model.CloudCredential.ResourceTag()
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `model not found`)
+	c.Assert(err, qt.ErrorMatches, `model not found`)
 }
 
-func (s *modelE2EManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc.C) {
+func TestChangeModelCredentialNotFoundCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -737,10 +791,13 @@ func (s *modelE2EManagerSuite) TestChangeModelCredentialNotFoundCredential(c *gc
 	credTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/bob@canonical.com/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `cloudcredential "`+jimmtest.TestE2ECloudName+`/bob@canonical.com/cred2" not found`)
+	c.Assert(err, qt.ErrorMatches, `cloudcredential "`+jimmtest.TestE2ECloudName+`/bob@canonical.com/cred2" not found`)
 }
 
-func (s *modelE2EManagerSuite) TestChangeModelCredentialLocalUserCredential(c *gc.C) {
+func TestChangeModelCredentialLocalUserCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -748,10 +805,13 @@ func (s *modelE2EManagerSuite) TestChangeModelCredentialLocalUserCredential(c *g
 	credTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/bob/cred2")
 	client := modelmanager.NewClient(conn)
 	err := client.ChangeModelCredential(modelTag, credTag)
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized`)
 }
 
-func (s *modelE2EManagerSuite) TestModelDefaults(c *gc.C) {
+func TestModelDefaults(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	err := s.JIMM.Database.AddCloud(context.Background(), &dbmodel.Cloud{
 		Name: "aws",
 		Type: "ec2",
@@ -761,7 +821,7 @@ func (s *modelE2EManagerSuite) TestModelDefaults(c *gc.C) {
 			Name: "eu-central-2",
 		}},
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -771,16 +831,16 @@ func (s *modelE2EManagerSuite) TestModelDefaults(c *gc.C) {
 		"a": 1,
 		"b": "value1",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	err = client.SetModelDefaults("aws", "eu-central-2", map[string]interface{}{
 		"b": "value2",
 		"c": 17,
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	values, err := client.ModelDefaults("aws")
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{
+	c.Assert(err, qt.IsNil)
+	c.Assert(values, qt.DeepEquals, config.ModelDefaultAttributes{
 		"a": config.AttributeDefaultValues{
 			Regions: []config.RegionDefaultValue{{
 				Name:  "eu-central-1",
@@ -805,14 +865,14 @@ func (s *modelE2EManagerSuite) TestModelDefaults(c *gc.C) {
 	})
 
 	err = client.UnsetModelDefaults("aws", "eu-central-1", "b", "c")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = client.UnsetModelDefaults("aws", "eu-central-2", "a", "b")
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	values, err = client.ModelDefaults("aws")
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{
+	c.Assert(err, qt.IsNil)
+	c.Assert(values, qt.DeepEquals, config.ModelDefaultAttributes{
 		"a": config.AttributeDefaultValues{
 			Regions: []config.RegionDefaultValue{{
 				Name:  "eu-central-1",
@@ -832,6 +892,6 @@ func (s *modelE2EManagerSuite) TestModelDefaults(c *gc.C) {
 	client1 := modelmanager.NewClient(conn1)
 
 	values, err = client1.ModelDefaults("aws")
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(values, jc.DeepEquals, config.ModelDefaultAttributes{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(values, qt.DeepEquals, config.ModelDefaultAttributes{})
 }

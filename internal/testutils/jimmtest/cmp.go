@@ -4,9 +4,7 @@ package jimmtest
 
 import (
 	qt "github.com/frankban/quicktest"
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	gc "gopkg.in/check.v1"
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -50,30 +48,3 @@ var DBObjectEquals = qt.CmpEquals(
 	cmpopts.IgnoreFields(dbmodel.ApplicationOffer{}, "ID", "CreatedAt", "UpdatedAt", "ModelID"),
 	cmpopts.IgnoreFields(dbmodel.RoleEntry{}, "CreatedAt", "UpdatedAt"),
 )
-
-// CmpEquals uses cmp.Diff (see http://godoc.org/github.com/google/go-cmp/cmp#Diff)
-// to compare two values, passing opts to the comparer to enable custom
-// comparison.
-func CmpEquals(opts ...cmp.Option) gc.Checker {
-	return &cmpEqualsChecker{
-		CheckerInfo: &gc.CheckerInfo{
-			Name:   "CmpEquals",
-			Params: []string{"obtained", "expected"},
-		},
-		check: func(params []interface{}, names []string) (result bool, error string) {
-			if diff := cmp.Diff(params[0], params[1], opts...); diff != "" {
-				return false, diff
-			}
-			return true, ""
-		},
-	}
-}
-
-type cmpEqualsChecker struct {
-	*gc.CheckerInfo
-	check func(params []interface{}, names []string) (result bool, error string)
-}
-
-func (c *cmpEqualsChecker) Check(params []interface{}, names []string) (result bool, error string) {
-	return c.check(params, names)
-}

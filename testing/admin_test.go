@@ -14,9 +14,11 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/antonlindstrom/pgstore"
+	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
 	"github.com/juju/errors"
 	"github.com/juju/juju/api"
@@ -24,34 +26,25 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/utils/proxy"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type adminSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
+func TestLoginToController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
 
-func (s *adminSuite) SetUpTest(c *gc.C) {
-	s.UseRealAuthentication(c)
-	s.WebsocketE2ESuite.SetUpTest(c)
-}
-
-var _ = gc.Suite(&adminSuite{})
-
-func (s *adminSuite) TestLoginToController(c *gc.C) {
 	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
 	}, "test", nil)
 	defer conn.Close()
 	err := conn.Login(nil, "", "", nil)
-	c.Assert(err, gc.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
+	c.Assert(err, qt.ErrorMatches, `JIMM does not support login from old clients \(not supported\)`)
 	var resp jujuparams.RedirectInfoResult
 	err = conn.APICall("Admin", 3, "", "RedirectInfo", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, "(?s).*not implemented.*")
+	c.Assert(err, qt.ErrorMatches, "(?s).*not implemented.*")
 }
 
 // TestBrowserLogin takes a test user through the flow of logging into jimm
@@ -63,7 +56,10 @@ func (s *adminSuite) TestLoginToController(c *gc.C) {
 // We only test happy path here due to having tested edge cases and failure cases
 // within the auth service itself such as invalid cookies, expired access tokens and
 // missing/expired/revoked refresh tokens.
-func (s *adminSuite) TestBrowserLoginWithSafeEmail(c *gc.C) {
+func TestBrowserLoginWithSafeEmail(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+
 	testBrowserLogin(
 		c,
 		s,
@@ -74,7 +70,10 @@ func (s *adminSuite) TestBrowserLoginWithSafeEmail(c *gc.C) {
 	)
 }
 
-func (s *adminSuite) TestBrowserLoginWithUnsafeEmail(c *gc.C) {
+func TestBrowserLoginWithUnsafeEmail(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+
 	testBrowserLogin(
 		c,
 		s,
@@ -85,14 +84,14 @@ func (s *adminSuite) TestBrowserLoginWithUnsafeEmail(c *gc.C) {
 	)
 }
 
-func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail, expectedDisplayName string) {
+func testBrowserLogin(c *qt.C, s jimmtest.WebsocketE2ESuite, username, password, expectedEmail, expectedDisplayName string) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
 	sqldb, err := s.JIMM.Database.DB.DB()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	defer sessionStore.Close()
 
 	cookie, err := jimmtest.RunBrowserLogin(
@@ -101,20 +100,20 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 		username,
 		password,
 	)
-	c.Assert(err, gc.IsNil)
-	c.Assert(cookie, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(cookie, qt.Not(qt.Equals), "")
 
 	cookies := jimmtest.ParseCookies(cookie)
-	c.Assert(cookies, gc.HasLen, 1)
+	c.Assert(cookies, qt.HasLen, 1)
 
 	jar, err := cookiejar.New(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Now we move this cookie to the JIMM server on the admin suite and
 	// set the cookie on the jimm test server url so that the cookie can be
 	// sent on WS calls.
 	jimmURL, err := url.Parse(s.Server.URL)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	jar.SetCookies(jimmURL, cookies)
 
 	conn := s.OpenWithDialWebsocket(
@@ -129,14 +128,17 @@ func testBrowserLogin(c *gc.C, s *adminSuite, username, password, expectedEmail,
 
 	lr := &jujuparams.LoginResult{}
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
-	c.Assert(lr.UserInfo.Identity, gc.Equals, expectedEmail)
-	c.Assert(lr.UserInfo.DisplayName, gc.Equals, expectedDisplayName)
+	c.Assert(lr.UserInfo.Identity, qt.Equals, expectedEmail)
+	c.Assert(lr.UserInfo.DisplayName, qt.Equals, expectedDisplayName)
 }
 
 // TestBrowserLoginNoCookie attempts to login without a cookie.
-func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
+func TestBrowserLoginNoCookie(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+
 	conn := s.Open(
 		c,
 		&api.Info{
@@ -147,7 +149,7 @@ func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
 
 	lr := &jujuparams.LoginResult{}
 	err := conn.APICall("Admin", 4, "", "LoginWithSessionCookie", nil, lr)
-	c.Assert(err, gc.ErrorMatches, `missing cookie identity \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `missing cookie identity \(unauthorized access\)`)
 }
 
 // TestDeviceLogin takes a test user through the flow of logging into jimm
@@ -155,23 +157,26 @@ func (s *adminSuite) TestBrowserLoginNoCookie(c *gc.C) {
 //
 // Within the test are clear comments explaining what is happening when and why.
 // Please refer to these comments for further details.
-func (s *adminSuite) TestDeviceLogin(c *gc.C) {
+func TestDeviceLogin(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+
 	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
 	}, "test", nil)
 	defer conn.Close()
 
 	err := s.JIMM.Database.Migrate(context.Background())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Create a user in keycloak
 	user, err := jimmtest.CreateRandomKeycloakUser()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// We create a http client to keep the same cookies across all requests
 	// using a simple jar.
 	jar, err := cookiejar.New(nil)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	client := &http.Client{
 		Jar: jar,
@@ -195,18 +200,18 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	// where the user code is set as a part of the query string.
 	var loginDeviceResp params.LoginDeviceResponse
 	err = conn.APICall("Admin", 4, "", "LoginDevice", nil, &loginDeviceResp)
-	c.Assert(err, gc.IsNil)
-	c.Assert(loginDeviceResp.UserCode, gc.Not(gc.IsNil))
-	c.Assert(loginDeviceResp.VerificationURI, gc.Equals, "http://localhost:8082/realms/jimm/device")
+	c.Assert(err, qt.IsNil)
+	c.Assert(loginDeviceResp.UserCode, qt.Not(qt.IsNil))
+	c.Assert(loginDeviceResp.VerificationURI, qt.Equals, "http://localhost:8082/realms/jimm/device")
 
 	// Step 2, complete the user side of the authentication by sending the
 	// user code to the verification URI using the "complete" method.
 	userResp, err := client.Get(loginDeviceResp.VerificationURI + "?user_code=" + loginDeviceResp.UserCode)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	body := userResp.Body
 	defer body.Close()
 	b, err := io.ReadAll(body)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	loginForm := string(b)
 
 	// Step 2.1, handle the login form (see this func for more details)
@@ -217,44 +222,44 @@ func (s *adminSuite) TestDeviceLogin(c *gc.C) {
 	// user code, for the simplicity of testing, we are retrieving it AFTER.
 	var sessionTokenResp params.GetDeviceSessionTokenResponse
 	err = conn.APICall("Admin", 4, "", "GetDeviceSessionToken", nil, &sessionTokenResp)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	// Ensure it is base64 and decodable
 	decodedToken, err := base64.StdEncoding.DecodeString(sessionTokenResp.SessionToken)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Step 4, use this session token to "login".
 
 	// Test no token present
 	var loginResult jujuparams.LoginResult
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", nil, &loginResult)
-	c.Assert(err, gc.ErrorMatches, "no token presented.*")
+	c.Assert(err, qt.ErrorMatches, "no token presented.*")
 
 	// Test token not base64 encoded
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest{SessionToken: string(decodedToken)}, &loginResult)
-	c.Assert(err, gc.ErrorMatches, "failed to decode token.*")
+	c.Assert(err, qt.ErrorMatches, "failed to decode token.*")
 
 	// Test token base64 encoded passes authentication
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest(sessionTokenResp), &loginResult)
-	c.Assert(err, gc.IsNil)
-	c.Assert(loginResult.UserInfo.Identity, gc.Equals, "user-"+user.Email)
-	c.Assert(loginResult.UserInfo.DisplayName, gc.Equals, strings.Split(user.Email, "@")[0])
+	c.Assert(err, qt.IsNil)
+	c.Assert(loginResult.UserInfo.Identity, qt.Equals, "user-"+user.Email)
+	c.Assert(loginResult.UserInfo.DisplayName, qt.Equals, strings.Split(user.Email, "@")[0])
 
 	// Finally, ensure db did indeed update the access token for this user
 	updatedUser, err := dbmodel.NewIdentity(user.Email)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
-	c.Assert(s.JIMM.Database.GetIdentity(context.Background(), updatedUser), gc.IsNil)
+	c.Assert(s.JIMM.Database.GetIdentity(context.Background(), updatedUser), qt.IsNil)
 	// TODO(ale8k): Do we need to validate the token again for the test?
 	// It has just been through a verifier etc and was returned directly
 	// from the device grant?
-	c.Assert(updatedUser.AccessToken, gc.Not(gc.Equals), "")
+	c.Assert(updatedUser.AccessToken, qt.Not(qt.Equals), "")
 
 }
 
 // handleLoginForm runs through the login process emulating the user typing in
 // their username and password and then clicking consent, to complete
 // the device login flow.
-func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, password string) {
+func handleLoginForm(c *qt.C, loginForm string, client *http.Client, username, password string) {
 	// Step 2.2, now we'll be redirected to a sign-in page and must sign in.
 	re := regexp.MustCompile(`action="(.*?)" method=`)
 	match := re.FindStringSubmatch(loginForm)
@@ -266,7 +271,7 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, p
 	v.Add("username", username)
 	v.Add("password", password)
 	loginResp, err := client.PostForm(loginFormUrl, v)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	loginRespBody := loginResp.Body
 	defer loginRespBody.Close()
@@ -274,7 +279,7 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, p
 	// Step 2.3, the user will now be redirected to a consent screen
 	// and is expected to click "yes". We simulate this by posting the form programatically.
 	loginRespB, err := io.ReadAll(loginRespBody)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	loginRespS := string(loginRespB)
 
 	re = regexp.MustCompile(`action="(.*?)" method=`)
@@ -285,18 +290,21 @@ func handleLoginForm(c *gc.C, loginForm string, client *http.Client, username, p
 	v = url.Values{}
 	v.Add("accept", "Yes")
 	consentResp, err := client.PostForm("http://localhost:8082"+consentFormUri, v)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	defer consentResp.Body.Close()
 
 	// Read the response to ensure it is OK and has been accepted.
 	b, err := io.ReadAll(consentResp.Body)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	re = regexp.MustCompile(`Device Login Successful`)
-	c.Assert(re.MatchString(string(b)), gc.Equals, true)
+	c.Assert(re.MatchString(string(b)), qt.Equals, true)
 }
 
-func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
+func TestLoginWithClientCredentials(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+
 	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
 	}, "test", nil)
@@ -314,15 +322,15 @@ func (s *adminSuite) TestLoginWithClientCredentials(c *gc.C) {
 		ClientID:     validClientID,
 		ClientSecret: validClientSecret,
 	}, &loginResult)
-	c.Assert(err, gc.IsNil)
-	c.Assert(loginResult.ControllerTag, gc.Equals, names.NewControllerTag(s.Params.ControllerUUID).String())
-	c.Assert(loginResult.UserInfo.Identity, gc.Equals, names.NewUserTag("test-client-id@serviceaccount").String())
+	c.Assert(err, qt.IsNil)
+	c.Assert(loginResult.ControllerTag, qt.Equals, names.NewControllerTag(s.Params.ControllerUUID).String())
+	c.Assert(loginResult.UserInfo.Identity, qt.Equals, names.NewUserTag("test-client-id@serviceaccount").String())
 
 	err = conn.APICall("Admin", 4, "", "LoginWithClientCredentials", params.LoginWithClientCredentialsRequest{
 		ClientID:     "invalid-client-id",
 		ClientSecret: "invalid-secret",
 	}, &loginResult)
-	c.Assert(err, gc.ErrorMatches, `invalid client credentials: oauth2: "invalid_client" "Invalid client or Invalid client credentials" \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `invalid client credentials: oauth2: "invalid_client" "Invalid client or Invalid client credentials" \(unauthorized access\)`)
 }
 
 // getDialWebsocketWithCustomCookieJar is mostly the default dialer configuration exception

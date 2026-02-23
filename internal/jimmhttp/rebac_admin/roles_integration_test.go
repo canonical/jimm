@@ -3,13 +3,13 @@
 package rebac_admin_test
 
 import (
-	"context"
 	"fmt"
+	"testing"
 
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
@@ -19,23 +19,29 @@ import (
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
-type roleSuite struct {
-	jimmtest.JIMMSuite
+type rolesTest struct {
+	jimmtest.JIMMEnv
 	roleSvc *rebac_admin.RolesService
 }
 
-func (s *roleSuite) SetUpTest(c *gc.C) {
-	s.JIMMSuite.SetUpTest(c)
-	s.roleSvc = rebac_admin.NewRoleService(jujuapi.NewJIMMAdapter(s.JIMM))
+func SetupRolesTest(c *qt.C) (s *rolesTest) {
+	jimmEnv := jimmtest.SetupJimmEnv(c)
+	roleSvc := rebac_admin.NewRoleService(jujuapi.NewJIMMAdapter(jimmEnv.JIMM))
+	s = &rolesTest{
+		JIMMEnv: jimmEnv,
+		roleSvc: roleSvc,
+	}
+	return s
 }
 
-var _ = gc.Suite(&roleSuite{})
+func TestListRolesWithFilterIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupRolesTest(c)
+	ctx := c.Context()
 
-func (s roleSuite) TestListRolesWithFilterIntegration(c *gc.C) {
-	ctx := context.Background()
 	for i := range 10 {
 		_, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, fmt.Sprintf("test-role-filter-%d", i))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 	}
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
@@ -43,29 +49,32 @@ func (s roleSuite) TestListRolesWithFilterIntegration(c *gc.C) {
 	page := 0
 	params := &resources.GetRolesParams{Size: &pageSize, Page: &page}
 	res, err := s.roleSvc.ListRoles(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(res.Meta.Size, gc.Equals, 5)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(res.Meta.Size, qt.Equals, 5)
 
 	match := "role-filter-1"
 	params.Filter = &match
 	res, err = s.roleSvc.ListRoles(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(len(res.Data), gc.Equals, 1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(len(res.Data), qt.Equals, 1)
 
 	match = "role"
 	params.Filter = &match
 	res, err = s.roleSvc.ListRoles(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(len(res.Data), gc.Equals, pageSize)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(len(res.Data), qt.Equals, pageSize)
 }
 
-func (s roleSuite) TestGetRoleEntitlementsIntegration(c *gc.C) {
-	ctx := context.Background()
+func TestGetRoleEntitlementsIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupRolesTest(c)
+	ctx := c.Context()
+
 	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, "test-role")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(role.UUID), ofganames.AssigneeRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -82,22 +91,22 @@ func (s roleSuite) TestGetRoleEntitlementsIntegration(c *gc.C) {
 		tuples = append(tuples, t)
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	emptyPageToken := ""
 	req := resources.GetRolesItemEntitlementsParams{NextPageToken: &emptyPageToken}
 	var entitlements []resources.EntityEntitlement
 	res, err := s.roleSvc.GetRoleEntitlements(ctx, role.UUID, &req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
 	entitlements = append(entitlements, res.Data...)
-	c.Assert(entitlements, gc.HasLen, 6)
+	c.Assert(entitlements, qt.HasLen, 6)
 	modelEntitlementCount := 0
 	controllerEntitlementCount := 0
 	for _, entitlement := range entitlements {
-		c.Assert(entitlement.Entitlement, gc.Equals, ofganames.AdministratorRelation.String())
-		c.Assert(entitlement.EntityId, gc.Matches, `test-(model|controller)-\d`)
+		c.Assert(entitlement.Entitlement, qt.Equals, ofganames.AdministratorRelation.String())
+		c.Assert(entitlement.EntityId, qt.Matches, `test-(model|controller)-\d`)
 		switch entitlement.EntityType {
 		case openfga.ModelType.String():
 			modelEntitlementCount++
@@ -108,8 +117,8 @@ func (s roleSuite) TestGetRoleEntitlementsIntegration(c *gc.C) {
 			c.FailNow()
 		}
 	}
-	c.Assert(modelEntitlementCount, gc.Equals, 3)
-	c.Assert(controllerEntitlementCount, gc.Equals, 3)
+	c.Assert(modelEntitlementCount, qt.Equals, 3)
+	c.Assert(controllerEntitlementCount, qt.Equals, 3)
 }
 
 // patchRoleEntitlementTestEnv is used to create entries in JIMM's database.
@@ -162,16 +171,18 @@ models:
 `
 
 // TestPatchRoleEntitlementsIntegration creates 4 models and verifies that relations from a role to these models can be added/removed.
-func (s roleSuite) TestPatchRoleEntitlementsIntegration(c *gc.C) {
-	ctx := context.Background()
-	tester := jimmtest.GocheckTester{C: c}
-	env := jimmtest.ParseEnvironment(tester, patchRoleEntitlementTestEnv)
-	env.PopulateDB(tester, s.JIMM.Database)
+func TestPatchRoleEntitlementsIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupRolesTest(c)
+	ctx := c.Context()
+
+	env := jimmtest.ParseEnvironment(c, patchRoleEntitlementTestEnv)
+	env.PopulateDB(c, s.JIMM.Database)
 	oldModels := []string{env.Models[0].UUID, env.Models[1].UUID}
 	newModels := []string{env.Models[2].UUID, env.Models[3].UUID}
 
 	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, "test-role")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewRoleTag(role.UUID), ofganames.AssigneeRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -184,10 +195,10 @@ func (s roleSuite) TestPatchRoleEntitlementsIntegration(c *gc.C) {
 		tuples = append(tuples, t)
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	allowed, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[0], false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, true)
 	// Above we have added granted the role with administrator permission to 2 models.
 	// Below, we will request those 2 relations to be removed and add 2 different relations.
 
@@ -215,19 +226,19 @@ func (s roleSuite) TestPatchRoleEntitlementsIntegration(c *gc.C) {
 	}
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err := s.roleSvc.PatchRoleEntitlements(ctx, role.UUID, entitlementPatches)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Equals, true)
 
 	for i := range 2 {
 		allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[i], false)
-		c.Assert(err, gc.IsNil)
-		c.Assert(allowed, gc.Equals, false)
+		c.Assert(err, qt.IsNil)
+		c.Assert(allowed, qt.Equals, false)
 	}
 	for i := range 2 {
 		newTuple := tuples[0]
 		newTuple.Target = ofganames.ConvertTag(names.NewModelTag(newModels[i]))
 		allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, newTuple, false)
-		c.Assert(err, gc.IsNil)
-		c.Assert(allowed, gc.Equals, true)
+		c.Assert(err, qt.IsNil)
+		c.Assert(allowed, qt.Equals, true)
 	}
 }

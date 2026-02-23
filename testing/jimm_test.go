@@ -8,17 +8,17 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"testing"
 	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/juju/juju/api/client/modelconfig"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -31,19 +31,16 @@ import (
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
-type jimmSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
+func TestListControllersAdmin(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 
-var _ = gc.Suite(&jimmSuite{})
-
-func (s *jimmSuite) TestListControllersAdmin(c *gc.C) {
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	cis, err := client.ListControllers()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	confs := s.GetControllersConfig(c)
 	controllerInfos := make([]apiparams.ControllerInfo, 0, len(confs.Controllers))
 	for name, conf := range confs.Controllers {
@@ -64,8 +61,8 @@ func (s *jimmSuite) TestListControllersAdmin(c *gc.C) {
 }
 
 // assertControllerInfos verifies that the controller infos match expectations, including API addresses.
-func assertControllerInfos(c *gc.C, actual []apiparams.ControllerInfo, expected []apiparams.ControllerInfo, confs *jimmtest.ControllersConfig) {
-	c.Check(actual, jimmtest.CmpEquals(
+func assertControllerInfos(c *qt.C, actual []apiparams.ControllerInfo, expected []apiparams.ControllerInfo, confs *jimmtest.ControllersConfig) {
+	c.Check(actual, qt.CmpEquals(
 		cmpopts.IgnoreFields(apiparams.ControllerInfo{}, "AgentVersion", "APIAddresses"),
 		cmpopts.SortSlices(func(a, b apiparams.ControllerInfo) bool {
 			return a.UUID < b.UUID
@@ -79,7 +76,7 @@ func assertControllerInfos(c *gc.C, actual []apiparams.ControllerInfo, expected 
 				expectedAddrs := conf.ToAPIInfo().Addrs
 				for _, expectedAddr := range expectedAddrs {
 					found := slices.Contains(ci.APIAddresses, expectedAddr)
-					c.Assert(found, gc.Equals, true, gc.Commentf(
+					c.Assert(found, qt.Equals, true, qt.Commentf(
 						"controller %q: expected address %q not found in APIAddresses %v",
 						name, expectedAddr, ci.APIAddresses))
 				}
@@ -88,7 +85,10 @@ func assertControllerInfos(c *gc.C, actual []apiparams.ControllerInfo, expected 
 	}
 }
 
-func (s *jimmSuite) TestListControllersOrdinaryUser(c *gc.C) {
+func TestListControllersOrdinaryUser(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	ctx := context.Background()
 
 	ctrl0 := &dbmodel.Controller{
@@ -110,36 +110,36 @@ func (s *jimmSuite) TestListControllersOrdinaryUser(c *gc.C) {
 	}
 
 	err := s.JIMM.Database.AddController(ctx, ctrl0)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.AddController(ctx, ctrl1)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.AddController(ctx, ctrl2)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Explicitly set access to controllers 0 and 2, but not 1.
 	u, err := dbmodel.NewIdentity("alex@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	openfgaUser := openfga.NewUser(u, s.JIMM.OpenFGAClient)
 
 	err = openfgaUser.SetControllerAccess(ctx, names.NewControllerTag(ctrl0.UUID), ofganames.CanAddModelRelation)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = openfgaUser.SetControllerAccess(ctx, names.NewControllerTag(ctrl2.UUID), ofganames.CanAddModelRelation)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	conn := s.Open(c, nil, "alex@canonical.com", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	cis, err := client.ListControllers()
-	c.Assert(err, gc.Equals, nil)
-	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{
+	c.Assert(err, qt.Equals, nil)
+	c.Check(cis, qt.DeepEquals, []apiparams.ControllerInfo{
 		{
 			Name:     "dummy-0",
 			UUID:     "00000001-0000-0000-0000-000000000000",
@@ -159,33 +159,42 @@ func (s *jimmSuite) TestListControllersOrdinaryUser(c *gc.C) {
 	})
 }
 
-func (s *jimmSuite) TestModelGet(c *gc.C) {
+func TestModelGet(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := modelconfig.NewClient(conn)
 
 	jimmCfg, err := client.ModelGet()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	v, ok := jimmCfg["agent-version"]
-	c.Assert(ok, gc.Equals, true)
+	c.Assert(ok, qt.Equals, true)
 	vers, ok := v.(string)
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(vers, gc.Equals, jimmversion.ControllerVersion)
+	c.Assert(ok, qt.Equals, true)
+	c.Assert(vers, qt.Equals, jimmversion.ControllerVersion)
 }
 
-func (s *jimmSuite) TestListControllersUnauthorized(c *gc.C) {
+func TestListControllersUnauthorized(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "abrandnewuserwithnopermissions", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	cis, err := client.ListControllers()
-	c.Assert(err, gc.Equals, nil)
-	c.Check(cis, jc.DeepEquals, []apiparams.ControllerInfo{})
+	c.Assert(err, qt.Equals, nil)
+	c.Check(cis, qt.DeepEquals, []apiparams.ControllerInfo{})
 }
 
-func (s *jimmSuite) TestAddControllerPublicAddressWithoutPort(c *gc.C) {
+func TestAddControllerPublicAddressWithoutPort(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -220,12 +229,15 @@ func (s *jimmSuite) TestAddControllerPublicAddressWithoutPort(c *gc.C) {
 
 	for _, test := range tests {
 		ci, err := client.AddController(&test.req)
-		c.Assert(err, gc.ErrorMatches, test.expectedError)
-		c.Check(ci, jc.DeepEquals, apiparams.ControllerInfo{})
+		c.Assert(err, qt.ErrorMatches, test.expectedError)
+		c.Check(ci, qt.DeepEquals, apiparams.ControllerInfo{})
 	}
 }
 
-func (s *jimmSuite) TestAddController(c *gc.C) {
+func TestAddController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -243,7 +255,7 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	}
 
 	ci, err := client.AddController(&acr)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ciExpected := apiparams.ControllerInfo{
 		Name:          acr.Name,
 		UUID:          acr.UUID,
@@ -259,24 +271,27 @@ func (s *jimmSuite) TestAddController(c *gc.C) {
 	assertControllerInfos(c, []apiparams.ControllerInfo{ci}, []apiparams.ControllerInfo{ciExpected}, s.GetControllersConfig(c))
 
 	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `failed to add controller: controller "controller-2" already exists \(already exists\)`)
-	c.Assert(jujuparams.IsCodeAlreadyExists(err), gc.Equals, true)
+	c.Assert(err, qt.ErrorMatches, `failed to add controller: controller "controller-2" already exists \(already exists\)`)
+	c.Assert(jujuparams.IsCodeAlreadyExists(err), qt.Equals, true)
 
 	acr.Name = "jimm"
 	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
-	c.Assert(jujuparams.IsBadRequest(err), gc.Equals, true)
+	c.Assert(err, qt.ErrorMatches, `cannot add a controller with name "jimm" \(bad request\)`)
+	c.Assert(jujuparams.IsBadRequest(err), qt.Equals, true)
 
 	conn = s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client = api.NewClient(conn)
 	acr.Name = "controller-2"
 	_, err = client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(jujuparams.IsCodeUnauthorized(err), qt.Equals, true)
 }
 
-func (s *jimmSuite) TestRemoveAndAddController(c *gc.C) {
+func TestRemoveAndAddController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -295,15 +310,18 @@ func (s *jimmSuite) TestRemoveAndAddController(c *gc.C) {
 	}
 
 	ci, err := client.AddController(&acr)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, err = client.RemoveController(&apiparams.RemoveControllerRequest{Name: acr.Name, Force: true})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ciNew, err := client.AddController(&acr)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ci, gc.DeepEquals, ciNew)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ci, qt.DeepEquals, ciNew)
 }
 
-func (s *jimmSuite) TestAddControllerCustomTLSHostname(c *gc.C) {
+func TestAddControllerCustomTLSHostname(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -322,10 +340,10 @@ func (s *jimmSuite) TestAddControllerCustomTLSHostname(c *gc.C) {
 	}
 
 	_, err := client.AddController(&acr)
-	c.Assert(err, gc.ErrorMatches, "failed to add controller: failed to dial the controller.*")
+	c.Assert(err, qt.ErrorMatches, "failed to add controller: failed to dial the controller.*")
 	acr.TLSHostname = "juju-apiserver"
 	ci, err := client.AddController(&acr)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	ciExpected := apiparams.ControllerInfo{
 		Name:          acr.Name,
 		UUID:          acr.UUID,
@@ -340,7 +358,10 @@ func (s *jimmSuite) TestAddControllerCustomTLSHostname(c *gc.C) {
 	assertControllerInfos(c, []apiparams.ControllerInfo{ci}, []apiparams.ControllerInfo{ciExpected}, s.GetControllersConfig(c))
 }
 
-func (s *jimmSuite) TestRemoveController(c *gc.C) {
+func TestRemoveController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -350,8 +371,8 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	_, err := client.RemoveController(&apiparams.RemoveControllerRequest{
 		Name: name,
 	})
-	c.Check(err, gc.ErrorMatches, `controller is still alive \(still alive\)`)
-	c.Check(jujuparams.ErrCode(err), gc.Equals, apiparams.CodeStillAlive)
+	c.Check(err, qt.ErrorMatches, `controller is still alive \(still alive\)`)
+	c.Check(jujuparams.ErrCode(err), qt.Equals, apiparams.CodeStillAlive)
 
 	conn2 := s.Open(c, nil, "bob", nil)
 	defer conn2.Close()
@@ -360,14 +381,14 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	_, err = client2.RemoveController(&apiparams.RemoveControllerRequest{
 		Name: name,
 	})
-	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
+	c.Check(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Check(jujuparams.ErrCode(err), qt.Equals, jujuparams.CodeUnauthorized)
 
 	ci, err := client.RemoveController(&apiparams.RemoveControllerRequest{
 		Name:  name,
 		Force: true,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ciExpected := apiparams.ControllerInfo{
 		Name:          name,
 		UUID:          conf.UUID,
@@ -382,7 +403,10 @@ func (s *jimmSuite) TestRemoveController(c *gc.C) {
 	assertControllerInfos(c, []apiparams.ControllerInfo{ci}, []apiparams.ControllerInfo{ciExpected}, s.GetControllersConfig(c))
 }
 
-func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
+func TestSetControllerDeprecated(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -393,7 +417,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		Name:       name,
 		Deprecated: true,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ciExpected := apiparams.ControllerInfo{
 		Name:          name,
 		UUID:          conf.UUID,
@@ -411,7 +435,7 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		Name:       name,
 		Deprecated: false,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	ciExpected = apiparams.ControllerInfo{
 		Name:          name,
 		UUID:          conf.UUID,
@@ -430,8 +454,8 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		Name:       "controller-2",
 		Deprecated: true,
 	})
-	c.Check(err, gc.ErrorMatches, `controller not found \(not found\)`)
-	c.Check(jujuparams.IsCodeNotFound(err), gc.Equals, true)
+	c.Check(err, qt.ErrorMatches, `controller not found \(not found\)`)
+	c.Check(jujuparams.IsCodeNotFound(err), qt.Equals, true)
 
 	conn = s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -440,32 +464,35 @@ func (s *jimmSuite) TestSetControllerDeprecated(c *gc.C) {
 		Name:       "controller-1",
 		Deprecated: true,
 	})
-	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-	c.Check(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+	c.Check(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Check(jujuparams.IsCodeUnauthorized(err), qt.Equals, true)
 }
 
-func (s *jimmSuite) TestAuditLog(c *gc.C) {
+func TestAuditLog(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 
 	_, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
-	c.Check(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-	c.Check(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeUnauthorized)
+	c.Check(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Check(jujuparams.ErrCode(err), qt.Equals, jujuparams.CodeUnauthorized)
 
 	mmclient := modelmanager.NewClient(conn)
 	zeroDuration := time.Duration(0)
 	err = mmclient.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, &zeroDuration)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	conn2 := s.Open(c, nil, "alice", nil)
 	defer conn2.Close()
 	client2 := api.NewClient(conn2)
 
 	evs, err := client2.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
-	c.Assert(len(evs.Events), gc.Equals, 9)
+	c.Assert(len(evs.Events), qt.Equals, 9)
 
 	bobTag := names.NewUserTag("bob@canonical.com").String()
 
@@ -523,13 +550,13 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 	truncatedEvents := make([]apiparams.AuditEvent, 4)
 	copy(truncatedEvents, evs.Events)
 	evs.Events = truncatedEvents
-	c.Check(evs, jc.DeepEquals, expectedEvents)
+	c.Check(evs, qt.DeepEquals, expectedEvents)
 
 	// alice can grant bob access to audit log entries
 	err = client2.GrantAuditLogAccess(&apiparams.AuditLogAccessRequest{
 		UserTag: names.NewUserTag("bob@canonical.com").String(),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// now bob can access audit events as well
 	conn3 := s.Open(c, nil, "bob", nil)
@@ -538,20 +565,26 @@ func (s *jimmSuite) TestAuditLog(c *gc.C) {
 
 	evs, err = client3.FindAuditEvents(&apiparams.FindAuditEventsRequest{})
 	evs.Events = truncatedEvents
-	c.Assert(err, gc.Equals, nil)
-	c.Check(evs, jc.DeepEquals, expectedEvents)
+	c.Assert(err, qt.Equals, nil)
+	c.Check(evs, qt.DeepEquals, expectedEvents)
 }
 
-func (s *jimmSuite) TestAuditLogFilterByMethod(c *gc.C) {
+func TestAuditLogFilterByMethod(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 	evs, err := client.FindAuditEvents(&apiparams.FindAuditEventsRequest{Method: "Deploy"})
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(len(evs.Events), gc.Equals, 0)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(len(evs.Events), qt.Equals, 0)
 }
 
-func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
+func TestFullModelStatus(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	_, conf := s.GetOneControllerConfig(c)
 
 	s.AddController(c, "controller-2", conf.ToAPIInfo())
@@ -569,12 +602,12 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	_, err := client.FullModelStatus(&apiparams.FullModelStatusRequest{
 		ModelTag: "invalid-model-tag",
 	})
-	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+	c.Assert(err, qt.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 
 	_, err = client.FullModelStatus(&apiparams.FullModelStatusRequest{
 		ModelTag: mt.String(),
 	})
-	c.Assert(err, gc.ErrorMatches, "unauthorized.*")
+	c.Assert(err, qt.ErrorMatches, "unauthorized.*")
 
 	conn = s.Open(c, nil, "alice@canonical.com", nil)
 	defer conn.Close()
@@ -583,9 +616,9 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 	status, err := client.FullModelStatus(&apiparams.FullModelStatusRequest{
 		ModelTag: mt.String(),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	c.Assert(status,
-		jimmtest.CmpEquals(
+		qt.CmpEquals(
 			cmpopts.EquateEmpty(),
 			cmpopts.IgnoreTypes(&time.Time{}),
 			cmpopts.IgnoreFields(jujuparams.ModelStatusInfo{}, "Version"),
@@ -604,7 +637,10 @@ func (s *jimmSuite) TestFullModelStatus(c *gc.C) {
 		})
 }
 
-func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
+func TestUpdateMigratedModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	// Open the API connection as user "bob".
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -614,7 +650,7 @@ func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 		TargetController: s.Model2.Controller.Name,
 	}
 	err := conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	// Open the API connection as user "alice".
 	conn = s.Open(c, nil, "alice", nil)
@@ -625,26 +661,29 @@ func (s *jimmSuite) TestUpdateMigratedModel(c *gc.C) {
 		TargetController: s.Model2.Controller.Name,
 	}
 	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	req = apiparams.UpdateMigratedModelRequest{
 		ModelTag:         "invalid-model-tag",
 		TargetController: s.Model2.Controller.Name,
 	}
 	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
-	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+	c.Assert(err, qt.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
 
-func (s *jimmSuite) TestImportModel(c *gc.C) {
+func TestImportModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	// Open the API connection as user "bob".
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	controllerName := s.Model2.Controller.Name
 
 	err := s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), s.Model2.Controller.ResourceTag(), s.Model2.ResourceTag())
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	err = s.JIMM.Database.DeleteModel(context.Background(), s.Model2)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	req := apiparams.ImportModelRequest{
 		Controller: controllerName,
@@ -652,37 +691,40 @@ func (s *jimmSuite) TestImportModel(c *gc.C) {
 		Owner:      "",
 	}
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	// Open the API connection as user "alice".
 	conn = s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	var model2 dbmodel.Model
 	model2.SetTag(s.Model2.ResourceTag())
 	err = s.JIMM.Database.GetModel(context.Background(), &model2)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(model2.CreatedAt.After(s.Model2.CreatedAt), gc.Equals, true)
+	c.Assert(err, qt.Equals, nil)
+	c.Check(model2.CreatedAt.After(s.Model2.CreatedAt), qt.Equals, true)
 
 	req = apiparams.ImportModelRequest{
 		Controller: controllerName,
 		ModelTag:   "invalid-model-tag",
 	}
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
-	c.Assert(err, gc.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
+	c.Assert(err, qt.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
 
-func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
+func TestAddCloudToController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	ctx := context.Background()
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	conn := s.Open(c, nil, "alice@canonical.com", nil)
 	defer conn.Close()
@@ -706,31 +748,34 @@ func (s *jimmSuite) TestAddCloudToController(c *gc.C) {
 		},
 	}
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	user := openfga.NewUser(u, s.OFGAClient)
 
 	cloud, err := s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cloud.Name, gc.DeepEquals, cloudName)
-	c.Assert(cloud.Type, gc.DeepEquals, "kubernetes")
+	c.Assert(err, qt.IsNil)
+	c.Assert(cloud.Name, qt.DeepEquals, cloudName)
+	c.Assert(cloud.Type, qt.DeepEquals, "kubernetes")
 
 	req1 := apiparams.RemoveCloudFromControllerRequest{
 		CloudTag:       names.NewCloudTag(cloudName).String(),
 		ControllerName: name,
 	}
 	err = conn.APICall("JIMM", 4, "", "RemoveCloudFromController", &req1, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
+func TestAddExistingCloudToController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	ctx := context.Background()
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	conn := s.Open(c, nil, "alice@canonical.com", nil)
 	defer conn.Close()
@@ -755,42 +800,45 @@ func (s *jimmSuite) TestAddExistingCloudToController(c *gc.C) {
 		},
 	}
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	user := openfga.NewUser(u, s.OFGAClient)
 	cloud, err := s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cloud.Name, gc.DeepEquals, cloudName)
-	c.Assert(cloud.Type, gc.DeepEquals, "MAAS")
+	c.Assert(err, qt.IsNil)
+	c.Assert(cloud.Name, qt.DeepEquals, cloudName)
+	c.Assert(cloud.Type, qt.DeepEquals, "MAAS")
 	// Simulate the cloud being present on the Juju controller but not in JIMM.
 	err = s.JIMM.Database.DeleteCloud(ctx, &cloud)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	cloud, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.NotNil)
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
+	c.Assert(err, qt.Not(qt.IsNil))
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	cloud, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.IsNil)
-	c.Assert(cloud.Name, gc.DeepEquals, cloudName)
-	c.Assert(cloud.Type, gc.DeepEquals, "MAAS")
+	c.Assert(err, qt.IsNil)
+	c.Assert(cloud.Name, qt.DeepEquals, cloudName)
+	c.Assert(cloud.Type, qt.DeepEquals, "MAAS")
 
 	req1 := apiparams.RemoveCloudFromControllerRequest{
 		CloudTag:       names.NewCloudTag(cloudName).String(),
 		ControllerName: name,
 	}
 	err = conn.APICall("JIMM", 4, "", "RemoveCloudFromController", &req1, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 }
 
-func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
+func TestRemoveCloudFromController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	ctx := context.Background()
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	conn := s.Open(c, nil, "alice@canonical.com", nil)
 	defer conn.Close()
@@ -813,25 +861,28 @@ func (s *jimmSuite) TestRemoveCloudFromController(c *gc.C) {
 		},
 	}
 	err = conn.APICall("JIMM", 4, "", "AddCloudToController", &req, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	user := openfga.NewUser(u, s.OFGAClient)
 
 	_, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	req1 := apiparams.RemoveCloudFromControllerRequest{
 		CloudTag:       names.NewCloudTag(cloudName).String(),
 		ControllerName: name,
 	}
 	err = conn.APICall("JIMM", 4, "", "RemoveCloudFromController", &req1, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	_, err = s.JIMM.JujuManager.GetCloud(context.Background(), user, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.ErrorMatches, `cloud "`+cloudName+`" not found`)
+	c.Assert(err, qt.ErrorMatches, `cloud "`+cloudName+`" not found`)
 }
 
-func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
+func TestCrossModelQuery(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	s.AddModel(
 		c,
 		names.NewUserTag("charlie@canonical.com"),
@@ -867,32 +918,32 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 		Type:  "some-type-not-supported",
 		Query: ".",
 	})
-	c.Assert(err, gc.ErrorMatches, `unable to query models \(invalid query type\)`)
+	c.Assert(err, qt.ErrorMatches, `unable to query models \(invalid query type\)`)
 
 	_, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
 		Type:  "jimmsql",
 		Query: ".",
 	})
-	c.Assert(err, gc.ErrorMatches, `(?s).*not implemented \(not implemented\).*`)
+	c.Assert(err, qt.ErrorMatches, `(?s).*not implemented \(not implemented\).*`)
 
 	res, err := client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
 		Type:  "jq",
 		Query: ".",
 	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 5)
-	c.Assert(res.Errors, gc.HasLen, 0)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 5)
+	c.Assert(res.Errors, qt.HasLen, 0)
 
 	// Query with broken jq, this JQ will run against each model and return the same error
 	res, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
 		Type:  "jq",
 		Query: "dig-lett",
 	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 0)
-	c.Assert(res.Errors, gc.HasLen, 5)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 0)
+	c.Assert(res.Errors, qt.HasLen, 5)
 	for _, errString := range res.Errors {
-		c.Assert(errString[0], gc.Equals, "jq error: function not defined: lett/0")
+		c.Assert(errString[0], qt.Equals, "jq error: function not defined: lett/0")
 	}
 
 	// Query for two very specific models
@@ -900,15 +951,18 @@ func (s *jimmSuite) TestCrossModelQuery(c *gc.C) {
 		Type:  "jq",
 		Query: "select((.model.name==\"" + model21Name + "\") or .model.name==\"" + model22Name + "\")",
 	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 2)
-	c.Assert(res.Errors, gc.HasLen, 0)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 2)
+	c.Assert(res.Errors, qt.HasLen, 0)
 }
 
 // TestJimmModelMigration tests that a migration request makes it through to the Juju controller.
 // Because our test suite only spins up 1 controller the further we can go is reaching Juju pre-checks which
 // detect that a model with the same UUID already exists on the target controller.
-func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
+func TestJimmModelMigrationSuperuser(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	modelName := petname.Generate(2, "-")
 	name, _ := s.GetOneControllerConfig(c)
 	mt := s.AddModelToController(
@@ -931,21 +985,24 @@ func (s *jimmSuite) TestJimmModelMigrationSuperuser(c *gc.C) {
 			{TargetModelNameOrUUID: "charlie@canonical.com/" + modelName, TargetController: name},
 		},
 	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 2)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 2)
 
 	item := res.Results[0]
-	c.Assert(item.ModelTag, gc.Equals, mt.String())
-	c.Assert(item.MigrationId, gc.Equals, "")
-	c.Assert(item.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
+	c.Assert(item.ModelTag, qt.Equals, mt.String())
+	c.Assert(item.MigrationId, qt.Equals, "")
+	c.Assert(item.Error.Message, qt.Matches, "target prechecks failed: model with same UUID already exists .*")
 
 	item2 := res.Results[1]
-	c.Assert(item2.ModelTag, gc.Equals, mt.String())
-	c.Assert(item2.MigrationId, gc.Equals, "")
-	c.Assert(item2.Error.Message, gc.Matches, "target prechecks failed: model with same UUID already exists .*")
+	c.Assert(item2.ModelTag, qt.Equals, mt.String())
+	c.Assert(item2.MigrationId, qt.Equals, "")
+	c.Assert(item2.Error.Message, qt.Matches, "target prechecks failed: model with same UUID already exists .*")
 }
 
-func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
+func TestJimmModelMigrationNonSuperuser(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	modelName := petname.Generate(2, "-")
 	mt := s.AddModel(
 		c,
@@ -965,23 +1022,29 @@ func (s *jimmSuite) TestJimmModelMigrationNonSuperuser(c *gc.C) {
 			{TargetModelNameOrUUID: mt.Id(), TargetController: name},
 		},
 	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(res.Results, gc.HasLen, 1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 1)
 	item := res.Results[0]
-	c.Assert(item.Error.Message, gc.Matches, "unauthorized access")
+	c.Assert(item.Error.Message, qt.Matches, "unauthorized access")
 }
 
-func (s *jimmSuite) TestVersion(c *gc.C) {
+func TestVersion(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 	versionInfo, err := client.Version()
-	c.Assert(err, gc.IsNil)
-	c.Assert(versionInfo.Version, gc.Not(gc.Equals), "")
-	c.Assert(versionInfo.Commit, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(versionInfo.Version, qt.Not(qt.Equals), "")
+	c.Assert(versionInfo.Commit, qt.Not(qt.Equals), "")
 }
 
-func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
+func TestPrepareModelMigration(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -995,11 +1058,14 @@ func (s *jimmSuite) TestPrepareModelMigration(c *gc.C) {
 		BackingControllerName: ctlName,
 		UserMapping:           map[string]string{"alice": "alice@canonical.com"}, // `{"alice": "alice@canonical.com"}`,
 	})
-	c.Assert(err, gc.IsNil)
-	c.Assert(migrationToken, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationToken, qt.Not(qt.Equals), "")
 }
 
-func (s *jimmSuite) TestListMigrationTargets(c *gc.C) {
+func TestListMigrationTargets(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	// Add model to a specific controller and verify other controllers are listed as migration targets.
 	confs := s.GetControllersConfig(c)
 	var controllerName string
@@ -1039,13 +1105,16 @@ func (s *jimmSuite) TestListMigrationTargets(c *gc.C) {
 	cis, err := client.ListMigrationTargets(&apiparams.ListMigrationTargetsRequest{
 		ModelTag: mt.String(),
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	assertControllerInfos(c, cis, otherControllers, s.GetControllersConfig(c))
 }
 
 // TestUpgradeTo_Unauthorized verifies non-admins cannot call the facade.
-func (s *jimmSuite) TestUpgradeTo_Unauthorized(c *gc.C) {
+func TestUpgradeTo_Unauthorized(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -1055,12 +1124,15 @@ func (s *jimmSuite) TestUpgradeTo_Unauthorized(c *gc.C) {
 		TargetControllerName: s.Model.Controller.Name,
 	}
 	_, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
-	c.Assert(jujuparams.IsCodeUnauthorized(err), gc.Equals, true)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(jujuparams.IsCodeUnauthorized(err), qt.Equals, true)
 }
 
 // TestUpgradeTo_InvalidModelTag verifies invalid model tags are rejected.
-func (s *jimmSuite) TestUpgradeTo_InvalidModelTag(c *gc.C) {
+func TestUpgradeTo_InvalidModelTag(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -1070,11 +1142,14 @@ func (s *jimmSuite) TestUpgradeTo_InvalidModelTag(c *gc.C) {
 		TargetControllerName: s.Model.Controller.Name,
 	}
 	_, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.ErrorMatches, `(invalid model tag "invalid-model-tag": )?"invalid-model-tag" is not a valid tag \(bad request\)`)
+	c.Assert(err, qt.ErrorMatches, `(invalid model tag "invalid-model-tag": )?"invalid-model-tag" is not a valid tag \(bad request\)`)
 }
 
 // TestUpgradeTo_InvalidController verifies invalid controllers are rejected.
-func (s *jimmSuite) TestUpgradeTo_InvalidController(c *gc.C) {
+func TestUpgradeTo_InvalidController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -1084,10 +1159,13 @@ func (s *jimmSuite) TestUpgradeTo_InvalidController(c *gc.C) {
 		TargetControllerName: "does-not-exist",
 	}
 	_, err := client.UpgradeTo(&req)
-	c.Assert(err, gc.ErrorMatches, regexp.QuoteMeta(`failed to run upgrade to: target controller does-not-exist is not a valid migration target for this model (bad request)`))
+	c.Assert(err, qt.ErrorMatches, regexp.QuoteMeta(`failed to run upgrade to: target controller does-not-exist is not a valid migration target for this model (bad request)`))
 }
 
-func (s *jimmSuite) TestCreateModelOnTargetController(c *gc.C) {
+func TestCreateModelOnTargetController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -1113,42 +1191,45 @@ func (s *jimmSuite) TestCreateModelOnTargetController(c *gc.C) {
 		},
 		ControllerName: controllerName,
 	}, &mi)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	model := dbmodel.Model{
 		UUID: sql.NullString{String: mi.UUID, Valid: true},
 	}
 	err = s.JIMM.Database.GetModel(context.Background(), &model)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Make sure the model is hosted on the specified controller
-	c.Assert(model.Controller.UUID, gc.Equals, conf.UUID)
+	c.Assert(model.Controller.UUID, qt.Equals, conf.UUID)
 
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(mi.Name, gc.Equals, name)
-	c.Assert(mi.UUID, gc.Not(gc.Equals), "")
-	c.Assert(mi.OwnerTag, gc.Equals, ownerTag)
-	c.Assert(mi.ControllerUUID, gc.Equals, jimmtest.ControllerUUID)
-	c.Assert(mi.Users, gc.Not(gc.HasLen), 0)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(mi.Name, qt.Equals, name)
+	c.Assert(mi.UUID, qt.Not(qt.Equals), "")
+	c.Assert(mi.OwnerTag, qt.Equals, ownerTag)
+	c.Assert(mi.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
+	c.Assert(mi.Users, qt.Not(qt.HasLen), 0)
 
 	tag, err := names.ParseCloudCredentialTag(mi.CloudCredentialTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(tag.String(), gc.Equals, credentialTag)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(tag.String(), qt.Equals, credentialTag)
 
 	ct, err := names.ParseCloudTag(cloudTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(mi.CloudTag, gc.Equals, names.NewCloudTag(ct.Id()).String())
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(mi.CloudTag, qt.Equals, names.NewCloudTag(ct.Id()).String())
 }
 
-func (s *jimmSuite) TestModelControllerInfo(c *gc.C) {
+func TestModelControllerInfo(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 
 	modelControllerInfo, err := client.ModelControllerInfo(s.Model.UUID.String)
-	c.Assert(err, gc.IsNil)
-	c.Assert(modelControllerInfo, gc.DeepEquals, &apiparams.ModelControllerInfo{
+	c.Assert(err, qt.IsNil)
+	c.Assert(modelControllerInfo, qt.DeepEquals, &apiparams.ModelControllerInfo{
 		ModelName:      s.Model.Name,
 		ModelUUID:      s.Model.UUID.String,
 		ControllerName: s.Model.Controller.Name,
@@ -1156,8 +1237,8 @@ func (s *jimmSuite) TestModelControllerInfo(c *gc.C) {
 	})
 
 	modelControllerInfo, err = client.ModelControllerInfo(fmt.Sprintf("%s/%s", s.Model.OwnerIdentityName, s.Model.Name))
-	c.Assert(err, gc.IsNil)
-	c.Assert(modelControllerInfo, gc.DeepEquals, &apiparams.ModelControllerInfo{
+	c.Assert(err, qt.IsNil)
+	c.Assert(modelControllerInfo, qt.DeepEquals, &apiparams.ModelControllerInfo{
 		ModelName:      s.Model.Name,
 		ModelUUID:      s.Model.UUID.String,
 		ControllerName: s.Model.Controller.Name,
@@ -1165,7 +1246,10 @@ func (s *jimmSuite) TestModelControllerInfo(c *gc.C) {
 	})
 }
 
-func (s *jimmSuite) TestPurgeLogs(c *gc.C) {
+func TestPurgeLogs(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	ctx := context.Background()
 	relativeNow := time.Now().AddDate(-1, 0, 0)
 	ale := dbmodel.AuditLogEntry{
@@ -1182,13 +1266,13 @@ func (s *jimmSuite) TestPurgeLogs(c *gc.C) {
 	}
 
 	err := s.JIMM.Database.Migrate(context.Background())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale_past)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	err = s.JIMM.Database.AddAuditLogEntry(ctx, &ale_future)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	tomorrow := relativeNow.AddDate(0, 0, 1)
 
@@ -1201,11 +1285,14 @@ func (s *jimmSuite) TestPurgeLogs(c *gc.C) {
 		Date: tomorrow,
 	})
 	// check that logs have been deleted
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp.DeletedCount, gc.Equals, int64(2))
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.DeletedCount, qt.Equals, int64(2))
 }
 
-func (s *jimmSuite) TestPurgeLogs_NotAdmin(c *gc.C) {
+func TestPurgeLogs_NotAdmin(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	// bob is not a superuser
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -1214,10 +1301,13 @@ func (s *jimmSuite) TestPurgeLogs_NotAdmin(c *gc.C) {
 	_, err := client.PurgeLogs(&apiparams.PurgeLogsRequest{
 		Date: time.Now(),
 	})
-	c.Assert(err, gc.ErrorMatches, `unauthorized \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
 
-func (s *jimmSuite) TestJobInfo(c *gc.C) {
+func TestJobInfo(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -1225,5 +1315,5 @@ func (s *jimmSuite) TestJobInfo(c *gc.C) {
 
 	req := apiparams.JobInfoRequest{JobID: "123"}
 	_, err := client.JobInfo(&req)
-	c.Assert(err, gc.ErrorMatches, `failed to get job info: not found`)
+	c.Assert(err, qt.ErrorMatches, `failed to get job info: not found`)
 }

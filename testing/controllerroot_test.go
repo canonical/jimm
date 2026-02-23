@@ -3,39 +3,36 @@
 package testing
 
 import (
-	"context"
+	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
-	jc "github.com/juju/testing/checkers"
 	"github.com/juju/version/v2"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type controllerrootSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
-
-var _ = gc.Suite(&controllerrootSuite{})
-
-func (s *controllerrootSuite) TestServerVersion(c *gc.C) {
-	ctx := context.Background()
+func TestServerVersion(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 
 	s.Model.Controller.AgentVersion = "1.2.3"
-	err := s.JIMM.Database.UpdateController(ctx, &s.Model.Controller)
-	c.Assert(err, gc.Equals, nil)
+	err := s.JIMM.Database.UpdateController(c.Context(), &s.Model.Controller)
+	c.Assert(err, qt.Equals, nil)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 
 	v, ok := conn.ServerVersion()
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(v, jc.DeepEquals, version.MustParse("1.2.3"))
+	c.Assert(ok, qt.Equals, true)
+	c.Assert(v, qt.DeepEquals, version.MustParse("1.2.3"))
 }
 
-func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
+func TestUnimplementedMethodFails(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, &api.Info{
 		ModelTag:  s.Model.ResourceTag(),
 		SkipLogin: true,
@@ -43,13 +40,16 @@ func (s *controllerrootSuite) TestUnimplementedMethodFails(c *gc.C) {
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("Admin", 3, "", "Logout", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `(?s).*no such request - method Admin.Logout is not implemented \(not implemented\).*`)
+	c.Assert(err, qt.ErrorMatches, `(?s).*no such request - method Admin.Logout is not implemented \(not implemented\).*`)
 }
 
-func (s *controllerrootSuite) TestUnimplementedRootFails(c *gc.C) {
+func TestUnimplementedRootFails(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall("NoSuch", 1, "", "Method", nil, &resp)
-	c.Assert(err, gc.ErrorMatches, `(?s).*no such request - method NoSuch\(1\).Method is not implemented \(not implemented\).*`)
+	c.Assert(err, qt.ErrorMatches, `(?s).*no such request - method NoSuch\(1\).Method is not implemented \(not implemented\).*`)
 }

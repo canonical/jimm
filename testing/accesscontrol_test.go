@@ -5,13 +5,13 @@ package testing
 import (
 	"context"
 	"database/sql"
+	"testing"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/crossmodel"
 	"github.com/juju/juju/state"
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -21,54 +21,54 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type accessControlSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
-
-var _ = gc.Suite(&accessControlSuite{})
-
 /*
  Group facade related tests
 */
 
-func (s *accessControlSuite) TestAddGroup(c *gc.C) {
+func TestAddGroup(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	res, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(res.UUID, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.UUID, qt.Not(qt.Equals), "")
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, gc.ErrorMatches, ".*already exists.*")
+	c.Assert(err, qt.ErrorMatches, ".*already exists.*")
 }
 
-func (s *accessControlSuite) TestGetGroup(c *gc.C) {
+func TestGetGroup(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 
 	created, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	retrievedUuid, err := client.GetGroup(&apiparams.GetGroupRequest{UUID: created.UUID})
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(retrievedUuid.Group, gc.DeepEquals, created.Group)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedUuid.Group, qt.DeepEquals, created.Group)
 
 	retrievedName, err := client.GetGroup(&apiparams.GetGroupRequest{Name: created.Name})
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(retrievedName.Group, gc.DeepEquals, created.Group)
+	c.Assert(err, qt.IsNil)
+	c.Assert(retrievedName.Group, qt.DeepEquals, created.Group)
 
 	_, err = client.GetGroup(&apiparams.GetGroupRequest{UUID: "non-existent"})
-	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
 
 	_, err = client.GetGroup(&apiparams.GetGroupRequest{Name: created.Name, UUID: created.UUID})
-	c.Assert(err, gc.ErrorMatches, ".*only one of.*")
+	c.Assert(err, qt.ErrorMatches, ".*only one of.*")
 }
 
-func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
+func TestRemoveGroup(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -77,32 +77,34 @@ func (s *accessControlSuite) TestRemoveGroup(c *gc.C) {
 	err := client.RemoveGroup(&apiparams.RemoveGroupRequest{
 		Name: "test-group",
 	})
-	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{
 		Name: "test-group",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
+func TestRemoveGroupRemovesTuples(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	db := s.JIMM.Database
 
-	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	_, err := db.AddGroup(ctx, "test-group2")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	group2 := &dbmodel.GroupEntry{
 		Name: "test-group2",
 	}
 	err = db.GetGroup(ctx, group2)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	tuples := []openfga.Tuple{
 		// This tuple should remain as it has no relation to group2
@@ -140,36 +142,38 @@ func (s *accessControlSuite) TestRemoveGroupRemovesTuples(c *gc.C) {
 	checkAccessTupleModel := apiparams.RelationshipTuple{Object: u, Relation: "writer", TargetObject: "model-" + model.UUID.String}
 
 	err = s.JIMM.OpenFGAClient.AddRelation(context.Background(), tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	// Check user has access to model and controller through group2
 	checkResp, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
-	c.Assert(err, gc.IsNil)
-	c.Assert(checkResp.Allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(checkResp.Allowed, qt.Equals, true)
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleModel})
-	c.Assert(err, gc.IsNil)
-	c.Assert(checkResp.Allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(checkResp.Allowed, qt.Equals, true)
 
 	resp, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	previousTupleCount := len(resp.Tuples)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: group2.Name})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	resp, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{})
-	c.Assert(err, gc.IsNil)
-	c.Assert(len(resp.Tuples), gc.Equals, previousTupleCount-4)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(resp.Tuples), qt.Equals, previousTupleCount-4)
 
 	// Check user access has been revoked.
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleController})
-	c.Assert(err, gc.IsNil)
-	c.Assert(checkResp.Allowed, gc.Equals, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(checkResp.Allowed, qt.Equals, false)
 	checkResp, err = client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: checkAccessTupleModel})
-	c.Assert(err, gc.IsNil)
-	c.Assert(checkResp.Allowed, gc.Equals, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(checkResp.Allowed, qt.Equals, false)
 }
 
-func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
+func TestRenameGroup(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -179,19 +183,21 @@ func (s *accessControlSuite) TestRenameGroup(c *gc.C) {
 		Name:    "test-group",
 		NewName: "renamed-group",
 	})
-	c.Assert(err, gc.ErrorMatches, ".*not found.*")
+	c.Assert(err, qt.ErrorMatches, ".*not found.*")
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = client.RenameGroup(&apiparams.RenameGroupRequest{
 		Name:    "test-group",
 		NewName: "renamed-group",
 	})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *accessControlSuite) TestListGroups(c *gc.C) {
+func TestListGroups(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -206,19 +212,19 @@ func (s *accessControlSuite) TestListGroups(c *gc.C) {
 
 	for _, name := range groupNames {
 		_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: name})
-		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(err, qt.IsNil)
 	}
 	req := apiparams.ListGroupsRequest{Limit: 10, Offset: 0}
 	groups, err := client.ListGroups(&req)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(groups, gc.HasLen, 4)
+	c.Assert(err, qt.IsNil)
+	c.Assert(groups, qt.HasLen, 4)
 	// Verify the UUID is not empty.
-	c.Assert(groups[0].UUID, gc.Not(gc.Equals), "")
+	c.Assert(groups[0].UUID, qt.Not(qt.Equals), "")
 	// groups should be returned in ascending order of name
-	c.Assert(groups[0].Name, gc.Equals, "aaaFinalGroup")
-	c.Assert(groups[1].Name, gc.Equals, "test-group0")
-	c.Assert(groups[2].Name, gc.Equals, "test-group1")
-	c.Assert(groups[3].Name, gc.Equals, "test-group2")
+	c.Assert(groups[0].Name, qt.Equals, "aaaFinalGroup")
+	c.Assert(groups[1].Name, qt.Equals, "test-group0")
+	c.Assert(groups[2].Name, qt.Equals, "test-group1")
+	c.Assert(groups[3].Name, qt.Equals, "test-group2")
 }
 
 /*
@@ -252,23 +258,25 @@ func createTuple(object, relation, target string) openfga.Tuple {
 // group -> applicationoffer (name)
 // group -> applicationoffer (uuid)
 // group#member -> group
-func (s *accessControlSuite) TestAddRelation(c *gc.C) {
+func TestAddRelation(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	db := s.JIMM.Database
 
-	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	_, err := db.AddGroup(ctx, "test-group2")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	group2 := &dbmodel.GroupEntry{
 		Name: "test-group2",
 	}
 	err = db.GetGroup(ctx, group2)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	type tuple struct {
 		object   string
 		relation string
@@ -490,16 +498,16 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 			},
 		})
 		if tc.err {
-			c.Assert(err, gc.NotNil)
-			c.Assert(err, gc.ErrorMatches, tc.want)
+			c.Assert(err, qt.Not(qt.IsNil))
+			c.Assert(err, qt.ErrorMatches, tc.want)
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, qt.IsNil)
 			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, qt.IsNil)
 			key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-			c.Assert(key.User, gc.DeepEquals, tc.want.Object.String())
-			c.Assert(key.Relation, gc.DeepEquals, tc.want.Relation.String())
-			c.Assert(key.Object, gc.DeepEquals, tc.want.Target.String())
+			c.Assert(key.User, qt.DeepEquals, tc.want.Object.String())
+			c.Assert(key.Relation, qt.DeepEquals, tc.want.Relation.String())
+			c.Assert(key.Object, qt.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
@@ -521,10 +529,12 @@ func (s *accessControlSuite) TestAddRelation(c *gc.C) {
 // group -> model (uuid)
 // group -> applicationoffer (name)
 // group -> applicationoffer (uuid)
-func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
+func TestRemoveRelation(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 
-	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	type tuple struct {
@@ -771,13 +781,13 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 		c.Logf("running test %d", i)
 		ofgaClient := s.JIMM.OpenFGAClient
 		err := ofgaClient.AddRelation(context.Background(), tc.toAdd)
-		c.Check(err, gc.IsNil)
+		c.Check(err, qt.IsNil)
 		changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 		key := changes.GetChanges()[len(changes.GetChanges())-1].GetTupleKey()
-		c.Assert(key.User, gc.DeepEquals, tc.want.Object.String())
-		c.Assert(key.Relation, gc.DeepEquals, tc.want.Relation.String())
-		c.Assert(key.Object, gc.DeepEquals, tc.want.Target.String())
+		c.Assert(key.User, qt.DeepEquals, tc.want.Object.String())
+		c.Assert(key.Relation, qt.DeepEquals, tc.want.Relation.String())
+		c.Assert(key.Object, qt.DeepEquals, tc.want.Target.String())
 
 		err = client.RemoveRelation(&apiparams.RemoveRelationRequest{
 			Tuples: []apiparams.RelationshipTuple{
@@ -789,37 +799,38 @@ func (s *accessControlSuite) TestRemoveRelation(c *gc.C) {
 			},
 		})
 		if tc.err {
-			c.Assert(err, gc.NotNil)
-			c.Assert(err, gc.ErrorMatches, tc.want)
+			c.Assert(err, qt.Not(qt.IsNil))
+			c.Assert(err, qt.ErrorMatches, tc.want)
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, qt.IsNil)
 			changes, err := s.COFGAClient.ReadChanges(ctx, tc.changesType, 99, "")
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, qt.IsNil)
 			change := changes.GetChanges()[len(changes.GetChanges())-1]
 			operation := change.GetOperation()
-			c.Assert(string(operation), gc.Equals, "TUPLE_OPERATION_DELETE")
+			c.Assert(string(operation), qt.Equals, "TUPLE_OPERATION_DELETE")
 			key := change.GetTupleKey()
-			c.Assert(key.User, gc.DeepEquals, tc.want.Object.String())
-			c.Assert(key.Relation, gc.DeepEquals, tc.want.Relation.String())
-			c.Assert(key.Object, gc.DeepEquals, tc.want.Target.String())
+			c.Assert(key.User, qt.DeepEquals, tc.want.Object.String())
+			c.Assert(key.Relation, qt.DeepEquals, tc.want.Relation.String())
+			c.Assert(key.Object, qt.DeepEquals, tc.want.Target.String())
 		}
 	}
 }
 
-func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
-	ctx := context.Background()
+func TestListRelationshipTuples(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 
-	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	initialTupleCount := len(response.Tuples)
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
 		Object:       "group-orange#member",
@@ -840,16 +851,16 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 	}}
 
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	// first tuples are created during setup test
-	c.Assert(response.Tuples[initialTupleCount:], jc.DeepEquals, tuples)
+	c.Assert(response.Tuples[initialTupleCount:], qt.DeepEquals, tuples)
 	if len(response.Errors) != 0 {
 		c.Logf("Errors: %+v", response.Errors)
 	}
-	c.Assert(len(response.Errors), gc.Equals, 0)
+	c.Assert(len(response.Errors), qt.Equals, 0)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
@@ -857,9 +868,9 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		},
 		ResolveUUIDs: true,
 	})
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(response.Tuples, jc.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
-	c.Assert(len(response.Errors), gc.Equals, 0)
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.Tuples, qt.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
+	c.Assert(len(response.Errors), qt.Equals, 0)
 
 	// Test error message when a resource is not found
 	_, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
@@ -868,16 +879,18 @@ func (s *accessControlSuite) TestListRelationshipTuples(c *gc.C) {
 		},
 		ResolveUUIDs: true,
 	})
-	c.Assert(err, gc.ErrorMatches, "failed to list relations: failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
+	c.Assert(err, qt.ErrorMatches, "failed to list relations: failed to parse tuple target object key applicationoffer-fake-offer: application offer not found.*")
 }
 
-func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C) {
+func TestListRelationshipTuplesNoUUIDResolution(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
-	_, _, _, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	_, _, _, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	_, err := client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
 		Object:       "group-orange#member",
@@ -886,11 +899,11 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 	}}
 
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	groupOrange := dbmodel.GroupEntry{Name: "orange"}
 	err = s.JIMM.Database.GetGroup(ctx, &groupOrange)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	expected := []apiparams.RelationshipTuple{{
 		Object:       "group-" + groupOrange.UUID + "#member",
 		Relation:     "administrator",
@@ -902,24 +915,26 @@ func (s *accessControlSuite) TestListRelationshipTuplesNoUUIDResolution(c *gc.C)
 		},
 		ResolveUUIDs: false,
 	})
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(response.Tuples, jc.DeepEquals, expected)
-	c.Assert(len(response.Errors), gc.Equals, 0)
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.Tuples, qt.DeepEquals, expected)
+	c.Assert(len(response.Errors), qt.Equals, 0)
 }
 
-func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.C) {
-	ctx := context.Background()
-	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+func TestListRelationshipTuplesAfterDeletingGroup(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
+	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	initialTupleCount := len(response.Tuples)
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
 		Object:       "group-orange#member",
@@ -940,42 +955,44 @@ func (s *accessControlSuite) TestListRelationshipTuplesAfterDeletingGroup(c *gc.
 	}}
 
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = client.RemoveGroup(&apiparams.RemoveGroupRequest{Name: "yellow"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	// Create a new slice of tuples excluding the ones we expect to be deleted.
 	responseTuples := response.Tuples[initialTupleCount:]
-	c.Assert(responseTuples, gc.HasLen, 2)
+	c.Assert(responseTuples, qt.HasLen, 2)
 
 	expectedUserToGroupTuple := tuples[1]
 	expectedGroupToOfferTuple := tuples[3]
 
 	// Update the target to the group name
 	expectedUserToGroupTuple.TargetObject = "group-orange"
-	c.Assert(responseTuples[0], gc.DeepEquals, expectedUserToGroupTuple)
+	c.Assert(responseTuples[0], qt.DeepEquals, expectedUserToGroupTuple)
 	expectedGroupToOfferTuple.Object = "group-orange#member"
-	c.Assert(responseTuples[1], gc.DeepEquals, expectedGroupToOfferTuple)
+	c.Assert(responseTuples[1], qt.DeepEquals, expectedGroupToOfferTuple)
 
-	c.Assert(len(response.Errors), gc.Equals, 0)
+	c.Assert(len(response.Errors), qt.Equals, 0)
 }
 
-func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C) {
+func TestListRelationshipTuplesWithMissingGroups(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
-	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	response, err := client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	initialTupleCount := len(response.Tuples)
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "yellow"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "orange"})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	tuples := []apiparams.RelationshipTuple{{
 		Object:       "group-orange#member",
@@ -984,25 +1001,27 @@ func (s *accessControlSuite) TestListRelationshipTuplesWithMissingGroups(c *gc.C
 	}}
 
 	err = client.AddRelation(&apiparams.AddRelationRequest{Tuples: tuples})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Delete a group without going through the API.
 	group := &dbmodel.GroupEntry{Name: "yellow"}
 	err = s.JIMM.Database.GetGroup(ctx, group)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	err = s.JIMM.Database.RemoveGroup(ctx, group)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{ResolveUUIDs: true})
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	tupleWithoutDBEntry := tuples[0]
 	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID
 	// first tuples are created during setup test
-	c.Assert(response.Tuples[initialTupleCount], gc.Equals, tupleWithoutDBEntry)
-	c.Assert(response.Errors, gc.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID})
+	c.Assert(response.Tuples[initialTupleCount], qt.Equals, tupleWithoutDBEntry)
+	c.Assert(response.Errors, qt.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID})
 }
 
-func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
+func TestCheckRelationAsNonAdmin(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -1018,7 +1037,7 @@ func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
 	}
 	req := apiparams.CheckRelationRequest{Tuple: input}
 	_, err := client.CheckRelation(&req)
-	c.Assert(err, gc.ErrorMatches, `failed to check relation: unauthorized \(unauthorized access\)`)
+	c.Assert(err, qt.ErrorMatches, `failed to check relation: unauthorized \(unauthorized access\)`)
 	// Verify Bob can check for his own permission.
 	input = apiparams.RelationshipTuple{
 		Object:       userBobKey,
@@ -1027,14 +1046,16 @@ func (s *accessControlSuite) TestCheckRelationAsNonAdmin(c *gc.C) {
 	}
 	req = apiparams.CheckRelationRequest{Tuple: input}
 	_, err = client.CheckRelation(&req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
+func TestCheckRelationOfferReaderFlow(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, _, _, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, _, offer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	// Some tags (tuples) to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1064,7 +1085,7 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 		userToGroupOfferReader,
 		groupToOfferReader,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	type test struct {
 		input apiparams.RelationshipTuple
@@ -1096,16 +1117,18 @@ func (s *accessControlSuite) TestCheckRelationOfferReaderFlow(c *gc.C) {
 	for _, tc := range tests {
 		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res.Allowed, gc.Equals, tc.want)
+		c.Assert(err, qt.IsNil)
+		c.Assert(res.Allowed, qt.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
+func TestCheckRelationOfferConsumerFlow(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, _, _, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, _, offer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1134,7 +1157,7 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 		userToGroupMember,
 		groupToOfferConsumer,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	type test struct {
 		input apiparams.RelationshipTuple
@@ -1165,16 +1188,18 @@ func (s *accessControlSuite) TestCheckRelationOfferConsumerFlow(c *gc.C) {
 	for _, tc := range tests {
 		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res.Allowed, gc.Equals, tc.want)
+		c.Assert(err, qt.IsNil)
+		c.Assert(res.Allowed, qt.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
+func TestCheckRelationModelReaderFlow(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, _, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, model, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1205,7 +1230,7 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 		userToGroupMember,
 		groupToModelReader,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	type test struct {
 		input apiparams.RelationshipTuple
@@ -1236,16 +1261,18 @@ func (s *accessControlSuite) TestCheckRelationModelReaderFlow(c *gc.C) {
 	for _, tc := range tests {
 		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res.Allowed, gc.Equals, tc.want)
+		c.Assert(err, qt.IsNil)
+		c.Assert(res.Allowed, qt.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
+func TestCheckRelationModelWriterFlow(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, _, model, _, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, _, model, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1274,7 +1301,7 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 		userToGroupMember,
 		groupToModelWriter,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	type test struct {
 		input apiparams.RelationshipTuple
@@ -1305,16 +1332,18 @@ func (s *accessControlSuite) TestCheckRelationModelWriterFlow(c *gc.C) {
 	for _, tc := range tests {
 		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res.Allowed, gc.Equals, tc.want)
+		c.Assert(err, qt.IsNil)
+		c.Assert(res.Allowed, qt.Equals, tc.want)
 	}
 }
 
-func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.C) {
+func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
-	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(ctx, c, s)
+	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	// Some keys to assist in the creation of tuples within OpenFGA (such that they can be tested against)
@@ -1363,7 +1392,7 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 		controllerToModelAdmin,
 		modelToAppOfferAdmin,
 	)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	type test struct {
 		input apiparams.RelationshipTuple
@@ -1430,8 +1459,8 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 	for _, tc := range tests {
 		req := apiparams.CheckRelationRequest{Tuple: tc.input}
 		res, err := client.CheckRelation(&req)
-		c.Assert(err, gc.IsNil)
-		c.Assert(res.Allowed, gc.Equals, tc.want)
+		c.Assert(err, qt.IsNil)
+		c.Assert(res.Allowed, qt.Equals, tc.want)
 	}
 	// Check that the same tuples can be checked via the CheckRelations API
 	tuplesToCheck := apiparams.CheckRelationsRequest{}
@@ -1443,8 +1472,8 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 		})
 	}
 	results, err := client.CheckRelations(&tuplesToCheck)
-	c.Assert(err, gc.IsNil)
-	c.Assert(results, gc.DeepEquals, expected)
+	c.Assert(err, qt.IsNil)
+	c.Assert(results, qt.DeepEquals, expected)
 }
 
 /*
@@ -1468,7 +1497,7 @@ func (s *accessControlSuite) TestCheckRelationControllerAdministratorFlow(c *gc.
 //
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
-func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessControlSuite) (
+func createTestControllerEnvironment(c *qt.C, s jimmtest.WebsocketE2ESuite) (
 	dbmodel.Identity,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,
@@ -1478,19 +1507,20 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	dbmodel.CloudCredential,
 	*api.Client,
 	func()) {
+	ctx := c.Context()
 
 	db := s.JIMM.Database
 	groupEntry, err := db.AddGroup(ctx, "test-group")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	group := dbmodel.GroupEntry{Name: "test-group"}
 	err = db.GetGroup(ctx, &group)
-	c.Assert(err, gc.IsNil)
-	c.Assert(groupEntry.UUID, gc.Equals, group.UUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(groupEntry.UUID, qt.Equals, group.UUID)
 
 	u, err := dbmodel.NewIdentity(petname.Generate(2, "-") + "@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
-	c.Assert(db.DB.Create(u).Error, gc.IsNil)
+	c.Assert(db.DB.Create(u).Error, qt.IsNil)
 
 	cloud := dbmodel.Cloud{
 		Name: petname.Generate(2, "-"),
@@ -1499,7 +1529,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 			Name: petname.Generate(2, "-"),
 		}},
 	}
-	c.Assert(db.DB.Create(&cloud).Error, gc.IsNil)
+	c.Assert(db.DB.Create(&cloud).Error, qt.IsNil)
 	id, _ := uuid.NewRandom()
 	controller := dbmodel.Controller{
 		Name:        petname.Generate(2, "-"),
@@ -1512,7 +1542,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		}},
 	}
 	err = db.AddController(ctx, &controller)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	cred := dbmodel.CloudCredential{
 		Name:              petname.Generate(2, "-"),
@@ -1521,7 +1551,7 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		AuthType:          "empty",
 	}
 	err = db.SetCloudCredential(ctx, &cred)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	model := dbmodel.Model{
 		Name: petname.Generate(2, "-"),
@@ -1537,11 +1567,11 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 	}
 
 	err = db.AddModel(ctx, &model)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	offerName := petname.Generate(2, "-")
 	offerURL, err := crossmodel.ParseOfferURL(controller.Name + ":" + u.Name + "/" + model.Name + "." + offerName)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	offer := dbmodel.ApplicationOffer{
 		UUID:    id.String(),
@@ -1550,8 +1580,8 @@ func createTestControllerEnvironment(ctx context.Context, c *gc.C, s *accessCont
 		URL:     offerURL.String(),
 	}
 	err = db.AddApplicationOffer(context.Background(), &offer)
-	c.Assert(err, gc.IsNil)
-	c.Assert(len(offer.UUID), gc.Equals, 36)
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(offer.UUID), qt.Equals, 36)
 
 	conn := s.Open(c, nil, "alice", nil)
 	client := api.NewClient(conn)

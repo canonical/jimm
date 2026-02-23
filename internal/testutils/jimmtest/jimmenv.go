@@ -14,13 +14,13 @@ import (
 	"github.com/antonlindstrom/pgstore"
 	cofga "github.com/canonical/ofga"
 	"github.com/coreos/go-oidc/v3/oidc"
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/api"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	gc "gopkg.in/check.v1"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
@@ -47,36 +47,10 @@ var testJWKSPrivateKey []byte
 // ControllerUUID is the UUID of the JIMM controller used in tests.
 const ControllerUUID = "c1991ce8-96c2-497d-8e2a-e0cc42ca3aca"
 
-// A GocheckTester adapts a gc.C to the Tester interface.
-type GocheckTester struct {
-	*gc.C
-	AddCleanup func(func())
-}
-
-// Name implements Tester.Name.
-func (t GocheckTester) Name() string {
-	return t.TestName()
-}
-
-func (t GocheckTester) Cleanup(f func()) {
-	if t.AddCleanup != nil {
-		t.AddCleanup(f)
-	} else {
-		t.Logf("warning: gocheck does not support Cleanup functions; make sure you're using suite's tear-down method")
-	}
-}
-
-// jimmModifiers controls how JIMM is initialised.
-type jimmModifiers struct {
-	useRealAuthN     bool
-	useHardcodedJWKS bool
-}
-
-// A JIMMSuite is a suite that initialises a JIMM.
-type JIMMSuite struct {
-	// JIMM is a JIMM that can be used in tests. JIMM is initialised in
-	// SetUpTest. The JIMM configured in this suite does not have an
-	// Authenticator configured.
+// A JIMMEnv is an environment that initialises a JIMM for tests.
+type JIMMEnv struct {
+	// JIMM is the service that can be used in tests.
+	// The JIMM configured does not have an Authenticator configured by default.
 	JIMM *jimm.JIMM
 
 	AdminUser   *openfga.User
@@ -85,33 +59,23 @@ type JIMMSuite struct {
 	COFGAParams *cofga.OpenFGAParams
 
 	Server         *httptest.Server
-	cancel         context.CancelFunc
 	deviceFlowChan chan string
-	cleanup        []func()
 	service        *jimmsvc.Service
-
-	modifiers jimmModifiers
 }
 
-func (s *JIMMSuite) SetUpTest(c *gc.C) {
+func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
+	o := applySetupOptions(opts)
+	s := JIMMEnv{}
 	var err error
 	s.cleanup = nil
 
-	ctx, cancel := context.WithCancel(context.Background())
-	s.cancel = cancel
+	ctx := c.Context()
 
 	// Setup OpenFGA.
-	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.TestName())
-	c.Assert(err, gc.IsNil)
+	s.OFGAClient, s.COFGAClient, s.COFGAParams, err = SetupTestOFGAClient(c.Name())
+	c.Assert(err, qt.IsNil)
 
-	gct := &GocheckTester{
-		C: c,
-		AddCleanup: func(f func()) {
-			s.cleanup = append(s.cleanup, f)
-		},
-	}
-
-	dsn := testdb.CreateEmptyDatabase(gct)
+	dsn := testdb.CreateEmptyDatabase(c)
 
 	params := jimmsvc.Params{
 		ControllerUUID:                ControllerUUID,
@@ -126,11 +90,11 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	}
 
 	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.NewGormTestLogger(gct)})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	database := &db.Database{DB: gormDB}
 
 	riverClient, err := river.NewRiverClient(database)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	credentialStore := NewInMemoryCredentialStore()
 
@@ -168,7 +132,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 		JWKSService:                   jimmjwx.NewJWKSService(credentialStore),
 	}
 
-	if s.modifiers.useRealAuthN {
+	if o.useRealAuthN {
 		authSvc := s.realAuthenticationService(c, database)
 		deps.OAuthAuthenticator = authSvc
 		deps.MigrationTokenGenerator = authSvc
@@ -177,7 +141,7 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 			Authenticator:             authSvc,
 			DashboardFinalRedirectURL: params.DashboardFinalRedirectURL,
 		})
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 		deps.OAuthHandler = oauthHandler
 		s.deviceFlowChan = nil
 	} else {
@@ -189,38 +153,42 @@ func (s *JIMMSuite) SetUpTest(c *gc.C) {
 	}
 
 	s.service, err = jimmsvc.NewServiceFromDependencies(ctx, deps)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(s.service.Cleanup)
+
 	s.JIMM = s.service.JIMM()
 	s.OFGAClient = s.JIMM.OpenFGAClient
 
 	err = river.MigrateRiver(ctx, s.JIMM.Database)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
-	if s.modifiers.useHardcodedJWKS {
+	if o.useHardcodedJWKS {
 		set, privateKey, err := jwkSetFromPrivateKeyFile()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 		err = s.JIMM.CredentialStore.PutJWKS(ctx, set)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 		err = s.JIMM.CredentialStore.PutJWKSPrivateKey(ctx, privateKey)
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 		err = s.JIMM.CredentialStore.PutJWKSExpiry(ctx, time.Now().UTC().AddDate(10, 0, 0))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 	} else {
 		err = s.service.StartJWKSRotator(ctx, time.NewTicker(time.Hour).C, time.Now().UTC().AddDate(0, 3, 0))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 	}
 
 	alice, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	err = s.JIMM.Database.GetIdentity(ctx, alice)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	s.AdminUser = openfga.NewUser(alice, s.OFGAClient)
 	s.AdminUser.JimmAdmin = true
 	s.Server = httptest.NewServer(s.service)
+	c.Cleanup(s.Server.Close)
 
 	err = s.AdminUser.SetControllerAccess(ctx, s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
+	return s
 }
 
 // jwkSetFromPrivateKeyFile reads a PEM-encoded RSA private key from a file
@@ -262,43 +230,13 @@ func jwkSetFromPrivateKeyFile() (jwk.Set, []byte, error) {
 	return ks, testJWKSPrivateKey, nil
 }
 
-func (s *JIMMSuite) UseHardcodedJWKS(c *gc.C) {
-	s.modifiers.useHardcodedJWKS = true
-}
-
-func (s *JIMMSuite) TearDownTest(c *gc.C) {
-	if s.cancel != nil {
-		s.cancel()
-	}
-	if s.Server != nil {
-		s.Server.Close()
-	}
-	if s.service != nil {
-		s.service.Cleanup()
-	}
-	if s.JIMM != nil && s.JIMM.Database != nil {
-		if err := s.JIMM.Database.Close(); err != nil {
-			c.Logf("failed to close database connections at tear down: %s", err)
-		}
-	}
-
-	for i := len(s.cleanup) - 1; i >= 0; i-- {
-		s.cleanup[i]()
-	}
-	s.cleanup = nil
-}
-
-func (s *JIMMSuite) UseRealAuthentication(c *gc.C) {
-	s.modifiers.useRealAuthN = true
-}
-
-func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.AuthenticationService {
+func (s *JIMMEnv) realAuthenticationService(c *qt.C, db *db.Database) *auth.AuthenticationService {
 	sqldb, err := db.DB.DB()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
-	c.Assert(err, gc.IsNil)
-	s.cleanup = append(s.cleanup, func() {
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
 		sessionStore.Close()
 	})
 
@@ -314,40 +252,40 @@ func (s *JIMMSuite) realAuthenticationService(c *gc.C, db *db.Database) *auth.Au
 		JWTSessionKey:       "test-secret",
 		SecureCookies:       false,
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	return authSvc
 }
 
-func (s *JIMMSuite) AddAdminUser(c *gc.C, email string) {
+func (s *JIMMEnv) AddAdminUser(c *qt.C, email string) {
 	identity, err := dbmodel.NewIdentity(email)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	// Set the display name of the identity.
 	displayName, _, _ := strings.Cut(email, "@")
 	identity.DisplayName = displayName
 	err = s.JIMM.Database.UpdateIdentity(context.Background(), identity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	// Give the identity admin permission.
 	ofgaUser := openfga.NewUser(identity, s.OFGAClient)
 	err = ofgaUser.SetControllerAccess(context.Background(), s.JIMM.ResourceTag(), ofganames.AdministratorRelation)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *JIMMSuite) AddUser(c *gc.C, email string) {
+func (s *JIMMEnv) AddUser(c *qt.C, email string) {
 	identity, err := dbmodel.NewIdentity(email)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(context.Background(), identity)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *JIMMSuite) NewUser(u *dbmodel.Identity) *openfga.User {
+func (s *JIMMEnv) NewUser(u *dbmodel.Identity) *openfga.User {
 	return openfga.NewUser(u, s.OFGAClient)
 }
 
-func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) *dbmodel.Controller {
+func (s *JIMMEnv) AddController(c *qt.C, name string, info *api.Info) *dbmodel.Controller {
 	ctl := &dbmodel.Controller{
 		UUID:          info.ControllerUUID,
 		Name:          name,
@@ -361,7 +299,7 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) *dbmodel
 	ctl.Addresses = make(dbmodel.HostPorts, 0, len(info.Addrs))
 	for _, addr := range info.Addrs {
 		hp, err := network.ParseMachineHostPort(addr)
-		c.Assert(err, gc.Equals, nil)
+		c.Assert(err, qt.Equals, nil)
 		ctl.Addresses = append(ctl.Addresses, []jujuparams.HostPort{{
 			Address: jujuparams.FromMachineAddress(hp.MachineAddress),
 			Port:    hp.Port(),
@@ -369,24 +307,24 @@ func (s *JIMMSuite) AddController(c *gc.C, name string, info *api.Info) *dbmodel
 	}
 	ctl.TLSHostname = "juju-apiserver"
 	err := s.JIMM.JujuManager.AddController(context.Background(), s.AdminUser, ctl, ctlCreds)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return ctl
 }
 
-func (s *JIMMSuite) UpdateCloudCredential(c *gc.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
+func (s *JIMMEnv) UpdateCloudCredential(c *qt.C, tag names.CloudCredentialTag, cred jujuparams.CloudCredential) {
 	ctx := context.Background()
 	u, err := dbmodel.NewIdentity(tag.Owner().Id())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	user := openfga.NewUser(u, s.JIMM.OpenFGAClient)
 	err = s.JIMM.Database.GetIdentity(ctx, u)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, err = s.JIMM.JujuManager.UpdateCloudCredential(ctx, user, juju.UpdateCloudCredentialArgs{
 		CredentialTag: tag,
 		Credential:    cred,
 		SkipCheck:     true,
 	})
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
 type addModelArgs struct {
@@ -398,14 +336,14 @@ type addModelArgs struct {
 	targetControllerName string
 }
 
-func (s *JIMMSuite) AddModel(c *gc.C, args addModelArgs) names.ModelTag {
+func (s *JIMMEnv) AddModel(c *qt.C, args addModelArgs) names.ModelTag {
 	ctx := context.Background()
 
 	u, err := dbmodel.NewIdentity(args.owner.Id())
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	modelCreateArgs := &juju.ModelCreateArgs{
 		Name:            args.name,
 		Owner:           args.owner,
@@ -418,16 +356,16 @@ func (s *JIMMSuite) AddModel(c *gc.C, args addModelArgs) names.ModelTag {
 	}
 
 	mi, err := s.JIMM.JujuManager.AddModel(ctx, s.NewUser(u), modelCreateArgs)
-	c.Assert(err, gc.Equals, nil, gc.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", args.name, args.owner.String(), args.cloud.String(), args.region, args.cred.String(), err))
+	c.Assert(err, qt.Equals, nil, qt.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", args.name, args.owner.String(), args.cloud.String(), args.region, args.cred.String(), err))
 	return names.NewModelTag(mi.UUID)
 }
 
-func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.ModelTag) {
+func (s *JIMMEnv) DestroyModelAndDeleteFromDatabase(c *qt.C, modelTag names.ModelTag) {
 	ctx := context.Background()
 
 	// Call Juju DestroyModel API and set the model to dying state.
 	err := s.JIMM.JujuManager.DestroyModel(ctx, s.AdminUser, modelTag, nil, nil, nil, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	// Poll until the model is destroyed with a timeout
 	timeout := time.After(5 * 60 * time.Second)
@@ -443,28 +381,28 @@ func (s *JIMMSuite) DestroyModelAndDeleteFromDatabase(c *gc.C, modelTag names.Mo
 			if errors.ErrorCode(err) == errors.CodeNotFound || errors.ErrorCode(err) == errors.CodeUnauthorized {
 				return
 			}
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, qt.IsNil)
 		}
 	}
 }
 
 // RemoveCloud removes a cloud from JIMM and the backing controller.
-func (s *JIMMSuite) RemoveCloud(c *gc.C, cloudName string) {
+func (s *JIMMEnv) RemoveCloud(c *qt.C, cloudName string) {
 	err := s.JIMM.JujuManager.RemoveCloud(context.Background(), s.AdminUser, names.NewCloudTag(cloudName))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 }
 
-func (s *JIMMSuite) AddGroup(c *gc.C, groupName string) dbmodel.GroupEntry {
+func (s *JIMMEnv) AddGroup(c *qt.C, groupName string) dbmodel.GroupEntry {
 	ctx := context.Background()
 	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, groupName)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return *group
 }
 
-func (s *JIMMSuite) AddRole(c *gc.C, roleName string) dbmodel.RoleEntry {
+func (s *JIMMEnv) AddRole(c *qt.C, roleName string) dbmodel.RoleEntry {
 	ctx := context.Background()
 	role, err := s.JIMM.RoleManager.AddRole(ctx, s.AdminUser, roleName)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	return *role
 }
 
@@ -472,7 +410,7 @@ func (s *JIMMSuite) AddRole(c *gc.C, roleName string) dbmodel.RoleEntry {
 // Call this non-blocking function before login to ensure the device flow won't block.
 //
 // This is necessary as the mock authenticator simulates polling an external OIDC server.
-func (s *JIMMSuite) EnableDeviceFlow(username string) {
+func (s *JIMMEnv) EnableDeviceFlow(username string) {
 	s.deviceFlowChan <- username
 }
 

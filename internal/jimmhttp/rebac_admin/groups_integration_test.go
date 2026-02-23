@@ -3,13 +3,13 @@
 package rebac_admin_test
 
 import (
-	"context"
 	"fmt"
+	"testing"
 
 	rebac_handlers "github.com/canonical/rebac-admin-ui-handlers/v1"
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
@@ -19,23 +19,29 @@ import (
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
-type rebacAdminSuite struct {
-	jimmtest.JIMMSuite
+type groupsTest struct {
+	jimmtest.JIMMEnv
 	groupSvc *rebac_admin.GroupsService
 }
 
-func (s *rebacAdminSuite) SetUpTest(c *gc.C) {
-	s.JIMMSuite.SetUpTest(c)
-	s.groupSvc = rebac_admin.NewGroupService(jujuapi.NewJIMMAdapter(s.JIMM))
+func SetupGroupsTest(c *qt.C) (s *groupsTest) {
+	jimmEnv := jimmtest.SetupJimmEnv(c)
+	groupSvc := rebac_admin.NewGroupService(jujuapi.NewJIMMAdapter(jimmEnv.JIMM))
+	s = &groupsTest{
+		JIMMEnv:  jimmEnv,
+		groupSvc: groupSvc,
+	}
+	return s
 }
 
-var _ = gc.Suite(&rebacAdminSuite{})
+func TestListGroupsWithFilterIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
 
-func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
-	ctx := context.Background()
+	ctx := c.Context()
 	for i := range 10 {
 		_, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, fmt.Sprintf("test-group-filter-%d", i))
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 	}
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
@@ -43,29 +49,32 @@ func (s rebacAdminSuite) TestListGroupsWithFilterIntegration(c *gc.C) {
 	page := 0
 	params := &resources.GetGroupsParams{Size: &pageSize, Page: &page}
 	res, err := s.groupSvc.ListGroups(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(res.Meta.Size, gc.Equals, 5)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(res.Meta.Size, qt.Equals, 5)
 
 	match := "group-filter-1"
 	params.Filter = &match
 	res, err = s.groupSvc.ListGroups(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(len(res.Data), gc.Equals, 1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(len(res.Data), qt.Equals, 1)
 
 	match = "group"
 	params.Filter = &match
 	res, err = s.groupSvc.ListGroups(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(len(res.Data), gc.Equals, pageSize)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(len(res.Data), qt.Equals, pageSize)
 }
 
-func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
-	ctx := context.Background()
+func TestGetGroupIdentitiesIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
+
+	ctx := c.Context()
 	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Relation: ofganames.MemberRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(group.UUID)),
@@ -77,43 +86,46 @@ func (s rebacAdminSuite) TestGetGroupIdentitiesIntegration(c *gc.C) {
 		tuples = append(tuples, t)
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	// Request Subset of items
 	pageSize := 5
 	params := &resources.GetGroupsItemIdentitiesParams{Size: &pageSize}
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err := s.groupSvc.GetGroupIdentities(ctx, group.UUID, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(res.Meta.Size, gc.Equals, 5)
-	c.Assert(*res.Meta.PageToken, gc.Equals, "")
-	c.Assert(*res.Next.PageToken, gc.Not(gc.Equals), "")
-	c.Assert(res.Data, gc.HasLen, 5)
-	c.Assert(res.Data[0].Email, gc.Matches, `foo\d@canonical\.com`)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(res.Meta.Size, qt.Equals, 5)
+	c.Assert(*res.Meta.PageToken, qt.Equals, "")
+	c.Assert(*res.Next.PageToken, qt.Not(qt.Equals), "")
+	c.Assert(res.Data, qt.HasLen, 5)
+	c.Assert(res.Data[0].Email, qt.Matches, `foo\d@canonical\.com`)
 
 	// Request next page
 	params.NextPageToken = res.Next.PageToken
 	res, err = s.groupSvc.GetGroupIdentities(ctx, group.UUID, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(res.Meta.Size, gc.Equals, 5)
-	c.Assert(*res.Meta.PageToken, gc.Equals, *params.NextPageToken)
-	c.Assert(res.Next.PageToken, gc.IsNil)
-	c.Assert(res.Data, gc.HasLen, 5)
-	c.Assert(res.Data[0].Email, gc.Matches, `foo\d@canonical\.com`)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(res.Meta.Size, qt.Equals, 5)
+	c.Assert(*res.Meta.PageToken, qt.Equals, *params.NextPageToken)
+	c.Assert(res.Next.PageToken, qt.IsNil)
+	c.Assert(res.Data, qt.HasLen, 5)
+	c.Assert(res.Data[0].Email, qt.Matches, `foo\d@canonical\.com`)
 
 	// Request all items, no next page.
 	allItems := &resources.GetGroupsItemIdentitiesParams{}
 	res, err = s.groupSvc.GetGroupIdentities(ctx, group.UUID, allItems)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(res.Next.PageToken, gc.IsNil)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(res.Next.PageToken, qt.IsNil)
 }
 
-func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
-	ctx := context.Background()
+func TestPatchGroupIdentitiesIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
+
+	ctx := c.Context()
 	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Relation: ofganames.MemberRelation,
 		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(group.UUID)),
@@ -125,10 +137,10 @@ func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 		tuples = append(tuples, t)
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	allowed, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[0], false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, true)
 	// Above we have added 2 users to the group, below, we will request those 2 users to be removed
 	// and add 2 different users to the group, in the same request.
 	entitlementPatches := []resources.GroupIdentitiesPatchItem{
@@ -139,21 +151,24 @@ func (s rebacAdminSuite) TestPatchGroupIdentitiesIntegration(c *gc.C) {
 	}
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err := s.groupSvc.PatchGroupIdentities(ctx, group.UUID, entitlementPatches)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Equals, true)
 
 	allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[0], false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, false)
 	newTuple := tuples[0]
 	newTuple.Object = ofganames.ConvertTag(names.NewUserTag("foo2@canonical.com"))
 	allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, newTuple, false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, true)
 }
 
-func (s rebacAdminSuite) TestGetGroupRolesIntegration(c *gc.C) {
-	ctx := context.Background()
+func TestGetGroupRolesIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
+
+	ctx := c.Context()
 	group := s.AddGroup(c, "test-group")
 	role := s.AddRole(c, "test-role")
 	tuple := openfga.Tuple{
@@ -162,24 +177,27 @@ func (s rebacAdminSuite) TestGetGroupRolesIntegration(c *gc.C) {
 		Target:   ofganames.ConvertTag(jimmnames.NewRoleTag(role.UUID)),
 	}
 	err := s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	params := &resources.GetGroupsItemRolesParams{}
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err := s.groupSvc.GetGroupRoles(ctx, group.UUID, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
-	c.Assert(res.Meta.Size, gc.Equals, 1)
-	c.Assert(*res.Meta.PageToken, gc.Equals, "")
-	c.Assert(res.Next.PageToken, gc.IsNil)
-	c.Assert(res.Data, gc.HasLen, 1)
-	c.Assert(res.Data[0].Id, gc.Not(gc.IsNil))
-	c.Assert(*res.Data[0].Id, gc.Equals, role.UUID)
-	c.Assert(res.Data[0].Name, gc.Equals, role.Name)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
+	c.Assert(res.Meta.Size, qt.Equals, 1)
+	c.Assert(*res.Meta.PageToken, qt.Equals, "")
+	c.Assert(res.Next.PageToken, qt.IsNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(res.Data[0].Id, qt.Not(qt.IsNil))
+	c.Assert(*res.Data[0].Id, qt.Equals, role.UUID)
+	c.Assert(res.Data[0].Name, qt.Equals, role.Name)
 }
 
-func (s rebacAdminSuite) TestPatchGroupRolesIntegration(c *gc.C) {
-	ctx := context.Background()
+func TestPatchGroupRolesIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
+
+	ctx := c.Context()
 	group := s.AddGroup(c, "test-group")
 	role := s.AddRole(c, "test-role")
 
@@ -189,8 +207,8 @@ func (s rebacAdminSuite) TestPatchGroupRolesIntegration(c *gc.C) {
 	}
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err := s.groupSvc.PatchGroupRoles(ctx, group.UUID, rolePatches)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Equals, true)
 
 	checkTuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(group.ResourceTag(), ofganames.MemberRelation),
@@ -198,25 +216,28 @@ func (s rebacAdminSuite) TestPatchGroupRolesIntegration(c *gc.C) {
 		Target:   ofganames.ConvertTag(role.ResourceTag()),
 	}
 	allowed, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, checkTuple, false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, true)
 
 	// Remove the role from the group.
 	rolePatches[0].Op = resources.GroupRolesPatchItemOpRemove
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err = s.groupSvc.PatchGroupRoles(ctx, group.UUID, rolePatches)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Equals, true)
 
 	allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, checkTuple, false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, false)
 }
 
-func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
-	ctx := context.Background()
+func TestGetGroupEntitlementsIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
+
+	ctx := c.Context()
 	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -233,22 +254,22 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 		tuples = append(tuples, t)
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	emptyPageToken := ""
 	req := resources.GetGroupsItemEntitlementsParams{NextPageToken: &emptyPageToken}
 	var entitlements []resources.EntityEntitlement
 	res, err := s.groupSvc.GetGroupEntitlements(ctx, group.UUID, &req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Not(gc.IsNil))
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Not(qt.IsNil))
 	entitlements = append(entitlements, res.Data...)
-	c.Assert(entitlements, gc.HasLen, 6)
+	c.Assert(entitlements, qt.HasLen, 6)
 	modelEntitlementCount := 0
 	controllerEntitlementCount := 0
 	for _, entitlement := range entitlements {
-		c.Assert(entitlement.Entitlement, gc.Equals, ofganames.AdministratorRelation.String())
-		c.Assert(entitlement.EntityId, gc.Matches, `test-(model|controller)-\d`)
+		c.Assert(entitlement.Entitlement, qt.Equals, ofganames.AdministratorRelation.String())
+		c.Assert(entitlement.EntityId, qt.Matches, `test-(model|controller)-\d`)
 		switch entitlement.EntityType {
 		case openfga.ModelType.String():
 			modelEntitlementCount++
@@ -259,8 +280,8 @@ func (s rebacAdminSuite) TestGetGroupEntitlementsIntegration(c *gc.C) {
 			c.FailNow()
 		}
 	}
-	c.Assert(modelEntitlementCount, gc.Equals, 3)
-	c.Assert(controllerEntitlementCount, gc.Equals, 3)
+	c.Assert(modelEntitlementCount, qt.Equals, 3)
+	c.Assert(controllerEntitlementCount, qt.Equals, 3)
 }
 
 // patchGroupEntitlementTestEnv is used to create entries in JIMM's database.
@@ -313,16 +334,18 @@ models:
 `
 
 // TestPatchGroupEntitlementsIntegration creates 4 models and verifies that relations from a group to these models can be added/removed.
-func (s rebacAdminSuite) TestPatchGroupEntitlementsIntegration(c *gc.C) {
-	ctx := context.Background()
-	tester := jimmtest.GocheckTester{C: c}
-	env := jimmtest.ParseEnvironment(tester, patchGroupEntitlementTestEnv)
-	env.PopulateDB(tester, s.JIMM.Database)
+func TestPatchGroupEntitlementsIntegration(t *testing.T) {
+	c := qt.New(t)
+	s := SetupGroupsTest(c)
+
+	ctx := c.Context()
+	env := jimmtest.ParseEnvironment(c, patchGroupEntitlementTestEnv)
+	env.PopulateDB(c, s.JIMM.Database)
 	oldModels := []string{env.Models[0].UUID, env.Models[1].UUID}
 	newModels := []string{env.Models[2].UUID, env.Models[3].UUID}
 
 	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, "test-group")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -335,10 +358,10 @@ func (s rebacAdminSuite) TestPatchGroupEntitlementsIntegration(c *gc.C) {
 		tuples = append(tuples, t)
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	allowed, err := s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[0], false)
-	c.Assert(err, gc.IsNil)
-	c.Assert(allowed, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.Equals, true)
 	// Above we have added granted the group with administrator permission to 2 models.
 	// Below, we will request those 2 relations to be removed and add 2 different relations.
 
@@ -366,19 +389,19 @@ func (s rebacAdminSuite) TestPatchGroupEntitlementsIntegration(c *gc.C) {
 	}
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
 	res, err := s.groupSvc.PatchGroupEntitlements(ctx, group.UUID, entitlementPatches)
-	c.Assert(err, gc.IsNil)
-	c.Assert(res, gc.Equals, true)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.Equals, true)
 
 	for i := range 2 {
 		allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, tuples[i], false)
-		c.Assert(err, gc.IsNil)
-		c.Assert(allowed, gc.Equals, false)
+		c.Assert(err, qt.IsNil)
+		c.Assert(allowed, qt.Equals, false)
 	}
 	for i := range 2 {
 		newTuple := tuples[0]
 		newTuple.Target = ofganames.ConvertTag(names.NewModelTag(newModels[i]))
 		allowed, err = s.JIMM.OpenFGAClient.CheckRelation(ctx, newTuple, false)
-		c.Assert(err, gc.IsNil)
-		c.Assert(allowed, gc.Equals, true)
+		c.Assert(err, qt.IsNil)
+		c.Assert(allowed, qt.Equals, true)
 	}
 }

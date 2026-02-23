@@ -6,16 +6,16 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"testing"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	cloudapi "github.com/juju/juju/api/client/cloud"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -23,33 +23,30 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type cloudSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
-
-var _ = gc.Suite(&cloudSuite{})
-
-func (s *cloudSuite) addCloud(c *gc.C, username string, cloud cloud.Cloud, force bool, cleanup bool) {
+func addCloud(c *qt.C, s jimmtest.WebsocketE2ESuite, username string, cloud cloud.Cloud, force, cleanup bool) {
 	conn := s.Open(c, nil, username, nil)
 	defer conn.Close()
 
 	client := cloudapi.NewClient(conn)
 	err := client.AddCloud(cloud, force)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	if cleanup {
-		s.Cleanup(func() {
+		c.Cleanup(func() {
 			s.RemoveCloud(c, cloud.Name)
 		})
 	}
 }
 
-func (s *cloudSuite) TestCloudCall(c *gc.C) {
+func TestCloudCall(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	info, err := client.Cloud(names.NewCloudTag(jimmtest.TestE2ECloudName))
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(info, jimmtest.CmpEquals(
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(info, qt.CmpEquals(
 		cmpopts.IgnoreFields(cloud.Cloud{}, "Endpoint", "Regions"),
 	), cloud.Cloud{
 		Name:      jimmtest.TestE2ECloudName,
@@ -58,16 +55,19 @@ func (s *cloudSuite) TestCloudCall(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestClouds(c *gc.C) {
+func TestClouds(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	client := cloudapi.NewClient(conn)
 	clouds, err := client.Clouds()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	e2eCloud, ok := clouds[names.NewCloudTag(jimmtest.TestE2ECloudName)]
-	c.Assert(ok, gc.Equals, true)
-	c.Assert(e2eCloud, jimmtest.CmpEquals(
+	c.Assert(ok, qt.Equals, true)
+	c.Assert(e2eCloud, qt.CmpEquals(
 		cmpopts.IgnoreFields(cloud.Cloud{}, "Endpoint", "Regions"),
 	), cloud.Cloud{
 		Name:      jimmtest.TestE2ECloudName,
@@ -76,18 +76,24 @@ func (s *cloudSuite) TestClouds(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestUserCredentials(c *gc.C) {
+func TestUserCredentials(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("bob@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []names.CloudCredentialTag{
 		names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/bob@canonical.com/cred"),
 	})
 }
 
-func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
+func TestUserCredentialsWithDomain(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cct := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/test@domain/cred1")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
 		AuthType: "credtype",
@@ -100,13 +106,16 @@ func (s *cloudSuite) TestUserCredentialsWithDomain(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag(jimmtest.TestE2ECloudName))
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []names.CloudCredentialTag{
 		cct,
 	})
 }
 
-func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
+func TestUserCredentialsErrors(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	req := jujuparams.UserClouds{
@@ -117,12 +126,15 @@ func (s *cloudSuite) TestUserCredentialsErrors(c *gc.C) {
 	}
 	var resp jujuparams.StringsResults
 	err := conn.APICall("Cloud", 7, "", "UserCredentials", req, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-user-tag" is not a valid tag`)
-	c.Assert(resp.Results, gc.HasLen, 1)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `"not-a-user-tag" is not a valid tag`)
+	c.Assert(resp.Results, qt.HasLen, 1)
 }
 
-func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
+func TestUpdateCloudCredentials(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -134,21 +146,24 @@ func (s *cloudSuite) TestUpdateCloudCredentials(c *gc.C) {
 		}),
 	}
 	res, err := client.UpdateCloudsCredentials(reqCreds, false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(res, gc.DeepEquals, []jujuparams.UpdateCredentialResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(res, qt.DeepEquals, []jujuparams.UpdateCredentialResult{{
 		CredentialTag: credentialTag.String(),
 	}})
 	creds, err := client.UserCredentials(names.NewUserTag("test@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []names.CloudCredentialTag{credentialTag})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []names.CloudCredentialTag{credentialTag})
 	_, err = client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	creds, err = client.UserCredentials(names.NewUserTag("test@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	var _ = creds
 }
 
-func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
+func TestUpdateCloudCredentialsErrors(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	req := jujuparams.TaggedCredentials{
@@ -180,14 +195,17 @@ func (s *cloudSuite) TestUpdateCloudCredentialsErrors(c *gc.C) {
 	}
 	var resp jujuparams.ErrorResults
 	err := conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", req, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results, gc.HasLen, 3)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
-	c.Assert(resp.Results[1].Error, gc.ErrorMatches, `unauthorized`)
-	c.Assert(resp.Results[2].Error, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.Results, qt.HasLen, 3)
+	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
+	c.Assert(resp.Results[1].Error, qt.ErrorMatches, `unauthorized`)
+	c.Assert(resp.Results[2].Error, qt.IsNil)
 }
 
-func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
+func TestUpdateCloudCredentialsForce(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -198,7 +216,7 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	_, err := client.UpdateCredentialsCheckModels(credentialTag,
 		cloud.NewCredential("certificate", existingCloudCred.Attributes),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	modelName := petname.Generate(2, "-")
 	s.AddModel(c, names.NewUserTag("test@canonical.com"),
@@ -222,13 +240,13 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	// First try without Force to check that it fails.
 	var resp jujuparams.UpdateCredentialResults
 	err = conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", args, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `some models are no longer visible`)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `some models are no longer visible`)
 
 	// Check that the credentials have not been updated.
 	creds, err := client.Credentials(credentialTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "certificate",
 			Redacted: []string{"client-cert", "client-key", "server-cert"},
@@ -237,14 +255,14 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 
 	args.Force = true
 	err = conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", args, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Check(resp.Results[0].Error, gc.ErrorMatches, `updating cloud credentials: validating credential "`+jimmtest.TestE2ECloudName+`/test@canonical.com/`+credentialName+`" for cloud "`+jimmtest.TestE2ECloudName+`": supported auth-types \["certificate"\], "badauthtype" not supported`)
+	c.Assert(err, qt.Equals, nil)
+	c.Check(resp.Results[0].Error, qt.ErrorMatches, `updating cloud credentials: validating credential "`+jimmtest.TestE2ECloudName+`/test@canonical.com/`+credentialName+`" for cloud "`+jimmtest.TestE2ECloudName+`": supported auth-types \["certificate"\], "badauthtype" not supported`)
 	// Check that the credentials have been updated even though
 	// we got an error.
 	creds, err = client.Credentials(credentialTag)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	sort.Strings(creds[0].Result.Redacted)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "badauthtype",
 			Redacted: []string{"bad1attr", "bad2attr"},
@@ -252,7 +270,10 @@ func (s *cloudSuite) TestUpdateCloudCredentialsForce(c *gc.C) {
 	}})
 }
 
-func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
+func TestCheckCredentialsModels(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -263,7 +284,7 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(credTag, cred1)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	model1Name := petname.Generate(2, "-")
 	model1 := s.AddModel(c, names.NewUserTag("test@canonical.com"),
@@ -289,7 +310,7 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 			},
 		}},
 	}, &resp)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	modelResults := []jujuparams.UpdateCredentialModelResult{{
 		ModelUUID: model1.Id(),
 		ModelName: model1Name,
@@ -303,7 +324,7 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 	sort.Slice(resp.Results[0].Models, func(i, j int) bool {
 		return resp.Results[0].Models[i].ModelUUID < resp.Results[0].Models[j].ModelUUID
 	})
-	c.Assert(resp, jc.DeepEquals, jujuparams.UpdateCredentialResults{
+	c.Assert(resp, qt.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
 			CredentialTag: credTag.String(),
 			Models:        modelResults,
@@ -311,7 +332,10 @@ func (s *cloudSuite) TestCheckCredentialsModels(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
+func TestCheckCredentialsModelsInvalidCreds(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -322,7 +346,7 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(credTag, cred1)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	model1Name := petname.Generate(2, "-")
 	model1 := s.AddModel(c, names.NewUserTag("test@canonical.com"),
@@ -330,7 +354,7 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 		names.NewCloudTag(jimmtest.TestE2ECloudName),
 		jimmtest.TestE2ECloudRegionName,
 		credTag)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	var resp jujuparams.UpdateCredentialResults
 	err = conn.APICall("Cloud", 7, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
@@ -344,8 +368,8 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 			},
 		}},
 	}, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp, jc.DeepEquals, jujuparams.UpdateCredentialResults{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp, qt.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
 			CredentialTag: "cloudcred-" + jimmtest.TestE2ECloudName + "_test@canonical.com_" + credentialName,
 			Error:         &jujuparams.Error{Message: "some models are no longer visible"},
@@ -363,7 +387,10 @@ func (s *cloudSuite) TestCheckCredentialsModelsInvalidCreds(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestCredential(c *gc.C) {
+func TestCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	cred1Name := petname.Generate(2, "-")
@@ -378,9 +405,9 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 
 	client := cloudapi.NewClient(conn)
 	_, err := client.UpdateCredentialsCheckModels(cred1Tag, cred1)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, err = client.UpdateCredentialsCheckModels(cred2Tag, cred2)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	creds, err := client.Credentials(
 		cred1Tag,
@@ -389,14 +416,14 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 		names.NewCloudCredentialTag(jimmtest.TestE2ECloudName+"/no-test@canonical.com/cred4"),
 		names.NewCloudCredentialTag(jimmtest.TestE2ECloudName+"/admin@local/cred6"),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	for i := range creds {
 		if creds[i].Result == nil {
 			continue
 		}
 		sort.Strings(creds[i].Result.Redacted)
 	}
-	c.Assert(creds, jc.SameContents, []jujuparams.CloudCredentialResult{{
+	c.Assert(creds, qt.ContentEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "userpass",
 			Redacted: []string{
@@ -426,7 +453,10 @@ func (s *cloudSuite) TestCredential(c *gc.C) {
 	}})
 }
 
-func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
+func TestRevokeCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -436,28 +466,28 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 		credTag,
 		cloud.NewCredential("empty", nil),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{
 		credTag,
 	})
 
 	ccr, err := client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ccr, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "empty",
 		},
 	}})
 
 	err = client.RevokeCredential(credTag, false)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	ccr, err = client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ccr, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
 			Message: `cloudcredential "` + jimmtest.TestE2ECloudName + `/test@canonical.com/` + credName + `" not found`,
@@ -465,13 +495,16 @@ func (s *cloudSuite) TestRevokeCredential(c *gc.C) {
 	}})
 
 	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{})
 }
 
-func (s *cloudSuite) TestAddCloud(c *gc.C) {
+func TestAddCloud(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cloudName := petname.Generate(2, "-")
-	s.addCloud(c, "test", cloud.Cloud{
+	addCloud(c, s, "test", cloud.Cloud{
 		Name:             cloudName,
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -485,8 +518,8 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	clouds, err := client.Clouds()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds[names.NewCloudTag(cloudName)], jimmtest.CmpEquals(
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(clouds[names.NewCloudTag(cloudName)], qt.CmpEquals(
 		cmpopts.IgnoreFields(cloud.Cloud{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 		cmpopts.IgnoreFields(cloud.Region{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 	), cloud.Cloud{
@@ -499,7 +532,10 @@ func (s *cloudSuite) TestAddCloud(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
+func TestRevokeCredentialsCheckModels(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -511,17 +547,17 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 		credTag,
 		cloud.NewCredential("certificate", existingCloudCred.Attributes),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{
 		credTag,
 	})
 
 	ccr, err := client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ccr, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
 			AuthType: "certificate",
 			Redacted: []string{"client-cert", "client-key", "server-cert"},
@@ -531,7 +567,7 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	mmclient := modelmanager.NewClient(conn)
 	modelName := petname.Generate(2, "-")
 	modelInfo, err := mmclient.CreateModel(modelName, "test@canonical.com", jimmtest.TestE2ECloudName, jimmtest.TestE2ECloudRegionName, credTag, nil)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	var resp jujuparams.ErrorResults
 	err = conn.APICall("Cloud", 7, "", "RevokeCredentialsCheckModels", jujuparams.RevokeCredentialArgs{
@@ -540,8 +576,8 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 			Force: false,
 		}},
 	}, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
 
 	resp.Results = nil
 	// we don't support the force flag, so the test should fail again.
@@ -551,8 +587,8 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 			Force: true,
 		}},
 	}, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `cloud credential still used by 1 model\(s\)`)
 
 	s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(modelInfo.UUID))
 
@@ -563,12 +599,12 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 			Force: false,
 		}},
 	}, &resp)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(resp.Results[0].Error, gc.IsNil)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(resp.Results[0].Error, qt.IsNil)
 
 	ccr, err = client.Credentials(credTag)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(ccr, jc.DeepEquals, []jujuparams.CloudCredentialResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(ccr, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Error: &jujuparams.Error{
 			Code:    jujuparams.CodeNotFound,
 			Message: `cloudcredential "` + jimmtest.TestE2ECloudName + `/test@canonical.com/` + credentialName + `" not found`,
@@ -576,11 +612,14 @@ func (s *cloudSuite) TestRevokeCredentialsCheckModels(c *gc.C) {
 	}})
 
 	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(tags, jc.DeepEquals, []names.CloudCredentialTag{})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{})
 }
 
-func (s *cloudSuite) TestAddCloudError(c *gc.C) {
+func TestAddCloudError(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -593,10 +632,13 @@ func (s *cloudSuite) TestAddCloudError(c *gc.C) {
 		StorageEndpoint:  "https://0.1.2.3:5680",
 		HostCloudRegion:  jimmtest.TestE2ECloudName + "/" + jimmtest.TestE2ECloudRegionName,
 	}, false)
-	c.Assert(err, gc.ErrorMatches, `invalid cloud: empty auth-types not valid.*`)
+	c.Assert(err, qt.ErrorMatches, `invalid cloud: empty auth-types not valid.*`)
 }
 
-func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
+func TestAddCloudNoHostCloudRegion(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -608,11 +650,14 @@ func (s *cloudSuite) TestAddCloudNoHostCloudRegion(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 	}, false)
-	c.Assert(err, gc.ErrorMatches, `cloud host region not specified \(cloud region required\)`)
-	c.Assert(jujuparams.ErrCode(err), gc.Equals, jujuparams.CodeCloudRegionRequired)
+	c.Assert(err, qt.ErrorMatches, `cloud host region not specified \(cloud region required\)`)
+	c.Assert(jujuparams.ErrCode(err), qt.Equals, jujuparams.CodeCloudRegionRequired)
 }
 
-func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
+func TestAddCloudBadName(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -624,10 +669,13 @@ func (s *cloudSuite) TestAddCloudBadName(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 	}, false)
-	c.Assert(err, gc.ErrorMatches, `cloud "aws" already exists \(already exists\)`)
+	c.Assert(err, qt.ErrorMatches, `cloud "aws" already exists \(already exists\)`)
 }
 
-func (s *cloudSuite) TestAddCredential(c *gc.C) {
+func TestAddCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -642,10 +690,10 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 			},
 		),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	creds, err := client.CredentialContents(jimmtest.TestE2ECloudName, "cred3", true)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
@@ -668,10 +716,10 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 			},
 		),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	creds, err = client.CredentialContents(jimmtest.TestE2ECloudName, "cred3", true)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     "cred3",
@@ -686,7 +734,10 @@ func (s *cloudSuite) TestAddCredential(c *gc.C) {
 	}})
 }
 
-func (s *cloudSuite) TestCredentialContents(c *gc.C) {
+func TestCredentialContents(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -699,10 +750,10 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 		credentialTag.String(),
 		cred1,
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	creds, err := client.CredentialContents(jimmtest.TestE2ECloudName, credentialName, false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:     credentialName,
@@ -720,8 +771,8 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 		credentialTag)
 
 	creds, err = client.CredentialContents(jimmtest.TestE2ECloudName, credentialName, true)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:       credentialName,
@@ -738,8 +789,8 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 
 	// unspecified credentials return all.
 	creds, err = client.CredentialContents("", "", true)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:       credentialName,
@@ -756,7 +807,10 @@ func (s *cloudSuite) TestCredentialContents(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestCredentialContentsWithEmptyAttributes(c *gc.C) {
+func TestCredentialContentsWithEmptyAttributes(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -769,10 +823,10 @@ func (s *cloudSuite) TestCredentialContentsWithEmptyAttributes(c *gc.C) {
 			nil,
 		),
 	)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	creds, err := client.CredentialContents(jimmtest.TestE2ECloudName, credentialName, false)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(creds, jc.DeepEquals, []jujuparams.CredentialContentResult{{
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
 				Name:       credentialName,
@@ -784,9 +838,12 @@ func (s *cloudSuite) TestCredentialContentsWithEmptyAttributes(c *gc.C) {
 	}})
 }
 
-func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
+func TestRemoveCloud(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cloudName := petname.Generate(2, "-")
-	s.addCloud(c, "test", cloud.Cloud{
+	addCloud(c, s, "test", cloud.Cloud{
 		Name:             cloudName,
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -800,8 +857,8 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	clouds, err := client.Clouds()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds[names.NewCloudTag(cloudName)], jimmtest.CmpEquals(
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(clouds[names.NewCloudTag(cloudName)], qt.CmpEquals(
 		cmpopts.IgnoreFields(cloud.Cloud{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 		cmpopts.IgnoreFields(cloud.Region{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 	), cloud.Cloud{
@@ -814,25 +871,31 @@ func (s *cloudSuite) TestRemoveCloud(c *gc.C) {
 	})
 
 	err = client.RemoveCloud(cloudName)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	clouds, err = client.Clouds()
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(clouds[names.NewCloudTag(cloudName)], jc.DeepEquals, cloud.Cloud{})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(clouds[names.NewCloudTag(cloudName)], qt.DeepEquals, cloud.Cloud{})
 }
 
-func (s *cloudSuite) TestRemoveCloudNotFound(c *gc.C) {
+func TestRemoveCloudNotFound(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 
 	cloudName := petname.Generate(2, "-")
 	err := client.RemoveCloud(cloudName)
-	c.Assert(err, gc.ErrorMatches, `cloud "`+cloudName+`" not found`)
+	c.Assert(err, qt.ErrorMatches, `cloud "`+cloudName+`" not found`)
 }
 
-func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
+func TestModifyCloudAccess(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cloudName := petname.Generate(2, "-")
-	s.addCloud(c, "test", cloud.Cloud{
+	addCloud(c, s, "test", cloud.Cloud{
 		Name:             cloudName,
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -846,38 +909,41 @@ func (s *cloudSuite) TestModifyCloudAccess(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	clouds, err := client.Clouds()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, ok := clouds[names.NewCloudTag(cloudName)]
-	c.Assert(ok, jc.IsTrue)
+	c.Assert(ok, qt.IsTrue)
 
 	// Check that bob@canonical.com does not yet have access
 	conn2 := s.Open(c, nil, "bob", nil)
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	clouds, err = client2.Clouds()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, ok = clouds[names.NewCloudTag(cloudName)]
-	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
+	c.Assert(ok, qt.Equals, false, qt.Commentf("clouds: %#v", clouds))
 
 	err = client.GrantCloud("bob@canonical.com", "add-model", cloudName)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	clouds, err = client2.Clouds()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, ok = clouds[names.NewCloudTag(cloudName)]
-	c.Assert(ok, jc.IsTrue)
+	c.Assert(ok, qt.IsTrue)
 
 	err = client.RevokeCloud("bob@canonical.com", "add-model", cloudName)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	clouds, err = client2.Clouds()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, ok = clouds[names.NewCloudTag(cloudName)]
-	c.Assert(ok, gc.Equals, false, gc.Commentf("clouds: %#v", clouds))
+	c.Assert(ok, qt.Equals, false, qt.Commentf("clouds: %#v", clouds))
 }
 
-func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
+func TestModifyCloudAccessUnauthorized(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cloudName := petname.Generate(2, "-")
-	s.addCloud(c, "test", cloud.Cloud{
+	addCloud(c, s, "test", cloud.Cloud{
 		Name:             cloudName,
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -891,19 +957,22 @@ func (s *cloudSuite) TestModifyCloudAccessUnauthorized(c *gc.C) {
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
 	clouds, err := client.Clouds()
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	_, ok := clouds[names.NewCloudTag(cloudName)]
-	c.Assert(ok, jc.IsTrue)
+	c.Assert(ok, qt.IsTrue)
 
 	// Try granting cloud access as an unauthorized user.
 	conn2 := s.Open(c, nil, "charlie", nil)
 	defer conn2.Close()
 	client2 := cloudapi.NewClient(conn2)
 	err = client2.GrantCloud("charlie@canonical.com", "add-model", "test-cloud")
-	c.Assert(err, gc.ErrorMatches, `unauthorized`)
+	c.Assert(err, qt.ErrorMatches, `unauthorized`)
 }
 
-func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
+func TestUpdateCloud(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
@@ -915,12 +984,15 @@ func (s *cloudSuite) TestUpdateCloud(c *gc.C) {
 		IdentityEndpoint: "https://0.1.2.3:5679",
 		StorageEndpoint:  "https://0.1.2.3:5680",
 	})
-	c.Assert(jujuparams.IsCodeForbidden(err), gc.Equals, true, gc.Commentf("%#v", err))
+	c.Assert(jujuparams.IsCodeForbidden(err), qt.Equals, true, qt.Commentf("%#v", err))
 }
 
-func (s *cloudSuite) TestCloudInfo(c *gc.C) {
+func TestCloudInfo(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cloudName := petname.Generate(2, "-")
-	s.addCloud(c, "alice", cloud.Cloud{
+	addCloud(c, s, "alice", cloud.Cloud{
 		Name:             cloudName,
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -946,8 +1018,8 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 	}
 	var result jujuparams.CloudInfoResults
 	err := conn.APICall("Cloud", 7, "", "CloudInfo", args, &result)
-	c.Assert(err, gc.Equals, nil)
-	c.Assert(result, jimmtest.CmpEquals(
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(result, qt.CmpEquals(
 		cmpopts.IgnoreFields(jujuparams.CloudDetails{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 		cmpopts.IgnoreFields(jujuparams.CloudRegion{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 	), jujuparams.CloudInfoResults{
@@ -980,9 +1052,12 @@ func (s *cloudSuite) TestCloudInfo(c *gc.C) {
 	})
 }
 
-func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
+func TestListCloudInfo(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	cloudName := petname.Generate(2, "-")
-	s.addCloud(c, "alice", cloud.Cloud{
+	addCloud(c, s, "alice", cloud.Cloud{
 		Name:             cloudName,
 		Type:             "kubernetes",
 		AuthTypes:        cloud.AuthTypes{cloud.CertificateAuthType},
@@ -993,18 +1068,18 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 	}, false, true)
 
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	bob := openfga.NewUser(bobIdentity, s.OFGAClient)
 	err = bob.SetCloudAccess(context.Background(), names.NewCloudTag(cloudName), ofganames.CanAddModelRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	err = bob.SetCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestE2ECloudName), ofganames.CanAddModelRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 	alice := openfga.NewUser(aliceIdentity, s.OFGAClient)
 	err = alice.SetCloudAccess(context.Background(), names.NewCloudTag(jimmtest.TestE2ECloudName), ofganames.CanAddModelRelation)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	args := jujuparams.ListCloudsRequest{
 		UserTag: names.NewUserTag("alice@canonical.com").String(),
@@ -1014,11 +1089,11 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	err = conn.APICall("Cloud", 7, "", "ListCloudInfo", args, &result)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	sort.Slice(result.Results, func(i, j int) bool {
 		return result.Results[i].Result.Type > result.Results[j].Result.Type
 	})
-	c.Check(result, jimmtest.CmpEquals(
+	c.Check(result, qt.CmpEquals(
 		cmpopts.IgnoreFields(jujuparams.CloudDetails{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 		cmpopts.IgnoreFields(jujuparams.CloudRegion{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 	), jujuparams.ListCloudInfoResults{
@@ -1057,12 +1132,12 @@ func (s *cloudSuite) TestListCloudInfo(c *gc.C) {
 	}
 	result.Results = nil
 	err = conn.APICall("Cloud", 7, "", "ListCloudInfo", args, &result)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 
 	sort.Slice(result.Results, func(i, j int) bool {
 		return result.Results[i].Result.Type > result.Results[j].Result.Type
 	})
-	c.Check(result, jimmtest.CmpEquals(
+	c.Check(result, qt.CmpEquals(
 		cmpopts.IgnoreFields(jujuparams.CloudDetails{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 		cmpopts.IgnoreFields(jujuparams.CloudRegion{}, "Endpoint", "IdentityEndpoint", "StorageEndpoint"),
 	), jujuparams.ListCloudInfoResults{

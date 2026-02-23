@@ -3,14 +3,14 @@
 package logger
 
 import (
+	qt "github.com/frankban/quicktest"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	gc "gopkg.in/check.v1"
 )
 
 // NewGoCheckLogger create a logger to be used by the gocheck test library.
 // The logs are shown only when the test fails.
-func NewGoCheckLogger(c *gc.C) *zap.Logger {
+func NewGoCheckLogger(c *qt.C) *zap.Logger {
 	output := gocheckZapWriter{c}
 
 	devConfig := zap.NewDevelopmentEncoderConfig()
@@ -27,11 +27,11 @@ func NewGoCheckLogger(c *gc.C) *zap.Logger {
 }
 
 type gocheckZapWriter struct {
-	c *gc.C
+	c *qt.C
 }
 
 func (w gocheckZapWriter) Write(buf []byte) (int, error) {
-	w.c.Logf(string(buf))
+	w.c.Logf("%s", string(buf))
 	return len(buf), nil
 }
 

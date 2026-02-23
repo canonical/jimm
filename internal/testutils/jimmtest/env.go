@@ -41,12 +41,7 @@ type Environment struct {
 	IncomingMigrations []IncomingMigration `json:"incoming-migrations"`
 }
 
-// A Tester is the test interface required by this package.
-type Tester interface {
-	Fatalf(format string, args ...interface{})
-}
-
-func ParseEnvironment(c Tester, env string) *Environment {
+func ParseEnvironment(c *qt.C, env string) *Environment {
 	var e Environment
 
 	err := yaml.Unmarshal([]byte(env), &e)
@@ -260,7 +255,7 @@ func (e *Environment) PopulateDBAndPermissions(c *qt.C, jimmTag names.Controller
 	e.addJIMMRelations(c, jimmTag, db, client)
 }
 
-func (e *Environment) PopulateDB(c Tester, db *db.Database) {
+func (e *Environment) PopulateDB(c *qt.C, db *db.Database) {
 	for i := range e.Users {
 		e.Users[i].env = e
 		e.Users[i].DBObject(c, db)
@@ -308,7 +303,7 @@ type ApplicationOffer struct {
 	dbo dbmodel.ApplicationOffer
 }
 
-func (cd *ApplicationOffer) DBObject(c Tester, db *db.Database) dbmodel.ApplicationOffer {
+func (cd *ApplicationOffer) DBObject(c *qt.C, db *db.Database) dbmodel.ApplicationOffer {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -338,7 +333,7 @@ type CloudDefaults struct {
 	dbo dbmodel.CloudDefaults
 }
 
-func (cd *CloudDefaults) DBObject(c Tester, db *db.Database) dbmodel.CloudDefaults {
+func (cd *CloudDefaults) DBObject(c *qt.C, db *db.Database) dbmodel.CloudDefaults {
 	if cd.dbo.ID != 0 {
 		return cd.dbo
 	}
@@ -377,7 +372,7 @@ type CloudRegion struct {
 
 // DBObject returns a database object for the specified cloud, suitable
 // for adding to the database.
-func (cl *Cloud) DBObject(c Tester, db *db.Database) dbmodel.Cloud {
+func (cl *Cloud) DBObject(c *qt.C, db *db.Database) dbmodel.Cloud {
 	if cl.dbo.ID != 0 {
 		return cl.dbo
 	}
@@ -412,7 +407,7 @@ type CloudCredential struct {
 	dbo dbmodel.CloudCredential
 }
 
-func (cc *CloudCredential) DBObject(c Tester, db *db.Database) dbmodel.CloudCredential {
+func (cc *CloudCredential) DBObject(c *qt.C, db *db.Database) dbmodel.CloudCredential {
 	if cc.dbo.ID != 0 {
 		return cc.dbo
 	}
@@ -448,7 +443,7 @@ type Controller struct {
 	dbo dbmodel.Controller
 }
 
-func (ctl *Controller) DBObject(c Tester, db *db.Database) dbmodel.Controller {
+func (ctl *Controller) DBObject(c *qt.C, db *db.Database) dbmodel.Controller {
 	if ctl.dbo.ID != 0 {
 		return ctl.dbo
 	}
@@ -511,7 +506,7 @@ type Model struct {
 	dbo dbmodel.Model
 }
 
-func (m *Model) DBObject(c Tester, db *db.Database) dbmodel.Model {
+func (m *Model) DBObject(c *qt.C, db *db.Database) dbmodel.Model {
 	if m.dbo.ID != 0 {
 		return m.dbo
 	}
@@ -552,7 +547,7 @@ type User struct {
 	dbo dbmodel.Identity
 }
 
-func (u *User) DBObject(c Tester, db *db.Database) dbmodel.Identity {
+func (u *User) DBObject(c *qt.C, db *db.Database) dbmodel.Identity {
 	if u.dbo.ID != 0 {
 		return u.dbo
 	}
@@ -583,7 +578,7 @@ type UserMap struct {
 	ExternalUserName string `json:"external-user"`
 }
 
-func (im *IncomingMigration) DBObject(c Tester, db *db.Database) dbmodel.IncomingModelMigration {
+func (im *IncomingMigration) DBObject(c *qt.C, db *db.Database) dbmodel.IncomingModelMigration {
 	if im.dbo.ID != 0 {
 		return im.dbo
 	}

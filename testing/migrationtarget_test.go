@@ -3,46 +3,51 @@
 package testing
 
 import (
+	"testing"
+
+	qt "github.com/frankban/quicktest"
 	"github.com/juju/description/v10"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type migrationTargetSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
+func TestAbort(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 
-var _ = gc.Suite(&migrationTargetSuite{})
-
-func (s *migrationTargetSuite) TestAbort(c *gc.C) {
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	err := client.Abort(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
 }
 
-func (s *migrationTargetSuite) TestCheckMachines(c *gc.C) {
+func TestCheckMachines(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	_, err := client.CheckMachines(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
 }
 
-func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
+func TestPrechecks(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -75,7 +80,7 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	}
 	client := migrationtarget.NewClient(conn)
 	err := client.Prechecks(model)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
 
 	controllerName, _ := s.GetOneControllerConfig(c)
 
@@ -86,34 +91,43 @@ func (s *migrationTargetSuite) TestPrechecks(c *gc.C) {
 	}
 	jimmClient := api.NewClient(conn)
 	migrationToken, err := jimmClient.PrepareModelMigration(&prepareModelMigration)
-	c.Assert(err, gc.IsNil)
-	c.Assert(migrationToken, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationToken, qt.Not(qt.Equals), "")
 
 	err = client.Prechecks(model)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *migrationTargetSuite) TestCACert(c *gc.C) {
+func TestCACert(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
 	cert, err := client.CACert()
-	c.Assert(err, gc.IsNil)
-	c.Assert(cert, gc.Equals, "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(cert, qt.Equals, "")
 }
 
-func (s *migrationTargetSuite) TestAdoptResources(c *gc.C) {
+func TestAdoptResources(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	modelUUID := "00000001-0000-0000-0000-000000000001"
 	client := migrationtarget.NewClient(conn)
 	err := client.AdoptResources(modelUUID)
-	c.Assert(err, gc.ErrorMatches, `.*model not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model not found.*`)
 }
 
-func (s *migrationTargetSuite) TestActivate(c *gc.C) {
+func TestActivate(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -125,23 +139,29 @@ func (s *migrationTargetSuite) TestActivate(c *gc.C) {
 
 	client := migrationtarget.NewClient(conn)
 	err := client.Activate(modelUUID, sourceInfo, relatedModels)
-	c.Assert(err, gc.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
 }
 
-func (s *migrationTargetSuite) TestLatestLogTime(c *gc.C) {
+func TestLatestLogTime(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
 	_, err := client.LatestLogTime(s.Model.UUID.String)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *migrationTargetSuite) TestImport(c *gc.C) {
+func TestImport(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
+
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
 	err := client.Import([]byte{})
-	c.Assert(err, gc.ErrorMatches, `^failed to import model.*`)
+	c.Assert(err, qt.ErrorMatches, `^failed to import model.*`)
 }
