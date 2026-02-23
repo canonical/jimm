@@ -29,6 +29,7 @@ func (s *dialSuite) TestDial(c *gc.C) {
 		Name:          name,
 		CACertificate: config.CACert,
 		PublicAddress: config.Addrs[0],
+		TLSHostname:   "juju-apiserver",
 	}
 
 	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil, nil)
@@ -56,6 +57,7 @@ func (s *dialSuite) TestDialWithJWT(c *gc.C) {
 		Name:          name,
 		CACertificate: config.CACert,
 		PublicAddress: config.Addrs[0],
+		TLSHostname:   "juju-apiserver",
 	}
 
 	dialer := &jujuclient.Dialer{
@@ -89,6 +91,7 @@ func (s *dialSuite) TestConnectStreams(c *gc.C) {
 		Name:          name,
 		CACertificate: config.CACert,
 		PublicAddress: config.Addrs[0],
+		TLSHostname:   "juju-apiserver",
 	}
 
 	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, s.Model.ResourceTag(), nil, nil)
