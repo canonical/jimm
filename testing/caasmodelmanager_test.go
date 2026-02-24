@@ -3,7 +3,6 @@
 package testing
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -19,20 +18,12 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func skipWithoutMicrok8sCloud(t *testing.T) {
-	t.Helper()
-	if os.Getenv(jimmtest.Microk8sCloudNameEnv) == "" {
-		t.Skipf("%s is not set", jimmtest.Microk8sCloudNameEnv)
-	}
-}
-
 // caasModelManagerSuite requires additional setup, described in README.md#Setup microk8s cloud
 type caasModelManagerDeps struct {
 	jimmtest.WebsocketE2ESuite
 
 	cred      names.CloudCredentialTag
 	cloudName string
-	modelUUID string
 }
 
 func SetupCaasModelTest(c *qt.C) caasModelManagerDeps {
@@ -64,7 +55,6 @@ func SetupCaasModelTest(c *qt.C) caasModelManagerDeps {
 }
 
 func TestCreateModelKubernetes(t *testing.T) {
-	skipWithoutMicrok8sCloud(t)
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
 	conn := s.Open(c, nil, "bob", nil)
@@ -74,17 +64,18 @@ func TestCreateModelKubernetes(t *testing.T) {
 	modelName := petname.Generate(2, "-")
 	mi, err := client.CreateModel(modelName, "bob@canonical.com", s.cloudName, "", s.cred, nil)
 	c.Assert(err, qt.Equals, nil)
+	c.Cleanup(func() {
+		s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(mi.UUID))
+	})
 	c.Assert(mi.Name, qt.Equals, modelName)
 	c.Assert(mi.Type, qt.Equals, model.CAAS)
 	c.Assert(mi.ProviderType, qt.Equals, "kubernetes")
 	c.Assert(mi.Cloud, qt.Equals, s.cloudName)
 	c.Assert(mi.CloudRegion, qt.Equals, "localhost")
 	c.Assert(mi.Owner, qt.Equals, "bob@canonical.com")
-	s.modelUUID = mi.UUID
 }
 
 func TestListCAASModelSummaries(t *testing.T) {
-	skipWithoutMicrok8sCloud(t)
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
 	conn := s.Open(c, nil, "bob", nil)
@@ -94,7 +85,9 @@ func TestListCAASModelSummaries(t *testing.T) {
 	modelName := petname.Generate(2, "-")
 	mi, err := client.CreateModel(modelName, "bob@canonical.com", s.cloudName, "", s.cred, nil)
 	c.Assert(err, qt.Equals, nil)
-	s.modelUUID = mi.UUID
+	c.Cleanup(func() {
+		s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(mi.UUID))
+	})
 
 	models, err := client.ListModelSummaries("bob", false)
 	c.Assert(err, qt.Equals, nil)
@@ -155,7 +148,6 @@ func TestListCAASModelSummaries(t *testing.T) {
 }
 
 func TestListCAASModels(t *testing.T) {
-	skipWithoutMicrok8sCloud(t)
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
 	conn := s.Open(c, nil, "bob", nil)
@@ -165,7 +157,9 @@ func TestListCAASModels(t *testing.T) {
 	modelName := petname.Generate(2, "-")
 	mi, err := client.CreateModel(modelName, "bob@canonical.com", s.cloudName, "", s.cred, nil)
 	c.Assert(err, qt.Equals, nil)
-	s.modelUUID = mi.UUID
+	c.Cleanup(func() {
+		s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(mi.UUID))
+	})
 
 	models, err := client.ListModels("bob")
 	c.Assert(err, qt.Equals, nil)
