@@ -3,6 +3,7 @@
 package testing
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -17,6 +18,13 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
+
+func skipWithoutMicrok8sCloud(t *testing.T) {
+	t.Helper()
+	if os.Getenv(jimmtest.Microk8sCloudNameEnv) == "" {
+		t.Skipf("%s is not set", jimmtest.Microk8sCloudNameEnv)
+	}
+}
 
 // caasModelManagerSuite requires additional setup, described in README.md#Setup microk8s cloud
 type caasModelManagerDeps struct {
@@ -61,6 +69,7 @@ func TearDownTest(t *testing.T) {
 }
 
 func TestCreateModelKubernetes(t *testing.T) {
+	skipWithoutMicrok8sCloud(t)
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
 	conn := s.Open(c, nil, "bob", nil)
@@ -80,6 +89,7 @@ func TestCreateModelKubernetes(t *testing.T) {
 }
 
 func TestListCAASModelSummaries(t *testing.T) {
+	skipWithoutMicrok8sCloud(t)
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
 	conn := s.Open(c, nil, "bob", nil)
@@ -150,6 +160,7 @@ func TestListCAASModelSummaries(t *testing.T) {
 }
 
 func TestListCAASModels(t *testing.T) {
+	skipWithoutMicrok8sCloud(t)
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
 	conn := s.Open(c, nil, "bob", nil)
