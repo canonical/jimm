@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -95,4 +96,121 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestStartJWKSRotatorV2_InitialisesFromLegacy(t *testing.T) {
+	c := qt.New(t)
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+
+	store := setupCredentialStore(ctx, c)
+	err := store.CleanupJWKS(ctx)
+	c.Assert(err, qt.IsNil)
+
+	legacyJWKS, legacyPrivateKey, err := jimmjwx.GenerateJWK(ctx)
+	c.Assert(err, qt.IsNil)
+
+	err = store.PutJWKS(ctx, legacyJWKS)
+	c.Assert(err, qt.IsNil)
+	err = store.PutJWKSPrivateKey(ctx, legacyPrivateKey)
+	c.Assert(err, qt.IsNil)
+
+	legacyKey, ok := legacyJWKS.Key(0)
+	c.Assert(ok, qt.IsTrue)
+
+	svc := jimmjwx.NewJWKSService(store)
+	err = svc.StartJWKSRotatorV2(ctx, jimmjwx.StartJWKSRotatorParams{
+		CheckRotateRequired: make(chan time.Time),
+		RotationInterval:    24 * time.Hour,
+		GracePeriod:         15 * time.Minute,
+		MaxTokenLifetime:    time.Hour,
+	})
+	c.Assert(err, qt.IsNil)
+
+	meta, err := store.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(meta.CurrentActiveKID, qt.Equals, legacyKey.KeyID())
+	c.Assert(meta.Keys, qt.HasLen, 1)
+	c.Assert(meta.Keys[0].KID, qt.Equals, legacyKey.KeyID())
+	c.Assert(meta.Keys[0].PrivateKey, qt.Equals, string(legacyPrivateKey))
+	c.Assert(meta.Keys[0].ActivatedAt, qt.IsNotNil)
+}
+
+// This test tests the rotator from an empty state, into a full rotation verifying that the grace
+// period is honoured.
+func TestStartJWKSRotatorV2_FullRunFromUninitialised(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := qt.New(t)
+		ctx, cancelCtx := context.WithCancel(context.Background())
+		defer cancelCtx()
+
+		store := setupCredentialStore(ctx, c)
+
+		svc := jimmjwx.NewJWKSService(store)
+		checkRotateRequired := make(chan time.Time, 1)
+		p := jimmjwx.StartJWKSRotatorParams{
+			CheckRotateRequired: checkRotateRequired,
+			RotationInterval:    24 * time.Hour,
+			GracePeriod:         15 * time.Minute,
+			// Keep old key publishable beyond rotation interval so we can observe
+			// old(active)+new(pre-active) overlap.
+			MaxTokenLifetime: 48 * time.Hour,
+		}
+		err := svc.StartJWKSRotatorV2(ctx, p)
+		c.Assert(err, qt.IsNil)
+
+		// Fresh init should create one key and make it active immediately.
+		meta, err := store.GetKeyMetadata(ctx)
+		c.Assert(err, qt.IsNil)
+		// Expect just the one.
+		c.Assert(meta.Keys, qt.HasLen, 1)
+		// And it is active and good to go.
+		c.Assert(meta.CurrentActiveKID, qt.Equals, meta.Keys[0].KID)
+		c.Assert(meta.Keys[0].KID, qt.Not(qt.Equals), "")
+		c.Assert(meta.Keys[0].PrivateKey, qt.Contains, "BEGIN RSA PRIVATE KEY")
+		c.Assert(meta.Keys[0].PublicJWK, qt.Not(qt.Equals), "")
+		c.Assert(meta.Keys[0].ActivatedAt, qt.IsNotNil)
+		c.Assert(meta.RotationInterval, qt.Equals, 24*time.Hour)
+		c.Assert(meta.GracePeriod, qt.Equals, 15*time.Minute)
+		c.Assert(meta.MaxTokenLifetime, qt.Equals, 48*time.Hour)
+
+		ogKID := meta.CurrentActiveKID
+
+		// Now we fast forward over the rotation period, but before the next key is set active. (grace peroiod)
+		time.Sleep(p.RotationInterval + time.Second)
+		checkRotateRequired <- time.Now()
+		synctest.Wait()
+
+		meta, err = store.GetKeyMetadata(ctx)
+		c.Assert(err, qt.IsNil)
+		// We should have two keys now, one active and one preactive and we expect
+		// the OG key to be the active one still, as we are in the grace period.
+		c.Assert(meta.Keys, qt.HasLen, 2)
+		c.Assert(meta.CurrentActiveKID, qt.Equals, ogKID)
+
+		expectedNewActiveKID := ""
+		// Retrieve the preactive key to check it is defo the active key after retirement.
+		for _, key := range meta.Keys {
+			if key.KID != ogKID {
+				expectedNewActiveKID = key.KID
+				break
+			}
+		}
+
+		// Now wefast forward to just after the original key expiry (ActivatedAt + max token lifetime + grace).
+		// We subtract the first jump we already did, and add a small epsilon so retirement condition is strictly true.
+		// This avoids usovershooting into another rotation window.
+		// For reference: (24hr + 15m) - (24hr + 1s) + 500ms = 14m59s500ms, and we jumped rotate +1second.
+		// As such we're 500ms after the retirement condition is satisfied, but not so far as to have triggered another rotation window.
+		secondJump := (p.MaxTokenLifetime + p.GracePeriod) - (p.RotationInterval + time.Second) + 500*time.Millisecond
+		time.Sleep(secondJump)
+		checkRotateRequired <- time.Now()
+		synctest.Wait()
+
+		meta, err = store.GetKeyMetadata(ctx)
+		c.Assert(err, qt.IsNil)
+		// We should have just the one key now, and it should be the new one.
+		c.Assert(meta.Keys, qt.HasLen, 1)
+		c.Assert(meta.CurrentActiveKID, qt.Equals, expectedNewActiveKID)
+	})
 }
