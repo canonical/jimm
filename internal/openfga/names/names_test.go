@@ -5,59 +5,53 @@ package names_test
 import (
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
-func Test(t *testing.T) {
-	gc.TestingT(t)
-}
-
-var _ = gc.Suite(&namesSuite{})
-
-type namesSuite struct {
-}
-
-func (s *namesSuite) TestFromResourceTag(c *gc.C) {
+func TestFromResourceTag(t *testing.T) {
+	c := qt.New(t)
 	id, err := uuid.NewRandom()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	result := ofganames.ConvertTag(names.NewControllerTag(id.String()))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
 
 	result = ofganames.ConvertTag(names.NewModelTag(id.String()))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
 
 	result = ofganames.ConvertTag(names.NewUserTag("eve"))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag("eve", names.UserTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag("eve", names.UserTagKind, ""))
 
 	result = ofganames.ConvertTag(names.NewApplicationOfferTag("test"))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag("test", names.ApplicationOfferTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag("test", names.ApplicationOfferTagKind, ""))
 
 	result = ofganames.ConvertTag(names.NewCloudTag("test"))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag("test", names.CloudTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag("test", names.CloudTagKind, ""))
 
 	result = ofganames.ConvertTag(jimmnames.NewGroupTag(id.String()))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), jimmnames.GroupTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), jimmnames.GroupTagKind, ""))
 }
 
-func (s *namesSuite) TestFromGenericResourceTag(c *gc.C) {
+func TestFromGenericResourceTag(t *testing.T) {
+	c := qt.New(t)
 	id, err := uuid.NewRandom()
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	result := ofganames.ConvertGenericTag(names.NewControllerTag(id.String()))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), names.ControllerTagKind, ""))
 
 	result = ofganames.ConvertGenericTag(names.NewModelTag(id.String()))
-	c.Assert(result, gc.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), names.ModelTagKind, ""))
 }
 
-func (s *namesSuite) TestConvertJujuRelation(c *gc.C) {
+func TestConvertJujuRelation(t *testing.T) {
+	c := qt.New(t)
 	// unusedAccessLevels are access levels that are not
 	// represented in JIMM's OpenFGA model and should return
 	// an error.
@@ -70,17 +64,18 @@ func (s *namesSuite) TestConvertJujuRelation(c *gc.C) {
 		c.Logf("running test %d: %s", i, level)
 		_, err := ofganames.ConvertJujuRelation(string(level))
 		if _, ok := unusedAccessLevels[level]; ok {
-			c.Assert(err, gc.NotNil)
+			c.Assert(err, qt.IsNotNil)
 		} else {
-			c.Assert(err, gc.IsNil)
+			c.Assert(err, qt.IsNil)
 		}
 	}
 }
 
-func (s *namesSuite) TestParseRelations(c *gc.C) {
+func TestParseRelations(t *testing.T) {
+	c := qt.New(t)
 	for _, relation := range ofganames.AllRelations {
 		res, err := ofganames.ParseRelation(relation.String())
-		c.Assert(err, gc.IsNil, gc.Commentf("testing relation %s", relation))
-		c.Assert(res, gc.Equals, relation, gc.Commentf("testing relation %s", relation))
+		c.Assert(err, qt.IsNil, qt.Commentf("testing relation %s", relation))
+		c.Assert(res, qt.Equals, relation, qt.Commentf("testing relation %s", relation))
 	}
 }

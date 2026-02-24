@@ -9,10 +9,8 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 	"github.com/google/uuid"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -21,7 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
-type offerAuthorizerSuite struct {
+type offerAuthorizerDeps struct {
 	offerAuthorizer *offer.OfferAuthorizer
 
 	offerUUID string
@@ -65,9 +63,7 @@ application-offers:
     access: consume
 `
 
-var _ = gc.Suite(&offerAuthorizerSuite{})
-
-func (s *offerAuthorizerSuite) Init(c *qt.C) {
+func SetupOfferAuthorizerTests(c *qt.C) offerAuthorizerDeps {
 	db := &db.Database{
 		DB: testdb.PostgresDB(c, time.Now),
 	}
@@ -93,13 +89,18 @@ func (s *offerAuthorizerSuite) Init(c *qt.C) {
 	err = db.AddUserMapping(c.Context(), &migration)
 	c.Assert(err, qt.IsNil)
 
-	s.offerAuthorizer, err = offer.NewOfferAuthorizer(db, ofgaClient)
+	deps := offerAuthorizerDeps{}
+	deps.offerAuthorizer, err = offer.NewOfferAuthorizer(db, ofgaClient)
 	c.Assert(err, qt.IsNil)
 
-	s.offerUUID = env.ApplicationOffers[0].UUID
+	deps.offerUUID = env.ApplicationOffers[0].UUID
+	return deps
 }
 
-func (s *offerAuthorizerSuite) TestIsUserConsumerForOffer(c *qt.C) {
+func TestIsUserConsumerForOffer(t *testing.T) {
+	c := qt.New(t)
+	deps := SetupOfferAuthorizerTests(c)
+
 	tests := []struct {
 		name                string
 		userTag             names.UserTag
@@ -110,13 +111,13 @@ func (s *offerAuthorizerSuite) TestIsUserConsumerForOffer(c *qt.C) {
 		{
 			name:                "allowed external user",
 			userTag:             names.NewUserTag("eve@canonical.com"),
-			applicationOfferTag: names.NewApplicationOfferTag(s.offerUUID),
+			applicationOfferTag: names.NewApplicationOfferTag(deps.offerUUID),
 			allowed:             true,
 		},
 		{
 			name:                "not allowed external user",
 			userTag:             names.NewUserTag("eve-not-allowed@canonical.com"),
-			applicationOfferTag: names.NewApplicationOfferTag(s.offerUUID),
+			applicationOfferTag: names.NewApplicationOfferTag(deps.offerUUID),
 			allowed:             false,
 		},
 		{
@@ -128,13 +129,13 @@ func (s *offerAuthorizerSuite) TestIsUserConsumerForOffer(c *qt.C) {
 		{
 			name:                "allowed local user",
 			userTag:             names.NewLocalUserTag("bob"),
-			applicationOfferTag: names.NewApplicationOfferTag(s.offerUUID),
+			applicationOfferTag: names.NewApplicationOfferTag(deps.offerUUID),
 			allowed:             true,
 		},
 		{
 			name:                "not allowed local user",
 			userTag:             names.NewLocalUserTag("alice"),
-			applicationOfferTag: names.NewApplicationOfferTag(s.offerUUID),
+			applicationOfferTag: names.NewApplicationOfferTag(deps.offerUUID),
 			allowed:             false,
 			expectedError:       "user mapping not found",
 		},
@@ -149,7 +150,7 @@ func (s *offerAuthorizerSuite) TestIsUserConsumerForOffer(c *qt.C) {
 
 	for _, test := range tests {
 		c.Logf("Running test: %s", test.name)
-		allowed, err := s.offerAuthorizer.IsUserConsumerForOffer(c.Context(), test.userTag, test.applicationOfferTag)
+		allowed, err := deps.offerAuthorizer.IsUserConsumerForOffer(c.Context(), test.userTag, test.applicationOfferTag)
 		c.Assert(allowed, qt.Equals, test.allowed)
 		if test.expectedError != "" {
 			c.Assert(err, qt.ErrorMatches, test.expectedError)
@@ -157,8 +158,4 @@ func (s *offerAuthorizerSuite) TestIsUserConsumerForOffer(c *qt.C) {
 			c.Assert(err, qt.IsNil)
 		}
 	}
-}
-
-func TestOfferAuthorizerSuite(t *testing.T) {
-	qtsuite.Run(qt.New(t), &offerAuthorizerSuite{})
 }

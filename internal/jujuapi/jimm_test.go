@@ -12,7 +12,6 @@ import (
 	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -27,12 +26,10 @@ import (
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
-type jimmUnitTestSuite struct{}
+func TestPrepareModelMigration_UnauthorizedUser(t *testing.T) {
+	c := qt.New(t)
 
-var _ = gc.Suite(&jimmUnitTestSuite{})
-
-func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) {
-	ctx := context.Background()
+	ctx := c.Context()
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
@@ -42,11 +39,13 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_UnauthorizedUser(c *gc.C) 
 
 	_, err := root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{})
 
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
 
-func (s *jimmUnitTestSuite) TestAddController_UnauthorizedUser(c *gc.C) {
-	ctx := context.Background()
+func TestAddController_UnauthorizedUser(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{}
@@ -56,12 +55,14 @@ func (s *jimmUnitTestSuite) TestAddController_UnauthorizedUser(c *gc.C) {
 
 	_, err := root.AddController(ctx, apiparams.AddControllerRequest{})
 
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
 
-func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
-	ctx := context.Background()
+func TestAddController_Success(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	called := false
 	jimm := &jimmtest.JIMM{
@@ -70,14 +71,14 @@ func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
 				ControllerService: mocks.ControllerService{
 					AddController_: func(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error {
 						called = true
-						c.Assert(user.JimmAdmin, gc.Equals, true)
-						c.Assert(ctl.Name, gc.Equals, "controller-2")
-						c.Assert(ctl.UUID, gc.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
-						c.Assert(ctl.PublicAddress, gc.Equals, "controller.example.com:443")
-						c.Assert(ctl.CACertificate, gc.Equals, "ca-cert")
-						c.Assert(ctl.TLSHostname, gc.Equals, "juju-apiserver")
-						c.Assert(creds.AdminIdentityName, gc.Equals, "admin")
-						c.Assert(creds.AdminPassword, gc.Equals, "super-secret")
+						c.Assert(user.JimmAdmin, qt.Equals, true)
+						c.Assert(ctl.Name, qt.Equals, "controller-2")
+						c.Assert(ctl.UUID, qt.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
+						c.Assert(ctl.PublicAddress, qt.Equals, "controller.example.com:443")
+						c.Assert(ctl.CACertificate, qt.Equals, "ca-cert")
+						c.Assert(ctl.TLSHostname, qt.Equals, "juju-apiserver")
+						c.Assert(creds.AdminIdentityName, qt.Equals, "admin")
+						c.Assert(creds.AdminPassword, qt.Equals, "super-secret")
 
 						// Simulate the JujuManager filling in extra data during the add.
 						ctl.CloudName = "aws"
@@ -103,31 +104,35 @@ func (s *jimmUnitTestSuite) TestAddController_Success(c *gc.C) {
 	}
 
 	info, err := root.AddController(ctx, req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(called, gc.Equals, true)
-	c.Assert(info.Name, gc.Equals, req.Name)
-	c.Assert(info.UUID, gc.Equals, req.UUID)
-	c.Assert(info.PublicAddress, gc.Equals, req.PublicAddress)
-	c.Assert(info.CACertificate, gc.Equals, req.CACertificate)
-	c.Assert(info.APIAddresses, gc.DeepEquals, req.APIAddresses)
-	c.Assert(info.CloudTag, gc.Equals, names.NewCloudTag("aws").String())
-	c.Assert(info.CloudRegion, gc.Equals, "eu-west-1")
-	c.Assert(info.AgentVersion, gc.Equals, "3.6.9")
+	c.Assert(err, qt.IsNil)
+	c.Assert(called, qt.Equals, true)
+	c.Assert(info.Name, qt.Equals, req.Name)
+	c.Assert(info.UUID, qt.Equals, req.UUID)
+	c.Assert(info.PublicAddress, qt.Equals, req.PublicAddress)
+	c.Assert(info.CACertificate, qt.Equals, req.CACertificate)
+	c.Assert(info.APIAddresses, qt.DeepEquals, req.APIAddresses)
+	c.Assert(info.CloudTag, qt.Equals, names.NewCloudTag("aws").String())
+	c.Assert(info.CloudRegion, qt.Equals, "eu-west-1")
+	c.Assert(info.AgentVersion, qt.Equals, "3.6.9")
 }
 
-func (s *jimmUnitTestSuite) TestRemoveController_UnauthorizedUser(c *gc.C) {
-	ctx := context.Background()
+func TestRemoveController_UnauthorizedUser(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 	jimm := &jimmtest.JIMM{}
 	root := newTestControllerRoot(jimm, "alice@canonical.com", false)
 
 	_, err := root.RemoveController(ctx, apiparams.RemoveControllerRequest{})
 
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
 }
 
-func (s *jimmUnitTestSuite) TestRemoveController_Success(c *gc.C) {
-	ctx := context.Background()
+func TestRemoveController_Success(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	removeCalled := false
 	infoCalled := false
@@ -150,8 +155,8 @@ func (s *jimmUnitTestSuite) TestRemoveController_Success(c *gc.C) {
 					},
 					RemoveController_: func(ctx context.Context, user *openfga.User, controllerName string, force bool) error {
 						removeCalled = true
-						c.Check(controllerName, gc.Equals, testControllerName)
-						c.Check(user.JimmAdmin, gc.Equals, true)
+						c.Check(controllerName, qt.Equals, testControllerName)
+						c.Check(user.JimmAdmin, qt.Equals, true)
 						return nil
 					},
 				},
@@ -165,18 +170,20 @@ func (s *jimmUnitTestSuite) TestRemoveController_Success(c *gc.C) {
 	}
 
 	info, err := root.RemoveController(ctx, req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(removeCalled, gc.Equals, true)
-	c.Assert(infoCalled, gc.Equals, true)
-	c.Assert(info.Name, gc.Equals, req.Name)
-	c.Assert(info.UUID, gc.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
-	c.Assert(info.PublicAddress, gc.Equals, "controller.example.com:443")
-	c.Assert(info.CACertificate, gc.Equals, "ca-cert")
-	c.Assert(info.CloudTag, gc.Equals, names.NewCloudTag("openstack").String())
+	c.Assert(err, qt.IsNil)
+	c.Assert(removeCalled, qt.Equals, true)
+	c.Assert(infoCalled, qt.Equals, true)
+	c.Assert(info.Name, qt.Equals, req.Name)
+	c.Assert(info.UUID, qt.Equals, "982b16d9-a945-4762-b684-fd4fd885aa11")
+	c.Assert(info.PublicAddress, qt.Equals, "controller.example.com:443")
+	c.Assert(info.CACertificate, qt.Equals, "ca-cert")
+	c.Assert(info.CloudTag, qt.Equals, names.NewCloudTag("openstack").String())
 }
 
-func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
-	ctx := context.Background()
+func TestPrepareModelMigration_InvalidModelTag(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
@@ -189,11 +196,13 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidModelTag(c *gc.C) {
 		ModelTag: "blah",
 	})
 
-	c.Assert(err, gc.ErrorMatches, "invalid model tag")
+	c.Assert(err, qt.ErrorMatches, "invalid model tag")
 }
 
-func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidControllerName(c *gc.C) {
-	ctx := context.Background()
+func TestPrepareModelMigration_InvalidControllerName(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
@@ -207,11 +216,13 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidControllerName(c *g
 		BackingControllerName: "---bad wolf---",
 	})
 
-	c.Assert(err, gc.ErrorMatches, "invalid controller name")
+	c.Assert(err, qt.ErrorMatches, "invalid controller name")
 }
 
-func (s *jimmUnitTestSuite) TestPrepareModelMigration_EmptyExternalUser(c *gc.C) {
-	ctx := context.Background()
+func TestPrepareModelMigration_EmptyExternalUser(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
@@ -230,11 +241,13 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_EmptyExternalUser(c *gc.C)
 		UserMapping:           map[string]string{"alice": "alice@canonical.com", "skipped-local-user": ""},
 	})
 
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
-func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C) {
-	ctx := context.Background()
+func TestPrepareModelMigration_InvalidUserMapping(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
@@ -249,7 +262,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C
 		UserMapping:           map[string]string{"--bad local--": "alice@canonical.com"},
 	})
 
-	c.Assert(err, gc.ErrorMatches, `--bad local-- is not a valid local user name`)
+	c.Assert(err, qt.ErrorMatches, `--bad local-- is not a valid local user name`)
 
 	_, err = root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
 		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
@@ -257,7 +270,7 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C
 		UserMapping:           map[string]string{"alice": "alice"},
 	})
 
-	c.Assert(err, gc.ErrorMatches, `alice is not a valid external user name`)
+	c.Assert(err, qt.ErrorMatches, `alice is not a valid external user name`)
 
 	_, err = root.PrepareModelMigration(ctx, apiparams.PrepareModelMigrationRequest{
 		ModelTag:              names.NewModelTag("5650ac3f-8332-437f-874f-089e0e447e7f").String(),
@@ -265,11 +278,13 @@ func (s *jimmUnitTestSuite) TestPrepareModelMigration_InvalidUserMapping(c *gc.C
 		UserMapping:           map[string]string{"alice": "--badwolf--@canonical.com"},
 	})
 
-	c.Assert(err, gc.ErrorMatches, `--badwolf--@canonical.com is not a valid external user name`)
+	c.Assert(err, qt.ErrorMatches, `--badwolf--@canonical.com is not a valid external user name`)
 }
 
-func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
-	ctx := context.Background()
+func TestBootstrapStatus(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 	expectedJobID := int64(1)
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jujuapi.BootstrapManager {
@@ -293,16 +308,16 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 		Watermark: 0,
 	})
 
-	c.Assert(err, gc.IsNil)
-	c.Assert(response.Status, gc.Equals, apiparams.StatusRunning)
-	c.Assert(response.Logs, gc.DeepEquals, []string{"bootstrap logs"})
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.Status, qt.Equals, apiparams.StatusRunning)
+	c.Assert(response.Logs, qt.DeepEquals, []string{"bootstrap logs"})
 
 	// Test job not found
 	_, err = root.GetBootstrapInfo(ctx, apiparams.GetBootstrapInfoRequest{
 		JobID:     "999",
 		Watermark: 0,
 	})
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Test unauthorized user
 	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
@@ -310,25 +325,33 @@ func (s *jimmUnitTestSuite) TestBootstrapStatus(c *gc.C) {
 		JobID:     strconv.FormatInt(expectedJobID, 10),
 		Watermark: 0,
 	})
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 
-func (s *jimmUnitTestSuite) TestBootstrapStart_RejectsBuiltinClouds(c *gc.C) {
-	ctx := context.Background()
+func TestBootstrapStart_RejectsBuiltinClouds(t *testing.T) {
+	c := qt.New(t)
 
-	jimm := &jimmtest.JIMM{}
+	ctx := c.Context()
+
+	jimm := &jimmtest.JIMM{
+		BootstapManager_: func() jujuapi.BootstrapManager {
+			return &mocks.BootstapManager{}
+		},
+	}
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	params := apiparams.BootstrapParams{
-		CloudName: "localhost",
+		CloudName: "microk8s",
 	}
 
 	_, err := root.StartBootstrap(ctx, params)
-	c.Assert(err, gc.ErrorMatches, `.*bootstrap via JIMM does not support built-in clouds like "localhost"`)
+	c.Assert(err, qt.ErrorMatches, `.*bootstrap via JIMM does not support built-in clouds like "microk8s"`)
 }
 
-func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
-	ctx := context.Background()
+func TestBootstrapStart(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 	var startBootstrapErr error
 
 	jimm := &jimmtest.JIMM{
@@ -356,24 +379,26 @@ func (s *jimmUnitTestSuite) TestBootstrapStart(c *gc.C) {
 	}
 
 	response, err := root.StartBootstrap(ctx, params)
-	c.Assert(err, gc.IsNil)
-	c.Assert(response.JobID, gc.Not(gc.Equals), "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(response.JobID, qt.Not(qt.Equals), "")
 
 	// Test start bootstrap fails
 	startBootstrapErr = errors.E("foo")
 	_, err = root.StartBootstrap(ctx, params)
-	c.Assert(err, gc.NotNil)
-	c.Assert(err.Error(), gc.Matches, "failed to start bootstrap job: foo")
+	c.Assert(err, qt.Not(qt.IsNil))
+	c.Assert(err.Error(), qt.Matches, "failed to start bootstrap job: foo")
 
 	startBootstrapErr = nil
 	// Test unauthorized user
 	root = newTestControllerRoot(jimm, "alice@canonical.com", false)
 	_, err = root.StartBootstrap(ctx, params)
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 
-func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
-	ctx := context.Background()
+func TestBootstrapStop(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 	expectedJobID := int64(1)
 
 	jimm := &jimmtest.JIMM{
@@ -393,31 +418,33 @@ func (s *jimmUnitTestSuite) TestBootstrapStop(c *gc.C) {
 	err := root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 
 	// Test stop bootstrap job
 	root = newTestControllerRoot(jimm, "alice@canonical.com", true)
 	err = root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: strconv.FormatInt(expectedJobID, 10),
 	})
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Test job not found
 	err = root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: "999",
 	})
-	c.Assert(err, gc.ErrorMatches, ".*job not found.*")
+	c.Assert(err, qt.ErrorMatches, ".*job not found.*")
 
 	// Test stop bootstrap not valid job ID
 	err = root.StopBootstrap(ctx, apiparams.StopBootstrapRequest{
 		JobID: "random-string",
 	})
-	c.Assert(err, gc.NotNil)
-	c.Assert(err.Error(), gc.Matches, "invalid job ID.*")
+	c.Assert(err, qt.Not(qt.IsNil))
+	c.Assert(err.Error(), qt.Matches, "invalid job ID.*")
 }
 
-func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
-	ctx := context.Background()
+func TestStartDestroyControllerJob(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	ctrlInfo := &dbmodel.Controller{
 		Name:          "moribund",
@@ -453,28 +480,30 @@ func (s *jimmUnitTestSuite) TestStartDestroyControllerJob(c *gc.C) {
 
 	// OK to destroy controller without models
 	_, err := root.StartDestroyController(ctx, req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 
 	// Refuse to destroy controller with models
 	ctrlInfo.Models = append(ctrlInfo.Models, dbmodel.Model{})
 	_, err = root.StartDestroyController(ctx, req)
-	c.Assert(err, gc.ErrorMatches, "cannot destroy controller with models")
+	c.Assert(err, qt.ErrorMatches, "cannot destroy controller with models")
 }
 
-func (s *jimmUnitTestSuite) TestAddModelToController(c *gc.C) {
-	ctx := context.Background()
+func TestAddModelToController(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	jimm := &jimmtest.JIMM{
 		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelManager: mocks.ModelManager{
 					AddModel_: func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (base.ModelInfo, error) {
-						c.Check(args.Name, gc.Equals, "mymodel")
-						c.Check(args.Owner.String(), gc.Equals, "user-alice@canonical.com")
-						c.Check(args.Cloud.String(), gc.Equals, "cloud-openstack")
-						c.Check(args.CloudRegion, gc.Equals, "region-1")
-						c.Check(args.CloudCredential.String(), gc.Equals, "cloudcred-openstack_alice_mycred")
-						c.Check(args.ControllerName, gc.Equals, "controller-1")
+						c.Check(args.Name, qt.Equals, "mymodel")
+						c.Check(args.Owner.String(), qt.Equals, "user-alice@canonical.com")
+						c.Check(args.Cloud.String(), qt.Equals, "cloud-openstack")
+						c.Check(args.CloudRegion, qt.Equals, "region-1")
+						c.Check(args.CloudCredential.String(), qt.Equals, "cloudcred-openstack_alice_mycred")
+						c.Check(args.ControllerName, qt.Equals, "controller-1")
 						return base.ModelInfo{
 							Cloud:           "openstack",
 							Owner:           "alice@canonical.com",
@@ -499,7 +528,7 @@ func (s *jimmUnitTestSuite) TestAddModelToController(c *gc.C) {
 	}
 
 	_, err := root.AddModelToController(ctx, req)
-	c.Assert(err, gc.IsNil)
+	c.Assert(err, qt.IsNil)
 }
 
 // TestAuditLogAPIParamsConversion tests the conversion of API params to a AuditLogFilter struct.
@@ -564,21 +593,23 @@ func TestAuditLogAPIParamsConversion(t *testing.T) {
 	}
 }
 
-func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
-	ctx := context.Background()
+func TestModelControllerInfo(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	testCases := []struct {
 		about          string
 		admin          bool
 		modelQualifier string
-		jujuManager    func(*gc.C) jujuapi.JujuManager
+		jujuManager    func(*qt.C) jujuapi.JujuManager
 		expectedInfo   apiparams.ModelControllerInfo
 		expectedError  string
 	}{{
 		about:          "non-admin user with model uuid",
 		admin:          false,
 		modelQualifier: "12345678-1234-1234-1234-123456789abc",
-		jujuManager: func(c *gc.C) jujuapi.JujuManager {
+		jujuManager: func(c *qt.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 		expectedError: "unauthorized",
@@ -586,7 +617,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "invalid model uuid",
 		admin:          true,
 		modelQualifier: "invalid-model-uuid",
-		jujuManager: func(c *gc.C) jujuapi.JujuManager {
+		jujuManager: func(c *qt.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{}
 		},
 		expectedError: `invalid model UUID: invalid UUID length: 18`,
@@ -594,7 +625,7 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "model not found with model tag",
 		admin:          true,
 		modelQualifier: "12345678-1234-1234-1234-123456789abc",
-		jujuManager: func(c *gc.C) jujuapi.JujuManager {
+		jujuManager: func(c *qt.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 					return nil, errors.E("model not found")
@@ -606,10 +637,10 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "success with model tag",
 		admin:          true,
 		modelQualifier: "12345678-1234-1234-1234-123456789abc",
-		jujuManager: func(c *gc.C) jujuapi.JujuManager {
+		jujuManager: func(c *qt.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
-					c.Assert(user.JimmAdmin, gc.Equals, true)
+					c.Assert(user.JimmAdmin, qt.Equals, true)
 					return &apiparams.ModelControllerInfo{
 						ModelName:      "test-model",
 						ModelUUID:      "12345678-1234-1234-1234-123456789abc",
@@ -629,10 +660,10 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "success with owner and model name",
 		admin:          true,
 		modelQualifier: "alice@canonical.com/test-model",
-		jujuManager: func(c *gc.C) jujuapi.JujuManager {
+		jujuManager: func(c *qt.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
-					c.Assert(user.JimmAdmin, gc.Equals, true)
+					c.Assert(user.JimmAdmin, qt.Equals, true)
 					return &apiparams.ModelControllerInfo{
 						ModelName:      "test-model",
 						ModelUUID:      "12345678-1234-1234-1234-123456789abc",
@@ -652,25 +683,25 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		about:          "error with a partial model qualifier (only owner provided)",
 		admin:          true,
 		modelQualifier: "alice@canonical.com/",
-		jujuManager:    func(c *gc.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
+		jujuManager:    func(c *qt.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
 		expectedError:  `invalid model UUID: invalid UUID length: 20`,
 	}, {
 		about:          "error with a partial model qualifier (only model name provided)",
 		admin:          true,
 		modelQualifier: "/test-model",
-		jujuManager:    func(c *gc.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
+		jujuManager:    func(c *qt.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
 		expectedError:  `invalid model UUID: invalid UUID length: 11`,
 	}, {
 		about:          "non-admin user with owner and model name",
 		admin:          false,
 		modelQualifier: "alice@canonical.com/test-model",
-		jujuManager:    func(c *gc.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
+		jujuManager:    func(c *qt.C) jujuapi.JujuManager { return &mocks.JujuManager{} },
 		expectedError:  "unauthorized",
 	}, {
 		about:          "model not found with owner and model name",
 		admin:          true,
 		modelQualifier: "bob@canonical.com/non-existent",
-		jujuManager: func(c *gc.C) jujuapi.JujuManager {
+		jujuManager: func(c *qt.C) jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 					return nil, errors.E("model not found")
@@ -693,26 +724,28 @@ func (s *jimmUnitTestSuite) TestModelControllerInfo(c *gc.C) {
 		info, err := root.ModelControllerInfo(ctx, req)
 
 		if test.expectedError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectedError)
+			c.Assert(err, qt.ErrorMatches, test.expectedError)
 		} else {
-			c.Assert(err, gc.IsNil)
-			c.Assert(info, gc.DeepEquals, test.expectedInfo)
+			c.Assert(err, qt.IsNil)
+			c.Assert(info, qt.DeepEquals, test.expectedInfo)
 		}
 	}
 }
 
-func (s *jimmUnitTestSuite) TestJobInfo(c *gc.C) {
-	ctx := context.Background()
+func TestJobInfo(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	finishedTime := time.Date(2023, 8, 14, 0, 0, 0, 0, time.UTC)
 	jimm := &jimmtest.JIMM{
-		JujuManager_: func() jujuapi.JujuManager {
-			return &mocks.JujuManager{
-				JobInfo_: func(ctx context.Context, jobID string) (jobs.JobInfo, error) {
-					if jobID != "1" {
+		JobManager_: func() jujuapi.JobManager {
+			return &mocks.JobManager{
+				GetJobInfo_: func(ctx context.Context, jobID int64) (jobs.JobInfo, error) {
+					if jobID != int64(1) {
 						return jobs.JobInfo{}, errors.E(errors.CodeNotFound, "job not found")
 					}
-					c.Check(jobID, gc.Equals, "1")
+					c.Check(jobID, qt.Equals, int64(1))
 					return jobs.JobInfo{
 						ID:             1,
 						Kind:           "bootstrap",
@@ -737,45 +770,50 @@ func (s *jimmUnitTestSuite) TestJobInfo(c *gc.C) {
 	req := apiparams.JobInfoRequest{JobID: "1"}
 
 	resp, err := root.JobInfo(ctx, req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp.ID, gc.Equals, "1")
-	c.Assert(resp.Kind, gc.Equals, "bootstrap")
-	c.Assert(resp.Status, gc.Equals, apiparams.StatusRunning)
-	c.Assert(resp.CurrentAttempt, gc.Equals, 1)
-	c.Assert(resp.MaxAttempts, gc.Equals, 3)
-	c.Assert(resp.FinishedAt, gc.Equals, finishedTime)
-	c.Assert(len(resp.Errors), gc.Equals, 1)
-	c.Assert(resp.Errors[0].At, gc.Equals, finishedTime)
-	c.Assert(resp.Errors[0].Attempt, gc.Equals, 1)
-	c.Assert(resp.Errors[0].Error, gc.Equals, "some error")
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.ID, qt.Equals, int64(1))
+	c.Assert(resp.Kind, qt.Equals, "bootstrap")
+	c.Assert(resp.Status, qt.Equals, apiparams.StatusRunning)
+	c.Assert(resp.CurrentAttempt, qt.Equals, 1)
+	c.Assert(resp.MaxAttempts, qt.Equals, 3)
+	c.Assert(resp.FinishedAt, qt.IsNotNil)
+	c.Assert(*resp.FinishedAt, qt.DeepEquals, finishedTime)
+	c.Assert(len(resp.Errors), qt.Equals, 1)
+	c.Assert(resp.Errors[0].At, qt.Equals, finishedTime)
+	c.Assert(resp.Errors[0].Attempt, qt.Equals, 1)
+	c.Assert(resp.Errors[0].Error, qt.Equals, "some error")
 
 	// Test non-existent job ID
 	_, err = root.JobInfo(ctx, apiparams.JobInfoRequest{JobID: "invalid"})
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
-	c.Assert(err.Error(), gc.Matches, "job not found")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeBadRequest)
+	c.Assert(err.Error(), qt.Matches, "invalid job ID: invalid")
 }
 
-func (s *jimmUnitTestSuite) TestJobInfo_RequiresAdmin(c *gc.C) {
-	ctx := context.Background()
+func TestJobInfo_RequiresAdmin(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	root := newTestControllerRoot(nil, "alice@canonical.com", false)
 	req := apiparams.JobInfoRequest{JobID: "1"}
 
 	_, err := root.JobInfo(ctx, req)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 
-func (s *jimmUnitTestSuite) TestListJobs(c *gc.C) {
-	ctx := context.Background()
+func TestListJobs(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	jimm := &jimmtest.JIMM{
 		JobManager_: func() jujuapi.JobManager {
 			return &mocks.JobManager{
 				ListJobs_: func(ctx context.Context, params apiparams.ListJobsRequest) (apiparams.ListJobsResponse, error) {
-					c.Check(params.Statuses, gc.DeepEquals, []apiparams.JobStatus{apiparams.StatusRunning})
-					c.Check(params.Kinds, gc.DeepEquals, []string{"bootstrap-controller"})
-					c.Check(params.Count, gc.Equals, 10)
+					c.Check(params.Statuses, qt.DeepEquals, []apiparams.JobStatus{apiparams.StatusRunning})
+					c.Check(params.Kinds, qt.DeepEquals, []string{"bootstrap-controller"})
+					c.Check(params.Count, qt.Equals, 10)
 					return apiparams.ListJobsResponse{
 						Jobs: []apiparams.ListJobInfo{
 							{ID: 1, Status: apiparams.StatusRunning, Kind: "bootstrap-controller", MaxAttempts: 3},
@@ -797,13 +835,13 @@ func (s *jimmUnitTestSuite) TestListJobs(c *gc.C) {
 	}
 
 	resp, err := root.ListJobs(ctx, req)
-	c.Assert(err, gc.IsNil)
-	c.Assert(resp.Jobs, gc.HasLen, 3)
-	c.Assert(resp.Jobs[0].ID, gc.Equals, int64(1))
-	c.Assert(resp.Jobs[0].Status, gc.Equals, apiparams.StatusRunning)
-	c.Assert(resp.Jobs[0].Kind, gc.Equals, "bootstrap-controller")
-	c.Assert(resp.Jobs[0].MaxAttempts, gc.Equals, 3)
-	c.Assert(resp.NextCursor, gc.Equals, "test-cursor")
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.Jobs, qt.HasLen, 3)
+	c.Assert(resp.Jobs[0].ID, qt.Equals, int64(1))
+	c.Assert(resp.Jobs[0].Status, qt.Equals, apiparams.StatusRunning)
+	c.Assert(resp.Jobs[0].Kind, qt.Equals, "bootstrap-controller")
+	c.Assert(resp.Jobs[0].MaxAttempts, qt.Equals, 3)
+	c.Assert(resp.NextCursor, qt.Equals, "test-cursor")
 
 	// Test error case
 	jimm2 := &jimmtest.JIMM{
@@ -817,11 +855,13 @@ func (s *jimmUnitTestSuite) TestListJobs(c *gc.C) {
 	}
 	root2 := newTestControllerRoot(jimm2, "alice@canonical.com", true)
 	_, err = root2.ListJobs(ctx, req)
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeNotFound)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
-func (s *jimmUnitTestSuite) TestListJobs_RequiresAdmin(c *gc.C) {
-	ctx := context.Background()
+func TestListJobs_RequiresAdmin(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	root := newTestControllerRoot(nil, "alice@canonical.com", false)
 	req := apiparams.ListJobsRequest{
@@ -831,17 +871,19 @@ func (s *jimmUnitTestSuite) TestListJobs_RequiresAdmin(c *gc.C) {
 	}
 
 	_, err := root.ListJobs(ctx, req)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }
 
-func (s *jimmUnitTestSuite) TestListMigrationTargets_Unauthorized(c *gc.C) {
-	ctx := context.Background()
+func TestListMigrationTargets_Unauthorized(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
 
 	root := newTestControllerRoot(nil, "alice@canonical.com", false)
 	req := apiparams.ListMigrationTargetsRequest{ModelTag: "123"}
 
 	_, err := root.ListMigrationTargets(ctx, req)
-	c.Assert(err, gc.ErrorMatches, "unauthorized")
-	c.Assert(errors.ErrorCode(err), gc.Equals, errors.CodeUnauthorized)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 }

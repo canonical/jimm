@@ -4,17 +4,15 @@ package jujuapi_test
 
 import (
 	"fmt"
+	"testing"
 
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 )
 
-type pathTestSuite struct{}
-
-var _ = gc.Suite(&pathTestSuite{})
-
-func (s *pathTestSuite) Test(c *gc.C) {
+func TestPathHandling(t *testing.T) {
+	c := qt.New(t)
 
 	testUUID := "059744f6-26d2-4f00-92be-5df97fccbb97"
 	tests := []struct {
@@ -38,11 +36,11 @@ func (s *pathTestSuite) Test(c *gc.C) {
 		c.Logf("Running test %d for path %s", i, test.path)
 		uuid, finalPath, err := jujuapi.ModelInfoFromPath(test.path)
 		if !test.fail {
-			c.Assert(err, gc.IsNil)
-			c.Assert(uuid, gc.Equals, test.uuid)
-			c.Assert(finalPath, gc.Equals, test.finalPath)
+			c.Assert(err, qt.IsNil)
+			c.Assert(uuid, qt.Equals, test.uuid)
+			c.Assert(finalPath, qt.Equals, test.finalPath)
 		} else {
-			c.Assert(err, gc.NotNil)
+			c.Assert(err, qt.IsNotNil)
 		}
 	}
 }

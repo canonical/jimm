@@ -6,21 +6,13 @@ import (
 	"testing"
 	"time"
 
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
+	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/pubsub"
 )
 
-func TestPackage(t *testing.T) {
-	gc.TestingT(t)
-}
-
-type hubSuite struct{}
-
-var _ = gc.Suite(&hubSuite{})
-
-func (s *hubSuite) TestSubscribeToModelMessages(c *gc.C) {
+func TestSubscribeToModelMessages(t *testing.T) {
+	c := qt.New(t)
 	hub := &pubsub.Hub{}
 
 	messages := make(chan interface{}, 10)
@@ -33,7 +25,7 @@ func (s *hubSuite) TestSubscribeToModelMessages(c *gc.C) {
 	}
 
 	unsubscribe, err := hub.Subscribe("model1", handlerFunc)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	assertPublish(c, hub, "model1", "message1")
 	assertMessage(c, messages, "message1")
@@ -47,7 +39,9 @@ func (s *hubSuite) TestSubscribeToModelMessages(c *gc.C) {
 	assertMessage(c, messages, "")
 }
 
-func (s *hubSuite) TestSubscribeToModelMessagesAfterMessagesHaveBeenSent(c *gc.C) {
+func TestSubscribeToModelMessagesAfterMessagesHaveBeenSent(t *testing.T) {
+
+	c := qt.New(t)
 	hub := &pubsub.Hub{}
 
 	messages := make(chan interface{}, 10)
@@ -63,13 +57,15 @@ func (s *hubSuite) TestSubscribeToModelMessagesAfterMessagesHaveBeenSent(c *gc.C
 	assertPublish(c, hub, "model1", "message2")
 
 	unsubscribe, err := hub.Subscribe("model1", handlerFunc)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 	defer unsubscribe()
 
 	assertMessage(c, messages, "message2")
 }
 
-func (s *hubSuite) TestSubscribeMatcher(c *gc.C) {
+func TestSubscribeMatcher(t *testing.T) {
+
+	c := qt.New(t)
 	hub := &pubsub.Hub{}
 
 	messages := make(chan interface{}, 10)
@@ -94,7 +90,7 @@ func (s *hubSuite) TestSubscribeMatcher(c *gc.C) {
 	assertPublish(c, hub, "model1", "message3")
 
 	unsubscribe, err := hub.SubscribeMatch(matcher, handlerFunc)
-	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(err, qt.IsNil)
 
 	// when we subscribe, we expect to receive message3, which
 	// was the last message to be published about model1 before
@@ -122,7 +118,7 @@ type messageHub interface {
 	Publish(string, interface{}) <-chan struct{}
 }
 
-func assertPublish(c *gc.C, hub messageHub, model string, message interface{}) {
+func assertPublish(c *qt.C, hub messageHub, model string, message interface{}) {
 	done := hub.Publish(model, message)
 	select {
 	case <-done:
@@ -131,12 +127,12 @@ func assertPublish(c *gc.C, hub messageHub, model string, message interface{}) {
 	}
 }
 
-func assertMessage(c *gc.C, messages chan interface{}, expectedMessage string) {
+func assertMessage(c *qt.C, messages chan interface{}, expectedMessage string) {
 	var message interface{}
 	select {
 	case message = <-messages:
 		if expectedMessage != "" {
-			c.Assert(message, jc.DeepEquals, expectedMessage)
+			c.Assert(message, qt.DeepEquals, expectedMessage)
 		} else {
 			c.Fatal("received unexpected message")
 		}

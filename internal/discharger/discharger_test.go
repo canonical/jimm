@@ -9,13 +9,11 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/frankban/quicktest/qtsuite"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/google/uuid"
 	"github.com/juju/names/v5"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/discharger"
@@ -23,15 +21,12 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
-type dischargerSuite struct {
-	discharger *discharger.MacaroonDischarger
-
+type dischargerTestDeps struct {
+	discharger     *discharger.MacaroonDischarger
 	validOfferUUID string
 }
 
-var _ = gc.Suite(&dischargerSuite{})
-
-func (s *dischargerSuite) Init(c *qt.C) {
+func SetupTests(c *qt.C) dischargerTestDeps {
 	db := &db.Database{
 		DB: testdb.PostgresDB(c, time.Now),
 	}
@@ -44,26 +39,32 @@ func (s *dischargerSuite) Init(c *qt.C) {
 		PrivateKey:             "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
 		PublicKey:              "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
 	}
-	s.validOfferUUID = uuid.NewString()
+	tests := dischargerTestDeps{
+		validOfferUUID: uuid.NewString(),
+	}
 	authorizer := &mocks.OfferAuthorizer{
 		IsUserConsumerForOfferFunc: func(ctx context.Context, userTag names.UserTag, offerTag names.ApplicationOfferTag) (bool, error) {
 			if userTag.IsLocal() {
-				if userTag.Id() == "local-user" && offerTag.Id() == s.validOfferUUID {
+				if userTag.Id() == "local-user" && offerTag.Id() == tests.validOfferUUID {
 					return true, nil
 				}
 				return false, nil
-			} else if userTag.Id() == "external-user@external.com" && offerTag.Id() == s.validOfferUUID {
+			} else if userTag.Id() == "external-user@external.com" && offerTag.Id() == tests.validOfferUUID {
 				return true, nil
 			}
 			return false, nil
 		},
 	}
-	s.discharger, err = discharger.NewMacaroonDischarger(cfg, db, authorizer)
+	tests.discharger, err = discharger.NewMacaroonDischarger(cfg, db, authorizer)
 	c.Assert(err, qt.IsNil)
 
+	return tests
 }
 
-func (s *dischargerSuite) TestCheckThirdPartyCaveat(c *qt.C) {
+func TestCheckThirdPartyCaveat(t *testing.T) {
+	c := qt.New(t)
+	deps := SetupTests(c)
+
 	tests := []struct {
 		name          string
 		condition     string
@@ -71,17 +72,17 @@ func (s *dischargerSuite) TestCheckThirdPartyCaveat(c *qt.C) {
 	}{
 		{
 			name:          "valid local user and offer",
-			condition:     fmt.Sprintf("is-consumer user-local-user %s", s.validOfferUUID),
+			condition:     fmt.Sprintf("is-consumer user-local-user %s", deps.validOfferUUID),
 			expectedError: nil,
 		},
 		{
 			name:          "valid external user and offer",
-			condition:     fmt.Sprintf("is-consumer user-external-user@external.com %s", s.validOfferUUID),
+			condition:     fmt.Sprintf("is-consumer user-external-user@external.com %s", deps.validOfferUUID),
 			expectedError: nil,
 		},
 		{
 			name:          "invalid user and offer",
-			condition:     fmt.Sprintf("is-consumer user-invalid-user %s", s.validOfferUUID),
+			condition:     fmt.Sprintf("is-consumer user-invalid-user %s", deps.validOfferUUID),
 			expectedError: httpbakery.ErrPermissionDenied,
 		},
 		{
@@ -102,12 +103,8 @@ func (s *dischargerSuite) TestCheckThirdPartyCaveat(c *qt.C) {
 			cavInfo := &bakery.ThirdPartyCaveatInfo{
 				Condition: []byte(test.condition),
 			}
-			_, err := s.discharger.CheckThirdPartyCaveat(ctx, nil, cavInfo, nil)
+			_, err := deps.discharger.CheckThirdPartyCaveat(ctx, nil, cavInfo, nil)
 			c.Assert(err, qt.Equals, test.expectedError)
 		})
 	}
-}
-
-func TestDischarger(t *testing.T) {
-	qtsuite.Run(qt.New(t), &dischargerSuite{})
 }

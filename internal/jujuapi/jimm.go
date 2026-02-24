@@ -653,7 +653,7 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	// Check built in clouds like localhost (lxd).
+	// Check built in clouds like microk8s.
 	builtinClouds, err := common.BuiltInClouds()
 	if err != nil {
 		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeIncompatibleClouds, "unauthorized")

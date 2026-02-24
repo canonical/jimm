@@ -141,7 +141,6 @@ func (c *addModelCommand) newAPIRoot() (api.Connection, error) {
 //
 //nolint:gocognit
 func (c *addModelCommand) Run(ctx *cmd.Context) error {
-
 	controllerName, err := c.ControllerName()
 	if err != nil {
 		return err

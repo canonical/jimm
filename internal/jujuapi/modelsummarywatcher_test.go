@@ -5,28 +5,26 @@ package jujuapi_test
 import (
 	"context"
 	"sync"
+	"testing"
 	"time"
 
+	qt "github.com/frankban/quicktest"
 	jujuparams "github.com/juju/juju/rpc/params"
-	jc "github.com/juju/testing/checkers"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 )
 
-type modelSummaryWatcherSuite struct{}
+func TestModelSummaryWatcher(t *testing.T) {
+	c := qt.New(t)
 
-var _ = gc.Suite(&modelSummaryWatcherSuite{})
-
-func (s *modelSummaryWatcherSuite) TestModelSummaryWatcher(c *gc.C) {
 	watcher := jujuapi.NewModelSummaryWatcher()
 	defer func() {
 		err := watcher.Stop()
-		c.Assert(err, gc.IsNil)
+		c.Assert(err, qt.IsNil)
 	}()
 	result, err := watcher.Next()
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result, gc.DeepEquals, jujuparams.SummaryWatcherNextResults{
+	c.Assert(err, qt.IsNil)
+	c.Assert(result, qt.DeepEquals, jujuparams.SummaryWatcherNextResults{
 		Models: []jujuparams.ModelAbstract{},
 	})
 
@@ -40,8 +38,8 @@ func (s *modelSummaryWatcherSuite) TestModelSummaryWatcher(c *gc.C) {
 	})
 
 	result, err = watcher.Next()
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result, gc.DeepEquals, jujuparams.SummaryWatcherNextResults{
+	c.Assert(err, qt.IsNil)
+	c.Assert(result, qt.DeepEquals, jujuparams.SummaryWatcherNextResults{
 		Models: []jujuparams.ModelAbstract{{
 			UUID: "12345",
 			Name: "test-model",
@@ -52,7 +50,8 @@ func (s *modelSummaryWatcherSuite) TestModelSummaryWatcher(c *gc.C) {
 	})
 }
 
-func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
+func TestModelAccessWatcher(t *testing.T) {
+	c := qt.New(t)
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
@@ -72,7 +71,7 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 	}
 
 	match := jujuapi.ModelAccessWatcherMatch(watcher, "model1")
-	c.Assert(match, jc.IsFalse)
+	c.Assert(match, qt.IsFalse)
 
 	modelGetter.setModels([]string{"model1", "model2"})
 
@@ -89,13 +88,13 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 	wg.Wait()
 
 	match = jujuapi.ModelAccessWatcherMatch(watcher, "model1")
-	c.Assert(match, jc.IsTrue)
+	c.Assert(match, qt.IsTrue)
 
 	match = jujuapi.ModelAccessWatcherMatch(watcher, "model2")
-	c.Assert(match, jc.IsTrue)
+	c.Assert(match, qt.IsTrue)
 
 	match = jujuapi.ModelAccessWatcherMatch(watcher, "model3")
-	c.Assert(match, jc.IsFalse)
+	c.Assert(match, qt.IsFalse)
 
 	// Now with the watcher stopped, we set new models and
 	// check that the previous models are still matched.
@@ -104,7 +103,7 @@ func (s *modelSummaryWatcherSuite) TestModelAccessWatcher(c *gc.C) {
 	<-time.After(200 * time.Millisecond)
 
 	match = jujuapi.ModelAccessWatcherMatch(watcher, "model2")
-	c.Assert(match, jc.IsTrue)
+	c.Assert(match, qt.IsTrue)
 }
 
 type testModelGetter struct {
