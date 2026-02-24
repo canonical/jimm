@@ -7,22 +7,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"testing"
 
+	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/websocket"
-	gc "gopkg.in/check.v1"
 
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-type apiSuite struct {
-	jimmtest.WebsocketE2ESuite
-}
+func TestModelCommandsModelNotFoundf(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupWebsocketEnv(c)
 
-var _ = gc.Suite(&apiSuite{})
-
-func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
 	serverURL, err := url.Parse(s.HTTP.URL)
-	c.Assert(err, gc.Equals, nil)
+	c.Assert(err, qt.Equals, nil)
 	u := url.URL{
 		Scheme: "wss",
 		Host:   serverURL.Host,
@@ -35,9 +33,9 @@ func (s *apiSuite) TestModelCommandsModelNotFoundf(c *gc.C) {
 	}
 	_, response, err := dial.Dial(u.String(), nil)
 	if err != nil {
-		c.Assert(err, gc.ErrorMatches, "websocket: bad handshake")
+		c.Assert(err, qt.ErrorMatches, "websocket: bad handshake")
 	}
 	defer response.Body.Close()
 
-	c.Assert(response.StatusCode, gc.Equals, http.StatusNotFound)
+	c.Assert(response.StatusCode, qt.Equals, http.StatusNotFound)
 }

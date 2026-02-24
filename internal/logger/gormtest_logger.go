@@ -39,7 +39,7 @@ func NewGormTestLogger(t Tester) logger.Interface {
 		zapcore.NewCore(
 			zapcore.NewConsoleEncoder(devConfig),
 			output,
-			zap.DebugLevel,
+			zap.WarnLevel,
 		))
 	zapctx.Default = logger
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_TEST_LOG_SQL"))
