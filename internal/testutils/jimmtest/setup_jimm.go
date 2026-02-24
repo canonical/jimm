@@ -370,6 +370,9 @@ func (s *JIMMEnv) DestroyModelAndDeleteFromDatabase(c *qt.C, modelTag names.Mode
 
 	// Call Juju DestroyModel API and set the model to dying state.
 	err := s.JIMM.JujuManager.DestroyModel(ctx, s.AdminUser, modelTag, nil, nil, nil, nil)
+	if errors.ErrorCode(err) == errors.CodeNotFound {
+		return
+	}
 	c.Assert(err, qt.Equals, nil)
 
 	// Poll until the model is destroyed with a timeout

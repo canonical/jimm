@@ -92,7 +92,7 @@ func testBrowserLogin(c *qt.C, s jimmtest.WebsocketE2ESuite, username, password,
 
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, qt.IsNil)
-	defer sessionStore.Close()
+	// Don't close the session store as it will close the underlying sql.DB which is shared with gorm and used by the JIMM instance.
 
 	cookie, err := jimmtest.RunBrowserLogin(
 		s.JIMM.Database,

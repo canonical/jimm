@@ -221,7 +221,7 @@ func TestModelInfo(t *testing.T) {
 	}
 
 	// Model 1 (s.Model) - bob has admin access
-	c.Assert(models[0].Error, qt.IsNil)
+	c.Assert(models[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(models[0].Result.Name, qt.Equals, s.Model.Name)
 	c.Assert(models[0].Result.UUID, qt.Equals, s.Model.UUID.String)
 	c.Assert(models[0].Result.Life, qt.Equals, life.Alive)
@@ -238,7 +238,7 @@ func TestModelInfo(t *testing.T) {
 	c.Assert(models[1].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
 
 	// Model 3 (s.Model3) - bob has read access
-	c.Assert(models[2].Error, qt.IsNil)
+	c.Assert(models[2].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(models[2].Result.Name, qt.Equals, s.Model3.Name)
 	c.Assert(models[2].Result.UUID, qt.Equals, s.Model3.UUID.String)
 	c.Assert(models[2].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
@@ -250,7 +250,7 @@ func TestModelInfo(t *testing.T) {
 	c.Assert(models[2].Result.Machines, qt.IsNil)
 
 	// Model 4 (mt4) - bob has write access
-	c.Assert(models[3].Error, qt.IsNil)
+	c.Assert(models[3].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(models[3].Result.Name, qt.Equals, model4Name)
 	c.Assert(models[3].Result.UUID, qt.Equals, mt4.Id())
 	c.Assert(models[3].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
@@ -260,7 +260,7 @@ func TestModelInfo(t *testing.T) {
 	// Write access means machines are visible (not nil, though may be empty)
 
 	// Model 5 (mt5) - bob has admin access
-	c.Assert(models[4].Error, qt.IsNil)
+	c.Assert(models[4].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(models[4].Result.Name, qt.Equals, model5Name)
 	c.Assert(models[4].Result.UUID, qt.Equals, mt5.Id())
 	c.Assert(models[4].Result.ControllerUUID, qt.Equals, jimmtest.ControllerUUID)
@@ -301,7 +301,7 @@ func TestModelInfoDisableControllerUUIDMasking(t *testing.T) {
 	models, err := client.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(models, qt.HasLen, 1)
-	c.Assert(models[0].Error, qt.IsNil)
+	c.Assert(models[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 
 	// The controller UUID should NOT be the masked JIMM controller UUID
 	c.Assert(models[0].Result.ControllerUUID, qt.Not(qt.Equals), jimmtest.ControllerUUID)
@@ -489,7 +489,7 @@ func TestGrantAndRevokeModel(t *testing.T) {
 	res, err = client2.ModelInfo([]names.ModelTag{s.Model.ResourceTag()})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 1)
-	c.Assert(res[0].Error, qt.IsNil)
+	c.Assert(res[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(res[0].Result.UUID, qt.Equals, s.Model.UUID.String)
 
 	err = client.RevokeModel("charlie@canonical.com", "read", s.Model.UUID.String)
@@ -520,7 +520,7 @@ func TestUserRevokeOwnAccess(t *testing.T) {
 	res, err := client2.ModelInfo([]names.ModelTag{names.NewModelTag(s.Model.UUID.String)})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 1)
-	c.Assert(res[0].Error, qt.IsNil)
+	c.Assert(res[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(res[0].Result.UUID, qt.Equals, s.Model.UUID.String)
 
 	err = client2.RevokeModel("charlie@canonical.com", "read", s.Model.UUID.String)
@@ -734,7 +734,7 @@ func TestChangeModelCredential(t *testing.T) {
 	mir, err := client.ModelInfo([]names.ModelTag{modelTag})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(mir, qt.HasLen, 1)
-	c.Assert(mir[0].Error, qt.IsNil)
+	c.Assert(mir[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 	c.Assert(mir[0].Result.CloudCredentialTag, qt.Equals, credTag.String())
 }
 

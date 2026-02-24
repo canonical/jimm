@@ -85,9 +85,8 @@ func TestUserCredentials(t *testing.T) {
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("bob@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(creds, qt.DeepEquals, []names.CloudCredentialTag{
-		names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/bob@canonical.com/cred"),
-	})
+	c.Assert(creds, qt.HasLen, 1)
+	c.Assert(creds[0], qt.Equals, names.NewCloudCredentialTag(jimmtest.TestE2ECloudName+"/bob@canonical.com/cred"))
 }
 
 func TestUserCredentialsWithDomain(t *testing.T) {
@@ -107,9 +106,8 @@ func TestUserCredentialsWithDomain(t *testing.T) {
 	client := cloudapi.NewClient(conn)
 	creds, err := client.UserCredentials(names.NewUserTag("test@domain"), names.NewCloudTag(jimmtest.TestE2ECloudName))
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(creds, qt.DeepEquals, []names.CloudCredentialTag{
-		cct,
-	})
+	c.Assert(creds, qt.HasLen, 1)
+	c.Assert(creds[0], qt.Equals, cct)
 }
 
 func TestUserCredentialsErrors(t *testing.T) {
@@ -152,12 +150,12 @@ func TestUpdateCloudCredentials(t *testing.T) {
 	}})
 	creds, err := client.UserCredentials(names.NewUserTag("test@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(creds, qt.DeepEquals, []names.CloudCredentialTag{credentialTag})
+	c.Assert(creds, qt.HasLen, 1)
+	c.Assert(creds[0], qt.Equals, credentialTag)
 	_, err = client.UpdateCredentialsCheckModels(credentialTag, cloud.NewCredential("credtype", map[string]string{"attr1": "val33", "attr2": "val34"}))
-	c.Assert(err, qt.Equals, nil)
-	creds, err = client.UserCredentials(names.NewUserTag("test@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
-	c.Assert(err, qt.Equals, nil)
-	var _ = creds
+	c.Assert(err, qt.IsNil)
+	_, err = client.UserCredentials(names.NewUserTag("test@canonical.com"), names.NewCloudTag(jimmtest.TestE2ECloudName))
+	c.Assert(err, qt.IsNil)
 }
 
 func TestUpdateCloudCredentialsErrors(t *testing.T) {
@@ -199,7 +197,7 @@ func TestUpdateCloudCredentialsErrors(t *testing.T) {
 	c.Assert(resp.Results, qt.HasLen, 3)
 	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `"not-a-cloud-credentials-tag" is not a valid tag`)
 	c.Assert(resp.Results[1].Error, qt.ErrorMatches, `unauthorized`)
-	c.Assert(resp.Results[2].Error, qt.IsNil)
+	c.Assert(resp.Results[2].Error, qt.Equals, (*jujuparams.Error)(nil))
 }
 
 func TestUpdateCloudCredentialsForce(t *testing.T) {
@@ -470,9 +468,8 @@ func TestRevokeCredential(t *testing.T) {
 
 	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{
-		credTag,
-	})
+	c.Assert(tags, qt.HasLen, 1)
+	c.Assert(tags[0], qt.Equals, credTag)
 
 	ccr, err := client.Credentials(credTag)
 	c.Assert(err, qt.Equals, nil)
@@ -496,7 +493,7 @@ func TestRevokeCredential(t *testing.T) {
 
 	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{})
+	c.Assert(tags, qt.HasLen, 0)
 }
 
 func TestAddCloud(t *testing.T) {
@@ -551,9 +548,8 @@ func TestRevokeCredentialsCheckModels(t *testing.T) {
 
 	tags, err := client.UserCredentials(credTag.Owner(), credTag.Cloud())
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{
-		credTag,
-	})
+	c.Assert(tags, qt.HasLen, 1)
+	c.Assert(tags[0], qt.Equals, credTag)
 
 	ccr, err := client.Credentials(credTag)
 	c.Assert(err, qt.Equals, nil)
@@ -600,7 +596,7 @@ func TestRevokeCredentialsCheckModels(t *testing.T) {
 		}},
 	}, &resp)
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(resp.Results[0].Error, qt.IsNil)
+	c.Assert(resp.Results[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 
 	ccr, err = client.Credentials(credTag)
 	c.Assert(err, qt.Equals, nil)
@@ -613,7 +609,7 @@ func TestRevokeCredentialsCheckModels(t *testing.T) {
 
 	tags, err = client.UserCredentials(credTag.Owner(), credTag.Cloud())
 	c.Assert(err, qt.Equals, nil)
-	c.Assert(tags, qt.DeepEquals, []names.CloudCredentialTag{})
+	c.Assert(tags, qt.HasLen, 0)
 }
 
 func TestAddCloudError(t *testing.T) {

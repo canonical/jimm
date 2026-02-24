@@ -357,7 +357,7 @@ func TestModifyOfferAccess(t *testing.T) {
 	)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(results, qt.HasLen, 1)
-	c.Assert(results[0].Error, qt.IsNil)
+	c.Assert(results[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 
 	offerURL := "bob@canonical.com/" + s.Model.Name + ".test-offer1"
 

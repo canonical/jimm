@@ -81,10 +81,13 @@ func TestModelStatus(t *testing.T) {
 		c.Assert(err, qt.Equals, nil)
 		c.Assert(models, qt.HasLen, 2)
 		c.Check(models[0], qt.DeepEquals, base.ModelStatus{
+			Applications:       []base.Application{},
 			UUID:               s.Model.UUID.String,
 			Life:               life.Value(state.Alive.String()),
 			Owner:              "bob@canonical.com",
 			TotalMachineCount:  0,
+			Volumes:            []base.Volume{},
+			Filesystems:        []base.Filesystem{},
 			CoreCount:          0,
 			HostedMachineCount: 0,
 			ApplicationCount:   0,
