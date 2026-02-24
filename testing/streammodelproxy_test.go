@@ -43,6 +43,7 @@ func TestDebugLogsWithParams(t *testing.T) {
 	logChan, err := common.StreamDebugLog(context.TODO(), conn, common.DebugLogParams{
 		NoTail: true,
 		Limit:  1,
+		Replay: true,
 	})
 	c.Assert(err, qt.IsNil)
 	messages := 0
