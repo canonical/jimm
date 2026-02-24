@@ -33,7 +33,7 @@ import (
 
 func TestListControllersAdmin(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -87,7 +87,7 @@ func assertControllerInfos(c *qt.C, actual []apiparams.ControllerInfo, expected 
 
 func TestListControllersOrdinaryUser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	ctx := context.Background()
 
@@ -161,7 +161,7 @@ func TestListControllersOrdinaryUser(t *testing.T) {
 
 func TestModelGet(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -180,7 +180,7 @@ func TestModelGet(t *testing.T) {
 
 func TestListControllersUnauthorized(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "abrandnewuserwithnopermissions", nil)
 	defer conn.Close()
@@ -193,7 +193,7 @@ func TestListControllersUnauthorized(t *testing.T) {
 
 func TestAddControllerPublicAddressWithoutPort(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -236,7 +236,7 @@ func TestAddControllerPublicAddressWithoutPort(t *testing.T) {
 
 func TestAddController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -290,7 +290,7 @@ func TestAddController(t *testing.T) {
 
 func TestRemoveAndAddController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -320,7 +320,7 @@ func TestRemoveAndAddController(t *testing.T) {
 
 func TestAddControllerCustomTLSHostname(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -360,7 +360,7 @@ func TestAddControllerCustomTLSHostname(t *testing.T) {
 
 func TestRemoveController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -405,7 +405,8 @@ func TestRemoveController(t *testing.T) {
 
 func TestSetControllerDeprecated(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -443,7 +444,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 		CACertificate: conf.ToAPIInfo().CACert,
 		CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 		CloudRegion:   jimmtest.TestE2ECloudRegionName,
-		AgentVersion:  s.Model.Controller.AgentVersion,
+		AgentVersion:  model.Controller.AgentVersion,
 		Status: jujuparams.EntityStatus{
 			Status: "available",
 		},
@@ -470,7 +471,8 @@ func TestSetControllerDeprecated(t *testing.T) {
 
 func TestAuditLog(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -482,7 +484,7 @@ func TestAuditLog(t *testing.T) {
 
 	mmclient := modelmanager.NewClient(conn)
 	zeroDuration := time.Duration(0)
-	err = mmclient.DestroyModel(s.Model.ResourceTag(), nil, nil, nil, &zeroDuration)
+	err = mmclient.DestroyModel(model.ResourceTag(), nil, nil, nil, &zeroDuration)
 	c.Assert(err, qt.Equals, nil)
 
 	conn2 := s.Open(c, nil, "alice", nil)
@@ -571,7 +573,7 @@ func TestAuditLog(t *testing.T) {
 
 func TestAuditLogFilterByMethod(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -583,19 +585,11 @@ func TestAuditLogFilterByMethod(t *testing.T) {
 
 func TestFullModelStatus(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	_, conf := s.GetOneControllerConfig(c)
+	charlieModel := s.CreateModelForCharlie(c)
 
-	s.AddController(c, "controller-2", conf.ToAPIInfo())
-	modelName := petname.Generate(2, "-")
-	mt := s.AddModel(c, names.NewUserTag("charlie@canonical.com"),
-		modelName,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag())
-
-	conn := s.Open(c, nil, "bob", nil)
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 
@@ -605,7 +599,7 @@ func TestFullModelStatus(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
 
 	_, err = client.FullModelStatus(&apiparams.FullModelStatusRequest{
-		ModelTag: mt.String(),
+		ModelTag: charlieModel.ResourceTag().String(),
 	})
 	c.Assert(err, qt.ErrorMatches, "unauthorized.*")
 
@@ -614,7 +608,7 @@ func TestFullModelStatus(t *testing.T) {
 	client = api.NewClient(conn)
 
 	status, err := client.FullModelStatus(&apiparams.FullModelStatusRequest{
-		ModelTag: mt.String(),
+		ModelTag: charlieModel.ResourceTag().String(),
 	})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(status,
@@ -625,7 +619,7 @@ func TestFullModelStatus(t *testing.T) {
 		),
 		jujuparams.FullStatus{
 			Model: jujuparams.ModelStatusInfo{
-				Name:        modelName,
+				Name:        charlieModel.Name,
 				Type:        "iaas",
 				CloudTag:    names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 				CloudRegion: jimmtest.TestE2ECloudRegionName,
@@ -639,15 +633,16 @@ func TestFullModelStatus(t *testing.T) {
 
 func TestUpdateMigratedModel(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model2 := s.CreateModelForCharlie(c)
 
 	// Open the API connection as user "bob".
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	req := apiparams.UpdateMigratedModelRequest{
-		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetController: s.Model2.Controller.Name,
+		ModelTag:         names.NewModelTag(model2.UUID.String).String(),
+		TargetController: model2.Controller.Name,
 	}
 	err := conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -657,15 +652,15 @@ func TestUpdateMigratedModel(t *testing.T) {
 	defer conn.Close()
 
 	req = apiparams.UpdateMigratedModelRequest{
-		ModelTag:         names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetController: s.Model2.Controller.Name,
+		ModelTag:         names.NewModelTag(model2.UUID.String).String(),
+		TargetController: model2.Controller.Name,
 	}
 	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, qt.Equals, nil)
 
 	req = apiparams.UpdateMigratedModelRequest{
 		ModelTag:         "invalid-model-tag",
-		TargetController: s.Model2.Controller.Name,
+		TargetController: model2.Controller.Name,
 	}
 	err = conn.APICall("JIMM", 4, "", "UpdateMigratedModel", &req, nil)
 	c.Assert(err, qt.ErrorMatches, `"invalid-model-tag" is not a valid tag \(bad request\)`)
@@ -673,21 +668,22 @@ func TestUpdateMigratedModel(t *testing.T) {
 
 func TestImportModel(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model2 := s.CreateModelForCharlie(c)
 
 	// Open the API connection as user "bob".
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
-	controllerName := s.Model2.Controller.Name
+	controllerName := model2.Controller.Name
 
-	err := s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), s.Model2.Controller.ResourceTag(), s.Model2.ResourceTag())
+	err := s.JIMM.OpenFGAClient.RemoveControllerModel(context.Background(), model2.Controller.ResourceTag(), model2.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
-	err = s.JIMM.Database.DeleteModel(context.Background(), s.Model2)
+	err = s.JIMM.Database.DeleteModel(context.Background(), model2)
 	c.Assert(err, qt.Equals, nil)
 
 	req := apiparams.ImportModelRequest{
 		Controller: controllerName,
-		ModelTag:   s.Model2.Tag().String(),
+		ModelTag:   model2.Tag().String(),
 		Owner:      "",
 	}
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
@@ -700,11 +696,11 @@ func TestImportModel(t *testing.T) {
 	err = conn.APICall("JIMM", 4, "", "ImportModel", &req, nil)
 	c.Assert(err, qt.Equals, nil)
 
-	var model2 dbmodel.Model
-	model2.SetTag(s.Model2.ResourceTag())
-	err = s.JIMM.Database.GetModel(context.Background(), &model2)
+	var importedModel dbmodel.Model
+	importedModel.SetTag(model2.ResourceTag())
+	err = s.JIMM.Database.GetModel(context.Background(), &importedModel)
 	c.Assert(err, qt.Equals, nil)
-	c.Check(model2.CreatedAt.After(s.Model2.CreatedAt), qt.Equals, true)
+	c.Check(importedModel.CreatedAt.After(model2.CreatedAt), qt.Equals, true)
 
 	req = apiparams.ImportModelRequest{
 		Controller: controllerName,
@@ -716,7 +712,7 @@ func TestImportModel(t *testing.T) {
 
 func TestAddCloudToController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	ctx := context.Background()
 
@@ -767,7 +763,7 @@ func TestAddCloudToController(t *testing.T) {
 
 func TestAddExistingCloudToController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	ctx := context.Background()
 
@@ -830,7 +826,7 @@ func TestAddExistingCloudToController(t *testing.T) {
 
 func TestRemoveCloudFromController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	ctx := context.Background()
 
@@ -881,34 +877,11 @@ func TestRemoveCloudFromController(t *testing.T) {
 
 func TestCrossModelQuery(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	s.AddModel(
-		c,
-		names.NewUserTag("charlie@canonical.com"),
-		petname.Generate(2, "-"),
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag(),
-	)
-	model21Name := petname.Generate(2, "-")
-	s.AddModel(
-		c,
-		names.NewUserTag("charlie@canonical.com"),
-		model21Name,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag(),
-	)
-	model22Name := petname.Generate(2, "-")
-	s.AddModel(
-		c,
-		names.NewUserTag("charlie@canonical.com"),
-		model22Name,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag(),
-	)
+	_ = s.CreateModelForCharlie(c)
+	model2 := s.CreateModelForCharlie(c)
+	model3 := s.CreateModelForCharlie(c)
 
 	conn := s.Open(c, nil, "charlie", nil)
 	defer conn.Close()
@@ -931,7 +904,7 @@ func TestCrossModelQuery(t *testing.T) {
 		Query: ".",
 	})
 	c.Assert(err, qt.IsNil)
-	c.Assert(res.Results, qt.HasLen, 5)
+	c.Assert(res.Results, qt.HasLen, 3)
 	c.Assert(res.Errors, qt.HasLen, 0)
 
 	// Query with broken jq, this JQ will run against each model and return the same error
@@ -941,7 +914,7 @@ func TestCrossModelQuery(t *testing.T) {
 	})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res.Results, qt.HasLen, 0)
-	c.Assert(res.Errors, qt.HasLen, 5)
+	c.Assert(res.Errors, qt.HasLen, 3)
 	for _, errString := range res.Errors {
 		c.Assert(errString[0], qt.Equals, "jq error: function not defined: lett/0")
 	}
@@ -949,7 +922,7 @@ func TestCrossModelQuery(t *testing.T) {
 	// Query for two very specific models
 	res, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
 		Type:  "jq",
-		Query: "select((.model.name==\"" + model21Name + "\") or .model.name==\"" + model22Name + "\")",
+		Query: "select((.model.name==\"" + model2.Name + "\") or .model.name==\"" + model3.Name + "\")",
 	})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res.Results, qt.HasLen, 2)
@@ -961,19 +934,10 @@ func TestCrossModelQuery(t *testing.T) {
 // detect that a model with the same UUID already exists on the target controller.
 func TestJimmModelMigrationSuperuser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	modelName := petname.Generate(2, "-")
-	name, _ := s.GetOneControllerConfig(c)
-	mt := s.AddModelToController(
-		c,
-		names.NewUserTag("charlie@canonical.com"),
-		modelName,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag(),
-		name,
-	)
+	model := s.CreateModelForCharlie(c)
+	ctrlName := model.Controller.Name
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -981,45 +945,37 @@ func TestJimmModelMigrationSuperuser(t *testing.T) {
 
 	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
 		Specs: []apiparams.MigrateModelInfo{
-			{TargetModelNameOrUUID: mt.Id(), TargetController: name},
-			{TargetModelNameOrUUID: "charlie@canonical.com/" + modelName, TargetController: name},
+			{TargetModelNameOrUUID: model.UUID.String, TargetController: ctrlName},
+			{TargetModelNameOrUUID: "charlie@canonical.com/" + model.Name, TargetController: ctrlName},
 		},
 	})
 	c.Assert(err, qt.IsNil)
 	c.Assert(res.Results, qt.HasLen, 2)
 
 	item := res.Results[0]
-	c.Assert(item.ModelTag, qt.Equals, mt.String())
+	c.Assert(item.ModelTag, qt.Equals, model.ResourceTag().String())
 	c.Assert(item.MigrationId, qt.Equals, "")
 	c.Assert(item.Error.Message, qt.Matches, "target prechecks failed: model with same UUID already exists .*")
 
 	item2 := res.Results[1]
-	c.Assert(item2.ModelTag, qt.Equals, mt.String())
+	c.Assert(item2.ModelTag, qt.Equals, model.ResourceTag().String())
 	c.Assert(item2.MigrationId, qt.Equals, "")
 	c.Assert(item2.Error.Message, qt.Matches, "target prechecks failed: model with same UUID already exists .*")
 }
 
 func TestJimmModelMigrationNonSuperuser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	modelName := petname.Generate(2, "-")
-	mt := s.AddModel(
-		c,
-		names.NewUserTag("charlie@canonical.com"),
-		modelName,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag(),
-	)
+	model := s.CreateModelForCharlie(c)
 
-	conn := s.Open(c, nil, "bob", nil)
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
-	name, _ := s.GetOneControllerConfig(c)
+	ctrlName, _ := s.GetOneControllerConfig(c)
 	res, err := client.MigrateModel(&apiparams.MigrateModelRequest{
 		Specs: []apiparams.MigrateModelInfo{
-			{TargetModelNameOrUUID: mt.Id(), TargetController: name},
+			{TargetModelNameOrUUID: model.UUID.String, TargetController: ctrlName},
 		},
 	})
 	c.Assert(err, qt.IsNil)
@@ -1030,7 +986,7 @@ func TestJimmModelMigrationNonSuperuser(t *testing.T) {
 
 func TestVersion(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -1043,7 +999,7 @@ func TestVersion(t *testing.T) {
 
 func TestPrepareModelMigration(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -1064,15 +1020,15 @@ func TestPrepareModelMigration(t *testing.T) {
 
 func TestListMigrationTargets(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	// Add model to a specific controller and verify other controllers are listed as migration targets.
+	// Add model and verify other controllers are listed as migration targets.
+	model := s.CreateModelForCharlie(c)
+
 	confs := s.GetControllersConfig(c)
-	var controllerName string
 	otherControllers := []apiparams.ControllerInfo{}
 	for name, conf := range confs.Controllers {
-		if controllerName == "" {
-			controllerName = name
+		if name == model.Controller.Name {
 			continue
 		}
 		otherControllers = append(otherControllers, apiparams.ControllerInfo{
@@ -1087,23 +1043,13 @@ func TestListMigrationTargets(t *testing.T) {
 			},
 		})
 	}
-	// Add model that could migrate to target
-	mt := s.AddModelToController(
-		c,
-		names.NewUserTag("charlie@canonical.com"),
-		petname.Generate(2, "-"),
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		s.Model2.CloudCredential.ResourceTag(),
-		controllerName,
-	)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	cis, err := client.ListMigrationTargets(&apiparams.ListMigrationTargetsRequest{
-		ModelTag: mt.String(),
+		ModelTag: model.ResourceTag().String(),
 	})
 	c.Assert(err, qt.Equals, nil)
 
@@ -1113,15 +1059,17 @@ func TestListMigrationTargets(t *testing.T) {
 // TestUpgradeTo_Unauthorized verifies non-admins cannot call the facade.
 func TestUpgradeTo_Unauthorized(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+	model2 := s.CreateModelForCharlie(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	req := apiparams.UpgradeToRequest{
-		ModelTag:             names.NewModelTag(s.Model2.UUID.String).String(),
-		TargetControllerName: s.Model.Controller.Name,
+		ModelTag:             names.NewModelTag(model2.UUID.String).String(),
+		TargetControllerName: model.Controller.Name,
 	}
 	_, err := client.UpgradeTo(&req)
 	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
@@ -1131,7 +1079,8 @@ func TestUpgradeTo_Unauthorized(t *testing.T) {
 // TestUpgradeTo_InvalidModelTag verifies invalid model tags are rejected.
 func TestUpgradeTo_InvalidModelTag(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -1139,7 +1088,7 @@ func TestUpgradeTo_InvalidModelTag(t *testing.T) {
 	client := api.NewClient(conn)
 	req := apiparams.UpgradeToRequest{
 		ModelTag:             "invalid-model-tag",
-		TargetControllerName: s.Model.Controller.Name,
+		TargetControllerName: model.Controller.Name,
 	}
 	_, err := client.UpgradeTo(&req)
 	c.Assert(err, qt.ErrorMatches, `(invalid model tag "invalid-model-tag": )?"invalid-model-tag" is not a valid tag \(bad request\)`)
@@ -1148,14 +1097,15 @@ func TestUpgradeTo_InvalidModelTag(t *testing.T) {
 // TestUpgradeTo_InvalidController verifies invalid controllers are rejected.
 func TestUpgradeTo_InvalidController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model2 := s.CreateModelForCharlie(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 	req := apiparams.UpgradeToRequest{
-		ModelTag:             names.NewModelTag(s.Model2.UUID.String).String(),
+		ModelTag:             names.NewModelTag(model2.UUID.String).String(),
 		TargetControllerName: "does-not-exist",
 	}
 	_, err := client.UpgradeTo(&req)
@@ -1164,7 +1114,7 @@ func TestUpgradeTo_InvalidController(t *testing.T) {
 
 func TestCreateModelOnTargetController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -1220,35 +1170,36 @@ func TestCreateModelOnTargetController(t *testing.T) {
 
 func TestModelControllerInfo(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
 
-	modelControllerInfo, err := client.ModelControllerInfo(s.Model.UUID.String)
+	modelControllerInfo, err := client.ModelControllerInfo(model.UUID.String)
 	c.Assert(err, qt.IsNil)
 	c.Assert(modelControllerInfo, qt.DeepEquals, &apiparams.ModelControllerInfo{
-		ModelName:      s.Model.Name,
-		ModelUUID:      s.Model.UUID.String,
-		ControllerName: s.Model.Controller.Name,
-		ControllerUUID: s.Model.Controller.UUID,
+		ModelName:      model.Name,
+		ModelUUID:      model.UUID.String,
+		ControllerName: model.Controller.Name,
+		ControllerUUID: model.Controller.UUID,
 	})
 
-	modelControllerInfo, err = client.ModelControllerInfo(fmt.Sprintf("%s/%s", s.Model.OwnerIdentityName, s.Model.Name))
+	modelControllerInfo, err = client.ModelControllerInfo(fmt.Sprintf("%s/%s", model.OwnerIdentityName, model.Name))
 	c.Assert(err, qt.IsNil)
 	c.Assert(modelControllerInfo, qt.DeepEquals, &apiparams.ModelControllerInfo{
-		ModelName:      s.Model.Name,
-		ModelUUID:      s.Model.UUID.String,
-		ControllerName: s.Model.Controller.Name,
-		ControllerUUID: s.Model.Controller.UUID,
+		ModelName:      model.Name,
+		ModelUUID:      model.UUID.String,
+		ControllerName: model.Controller.Name,
+		ControllerUUID: model.Controller.UUID,
 	})
 }
 
 func TestPurgeLogs(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	ctx := context.Background()
 	relativeNow := time.Now().AddDate(-1, 0, 0)
@@ -1291,7 +1242,7 @@ func TestPurgeLogs(t *testing.T) {
 
 func TestPurgeLogs_NotAdmin(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	// bob is not a superuser
 	conn := s.Open(c, nil, "bob", nil)
@@ -1306,7 +1257,7 @@ func TestPurgeLogs_NotAdmin(t *testing.T) {
 
 func TestJobInfo(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()

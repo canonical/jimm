@@ -15,10 +15,11 @@ import (
 
 func TestServerVersion(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
-	s.Model.Controller.AgentVersion = "1.2.3"
-	err := s.JIMM.Database.UpdateController(c.Context(), &s.Model.Controller)
+	model.Controller.AgentVersion = "1.2.3"
+	err := s.JIMM.Database.UpdateController(c.Context(), &model.Controller)
 	c.Assert(err, qt.Equals, nil)
 
 	conn := s.Open(c, nil, "test", nil)
@@ -31,10 +32,11 @@ func TestServerVersion(t *testing.T) {
 
 func TestUnimplementedMethodFails(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: true,
 	}, "test", nil)
 	defer conn.Close()
@@ -45,7 +47,7 @@ func TestUnimplementedMethodFails(t *testing.T) {
 
 func TestUnimplementedRootFails(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()

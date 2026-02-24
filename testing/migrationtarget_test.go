@@ -20,7 +20,7 @@ import (
 
 func TestAbort(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -33,7 +33,7 @@ func TestAbort(t *testing.T) {
 
 func TestCheckMachines(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -46,7 +46,7 @@ func TestCheckMachines(t *testing.T) {
 
 func TestPrechecks(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -100,7 +100,7 @@ func TestPrechecks(t *testing.T) {
 
 func TestCACert(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -113,7 +113,7 @@ func TestCACert(t *testing.T) {
 
 func TestAdoptResources(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -126,7 +126,7 @@ func TestAdoptResources(t *testing.T) {
 
 func TestActivate(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -144,19 +144,20 @@ func TestActivate(t *testing.T) {
 
 func TestLatestLogTime(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
 	client := migrationtarget.NewClient(conn)
-	_, err := client.LatestLogTime(s.Model.UUID.String)
+	_, err := client.LatestLogTime(model.UUID.String)
 	c.Assert(err, qt.IsNil)
 }
 
 func TestImport(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()

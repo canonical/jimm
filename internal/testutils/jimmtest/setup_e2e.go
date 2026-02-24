@@ -131,18 +131,17 @@ func (info *ControllerInfo) ToAPIInfo() *api.Info {
 	}
 }
 
-// WebsocketEnv is a suite that initialises a JIMM with
+// JimmWithControllers is a suite that initialises a JIMM with
 // externally bootstrapped controller(s), and provides
 // methods to open websocket connections to the JIMM API.
-type WebsocketEnv struct {
-	JimmWithControllers
+type JimmWithControllers struct {
+	JIMMEnv
 
 	Params jujuapi.Params
 	HTTP   *httptest.Server
 
-	Credential2 *dbmodel.CloudCredential
-	Model2      *dbmodel.Model
-	Model3      *dbmodel.Model
+	BobCredential     *dbmodel.CloudCredential
+	CharlieCredential *dbmodel.CloudCredential
 }
 
 type LoginDetails struct {
@@ -152,13 +151,39 @@ type LoginDetails struct {
 	DialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
 }
 
-func SetupWebsocketEnv(c *qt.C, opts ...SetupOption) WebsocketEnv {
-	jimmWithControllers := SetupJimmWithControllers(c, opts...)
-	jimmEnv := jimmWithControllers.JIMMEnv
-	s := WebsocketEnv{
-		JimmWithControllers: jimmWithControllers,
+// SetupJimmWithControllers sets up a JIMM environment with externally bootstrapped controllers defined in the config file.
+// The config file path is specified in the JIMM_BACKING_CONTROLLER_CONFIG environment variable.
+//
+// The environment includes some test users by convention:
+// - bob@canonical.com has add-model permission on the controllers and cloud-credentials.
+// - charlie@canonical.com has add-model permission on the controllers and cloud-credentials.
+// - alice@canonical.com is an admin.
+func SetupJimmWithControllers(c *qt.C, opts ...SetupOption) JimmWithControllers {
+	jimmEnv := SetupJimmEnv(c, append([]SetupOption{WithHardcodedJWKS()}, opts...)...)
+	s := JimmWithControllers{
+		JIMMEnv: jimmEnv,
 	}
 	ctx := c.Context()
+
+	// Add all controllers from the config file
+	config := s.GetControllersConfig(c)
+	for name, info := range config.Controllers {
+		info.Validate(c, name)
+		controller := jimmEnv.AddController(c, name, info.ToAPIInfo())
+
+		// Grant fixture users bob and charlie with permission to
+		// add models to the controller.
+		err := jimmEnv.OFGAClient.AddRelation(context.Background(), cofga.Tuple{
+			Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
+			Relation: ofganames.CanAddModelRelation,
+			Target:   ofganames.ConvertTag(controller.ResourceTag()),
+		}, cofga.Tuple{
+			Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
+			Relation: ofganames.CanAddModelRelation,
+			Target:   ofganames.ConvertTag(controller.ResourceTag()),
+		})
+		c.Assert(err, qt.Equals, nil)
+	}
 
 	s.Params.ControllerUUID = ControllerUUID
 	s.HTTP = httptest.NewTLSServer(jimmEnv.service)
@@ -166,38 +191,54 @@ func SetupWebsocketEnv(c *qt.C, opts ...SetupOption) WebsocketEnv {
 
 	jimmEnv.AddAdminUser(c, "alice@canonical.com")
 
+	bobCCT := names.NewCloudCredentialTag(TestE2ECloudName + "/bob@canonical.com/cred")
+	bobCloudCredentials := s.GetExistingClientCredentialsForCloud(c, TestE2ECloudName)
+	jimmEnv.UpdateCloudCredential(c, bobCCT, bobCloudCredentials)
+	s.BobCredential = new(dbmodel.CloudCredential)
+	s.BobCredential.SetTag(bobCCT)
+	err := jimmEnv.JIMM.Database.GetCloudCredential(ctx, s.BobCredential)
+	c.Assert(err, qt.Equals, nil)
+
 	cct := names.NewCloudCredentialTag(TestE2ECloudName + "/charlie@canonical.com/cred")
-	cloudCredentials := jimmWithControllers.GetExistingClientCredentialsForCloud(c, TestE2ECloudName)
+	cloudCredentials := s.GetExistingClientCredentialsForCloud(c, TestE2ECloudName)
 	jimmEnv.UpdateCloudCredential(c, cct, cloudCredentials)
-	s.Credential2 = new(dbmodel.CloudCredential)
-	s.Credential2.SetTag(cct)
-	err := jimmEnv.JIMM.Database.GetCloudCredential(ctx, s.Credential2)
+	s.CharlieCredential = new(dbmodel.CloudCredential)
+	s.CharlieCredential.SetTag(cct)
+	err = jimmEnv.JIMM.Database.GetCloudCredential(ctx, s.CharlieCredential)
 	c.Assert(err, qt.Equals, nil)
-	mt := jimmWithControllers.AddModel(c, names.NewUserTag("charlie@canonical.com"), petname.Generate(2, "-"), names.NewCloudTag(TestE2ECloudName), TestE2ECloudRegionName, cct)
-	s.Model2 = new(dbmodel.Model)
-	s.Model2.SetTag(mt)
-	err = jimmEnv.JIMM.Database.GetModel(ctx, s.Model2)
-	c.Assert(err, qt.Equals, nil)
-	mt = jimmWithControllers.AddModel(c, names.NewUserTag("charlie@canonical.com"), petname.Generate(2, "-"), names.NewCloudTag(TestE2ECloudName), TestE2ECloudRegionName, cct)
-	s.Model3 = new(dbmodel.Model)
-	s.Model3.SetTag(mt)
-	err = jimmEnv.JIMM.Database.GetModel(ctx, s.Model3)
-	c.Assert(err, qt.Equals, nil)
+
+	return s
+}
+
+func (s *JimmWithControllers) CreateModelForCharlie(c *qt.C) *dbmodel.Model {
+	args := AddModelArgs{
+		Owner:  names.NewUserTag("charlie@canonical.com"),
+		Name:   petname.Generate(2, "-"),
+		Cloud:  names.NewCloudTag(TestE2ECloudName),
+		Region: TestE2ECloudRegionName,
+		Cred:   s.CharlieCredential.ResourceTag(),
+	}
+	return s.CreateModel(c, args)
+}
+
+func (s *JimmWithControllers) CreateModelForCharlieWithBobReadAccess(c *qt.C) *dbmodel.Model {
+	model := s.CreateModelForCharlie(c)
+	ctx := c.Context()
 
 	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 
 	bob := openfga.NewUser(
 		bobIdentity,
-		jimmEnv.OFGAClient,
+		s.OFGAClient,
 	)
-	err = bob.SetModelAccess(ctx, s.Model3.ResourceTag(), ofganames.ReaderRelation)
+	err = bob.SetModelAccess(ctx, model.ResourceTag(), ofganames.ReaderRelation)
 	c.Assert(err, qt.Equals, nil)
 
-	return s
+	return model
 }
 
-func (s *WebsocketEnv) OpenCustomLoginProvider(c *qt.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
+func (s *JimmWithControllers) OpenCustomLoginProvider(c *qt.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
 	ld := LoginDetails{Info: info, Username: username, Lp: lp}
 	return s.OpenNoAssert(c, ld, nil)
 }
@@ -209,7 +250,7 @@ type DeployApplicationParams struct {
 }
 
 // DeployApplication deploys a charm in the specified model as the given user.
-func (s *WebsocketEnv) DeployApplication(c *qt.C, user *openfga.User, modelTag names.Tag, params DeployApplicationParams) {
+func (s *JimmWithControllers) DeployApplication(c *qt.C, user *openfga.User, modelTag names.Tag, params DeployApplicationParams) {
 	modelTagConv, ok := modelTag.(names.ModelTag)
 	c.Assert(ok, qt.Equals, true)
 
@@ -237,7 +278,7 @@ func (s *WebsocketEnv) DeployApplication(c *qt.C, user *openfga.User, modelTag n
 // OpenNoAssert creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
-func (s *WebsocketEnv) OpenNoAssert(c *qt.C, d LoginDetails, modelTag *names.ModelTag) (api.Connection, error) {
+func (s *JimmWithControllers) OpenNoAssert(c *qt.C, d LoginDetails, modelTag *names.ModelTag) (api.Connection, error) {
 	var inf api.Info
 	if d.Info != nil {
 		inf = *d.Info
@@ -274,14 +315,14 @@ func (s *WebsocketEnv) OpenNoAssert(c *qt.C, d LoginDetails, modelTag *names.Mod
 	return api.Open(&inf, dialOpts)
 }
 
-func (s *WebsocketEnv) Open(c *qt.C, info *api.Info, username string, modelTag *names.ModelTag) api.Connection {
+func (s *JimmWithControllers) Open(c *qt.C, info *api.Info, username string, modelTag *names.ModelTag) api.Connection {
 	ld := LoginDetails{Info: info, Username: username}
 	conn, err := s.OpenNoAssert(c, ld, modelTag)
 	c.Assert(err, qt.Equals, nil)
 	return conn
 }
 
-func (s *WebsocketEnv) OpenWithDialWebsocket(
+func (s *JimmWithControllers) OpenWithDialWebsocket(
 	c *qt.C,
 	info *api.Info,
 	username string,
@@ -293,87 +334,24 @@ func (s *WebsocketEnv) OpenWithDialWebsocket(
 	return conn
 }
 
-// JimmWithControllers is a environment that initialises a JIMM svc
-// with externally bootstrapped controller(s).
-// It also creates cloud credential, and creates a model.
-type JimmWithControllers struct {
-	JIMMEnv
-
-	CloudCredential *dbmodel.CloudCredential
-	Model           *dbmodel.Model
-}
-
-func SetupJimmWithControllers(c *qt.C, opts ...SetupOption) JimmWithControllers {
-	jimmEnv := SetupJimmEnv(c, append([]SetupOption{WithHardcodedJWKS()}, opts...)...)
-	s := JimmWithControllers{
-		JIMMEnv: jimmEnv,
-	}
-
-	// Add all controllers from the config file
-	config := s.GetControllersConfig(c)
-	for name, info := range config.Controllers {
-		info.Validate(c, name)
-		controller := jimmEnv.AddController(c, name, info.ToAPIInfo())
-
-		// Grant fixture users bob and charlie with permission to
-		// add models to the controller.
-		err := jimmEnv.OFGAClient.AddRelation(context.Background(), cofga.Tuple{
-			Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
-			Relation: ofganames.CanAddModelRelation,
-			Target:   ofganames.ConvertTag(controller.ResourceTag()),
-		}, cofga.Tuple{
-			Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
-			Relation: ofganames.CanAddModelRelation,
-			Target:   ofganames.ConvertTag(controller.ResourceTag()),
-		})
-		c.Assert(err, qt.Equals, nil)
-	}
-
-	cct := names.NewCloudCredentialTag(TestE2ECloudName + "/bob@canonical.com/cred")
-	cloudCredentials := s.GetExistingClientCredentialsForCloud(c, TestE2ECloudName)
-	jimmEnv.UpdateCloudCredential(c, cct, cloudCredentials)
-	ctx := context.Background()
-	s.CloudCredential = new(dbmodel.CloudCredential)
-	s.CloudCredential.SetTag(cct)
-	err := jimmEnv.JIMM.Database.GetCloudCredential(ctx, s.CloudCredential)
+func (s *JimmWithControllers) CreateModel(c *qt.C, args AddModelArgs) *dbmodel.Model {
+	mt := s.AddModelWithCleanup(c, args)
+	model := new(dbmodel.Model)
+	model.SetTag(mt)
+	err := s.JIMM.Database.GetModel(c.Context(), model)
 	c.Assert(err, qt.Equals, nil)
-
-	mt := s.AddModel(c, names.NewUserTag("bob@canonical.com"), petname.Generate(2, "-"), names.NewCloudTag(TestE2ECloudName), TestE2ECloudName, cct)
-	s.Model = new(dbmodel.Model)
-	s.Model.SetTag(mt)
-	err = jimmEnv.JIMM.Database.GetModel(ctx, s.Model)
-	c.Assert(err, qt.Equals, nil)
-
-	return s
+	return model
 }
 
-func (s *JimmWithControllers) AddModel(c *qt.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag) names.ModelTag {
-	mt := s.JIMMEnv.AddModel(c, addModelArgs{
-		owner:  owner,
-		name:   name,
-		cloud:  cloud,
-		region: region,
-		cred:   cred,
-	})
-	c.Cleanup(func() {
-		s.DestroyModelAndDeleteFromDatabase(c, mt)
-	})
-	return mt
-}
-
-func (s *JimmWithControllers) AddModelToController(c *qt.C, owner names.UserTag, name string, cloud names.CloudTag, region string, cred names.CloudCredentialTag, controllerName string) names.ModelTag {
-	mt := s.JIMMEnv.AddModel(c, addModelArgs{
-		owner:                owner,
-		name:                 name,
-		cloud:                cloud,
-		region:               region,
-		cred:                 cred,
-		targetControllerName: controllerName,
-	})
-	c.Cleanup(func() {
-		s.DestroyModelAndDeleteFromDatabase(c, mt)
-	})
-	return mt
+func (s *JimmWithControllers) CreateModelForBob(c *qt.C) *dbmodel.Model {
+	args := AddModelArgs{
+		Name:   petname.Generate(2, "-"),
+		Owner:  names.NewUserTag("bob@canonical.com"),
+		Cloud:  names.NewCloudTag(TestE2ECloudName),
+		Region: TestE2ECloudRegionName,
+		Cred:   s.BobCredential.ResourceTag(),
+	}
+	return s.CreateModel(c, args)
 }
 
 func (s *JimmWithControllers) GetExistingClientCredentialsForCloud(c *qt.C, cloudName string) jujuparams.CloudCredential {

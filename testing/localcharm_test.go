@@ -21,10 +21,11 @@ import (
 
 func TestLocalCharmDeploy(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
 	}, s.AdminUser.Name, nil)
 
@@ -42,11 +43,12 @@ func TestLocalCharmDeploy(t *testing.T) {
 
 func TestResourceEndpoint(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	// setup: app and pending resource
 	conn := s.Open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
 	}, s.AdminUser.Name, nil)
 

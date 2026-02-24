@@ -22,7 +22,7 @@ import (
 
 func TestAddRole(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -38,7 +38,7 @@ func TestAddRole(t *testing.T) {
 
 func TestGetRole(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -71,7 +71,7 @@ func TestGetRole(t *testing.T) {
 
 func TestRemoveRole(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -99,7 +99,7 @@ func TestRemoveRole(t *testing.T) {
 
 func TestRemoveRoleRemovesTuples(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	ctx := context.Background()
 	db := s.JIMM.Database
@@ -160,7 +160,7 @@ func TestRemoveRoleRemovesTuples(t *testing.T) {
 
 func TestRenameRole(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -185,7 +185,7 @@ func TestRenameRole(t *testing.T) {
 
 func TestListRoles(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -218,7 +218,7 @@ func TestListRoles(t *testing.T) {
 
 func TestUnauthorizedUserForRoleManagerment(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "not-authorized-user", nil)
 	defer conn.Close()

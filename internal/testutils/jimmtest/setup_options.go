@@ -3,8 +3,8 @@ package jimmtest
 // SetupOption configures the various Setup* test-environment helpers.
 //
 // The options are intentionally shared across setup layers so callers can pass
-// the same options through SetupWebsocketEnv -> SetupJimmWithControllers ->
-// SetupJimmEnv without repeating per-layer modifier structs.
+// the same options through SetupWebsocketEnv -> SetupJimmEnv without repeating
+// per-layer modifier structs.
 type SetupOption func(*SetupOptions)
 
 // SetupOptions holds the normalized configuration derived from SetupOption.

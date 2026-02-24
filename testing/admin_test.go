@@ -34,7 +34,7 @@ import (
 
 func TestLoginToController(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
 	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
@@ -58,7 +58,7 @@ func TestLoginToController(t *testing.T) {
 // missing/expired/revoked refresh tokens.
 func TestBrowserLoginWithSafeEmail(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
 	testBrowserLogin(
 		c,
@@ -72,7 +72,7 @@ func TestBrowserLoginWithSafeEmail(t *testing.T) {
 
 func TestBrowserLoginWithUnsafeEmail(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
 	testBrowserLogin(
 		c,
@@ -84,7 +84,7 @@ func TestBrowserLoginWithUnsafeEmail(t *testing.T) {
 	)
 }
 
-func testBrowserLogin(c *qt.C, s jimmtest.WebsocketEnv, username, password, expectedEmail, expectedDisplayName string) {
+func testBrowserLogin(c *qt.C, s jimmtest.JimmWithControllers, username, password, expectedEmail, expectedDisplayName string) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
 	sqldb, err := s.JIMM.Database.DB.DB()
@@ -137,7 +137,7 @@ func testBrowserLogin(c *qt.C, s jimmtest.WebsocketEnv, username, password, expe
 // TestBrowserLoginNoCookie attempts to login without a cookie.
 func TestBrowserLoginNoCookie(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
 	conn := s.Open(
 		c,
@@ -159,7 +159,7 @@ func TestBrowserLoginNoCookie(t *testing.T) {
 // Please refer to these comments for further details.
 func TestDeviceLogin(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
 	conn := s.Open(c, &api.Info{
 		SkipLogin: true,
@@ -303,7 +303,7 @@ func handleLoginForm(c *qt.C, loginForm string, client *http.Client, username, p
 
 func TestLoginWithClientCredentials(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c, jimmtest.WithRealAuthN())
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
 	conn := s.Open(c, &api.Info{
 		SkipLogin: true,

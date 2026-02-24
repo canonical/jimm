@@ -23,7 +23,7 @@ import (
 
 func TestControllerConfigSetNotSupported(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -34,7 +34,7 @@ func TestControllerConfigSetNotSupported(t *testing.T) {
 
 func TestMongoVersion(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -46,7 +46,9 @@ func TestMongoVersion(t *testing.T) {
 
 func TestAllModels(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+	model3 := s.CreateModelForCharlieWithBobReadAccess(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -55,14 +57,14 @@ func TestAllModels(t *testing.T) {
 	models, err := client.AllModels()
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(models, qt.ContentEquals, []base.UserModel{{
-		Name:           s.Model.Name,
-		UUID:           s.Model.UUID.String,
+		Name:           model.Name,
+		UUID:           model.UUID.String,
 		Owner:          "bob@canonical.com",
 		LastConnection: nil,
 		Type:           "iaas",
 	}, {
-		Name:           s.Model3.Name,
-		UUID:           s.Model3.UUID.String,
+		Name:           model3.Name,
+		UUID:           model3.UUID.String,
 		Owner:          "charlie@canonical.com",
 		LastConnection: nil,
 		Type:           "iaas",
@@ -71,18 +73,21 @@ func TestAllModels(t *testing.T) {
 
 func TestModelStatus(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+	model2 := s.CreateModelForCharlie(c)
+	model3 := s.CreateModelForCharlieWithBobReadAccess(c)
 
 	type modelStatuser interface {
 		ModelStatus(tags ...names.ModelTag) ([]base.ModelStatus, error)
 	}
 	doTest := func(client modelStatuser) {
-		models, err := client.ModelStatus(s.Model.ResourceTag(), s.Model3.ResourceTag())
+		models, err := client.ModelStatus(model.ResourceTag(), model3.ResourceTag())
 		c.Assert(err, qt.Equals, nil)
 		c.Assert(models, qt.HasLen, 2)
 		c.Check(models[0], qt.DeepEquals, base.ModelStatus{
 			Applications:       []base.Application{},
-			UUID:               s.Model.UUID.String,
+			UUID:               model.UUID.String,
 			Life:               life.Value(state.Alive.String()),
 			Owner:              "bob@canonical.com",
 			TotalMachineCount:  0,
@@ -95,7 +100,7 @@ func TestModelStatus(t *testing.T) {
 			ModelType:          "iaas",
 		})
 		c.Check(models[1].Error, qt.ErrorMatches, `unauthorized`)
-		status, err := client.ModelStatus(s.Model2.ResourceTag())
+		status, err := client.ModelStatus(model2.ResourceTag())
 		c.Assert(err, qt.Equals, nil)
 		c.Assert(status, qt.HasLen, 1)
 		c.Check(status[0].Error, qt.ErrorMatches, "unauthorized")
@@ -109,7 +114,7 @@ func TestModelStatus(t *testing.T) {
 
 func TestIdentityProviderURL(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -122,7 +127,7 @@ func TestIdentityProviderURL(t *testing.T) {
 
 func TestControllerVersion(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -138,7 +143,7 @@ func TestControllerVersion(t *testing.T) {
 
 func TestControllerAccess(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -166,7 +171,7 @@ func TestControllerAccess(t *testing.T) {
 
 func TestControllerConfig(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -184,10 +189,12 @@ func TestControllerConfig(t *testing.T) {
 
 func TestWatchModelSummaries(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+	model3 := s.CreateModelForCharlieWithBobReadAccess(c)
 
-	done := s.JIMM.Pubsub.Publish(s.Model.UUID.String, jujuparams.ModelAbstract{
-		UUID:  s.Model.UUID.String,
+	done := s.JIMM.Pubsub.Publish(model.UUID.String, jujuparams.ModelAbstract{
+		UUID:  model.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-1",
 	})
@@ -196,8 +203,8 @@ func TestWatchModelSummaries(t *testing.T) {
 	case <-time.After(time.Second):
 		c.Fatalf("timed out")
 	}
-	done = s.JIMM.Pubsub.Publish(s.Model3.UUID.String, jujuparams.ModelAbstract{
-		UUID:  s.Model3.UUID.String,
+	done = s.JIMM.Pubsub.Publish(model3.UUID.String, jujuparams.ModelAbstract{
+		UUID:  model3.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-3",
 	})
@@ -208,11 +215,11 @@ func TestWatchModelSummaries(t *testing.T) {
 	}
 
 	expectedModels := []jujuparams.ModelAbstract{{
-		UUID:  s.Model.UUID.String,
+		UUID:  model.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-1",
 	}, {
-		UUID:  s.Model3.UUID.String,
+		UUID:  model3.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-3",
 	}}
@@ -241,10 +248,12 @@ func TestWatchModelSummaries(t *testing.T) {
 
 func TestWatchAllModelSummaries(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+	model3 := s.CreateModelForCharlieWithBobReadAccess(c)
 
-	done := s.JIMM.Pubsub.Publish(s.Model.UUID.String, jujuparams.ModelAbstract{
-		UUID:  s.Model.UUID.String,
+	done := s.JIMM.Pubsub.Publish(model.UUID.String, jujuparams.ModelAbstract{
+		UUID:  model.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-1",
 	})
@@ -253,8 +262,8 @@ func TestWatchAllModelSummaries(t *testing.T) {
 	case <-time.After(time.Second):
 		c.Fatalf("timed out")
 	}
-	done = s.JIMM.Pubsub.Publish(s.Model3.UUID.String, jujuparams.ModelAbstract{
-		UUID:  s.Model3.UUID.String,
+	done = s.JIMM.Pubsub.Publish(model3.UUID.String, jujuparams.ModelAbstract{
+		UUID:  model3.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-3",
 	})
@@ -265,11 +274,11 @@ func TestWatchAllModelSummaries(t *testing.T) {
 	}
 
 	expectedModels := []jujuparams.ModelAbstract{{
-		UUID:  s.Model.UUID.String,
+		UUID:  model.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-1",
 	}, {
-		UUID:  s.Model3.UUID.String,
+		UUID:  model3.UUID.String,
 		Cloud: "test-cloud",
 		Name:  "test-name-3",
 	}}

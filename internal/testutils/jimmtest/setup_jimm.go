@@ -322,37 +322,41 @@ func (s *JIMMEnv) UpdateCloudCredential(c *qt.C, tag names.CloudCredentialTag, c
 	c.Assert(err, qt.Equals, nil)
 }
 
-type addModelArgs struct {
-	owner                names.UserTag
-	name                 string
-	cloud                names.CloudTag
-	region               string
-	cred                 names.CloudCredentialTag
-	targetControllerName string
+type AddModelArgs struct {
+	Owner                names.UserTag
+	Name                 string
+	Cloud                names.CloudTag
+	Region               string
+	Cred                 names.CloudCredentialTag
+	TargetControllerName string
 }
 
-func (s *JIMMEnv) AddModel(c *qt.C, args addModelArgs) names.ModelTag {
+// AddModelWithCleanup adds a model to JIMM with the given arguments and returns the model tag.
+// The model will be destroyed and removed from the database when the test finishes.
+func (s *JIMMEnv) AddModelWithCleanup(c *qt.C, args AddModelArgs) names.ModelTag {
 	ctx := context.Background()
 
-	u, err := dbmodel.NewIdentity(args.owner.Id())
+	u, err := dbmodel.NewIdentity(args.Owner.Id())
 	c.Assert(err, qt.IsNil)
 
 	err = s.JIMM.Database.GetIdentity(ctx, u)
 	c.Assert(err, qt.Equals, nil)
 	modelCreateArgs := &juju.ModelCreateArgs{
-		Name:            args.name,
-		Owner:           args.owner,
-		Cloud:           args.cloud,
-		CloudRegion:     args.region,
-		CloudCredential: args.cred,
-	}
-	if args.targetControllerName != "" {
-		modelCreateArgs.ControllerName = args.targetControllerName
+		Name:            args.Name,
+		Owner:           args.Owner,
+		Cloud:           args.Cloud,
+		CloudRegion:     args.Region,
+		CloudCredential: args.Cred,
+		ControllerName:  args.TargetControllerName,
 	}
 
 	mi, err := s.JIMM.JujuManager.AddModel(ctx, s.NewUser(u), modelCreateArgs)
-	c.Assert(err, qt.Equals, nil, qt.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", args.name, args.owner.String(), args.cloud.String(), args.region, args.cred.String(), err))
-	return names.NewModelTag(mi.UUID)
+	c.Assert(err, qt.Equals, nil, qt.Commentf("failed to add model %q for owner %q on cloud %q region %q with cred %q: %v", args.Name, args.Owner.String(), args.Cloud.String(), args.Region, args.Cred.String(), err))
+	mt := names.NewModelTag(mi.UUID)
+	c.Cleanup(func() {
+		s.DestroyModelAndDeleteFromDatabase(c, mt)
+	})
+	return mt
 }
 
 func (s *JIMMEnv) DestroyModelAndDeleteFromDatabase(c *qt.C, modelTag names.ModelTag) {

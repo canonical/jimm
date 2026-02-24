@@ -19,9 +19,10 @@ import (
 
 func TestDebugLogs(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
-	conn := s.Open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "bob", nil)
+	conn := s.Open(c, &api.Info{ModelTag: model.ResourceTag()}, "bob", nil)
 	defer conn.Close()
 	logs, err := common.StreamDebugLog(context.TODO(), conn, common.DebugLogParams{})
 	c.Assert(err, qt.IsNil)
@@ -36,9 +37,10 @@ func TestDebugLogs(t *testing.T) {
 func TestDebugLogsWithParams(t *testing.T) {
 	t.Skip("Often flaky receiving 0 messages once the logChan has closed.")
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
-	conn := s.Open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "bob", nil)
+	conn := s.Open(c, &api.Info{ModelTag: model.ResourceTag()}, "bob", nil)
 	defer conn.Close()
 
 	logChan, err := common.StreamDebugLog(context.TODO(), conn, common.DebugLogParams{
@@ -71,7 +73,8 @@ func TestDebugLogsWithParams(t *testing.T) {
 // Then, before we call the log stream, we remove the user's model access.
 func TestDebugLogsError(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	fooUser, err := dbmodel.NewIdentity("foo@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -82,11 +85,11 @@ func TestDebugLogsError(t *testing.T) {
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(fooUser.ResourceTag()),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(s.Model.ResourceTag()),
+		Target:   ofganames.ConvertTag(model.ResourceTag()),
 	}
 	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuple)
 	c.Assert(err, qt.IsNil)
-	conn := s.Open(c, &api.Info{ModelTag: s.Model.ResourceTag()}, "foo", nil)
+	conn := s.Open(c, &api.Info{ModelTag: model.ResourceTag()}, "foo", nil)
 	defer conn.Close()
 	err = s.JIMM.OpenFGAClient.RemoveRelation(ctx, tuple)
 	c.Assert(err, qt.IsNil)

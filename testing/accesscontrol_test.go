@@ -27,7 +27,7 @@ import (
 
 func TestAddGroup(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -42,7 +42,7 @@ func TestAddGroup(t *testing.T) {
 
 func TestGetGroup(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -68,7 +68,7 @@ func TestGetGroup(t *testing.T) {
 
 func TestRemoveGroup(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -90,7 +90,7 @@ func TestRemoveGroup(t *testing.T) {
 
 func TestRemoveGroupRemovesTuples(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -173,7 +173,7 @@ func TestRemoveGroupRemovesTuples(t *testing.T) {
 
 func TestRenameGroup(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -197,7 +197,7 @@ func TestRenameGroup(t *testing.T) {
 
 func TestListGroups(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 
@@ -260,7 +260,7 @@ func createTuple(object, relation, target string) openfga.Tuple {
 // group#member -> group
 func TestAddRelation(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	db := s.JIMM.Database
 
@@ -531,7 +531,7 @@ func TestAddRelation(t *testing.T) {
 // group -> applicationoffer (uuid)
 func TestRemoveRelation(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 
 	user, group, controller, model, offer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
@@ -818,7 +818,7 @@ func TestRemoveRelation(t *testing.T) {
 
 func TestListRelationshipTuples(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
@@ -884,7 +884,7 @@ func TestListRelationshipTuples(t *testing.T) {
 
 func TestListRelationshipTuplesNoUUIDResolution(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	_, _, _, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
@@ -922,7 +922,7 @@ func TestListRelationshipTuplesNoUUIDResolution(t *testing.T) {
 
 func TestListRelationshipTuplesAfterDeletingGroup(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	user, _, controller, _, applicationOffer, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
@@ -980,7 +980,7 @@ func TestListRelationshipTuplesAfterDeletingGroup(t *testing.T) {
 
 func TestListRelationshipTuplesWithMissingGroups(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	_, _, _, _, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
@@ -1021,7 +1021,7 @@ func TestListRelationshipTuplesWithMissingGroups(t *testing.T) {
 
 func TestCheckRelationAsNonAdmin(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
@@ -1051,7 +1051,7 @@ func TestCheckRelationAsNonAdmin(t *testing.T) {
 
 func TestCheckRelationOfferReaderFlow(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -1124,7 +1124,7 @@ func TestCheckRelationOfferReaderFlow(t *testing.T) {
 
 func TestCheckRelationOfferConsumerFlow(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -1195,7 +1195,7 @@ func TestCheckRelationOfferConsumerFlow(t *testing.T) {
 
 func TestCheckRelationModelReaderFlow(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -1268,7 +1268,7 @@ func TestCheckRelationModelReaderFlow(t *testing.T) {
 
 func TestCheckRelationModelWriterFlow(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -1339,7 +1339,7 @@ func TestCheckRelationModelWriterFlow(t *testing.T) {
 
 func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	ctx := context.Background()
 	ofgaClient := s.JIMM.OpenFGAClient
 
@@ -1497,7 +1497,7 @@ func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
 //
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
-func createTestControllerEnvironment(c *qt.C, s jimmtest.WebsocketEnv) (
+func createTestControllerEnvironment(c *qt.C, s jimmtest.JimmWithControllers) (
 	dbmodel.Identity,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,

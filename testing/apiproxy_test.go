@@ -23,10 +23,11 @@ import (
 
 func TestConnectToModel(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: true,
 	}, "test", nil)
 	defer conn.Close()
@@ -40,17 +41,18 @@ func TestConnectToModel(t *testing.T) {
 // the user would be prompted with a login URL and fake the user login via the `EnableDeviceFlow` method.
 func TestSessionTokenLoginProvider(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	ctx := context.Background()
 	alice := names.NewUserTag("alice@canonical.com")
 	aliceUser := openfga.NewUser(&dbmodel.Identity{Name: alice.Id()}, s.JIMM.OpenFGAClient)
-	err := aliceUser.SetControllerAccess(ctx, s.Model.Controller.ResourceTag(), ofganames.AdministratorRelation)
+	err := aliceUser.SetControllerAccess(ctx, model.Controller.ResourceTag(), ofganames.AdministratorRelation)
 	c.Assert(err, qt.IsNil)
 	var output bytes.Buffer
 	s.EnableDeviceFlow(aliceUser.Name)
 	conn, err := s.OpenCustomLoginProvider(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
 	}, "alice", api.NewSessionTokenLoginProvider("", &output, func(s string) {}))
 	c.Assert(err, qt.IsNil)
@@ -65,14 +67,15 @@ func TestSessionTokenLoginProvider(t *testing.T) {
 // for opening the connection because we want to test authenticating as an agent.
 func TestAgentLoginReturnsRedirect(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	u, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, qt.Equals, nil)
 
 	info := api.Info{
 		Tag:      names.NewUnitTag("ubuntu/1"),
-		ModelTag: s.Model.ResourceTag(),
+		ModelTag: model.ResourceTag(),
 		Addrs:    []string{u.Host},
 	}
 	dialOpts := api.DialOpts{
@@ -91,7 +94,7 @@ func TestAgentLoginReturnsRedirect(t *testing.T) {
 
 func TestAgentLoginModelDoesNotExist(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	u, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, qt.Equals, nil)
@@ -115,10 +118,11 @@ func (l logger) Errorf(string, ...interface{}) {}
 
 func TestProxyModelStatus(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
 	}, "alice@canonical.com", nil)
 	defer conn.Close()
@@ -126,18 +130,19 @@ func TestProxyModelStatus(t *testing.T) {
 	status, err := jujuClient.Status(nil)
 	c.Check(err, qt.IsNil)
 	c.Check(status, qt.Not(qt.IsNil))
-	c.Check(status.Model.Name, qt.Equals, s.Model.Name)
+	c.Check(status.Model.Name, qt.Equals, model.Name)
 }
 
 func TestProxyModelStatusWithoutPermission(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	fooUser := openfga.NewUser(&dbmodel.Identity{Name: "foo@canonical.com"}, s.JIMM.OpenFGAClient)
 	var output bytes.Buffer
 	s.EnableDeviceFlow(fooUser.Name)
 	conn, err := s.OpenCustomLoginProvider(c, &api.Info{
-		ModelTag:  s.Model.ResourceTag(),
+		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
 	}, "foo", api.NewSessionTokenLoginProvider("", &output, func(s string) {}))
 	c.Check(err, qt.ErrorMatches, "permission denied .*")

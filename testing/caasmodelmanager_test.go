@@ -20,16 +20,16 @@ import (
 
 // caasModelManagerSuite requires additional setup, described in README.md#Setup microk8s cloud
 type caasModelManagerDeps struct {
-	jimmtest.WebsocketEnv
+	jimmtest.JimmWithControllers
 
 	cred      names.CloudCredentialTag
 	cloudName string
 }
 
 func SetupCaasModelTest(c *qt.C) caasModelManagerDeps {
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 	deps := caasModelManagerDeps{
-		WebsocketEnv: s,
+		JimmWithControllers: s,
 	}
 
 	conn := s.Open(c, nil, "bob@canonical.com", nil)
@@ -150,6 +150,8 @@ func TestListCAASModelSummaries(t *testing.T) {
 func TestListCAASModels(t *testing.T) {
 	c := qt.New(t)
 	s := SetupCaasModelTest(c)
+	model := s.CreateModelForBob(c)
+	model3 := s.CreateModelForCharlieWithBobReadAccess(c)
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 
@@ -180,14 +182,14 @@ func TestListCAASModels(t *testing.T) {
 				Owner: "bob@canonical.com",
 				Type:  "caas",
 			}, {
-				Name:  s.Model.Name,
-				UUID:  s.Model.UUID.String,
+				Name:  model.Name,
+				UUID:  model.UUID.String,
 				Owner: "bob@canonical.com",
 				Type:  "iaas",
 			},
 			{
-				Name:  s.Model3.Name,
-				UUID:  s.Model3.UUID.String,
+				Name:  model3.Name,
+				UUID:  model3.UUID.String,
 				Owner: "charlie@canonical.com",
 				Type:  "iaas",
 			},

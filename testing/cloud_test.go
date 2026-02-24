@@ -23,7 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func addCloud(c *qt.C, s jimmtest.WebsocketEnv, username string, cloud cloud.Cloud, force, cleanup bool) {
+func addCloud(c *qt.C, s jimmtest.JimmWithControllers, username string, cloud cloud.Cloud, force, cleanup bool) {
 	conn := s.Open(c, nil, username, nil)
 	defer conn.Close()
 
@@ -39,7 +39,7 @@ func addCloud(c *qt.C, s jimmtest.WebsocketEnv, username string, cloud cloud.Clo
 
 func TestCloudCall(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -57,7 +57,7 @@ func TestCloudCall(t *testing.T) {
 
 func TestClouds(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -78,7 +78,7 @@ func TestClouds(t *testing.T) {
 
 func TestUserCredentials(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
@@ -91,7 +91,7 @@ func TestUserCredentials(t *testing.T) {
 
 func TestUserCredentialsWithDomain(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cct := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/test@domain/cred1")
 	s.UpdateCloudCredential(c, cct, jujuparams.CloudCredential{
@@ -112,7 +112,7 @@ func TestUserCredentialsWithDomain(t *testing.T) {
 
 func TestUserCredentialsErrors(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -131,7 +131,7 @@ func TestUserCredentialsErrors(t *testing.T) {
 
 func TestUpdateCloudCredentials(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -160,7 +160,7 @@ func TestUpdateCloudCredentials(t *testing.T) {
 
 func TestUpdateCloudCredentialsErrors(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -202,30 +202,23 @@ func TestUpdateCloudCredentialsErrors(t *testing.T) {
 
 func TestUpdateCloudCredentialsForce(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	s.AddAdminUser(c, "test@canonical.com")
-	conn := s.Open(c, nil, "test", nil)
+	conn := s.Open(c, nil, "bob", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credentialName := petname.Generate(2, "-")
-	credentialTag := names.NewCloudCredentialTag(fmt.Sprintf("%s/test@canonical.com/%s", jimmtest.TestE2ECloudName, credentialName))
+
 	existingCloudCred := s.GetExistingClientCredentialsForCloud(c, jimmtest.TestE2ECloudName)
-	_, err := client.UpdateCredentialsCheckModels(credentialTag,
+	_, err := client.UpdateCredentialsCheckModels(s.BobCredential.ResourceTag(),
 		cloud.NewCredential("certificate", existingCloudCred.Attributes),
 	)
 	c.Assert(err, qt.Equals, nil)
 
-	modelName := petname.Generate(2, "-")
-	s.AddModel(c, names.NewUserTag("test@canonical.com"),
-		modelName,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		credentialTag)
+	s.CreateModelForBob(c)
 
 	args := jujuparams.UpdateCredentialArgs{
 		Credentials: []jujuparams.TaggedCredential{{
-			Tag: credentialTag.String(),
+			Tag: s.BobCredential.ResourceTag().String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType: "badauthtype",
 				Attributes: map[string]string{
@@ -242,7 +235,7 @@ func TestUpdateCloudCredentialsForce(t *testing.T) {
 	c.Assert(resp.Results[0].Error, qt.ErrorMatches, `some models are no longer visible`)
 
 	// Check that the credentials have not been updated.
-	creds, err := client.Credentials(credentialTag)
+	creds, err := client.Credentials(s.BobCredential.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(creds, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
 		Result: &jujuparams.CloudCredential{
@@ -254,10 +247,10 @@ func TestUpdateCloudCredentialsForce(t *testing.T) {
 	args.Force = true
 	err = conn.APICall("Cloud", 7, "", "UpdateCredentialsCheckModels", args, &resp)
 	c.Assert(err, qt.Equals, nil)
-	c.Check(resp.Results[0].Error, qt.ErrorMatches, `updating cloud credentials: validating credential "`+jimmtest.TestE2ECloudName+`/test@canonical.com/`+credentialName+`" for cloud "`+jimmtest.TestE2ECloudName+`": supported auth-types \["certificate"\], "badauthtype" not supported`)
+	c.Check(resp.Results[0].Error, qt.ErrorMatches, `updating cloud credentials: validating credential "`+s.BobCredential.ResourceTag().Id()+`" for cloud "`+jimmtest.TestE2ECloudName+`": supported auth-types \["certificate"\], "badauthtype" not supported`)
 	// Check that the credentials have been updated even though
 	// we got an error.
-	creds, err = client.Credentials(credentialTag)
+	creds, err = client.Credentials(s.BobCredential.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 	sort.Strings(creds[0].Result.Redacted)
 	c.Assert(creds, qt.DeepEquals, []jujuparams.CloudCredentialResult{{
@@ -270,38 +263,20 @@ func TestUpdateCloudCredentialsForce(t *testing.T) {
 
 func TestCheckCredentialsModels(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	s.AddAdminUser(c, "test@canonical.com")
-	conn := s.Open(c, nil, "test", nil)
+	model1 := s.CreateModelForBob(c)
+	model2 := s.CreateModelForBob(c)
+
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
-	credentialName := petname.Generate(2, "-")
-	credTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/test@canonical.com/" + credentialName)
+
 	existingCloudCred := s.GetExistingClientCredentialsForCloud(c, jimmtest.TestE2ECloudName)
-	cred1 := cloud.NewCredential("certificate", existingCloudCred.Attributes)
-
-	client := cloudapi.NewClient(conn)
-	_, err := client.UpdateCredentialsCheckModels(credTag, cred1)
-	c.Assert(err, qt.Equals, nil)
-
-	model1Name := petname.Generate(2, "-")
-	model1 := s.AddModel(c, names.NewUserTag("test@canonical.com"),
-		model1Name,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		credTag)
-
-	model2Name := petname.Generate(2, "-")
-	model2 := s.AddModel(c, names.NewUserTag("test@canonical.com"),
-		model2Name,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		credTag)
 
 	var resp jujuparams.UpdateCredentialResults
-	err = conn.APICall("Cloud", 7, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
+	err := conn.APICall("Cloud", 7, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{{
-			Tag: credTag.String(),
+			Tag: s.BobCredential.ResourceTag().String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType:   "certificate",
 				Attributes: existingCloudCred.Attributes,
@@ -310,11 +285,11 @@ func TestCheckCredentialsModels(t *testing.T) {
 	}, &resp)
 	c.Assert(err, qt.Equals, nil)
 	modelResults := []jujuparams.UpdateCredentialModelResult{{
-		ModelUUID: model1.Id(),
-		ModelName: model1Name,
+		ModelUUID: model1.UUID.String,
+		ModelName: model1.Name,
 	}, {
-		ModelUUID: model2.Id(),
-		ModelName: model2Name,
+		ModelUUID: model2.UUID.String,
+		ModelName: model2.Name,
 	}}
 	sort.Slice(modelResults, func(i, j int) bool {
 		return modelResults[i].ModelUUID < modelResults[j].ModelUUID
@@ -324,7 +299,7 @@ func TestCheckCredentialsModels(t *testing.T) {
 	})
 	c.Assert(resp, qt.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
-			CredentialTag: credTag.String(),
+			CredentialTag: s.BobCredential.ResourceTag().String(),
 			Models:        modelResults,
 		}},
 	})
@@ -332,32 +307,24 @@ func TestCheckCredentialsModels(t *testing.T) {
 
 func TestCheckCredentialsModelsInvalidCreds(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	s.AddAdminUser(c, "test@canonical.com")
-	conn := s.Open(c, nil, "test", nil)
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
-	credentialName := petname.Generate(2, "-")
-	credTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/test@canonical.com/" + credentialName)
+
 	existingCloudCred := s.GetExistingClientCredentialsForCloud(c, jimmtest.TestE2ECloudName)
 	cred1 := cloud.NewCredential("certificate", existingCloudCred.Attributes)
 
 	client := cloudapi.NewClient(conn)
-	_, err := client.UpdateCredentialsCheckModels(credTag, cred1)
+	_, err := client.UpdateCredentialsCheckModels(s.BobCredential.ResourceTag(), cred1)
 	c.Assert(err, qt.Equals, nil)
 
-	model1Name := petname.Generate(2, "-")
-	model1 := s.AddModel(c, names.NewUserTag("test@canonical.com"),
-		model1Name,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		credTag)
-	c.Assert(err, qt.Equals, nil)
+	model1 := s.CreateModelForBob(c)
 
 	var resp jujuparams.UpdateCredentialResults
 	err = conn.APICall("Cloud", 7, "", "CheckCredentialsModels", jujuparams.TaggedCredentials{
 		Credentials: []jujuparams.TaggedCredential{{
-			Tag: credTag.String(),
+			Tag: s.BobCredential.ResourceTag().String(),
 			Credential: jujuparams.CloudCredential{
 				AuthType: "unknowntype",
 				Attributes: map[string]string{
@@ -369,14 +336,14 @@ func TestCheckCredentialsModelsInvalidCreds(t *testing.T) {
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(resp, qt.DeepEquals, jujuparams.UpdateCredentialResults{
 		Results: []jujuparams.UpdateCredentialResult{{
-			CredentialTag: "cloudcred-" + jimmtest.TestE2ECloudName + "_test@canonical.com_" + credentialName,
+			CredentialTag: s.BobCredential.ResourceTag().String(),
 			Error:         &jujuparams.Error{Message: "some models are no longer visible"},
 			Models: []jujuparams.UpdateCredentialModelResult{{
-				ModelUUID: model1.Id(),
-				ModelName: model1Name,
+				ModelUUID: model1.UUID.String,
+				ModelName: model1.Name,
 				Errors: []jujuparams.ErrorResult{{
 					Error: &jujuparams.Error{
-						Message: `validating credential "` + jimmtest.TestE2ECloudName + `/test@canonical.com/` + credentialName + `" for cloud "` + jimmtest.TestE2ECloudName + `": supported auth-types ["certificate"], "unknowntype" not supported`,
+						Message: `validating credential "` + s.BobCredential.ResourceTag().Id() + `" for cloud "` + jimmtest.TestE2ECloudName + `": supported auth-types ["certificate"], "unknowntype" not supported`,
 						Code:    "not supported",
 					},
 				}},
@@ -387,7 +354,7 @@ func TestCheckCredentialsModelsInvalidCreds(t *testing.T) {
 
 func TestCredential(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -453,7 +420,7 @@ func TestCredential(t *testing.T) {
 
 func TestRevokeCredential(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -498,7 +465,7 @@ func TestRevokeCredential(t *testing.T) {
 
 func TestAddCloud(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cloudName := petname.Generate(2, "-")
 	addCloud(c, s, "test", cloud.Cloud{
@@ -531,7 +498,7 @@ func TestAddCloud(t *testing.T) {
 
 func TestRevokeCredentialsCheckModels(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	s.AddAdminUser(c, "test@canonical.com")
 	conn := s.Open(c, nil, "test", nil)
@@ -614,7 +581,7 @@ func TestRevokeCredentialsCheckModels(t *testing.T) {
 
 func TestAddCloudError(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -633,7 +600,7 @@ func TestAddCloudError(t *testing.T) {
 
 func TestAddCloudNoHostCloudRegion(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -652,7 +619,7 @@ func TestAddCloudNoHostCloudRegion(t *testing.T) {
 
 func TestAddCloudBadName(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -670,7 +637,7 @@ func TestAddCloudBadName(t *testing.T) {
 
 func TestAddCredential(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -732,52 +699,41 @@ func TestAddCredential(t *testing.T) {
 
 func TestCredentialContents(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
-	s.AddAdminUser(c, "test@canonical.com")
-	conn := s.Open(c, nil, "test", nil)
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
 	client := cloudapi.NewClient(conn)
-	credentialName := petname.Generate(2, "-")
-	credentialTag := names.NewCloudCredentialTag(jimmtest.TestE2ECloudName + "/test@canonical.com/" + credentialName)
+
 	existingCloudCred := s.GetExistingClientCredentialsForCloud(c, jimmtest.TestE2ECloudName)
 	cred1 := cloud.NewCredential("certificate", existingCloudCred.Attributes)
-	err := client.AddCredential(
-		credentialTag.String(),
-		cred1,
-	)
-	c.Assert(err, qt.Equals, nil)
-	creds, err := client.CredentialContents(jimmtest.TestE2ECloudName, credentialName, false)
+
+	creds, err := client.CredentialContents(jimmtest.TestE2ECloudName, s.BobCredential.Name, false)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
-				Name:     credentialName,
+				Name:     s.BobCredential.Name,
 				Cloud:    jimmtest.TestE2ECloudName,
 				AuthType: "certificate",
 			},
 		},
 	}})
 
-	modelName := petname.Generate(2, "-")
-	s.AddModel(c, names.NewUserTag("test@canonical.com"),
-		modelName,
-		names.NewCloudTag(jimmtest.TestE2ECloudName),
-		jimmtest.TestE2ECloudRegionName,
-		credentialTag)
+	model := s.CreateModelForBob(c)
 
-	creds, err = client.CredentialContents(jimmtest.TestE2ECloudName, credentialName, true)
+	creds, err = client.CredentialContents(jimmtest.TestE2ECloudName, s.BobCredential.Name, true)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
-				Name:       credentialName,
+				Name:       s.BobCredential.Name,
 				Cloud:      jimmtest.TestE2ECloudName,
 				AuthType:   "certificate",
 				Attributes: cred1.Attributes(),
 			},
 			Models: []jujuparams.ModelAccess{{
-				Model:  modelName,
+				Model:  model.Name,
 				Access: "admin",
 			}},
 		},
@@ -789,13 +745,13 @@ func TestCredentialContents(t *testing.T) {
 	c.Assert(creds, qt.DeepEquals, []jujuparams.CredentialContentResult{{
 		Result: &jujuparams.ControllerCredentialInfo{
 			Content: jujuparams.CredentialContent{
-				Name:       credentialName,
+				Name:       s.BobCredential.Name,
 				Cloud:      jimmtest.TestE2ECloudName,
 				AuthType:   "certificate",
 				Attributes: cred1.Attributes(),
 			},
 			Models: []jujuparams.ModelAccess{{
-				Model:  modelName,
+				Model:  model.Name,
 				Access: "admin",
 			}},
 		},
@@ -805,7 +761,7 @@ func TestCredentialContents(t *testing.T) {
 
 func TestCredentialContentsWithEmptyAttributes(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -836,7 +792,7 @@ func TestCredentialContentsWithEmptyAttributes(t *testing.T) {
 
 func TestRemoveCloud(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cloudName := petname.Generate(2, "-")
 	addCloud(c, s, "test", cloud.Cloud{
@@ -875,7 +831,7 @@ func TestRemoveCloud(t *testing.T) {
 
 func TestRemoveCloudNotFound(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -888,7 +844,7 @@ func TestRemoveCloudNotFound(t *testing.T) {
 
 func TestModifyCloudAccess(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cloudName := petname.Generate(2, "-")
 	addCloud(c, s, "test", cloud.Cloud{
@@ -936,7 +892,7 @@ func TestModifyCloudAccess(t *testing.T) {
 
 func TestModifyCloudAccessUnauthorized(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cloudName := petname.Generate(2, "-")
 	addCloud(c, s, "test", cloud.Cloud{
@@ -967,7 +923,7 @@ func TestModifyCloudAccessUnauthorized(t *testing.T) {
 
 func TestUpdateCloud(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "test", nil)
 	defer conn.Close()
@@ -985,7 +941,7 @@ func TestUpdateCloud(t *testing.T) {
 
 func TestCloudInfo(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cloudName := petname.Generate(2, "-")
 	addCloud(c, s, "alice", cloud.Cloud{
@@ -1050,7 +1006,7 @@ func TestCloudInfo(t *testing.T) {
 
 func TestListCloudInfo(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	cloudName := petname.Generate(2, "-")
 	addCloud(c, s, "alice", cloud.Cloud{

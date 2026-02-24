@@ -17,14 +17,14 @@ import (
 
 func TestModelCommandsModelNotFoundf(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
-
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 	serverURL, err := url.Parse(s.HTTP.URL)
 	c.Assert(err, qt.Equals, nil)
 	u := url.URL{
 		Scheme: "wss",
 		Host:   serverURL.Host,
-		Path:   fmt.Sprintf("/models/%s/commands", s.Model.UUID.String),
+		Path:   fmt.Sprintf("/models/%s/commands", model.UUID.String),
 	}
 	dial := websocket.DefaultDialer
 	dial.TLSClientConfig = &tls.Config{

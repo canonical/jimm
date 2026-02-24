@@ -18,7 +18,7 @@ import (
 
 func TestDial(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	name, config := s.GetOneControllerConfig(c)
 	ctl := dbmodel.Controller{
@@ -47,14 +47,15 @@ func TestDial(t *testing.T) {
 
 func TestDialWithJWT(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	ctx := context.Background()
 
-	config := s.GetControllerConfig(c, s.Model.Controller.Name)
+	config := s.GetControllerConfig(c, model.Controller.Name)
 	ctl := dbmodel.Controller{
 		UUID:          config.UUID,
-		Name:          s.Model.Controller.Name,
+		Name:          model.Controller.Name,
 		CACertificate: config.CACert,
 		PublicAddress: config.Addrs[0],
 		TLSHostname:   "juju-apiserver",
@@ -86,18 +87,19 @@ func TestDialWithJWT(t *testing.T) {
 // on a Juju controller, and that invalid endpoints return errors.
 func TestConnectStreams(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
-	config := s.GetControllerConfig(c, s.Model.Controller.Name)
+	config := s.GetControllerConfig(c, model.Controller.Name)
 	ctl := dbmodel.Controller{
 		UUID:          config.UUID,
-		Name:          s.Model.Controller.Name,
+		Name:          model.Controller.Name,
 		CACertificate: config.CACert,
 		PublicAddress: config.Addrs[0],
 		TLSHostname:   "juju-apiserver",
 	}
 
-	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, s.Model.ResourceTag(), nil, nil)
+	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, model.ResourceTag(), nil, nil)
 	c.Assert(err, qt.Equals, nil)
 	defer api.Close()
 

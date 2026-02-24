@@ -15,7 +15,7 @@ import (
 
 func TestAddUser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -27,7 +27,7 @@ func TestAddUser(t *testing.T) {
 
 func TestRemoveUser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -39,7 +39,7 @@ func TestRemoveUser(t *testing.T) {
 
 func TestEnableUser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -51,7 +51,7 @@ func TestEnableUser(t *testing.T) {
 
 func TestDisableUser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -63,7 +63,7 @@ func TestDisableUser(t *testing.T) {
 
 func TestUserInfoAllUsers(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -76,7 +76,7 @@ func TestUserInfoAllUsers(t *testing.T) {
 
 func TestUserInfoSpecifiedUser(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -97,7 +97,7 @@ func TestUserInfoSpecifiedUser(t *testing.T) {
 
 func TestUserInfoSpecifiedUsers(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -110,7 +110,7 @@ func TestUserInfoSpecifiedUsers(t *testing.T) {
 
 func TestUserInfoWithDomain(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice@mydomain", nil)
 	defer conn.Close()
@@ -131,7 +131,7 @@ func TestUserInfoWithDomain(t *testing.T) {
 
 func TestUserInfoInvalidUsername(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -144,7 +144,7 @@ func TestUserInfoInvalidUsername(t *testing.T) {
 
 func TestUserInfoLocalUsername(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -157,7 +157,7 @@ func TestUserInfoLocalUsername(t *testing.T) {
 
 func TestSetPassword(t *testing.T) {
 	c := qt.New(t)
-	s := jimmtest.SetupWebsocketEnv(c)
+	s := jimmtest.SetupJimmWithControllers(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
