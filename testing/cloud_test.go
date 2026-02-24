@@ -23,7 +23,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func addCloud(c *qt.C, s jimmtest.WebsocketE2ESuite, username string, cloud cloud.Cloud, force, cleanup bool) {
+func addCloud(c *qt.C, s jimmtest.WebsocketEnv, username string, cloud cloud.Cloud, force, cleanup bool) {
 	conn := s.Open(c, nil, username, nil)
 	defer conn.Close()
 

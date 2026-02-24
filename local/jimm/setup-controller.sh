@@ -40,5 +40,5 @@ if [[ -n "${AGENT_VERSION:-}" ]]; then
 fi
 
 echo "Bootstrapping controller"
-JUJU_DEV_FEATURE_FLAGS=ssh-jump /snap/juju/current/bin/juju bootstrap "${BOOTSTRAP_ARGS[@]}"
+JUJU_DEV_FEATURE_FLAGS=ssh-jump juju bootstrap "${BOOTSTRAP_ARGS[@]}"
 rm "$CLOUDINIT_FILE"

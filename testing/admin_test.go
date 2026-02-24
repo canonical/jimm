@@ -84,7 +84,7 @@ func TestBrowserLoginWithUnsafeEmail(t *testing.T) {
 	)
 }
 
-func testBrowserLogin(c *qt.C, s jimmtest.WebsocketE2ESuite, username, password, expectedEmail, expectedDisplayName string) {
+func testBrowserLogin(c *qt.C, s jimmtest.WebsocketEnv, username, password, expectedEmail, expectedDisplayName string) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
 	sqldb, err := s.JIMM.Database.DB.DB()

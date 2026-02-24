@@ -131,10 +131,10 @@ func (info *ControllerInfo) ToAPIInfo() *api.Info {
 	}
 }
 
-// WebsocketE2ESuite is a suite that initialises a JIMM with
+// WebsocketEnv is a suite that initialises a JIMM with
 // externally bootstrapped controller(s), and provides
 // methods to open websocket connections to the JIMM API.
-type WebsocketE2ESuite struct {
+type WebsocketEnv struct {
 	JimmWithControllers
 
 	Params jujuapi.Params
@@ -152,10 +152,10 @@ type LoginDetails struct {
 	DialWebsocket func(ctx context.Context, urlStr string, tlsConfig *tls.Config, ipAddr string) (jsoncodec.JSONConn, error)
 }
 
-func SetupWebsocketEnv(c *qt.C, opts ...SetupOption) WebsocketE2ESuite {
+func SetupWebsocketEnv(c *qt.C, opts ...SetupOption) WebsocketEnv {
 	jimmWithControllers := SetupJimmWithControllers(c, opts...)
 	jimmEnv := jimmWithControllers.JIMMEnv
-	s := WebsocketE2ESuite{
+	s := WebsocketEnv{
 		JimmWithControllers: jimmWithControllers,
 	}
 	ctx := c.Context()
@@ -197,7 +197,7 @@ func SetupWebsocketEnv(c *qt.C, opts ...SetupOption) WebsocketE2ESuite {
 	return s
 }
 
-func (s *WebsocketE2ESuite) OpenCustomLoginProvider(c *qt.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
+func (s *WebsocketEnv) OpenCustomLoginProvider(c *qt.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
 	ld := LoginDetails{Info: info, Username: username, Lp: lp}
 	return s.OpenNoAssert(c, ld, nil)
 }
@@ -209,7 +209,7 @@ type DeployApplicationParams struct {
 }
 
 // DeployApplication deploys a charm in the specified model as the given user.
-func (s *WebsocketE2ESuite) DeployApplication(c *qt.C, user *openfga.User, modelTag names.Tag, params DeployApplicationParams) {
+func (s *WebsocketEnv) DeployApplication(c *qt.C, user *openfga.User, modelTag names.Tag, params DeployApplicationParams) {
 	modelTagConv, ok := modelTag.(names.ModelTag)
 	c.Assert(ok, qt.Equals, true)
 
@@ -237,7 +237,7 @@ func (s *WebsocketE2ESuite) DeployApplication(c *qt.C, user *openfga.User, model
 // OpenNoAssert creates a new websocket connection to the test server, using the
 // connection info specified in info, authenticating as the given user.
 // If info is nil then default values will be used.
-func (s *WebsocketE2ESuite) OpenNoAssert(c *qt.C, d LoginDetails, modelTag *names.ModelTag) (api.Connection, error) {
+func (s *WebsocketEnv) OpenNoAssert(c *qt.C, d LoginDetails, modelTag *names.ModelTag) (api.Connection, error) {
 	var inf api.Info
 	if d.Info != nil {
 		inf = *d.Info
@@ -274,14 +274,14 @@ func (s *WebsocketE2ESuite) OpenNoAssert(c *qt.C, d LoginDetails, modelTag *name
 	return api.Open(&inf, dialOpts)
 }
 
-func (s *WebsocketE2ESuite) Open(c *qt.C, info *api.Info, username string, modelTag *names.ModelTag) api.Connection {
+func (s *WebsocketEnv) Open(c *qt.C, info *api.Info, username string, modelTag *names.ModelTag) api.Connection {
 	ld := LoginDetails{Info: info, Username: username}
 	conn, err := s.OpenNoAssert(c, ld, modelTag)
 	c.Assert(err, qt.Equals, nil)
 	return conn
 }
 
-func (s *WebsocketE2ESuite) OpenWithDialWebsocket(
+func (s *WebsocketEnv) OpenWithDialWebsocket(
 	c *qt.C,
 	info *api.Info,
 	username string,
@@ -293,7 +293,7 @@ func (s *WebsocketE2ESuite) OpenWithDialWebsocket(
 	return conn
 }
 
-// JimmWithControllers is a environemnt that initialises a JIMM svc
+// JimmWithControllers is a environment that initialises a JIMM svc
 // with externally bootstrapped controller(s).
 // It also creates cloud credential, and creates a model.
 type JimmWithControllers struct {
@@ -305,7 +305,6 @@ type JimmWithControllers struct {
 
 func SetupJimmWithControllers(c *qt.C, opts ...SetupOption) JimmWithControllers {
 	jimmEnv := SetupJimmEnv(c, append([]SetupOption{WithHardcodedJWKS()}, opts...)...)
-	// SetupTestLogger(c)
 	s := JimmWithControllers{
 		JIMMEnv: jimmEnv,
 	}

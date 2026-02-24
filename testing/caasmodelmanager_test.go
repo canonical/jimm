@@ -20,7 +20,7 @@ import (
 
 // caasModelManagerSuite requires additional setup, described in README.md#Setup microk8s cloud
 type caasModelManagerDeps struct {
-	jimmtest.WebsocketE2ESuite
+	jimmtest.WebsocketEnv
 
 	cred      names.CloudCredentialTag
 	cloudName string
@@ -29,7 +29,7 @@ type caasModelManagerDeps struct {
 func SetupCaasModelTest(c *qt.C) caasModelManagerDeps {
 	s := jimmtest.SetupWebsocketEnv(c)
 	deps := caasModelManagerDeps{
-		WebsocketE2ESuite: s,
+		WebsocketEnv: s,
 	}
 
 	conn := s.Open(c, nil, "bob@canonical.com", nil)

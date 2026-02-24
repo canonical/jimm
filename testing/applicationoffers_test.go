@@ -19,7 +19,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func SetupAppOfferTest(c *qt.C) jimmtest.WebsocketE2ESuite {
+func SetupAppOfferTest(c *qt.C) jimmtest.WebsocketEnv {
 	s := jimmtest.SetupWebsocketEnv(c)
 
 	// App will be cleaned up when the model is destroyed.

@@ -1497,7 +1497,7 @@ func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
 //
 // TODO(ale8k): Make this an implicit thing on the JIMM suite per test & refactor the current state.
 // and make the suite argument an interface of the required calls we use here.
-func createTestControllerEnvironment(c *qt.C, s jimmtest.WebsocketE2ESuite) (
+func createTestControllerEnvironment(c *qt.C, s jimmtest.WebsocketEnv) (
 	dbmodel.Identity,
 	dbmodel.GroupEntry,
 	dbmodel.Controller,
