@@ -21,8 +21,6 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/auth"
@@ -34,7 +32,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
-	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/river"
@@ -74,7 +71,10 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 	s.OFGAClient, s.COFGAClient, _, err = SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)
 
-	dsn := testdb.CreateEmptyDatabase(c)
+	database := &db.Database{DB: testdb.PostgresDB(c, time.Now)}
+	c.Cleanup(func() {
+		database.Close()
+	})
 
 	params := jimmsvc.Params{
 		ControllerUUID:                ControllerUUID,
@@ -87,16 +87,6 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		BootstrapLoginTokenRefreshURL: "https://jimm.localhost/.well-known/jwks.json",
 		DashboardFinalRedirectURL:     "localhost", // Can be any URL.
 	}
-
-	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.NewGormTestLogger(c)})
-	c.Assert(err, qt.IsNil)
-	sqlDB, err := gormDB.DB()
-	c.Assert(err, qt.IsNil)
-	c.Cleanup(func() {
-		err := sqlDB.Close()
-		c.Check(err, qt.IsNil)
-	})
-	database := &db.Database{DB: gormDB}
 
 	riverClient, err := river.NewRiverClient(database)
 	c.Assert(err, qt.IsNil)

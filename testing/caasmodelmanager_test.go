@@ -52,20 +52,15 @@ func SetupCaasModelTest(c *qt.C) caasModelManagerDeps {
 	deps.cred = names.NewCloudCredentialTag(deps.cloudName + "/bob@canonical.com/" + credentialName)
 	s.UpdateCloudCredential(c, deps.cred, credential)
 
-	return deps
-}
+	c.Cleanup(func() {
+		conn := s.Open(c, nil, "bob@canonical.com", nil)
+		defer conn.Close()
+		cloudclient := cloudapi.NewClient(conn)
+		err := cloudclient.RemoveCloud(deps.cloudName)
+		c.Check(err, qt.Equals, nil)
+	})
 
-func TearDownTest(t *testing.T) {
-	c := qt.New(t)
-	s := SetupCaasModelTest(c)
-	if s.modelUUID != "" {
-		s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(s.modelUUID))
-	}
-	conn := s.Open(c, nil, "bob@canonical.com", nil)
-	defer conn.Close()
-	cloudclient := cloudapi.NewClient(conn)
-	err := cloudclient.RemoveCloud(s.cloudName)
-	c.Assert(err, qt.Equals, nil)
+	return deps
 }
 
 func TestCreateModelKubernetes(t *testing.T) {
