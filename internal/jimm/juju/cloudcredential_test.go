@@ -1786,6 +1786,16 @@ func (s testCloudCredentialAttributeStore) PutOAuthSecret(ctx context.Context, r
 	return errors.E(errors.CodeNotImplemented)
 }
 
+// GetKeyMetadata retrieves the key metadata for rotation tracking.
+func (s testCloudCredentialAttributeStore) GetKeyMetadata(ctx context.Context) (vault.KeyMetadata, error) {
+	return vault.KeyMetadata{}, errors.E(errors.CodeNotImplemented)
+}
+
+// PutKeyMetadata stores the key metadata for rotation tracking.
+func (s testCloudCredentialAttributeStore) PutKeyMetadata(ctx context.Context, metadata vault.KeyMetadata) error {
+	return errors.E(errors.CodeNotImplemented)
+}
+
 func TestCopyCredential(t *testing.T) {
 	c := qt.New(t)
 

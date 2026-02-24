@@ -15,6 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 const (
@@ -27,6 +28,7 @@ const (
 	jwksPublicKeyTag  = "jwksPublicKey"
 	jwksPrivateKeyTag = "jwksPrivateKey"
 	jwksExpiryTag     = "jwksExpiry"
+	jwksMetadataTag   = "jwksKeyMetadata"
 	oauthKind         = "oauth"
 	oauthKeyTag       = "oauthKey"
 	//nolint:gosec // Thinks credentials hardcoded.
@@ -404,4 +406,53 @@ func (d *Database) CleanupOAuthSecrets(ctx context.Context) (err error) {
 		return errors.E(fmt.Errorf("failed to cleanup OAuth session store secret: %w", err))
 	}
 	return nil
+}
+
+// GetKeyMetadata retrieves the key metadata for rotation tracking.
+func (d *Database) GetKeyMetadata(ctx context.Context) (_ vault.KeyMetadata, err error) {
+	const op = "database.GetKeyMetadata"
+
+	if err := d.ready(); err != nil {
+		return vault.KeyMetadata{}, errors.E(err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	secret := dbmodel.NewSecret(jwksKind, jwksMetadataTag, nil)
+	if err := d.GetSecret(ctx, &secret); err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return vault.KeyMetadata{}, nil
+		}
+		return vault.KeyMetadata{}, errors.E(fmt.Errorf("failed to get key metadata: %w", err))
+	}
+
+	var metadata vault.KeyMetadata
+	if err := json.Unmarshal(secret.Data, &metadata); err != nil {
+		return vault.KeyMetadata{}, errors.E(fmt.Errorf("failed to unmarshal key metadata: %w", err))
+	}
+
+	return metadata, nil
+}
+
+// PutKeyMetadata stores the key metadata for rotation tracking.
+func (d *Database) PutKeyMetadata(ctx context.Context, metadata vault.KeyMetadata) (err error) {
+	const op = "database.PutKeyMetadata"
+
+	if err := d.ready(); err != nil {
+		return errors.E(err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return errors.E(fmt.Errorf("failed to marshal key metadata: %w", err))
+	}
+
+	secret := dbmodel.NewSecret(jwksKind, jwksMetadataTag, metadataJSON)
+	return d.UpsertSecret(ctx, &secret)
 }

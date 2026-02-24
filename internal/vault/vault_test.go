@@ -184,3 +184,122 @@ func TestGetAndPutJWKSPrivateKey(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(keyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
 }
+func TestGetKeyMetadataEmpty(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	metadata, err := store.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+	// Should return zero value when not set
+	c.Assert(metadata.Keys, qt.HasLen, 0)
+	c.Assert(metadata.CurrentActiveKID, qt.Equals, "")
+}
+
+func TestPutAndGetKeyMetadata(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	now := time.Now()
+	activeAt := now.Add(-1 * time.Hour)
+	preActiveAt := now.Add(30 * time.Minute)
+	oldAt := now.Add(-100 * time.Hour)
+
+	metadata := vault.KeyMetadata{
+		Keys: []vault.KeyInfo{
+			{
+				KID:         "key-1",
+				PrivateKey:  "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+				PublicJWK:   `{"kty":"RSA","kid":"key-1"}`,
+				ActivatedAt: &activeAt,
+			},
+			{
+				KID:         "key-2",
+				PrivateKey:  "",
+				PublicJWK:   `{"kty":"RSA","kid":"key-2"}`,
+				ActivatedAt: &preActiveAt,
+			},
+			{
+				KID:         "key-0",
+				PrivateKey:  "",
+				PublicJWK:   `{"kty":"RSA","kid":"key-0"}`,
+				ActivatedAt: &oldAt,
+			},
+		},
+		CurrentActiveKID: "key-1",
+		MaxTokenLifetime: 1 * time.Hour,
+		GracePeriod:      15 * time.Minute,
+		RotationInterval: 2160 * time.Hour, // 90 days
+	}
+
+	err := store.PutKeyMetadata(ctx, metadata)
+	c.Assert(err, qt.IsNil)
+
+	retrieved, err := store.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(retrieved.CurrentActiveKID, qt.Equals, "key-1")
+	c.Assert(retrieved.Keys, qt.HasLen, 3)
+	c.Assert(retrieved.Keys[0].KID, qt.Equals, "key-1")
+	c.Assert(retrieved.Keys[0].ActivatedAt, qt.IsNotNil)
+	c.Assert(retrieved.Keys[1].KID, qt.Equals, "key-2")
+	c.Assert(retrieved.Keys[2].KID, qt.Equals, "key-0")
+	c.Assert(retrieved.Keys[2].ActivatedAt, qt.IsNotNil)
+	c.Assert(retrieved.MaxTokenLifetime, qt.Equals, 1*time.Hour)
+	c.Assert(retrieved.GracePeriod, qt.Equals, 15*time.Minute)
+	c.Assert(retrieved.RotationInterval, qt.Equals, 2160*time.Hour)
+}
+
+func TestUpdateKeyMetadata(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	store := newStore(c)
+
+	now := time.Now()
+	activeAt := now
+	preActiveAt := now.Add(1 * time.Hour)
+
+	initial := vault.KeyMetadata{
+		Keys: []vault.KeyInfo{
+			{
+				KID:         "key-1",
+				PrivateKey:  "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+				PublicJWK:   `{"kty":"RSA","kid":"key-1"}`,
+				ActivatedAt: &activeAt,
+			},
+		},
+		CurrentActiveKID: "key-1",
+		MaxTokenLifetime: 1 * time.Hour,
+		GracePeriod:      15 * time.Minute,
+		RotationInterval: 2160 * time.Hour,
+	}
+
+	err := store.PutKeyMetadata(ctx, initial)
+	c.Assert(err, qt.IsNil)
+
+	// Retrieve and modify.
+	retrieved, err := store.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+
+	// Add newww key as preactive (ActivatedAt is in the future).
+	retrieved.Keys = append(retrieved.Keys, vault.KeyInfo{
+		KID:         "key-2",
+		PrivateKey:  "",
+		PublicJWK:   `{"kty":"RSA","kid":"key-2"}`,
+		ActivatedAt: &preActiveAt,
+	})
+
+	err = store.PutKeyMetadata(ctx, retrieved)
+	c.Assert(err, qt.IsNil)
+
+	// Verify changes persisted
+	final, err := store.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+
+	c.Assert(final.Keys, qt.HasLen, 2)
+	c.Assert(final.Keys[0].KID, qt.Equals, "key-1")
+	c.Assert(final.Keys[1].KID, qt.Equals, "key-2")
+	c.Assert(final.Keys[1].ActivatedAt, qt.IsNotNil)
+	// key-2's ActivatedAt is in the future, so it's pre-active
+}

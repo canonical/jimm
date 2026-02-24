@@ -14,6 +14,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 var testTime = time.Date(2013, 7, 26, 0, 0, 0, 0, time.UTC)
@@ -278,4 +279,47 @@ func (s *dbSuite) TestCleanupJWKS(c *qt.C) {
 	c.Assert(s.Database.CleanupJWKS(ctx), qt.IsNil)
 	c.Assert(s.Database.DB.Model(&dbmodel.Secret{}).Count(&count).Error, qt.IsNil)
 	c.Assert(count, qt.Equals, int64(0))
+}
+
+func (s *dbSuite) TestGetKeyMetadataEmpty(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+
+	metadata, err := s.Database.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(metadata, qt.DeepEquals, vault.KeyMetadata{})
+}
+
+func (s *dbSuite) TestPutAndGetKeyMetadata(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+	ctx := context.Background()
+
+	activatedAt := testTime.Add(5 * time.Minute)
+	metadata := vault.KeyMetadata{
+		Keys: []vault.KeyInfo{{
+			KID:         "kid-1",
+			PrivateKey:  "priv-1",
+			PublicJWK:   "pub-1",
+			ActivatedAt: &activatedAt,
+		}},
+		CurrentActiveKID: "kid-1",
+		RotationInterval: 24 * time.Hour,
+		GracePeriod:      15 * time.Minute,
+		MaxTokenLifetime: time.Hour,
+	}
+
+	c.Assert(s.Database.PutKeyMetadata(ctx, metadata), qt.IsNil)
+
+	// Verify the type/tag stored in secrets table for sanity.
+	secret := dbmodel.Secret{}
+	tx := s.Database.DB.First(&secret)
+	c.Assert(tx.Error, qt.IsNil)
+	c.Assert(secret.Type, qt.Equals, "jwks")
+	c.Assert(secret.Tag, qt.Equals, "jwksKeyMetadata")
+
+	got, err := s.Database.GetKeyMetadata(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(got, qt.DeepEquals, metadata)
 }

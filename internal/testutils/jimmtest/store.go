@@ -11,6 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 type controllerCredentials struct {
@@ -26,6 +27,7 @@ type InMemoryCredentialStore struct {
 	jwks                      jwk.Set
 	privateKey                []byte
 	expiry                    time.Time
+	keyMetadata               vault.KeyMetadata
 	oauthKey                  []byte
 	oauthSessionStoreSecret   []byte
 	controllerCredentials     map[string]controllerCredentials
@@ -188,5 +190,23 @@ func (s *InMemoryCredentialStore) PutJWKSExpiry(ctx context.Context, expiry time
 
 	s.expiry = expiry
 
+	return nil
+}
+
+// GetKeyMetadata retrieves the key metadata from the store.
+func (s *InMemoryCredentialStore) GetKeyMetadata(ctx context.Context) (vault.KeyMetadata, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Return the stored metadata, or empty if not set
+	return s.keyMetadata, nil
+}
+
+// PutKeyMetadata stores the key metadata in the store.
+func (s *InMemoryCredentialStore) PutKeyMetadata(ctx context.Context, metadata vault.KeyMetadata) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.keyMetadata = metadata
 	return nil
 }

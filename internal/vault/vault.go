@@ -32,8 +32,50 @@ const (
 	jwksKey        = "jwks"
 	jwksExpiryKey  = "jwks-expiry"
 	jwksPrivateKey = "jwks-private"
-	oAuthSecretKey = "oauth-secret"
 )
+
+// KeyInfo represents a single signing key and its lifecycle metadata.
+type KeyInfo struct {
+	// KID is the unique identifier for this key.
+	KID string `json:"kid"`
+
+	// PrivateKey is the private key material (PEM, PKCS8, etc.).
+	// Only populated for the active key; other keys have this empty to reduce exposure.
+	PrivateKey string `json:"private_key_pem,omitempty"`
+
+	// PublicJWK is the JSON Web Key representation of the public key.
+	// Used to publish to the JWKS endpoint so clients can verify tokens.
+	PublicJWK string `json:"public_jwk"`
+
+	// ActivatedAt is the timestamp when the key became active for signing.
+	// Pre-active keys have nil (not yet signing).
+	// All other state (retired, deleted) is derived from ActivatedAt, MaxTokenLifetime, and GracePeriod.
+	ActivatedAt *time.Time `json:"activated_at,omitempty"`
+}
+
+// KeyMetadata is the single Vault blob representing all keys and rotation policy.
+type KeyMetadata struct {
+	// Keys contains all signing keys in the system.
+	// New keys are appended; old keys are removed only after they're beyond MaxTokenLifetime + GracePeriod.
+	Keys []KeyInfo `json:"keys"`
+
+	// CurrentActiveKID points to the key currently used for signing tokens.
+	CurrentActiveKID string `json:"current_active_kid"`
+
+	// RotationInterval is the duration between consecutive key rotations.
+	// Rotation is triggered when: now >= activeKey.ActivatedAt + RotationInterval
+	RotationInterval time.Duration `json:"rotation_interval"`
+
+	// GracePeriod is the duration a pre-active key sits in JWKS before activation.
+	// Pre-active keys: ActivatedAt is in the future. Once ActivatedAt <= now, the key can be promoted to active.
+	// For a key to be publishable to JWKS: must be before its ActivatedAt + MaxTokenLifetime + GracePeriod deadline.
+	GracePeriod time.Duration `json:"grace_period"`
+
+	// MaxTokenLifetime is the maximum lifespan of any issued token.
+	// Retired keys must remain available for verification until MaxTokenLifetime has passed since ActivatedAt.
+	// Safe to delete once: now >= key.ActivatedAt + MaxTokenLifetime + GracePeriod
+	MaxTokenLifetime time.Duration `json:"max_token_lifetime"`
+}
 
 // A VaultStore stores cloud credential attributes and
 // controller credentials in vault.
@@ -411,6 +453,75 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err e
 	return nil
 }
 
+// GetKeyMetadata retrieves the key metadata from the vault.
+func (s *VaultStore) GetKeyMetadata(ctx context.Context) (_ KeyMetadata, err error) {
+	const op = "vault.GetKeyMetadata"
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return KeyMetadata{}, errors.E(err)
+	}
+
+	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getKeyMetadataPath())
+	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+		return KeyMetadata{}, errors.E(err)
+	}
+
+	// Return zero value if not found, caller should handle empty state
+	if secret == nil || secret.Data == nil {
+		return KeyMetadata{}, nil
+	}
+
+	// Vault KVv2 stores everything as map[string]interface{}
+	// We need to convert it back to our struct
+	metadataJSON, err := json.Marshal(secret.Data)
+	if err != nil {
+		return KeyMetadata{}, errors.E(err)
+	}
+
+	var metadata KeyMetadata
+	if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
+		return KeyMetadata{}, errors.E(err)
+	}
+
+	return metadata, nil
+}
+
+// PutKeyMetadata stores the key metadata in the vault.
+func (s *VaultStore) PutKeyMetadata(ctx context.Context, metadata KeyMetadata) (err error) {
+	const op = "vault.PutKeyMetadata"
+
+	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
+
+	client, err := s.client(ctx)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	// Convert struct to map for vault storage
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		return errors.E(err)
+	}
+
+	var dataMap map[string]interface{}
+	if err := json.Unmarshal(metadataJSON, &dataMap); err != nil {
+		return errors.E(err)
+	}
+
+	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getKeyMetadataPath(), dataMap); err != nil {
+		return errors.E(err)
+	}
+
+	return nil
+}
+
 // getWellKnownPath returns a hard coded path to the .well-known credentials.
 func (s *VaultStore) getWellKnownPath() string {
 	return path.Join("creds", ".well-known")
@@ -431,6 +542,11 @@ func (s *VaultStore) getJWKSPrivateKeyPath() string {
 // getJWKSPath returns the path to the jwks expiry secret.
 func (s *VaultStore) getJWKSExpiryPath() string {
 	return path.Join(s.getWellKnownPath(), "jwks-expiry")
+}
+
+// getKeyMetadataPath returns the path to the key metadata secret.
+func (s *VaultStore) getKeyMetadataPath() string {
+	return path.Join(s.getWellKnownPath(), "key-metadata")
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in

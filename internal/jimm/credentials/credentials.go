@@ -10,6 +10,8 @@ import (
 
 	"github.com/juju/names/v5"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+
+	"github.com/canonical/jimm/v3/internal/vault"
 )
 
 // A CredentialStore is a store for the attributes of:
@@ -19,6 +21,7 @@ import (
 //   - JWK expiry
 //   - JWK private key
 //   - OAuth session signing secret
+//   - Key metadata (rotation lifecycle)
 type CredentialStore interface {
 	// Get retrieves the stored attributes of a cloud credential.
 	Get(context.Context, names.CloudCredentialTag) (map[string]string, error)
@@ -54,4 +57,10 @@ type CredentialStore interface {
 
 	// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
 	PutJWKSExpiry(ctx context.Context, expiry time.Time) error
+
+	// GetKeyMetadata retrieves the key metadata for rotation tracking.
+	GetKeyMetadata(ctx context.Context) (vault.KeyMetadata, error)
+
+	// PutKeyMetadata stores the key metadata for rotation tracking.
+	PutKeyMetadata(ctx context.Context, metadata vault.KeyMetadata) error
 }
