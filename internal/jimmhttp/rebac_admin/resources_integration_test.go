@@ -16,10 +16,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-func SetupResourcesTest(c *qt.C) (s jimmtest.JIMMEnv) {
-	return jimmtest.SetupJimmEnv(c)
-}
-
 // resourcesTestEnv is used to create entries in JIMM's database.
 // The rebacAdminSuite does not spin up a Juju controller so we cannot use
 // regular JIMM methods to create resources.
@@ -63,7 +59,7 @@ models:
 
 func TestListResourcesIntegration(t *testing.T) {
 	c := qt.New(t)
-	s := SetupResourcesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	ctx := c.Context()
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)

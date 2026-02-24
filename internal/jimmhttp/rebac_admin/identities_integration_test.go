@@ -21,13 +21,9 @@ import (
 	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
-func SetupIdentitiesTest(c *qt.C) (s jimmtest.JIMMEnv) {
-	return jimmtest.SetupJimmEnv(c)
-}
-
 func TestIdentitiesList(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	ctx := c.Context()
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
@@ -61,7 +57,7 @@ func TestIdentitiesList(t *testing.T) {
 
 func TestIdentityPatchGroups(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
@@ -109,7 +105,7 @@ func TestIdentityPatchGroups(t *testing.T) {
 
 func TestIdentityGetGroups(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
@@ -161,7 +157,7 @@ func TestIdentityGetGroups(t *testing.T) {
 // has been removed from the database.
 func TestGetIdentityGroupsWithDeletedDbGroup(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	ctx := c.Context()
 
 	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
@@ -200,7 +196,7 @@ func TestGetIdentityGroupsWithDeletedDbGroup(t *testing.T) {
 
 func TestIdentityPatchRoles(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
@@ -248,7 +244,7 @@ func TestIdentityPatchRoles(t *testing.T) {
 
 func TestIdentityGetRoles(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
@@ -299,7 +295,7 @@ func TestIdentityGetRoles(t *testing.T) {
 // Setup: add controllers, models to a user and add the user to a group.
 func TestIdentityEntitlements(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
@@ -421,7 +417,7 @@ models:
 // Setup: add user to a group, and add models to the user.
 func TestPatchIdentityEntitlements(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
@@ -495,7 +491,7 @@ func TestPatchIdentityEntitlements(t *testing.T) {
 // TestPatchIdentityEntitlementsForCloudAccess tests granting access to a cloud.
 func TestPatchIdentityEntitlementsForCloudAccess(t *testing.T) {
 	c := qt.New(t)
-	s := SetupIdentitiesTest(c)
+	s := jimmtest.SetupJimmEnv(c)
 	// initialization
 	ctx := c.Context()
 
