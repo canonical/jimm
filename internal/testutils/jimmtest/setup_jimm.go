@@ -88,7 +88,7 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		DashboardFinalRedirectURL:     "localhost", // Can be any URL.
 	}
 
-	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.NewGormTestLogger(gct)})
+	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.NewGormTestLogger(c)})
 	c.Assert(err, qt.IsNil)
 	database := &db.Database{DB: gormDB}
 

@@ -132,7 +132,7 @@ func (info *ControllerInfo) ToAPIInfo() *api.Info {
 }
 
 // WebsocketE2ESuite is a suite that initialises a JIMM with
-// an externally bootstrapped controller, and provides
+// externally bootstrapped controller(s), and provides
 // methods to open websocket connections to the JIMM API.
 type WebsocketE2ESuite struct {
 	JimmWithControllers
