@@ -90,6 +90,12 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 
 	gormDB, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.NewGormTestLogger(c)})
 	c.Assert(err, qt.IsNil)
+	sqlDB, err := gormDB.DB()
+	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		err := sqlDB.Close()
+		c.Check(err, qt.IsNil)
+	})
 	database := &db.Database{DB: gormDB}
 
 	riverClient, err := river.NewRiverClient(database)

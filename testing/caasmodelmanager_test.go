@@ -33,7 +33,9 @@ func SetupCaasModelTest(c *qt.C) caasModelManagerDeps {
 		WebsocketE2ESuite: s,
 	}
 
-	cloudclient := cloudapi.NewClient(s.Open(c, nil, "bob@canonical.com", nil))
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
+	defer conn.Close()
+	cloudclient := cloudapi.NewClient(conn)
 	cloud, credential := s.GetMicrok8sCloudAndCloudCredential(c)
 	deps.cloudName = cloud.Name
 	err := cloudclient.AddCloud(cloud, false)
