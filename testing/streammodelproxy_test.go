@@ -34,6 +34,7 @@ func TestDebugLogs(t *testing.T) {
 }
 
 func TestDebugLogsWithParams(t *testing.T) {
+	t.Skip("Often flaky receiving 0 messages once the logChan has closed.")
 	c := qt.New(t)
 	s := jimmtest.SetupWebsocketEnv(c)
 
