@@ -19,23 +19,22 @@ To check if your system has all the prequisites installed simply run `make sys-d
 This will check for all test prequisites and inform you how to install them if not installed. 
 You will need to install `make` first with `sudo apt install make`
 
-### Understanding the test suite
-In order to enable testing with Juju's internal suites, it is required to have juju-db 
-(mongod) service installed.
-This can be installed via: `sudo snap install juju-db --channel=4.4/stable`.
+### Understanding the test setup
+Our tests are a mixture of unit and integration. Tests inside of `internal/` range from domain
+tests inside `internal/jimm` to tests for different primities like auth, JWTs, queues, etc in
+their respective `internal/<pkg>`. Truly end-to-end tests that use a real Juju controller
+are found in `testing` (Go based tests) and `tests` (uses Bash to exercise the Juju CLI).
+Ideally the split between `testing` and `tests` will be removed and simplified.
 
-Tests inside of `cmd/` and `internal/jujuapi/` are integration based, spinning up JIMM and 
-a Juju controller for testing. To spin up a Juju controller we use the `JujuConnSuite` which 
-in turn uses the [gocheck](http://labix.org/gocheck) test library.
+Running tests inside of the `testing` package requires an existing Juju controller.
+To run these tests, follow these steps:
+1. Start JIMM's Docker compose - `make test-env`
+2. Bootstrap a Juju controller - `JWKS_DNS=jwks.localhost CONTROLLER_NAME=test-e2e ./local/jimm/setup-controller.sh`
+3. Export the controller info  - `CONTROLLER=test-e2e make generate-test-env`, this will create a `controllers.yaml` file in the current directory.
+4. Run the tests - `JIMM_BACKING_CONTROLLER_CONFIG: <path-to-controllers.yaml> go test ./testing/... -timeout 30m`
 
-Because of the `JujuConnSuite` and its use in JIMM's test suites, there are 2 test libraries in JIMM:
-- GoCheck based tests, identified in the function signature with `func Test(c *gc.C)`.
-  - These tests normally interact with a Juju controller.
-  - GoCheck should only be used when using the suites in `internal/jimmtest`.
-- Stdlib `testing.T` tests, identified in the function signature with `func Test(t *testing.T)`.
-  - These tests vary in their scope but do not require a Juju controller.
-  - To provide assertions, the project uses [quicktest](https://github.com/frankban/quicktest), 
-    a lean testing library.
+Tests should use the standard library's `testing.T`, identified in the function signature with `func Test(t *testing.T)`.
+To provide assertions, the project uses [quicktest](https://github.com/frankban/quicktest), a lean testing library.
 
 Because many tests rely on PostgreSQL, OpenFGA and Vault which are dockerised 
 you may simply run `make test-env` to be integration test ready.
