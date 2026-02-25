@@ -168,8 +168,6 @@ ifeq ($(APT_BASED),0)
 	@$(call check_dep,microk8s,Missing microk8s - install with 'sudo snap install microk8s --channel=1.30-strict/stable')
 # Docker is required to start the test dependencies in containers.
 	@$(call check_dep,docker,Missing Docker - install from https://docs.docker.com/engine/install/ or 'sudo snap install docker')
-# juju-db is required for tests that use Juju's test fixture, requiring MongoDB.
-	@$(call check_dep,juju-db.mongo,Missing juju-db - install with 'sudo snap install juju-db --channel=4.4/stable')
 else
 	@echo sys-deps runs only on systems with apt-get
 	@echo on OS X with homebrew try: brew install bazaar mongodb

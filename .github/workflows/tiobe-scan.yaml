@@ -40,9 +40,6 @@ jobs:
         sudo snap install docker # installing via apt doesn't work, because you can't start systemctl services.
         sudo apt-get install -y docker-compose-plugin
     
-    - name: Install juju-db
-      run: sudo snap install juju-db --channel 4.4/stable
-
     - name: Start test environment
       run: docker compose up -d --wait
     
