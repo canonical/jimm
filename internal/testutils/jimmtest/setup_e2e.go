@@ -131,7 +131,7 @@ func (info *ControllerInfo) ToAPIInfo() *api.Info {
 	}
 }
 
-// JimmWithControllers is a suite that initialises a JIMM with
+// JimmWithControllers is an environment that initialises JIMM with
 // externally bootstrapped controller(s), and provides
 // methods to open websocket connections to the JIMM API.
 type JimmWithControllers struct {
@@ -155,9 +155,9 @@ type LoginDetails struct {
 // The config file path is specified in the JIMM_BACKING_CONTROLLER_CONFIG environment variable.
 //
 // The environment includes some test users by convention:
+// - alice@canonical.com is an admin.
 // - bob@canonical.com has add-model permission on the controllers and cloud-credentials.
 // - charlie@canonical.com has add-model permission on the controllers and cloud-credentials.
-// - alice@canonical.com is an admin.
 func SetupJimmWithControllers(c *qt.C, opts ...SetupOption) JimmWithControllers {
 	jimmEnv := SetupJimmEnv(c, append([]SetupOption{WithHardcodedJWKS()}, opts...)...)
 	s := JimmWithControllers{
@@ -210,6 +210,21 @@ func SetupJimmWithControllers(c *qt.C, opts ...SetupOption) JimmWithControllers 
 	return s
 }
 
+// CreateModelForBob creates a model with bob@canonical.com as the owner.
+// Bob is a non-admin user with add-model permission on all controllers.
+func (s *JimmWithControllers) CreateModelForBob(c *qt.C) *dbmodel.Model {
+	args := AddModelArgs{
+		Name:   petname.Generate(2, "-"),
+		Owner:  names.NewUserTag("bob@canonical.com"),
+		Cloud:  names.NewCloudTag(TestE2ECloudName),
+		Region: TestE2ECloudRegionName,
+		Cred:   s.BobCredential.ResourceTag(),
+	}
+	return s.CreateModel(c, args)
+}
+
+// CreateModelForCharlie creates a model with charlie@canonical.com as the owner.
+// Charlie is a non-admin user with add-model permission on all controllers.
 func (s *JimmWithControllers) CreateModelForCharlie(c *qt.C) *dbmodel.Model {
 	args := AddModelArgs{
 		Owner:  names.NewUserTag("charlie@canonical.com"),
@@ -221,6 +236,10 @@ func (s *JimmWithControllers) CreateModelForCharlie(c *qt.C) *dbmodel.Model {
 	return s.CreateModel(c, args)
 }
 
+// CreateModelForCharlieWithBobReadAccess creates a model with charlie@canonical.com
+// as the owner, and grants bob@canonical.com read access to the model.
+// Charlie is a non-admin user with add-model permission on all controllers.
+// Bob is a non-admin user with add-model permission on all controllers.
 func (s *JimmWithControllers) CreateModelForCharlieWithBobReadAccess(c *qt.C) *dbmodel.Model {
 	model := s.CreateModelForCharlie(c)
 	ctx := c.Context()
@@ -238,6 +257,8 @@ func (s *JimmWithControllers) CreateModelForCharlieWithBobReadAccess(c *qt.C) *d
 	return model
 }
 
+// OpenCustomLoginProvider creates a new websocket connection to the test server, using the
+// provided login provider for authentication.
 func (s *JimmWithControllers) OpenCustomLoginProvider(c *qt.C, info *api.Info, username string, lp api.LoginProvider) (api.Connection, error) {
 	ld := LoginDetails{Info: info, Username: username, Lp: lp}
 	return s.OpenNoAssert(c, ld, nil)
@@ -341,17 +362,6 @@ func (s *JimmWithControllers) CreateModel(c *qt.C, args AddModelArgs) *dbmodel.M
 	err := s.JIMM.Database.GetModel(c.Context(), model)
 	c.Assert(err, qt.Equals, nil)
 	return model
-}
-
-func (s *JimmWithControllers) CreateModelForBob(c *qt.C) *dbmodel.Model {
-	args := AddModelArgs{
-		Name:   petname.Generate(2, "-"),
-		Owner:  names.NewUserTag("bob@canonical.com"),
-		Cloud:  names.NewCloudTag(TestE2ECloudName),
-		Region: TestE2ECloudRegionName,
-		Cred:   s.BobCredential.ResourceTag(),
-	}
-	return s.CreateModel(c, args)
 }
 
 func (s *JimmWithControllers) GetExistingClientCredentialsForCloud(c *qt.C, cloudName string) jujuparams.CloudCredential {
