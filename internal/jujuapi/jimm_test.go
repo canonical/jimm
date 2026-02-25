@@ -341,11 +341,11 @@ func TestBootstrapStart_RejectsBuiltinClouds(t *testing.T) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	params := apiparams.BootstrapParams{
-		CloudName: "microk8s",
+		CloudName: "localhost",
 	}
 
 	_, err := root.StartBootstrap(ctx, params)
-	c.Assert(err, qt.ErrorMatches, `.*bootstrap via JIMM does not support built-in clouds like "microk8s"`)
+	c.Assert(err, qt.ErrorMatches, `.*bootstrap via JIMM does not support built-in clouds like "localhost"`)
 }
 
 func TestBootstrapStart(t *testing.T) {
