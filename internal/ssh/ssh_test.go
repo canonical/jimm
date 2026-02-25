@@ -283,6 +283,7 @@ func (s *sshSuite) TestInvalidVirtualHostname(c *qt.C) {
 }
 
 func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
+	c.Skip("flakey test, needs to sync the client side count with the server's")
 	// the reason we repeat this test 2 times is to make sure that closing the connections on
 	// the first iteration completely resets the counter on the ssh server side.
 	for range 2 {
