@@ -59,7 +59,7 @@ type API interface {
 
 	// CheckCredentialModels checks that an updated credential can be used
 	// with the associated models.
-	CheckCredentialModels(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	CheckCredentialModels(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error)
 
 	// CheckMachines compares the machines in state with the ones
 	// reported by the provider and reports any discrepancies.
@@ -156,7 +156,7 @@ type API interface {
 	UpdateCloud(names.CloudTag, jujucloud.Cloud) error
 
 	// UpdateCredential updates a credential.
-	UpdateCredential(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	UpdateCloudsCredentialForce(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error)
 
 	// ValidateModelUpgrade validates that a model can be upgraded.
 	ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error

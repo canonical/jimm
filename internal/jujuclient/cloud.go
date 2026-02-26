@@ -23,40 +23,25 @@ import (
 // For this reason, UpdateCredentialsCheckModels alone is insufficient as it
 // checks a single credential is safe and is is not suitable when updating
 // the cloud's credential across many controllers.
-func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-	in := jujuparams.TaggedCredentials{Credentials: []jujuparams.TaggedCredential{cred}}
-	out, err := cloudapi.NewClient(&c).CheckCredentialsModels(in)
-	if err != nil {
-		return nil, err
-	}
-
-	if out[0].Error != nil {
-		// Unlike many other places, we want to return something valid here to provide more details.
-		return out[0].Models, out[0].Error
-	}
-	return out[0].Models, nil
+func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+	return cloudapi.NewClient(&c).CheckCredentialsModels(jujuparams.TaggedCredentials{Credentials: []jujuparams.TaggedCredential{cred}})
 }
 
-// UpdateCredential updates the given credential on the controller. The
-// credential will always be upgraded if possible irrespective of whether
-// it will break existing models (this is a forced update). If the caller
-// wants to check that a credential will work with existing models then
-// CheckCredentialModels should be used first.
-func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-	jujuCredTag := cred.Tag
-	jujuCred := jujucloud.NewCredential(jujucloud.AuthType(cred.Credential.AuthType), cred.Credential.Attributes)
-	credsToUpdate := map[string]jujucloud.Credential{jujuCredTag: jujuCred}
-
-	out, err := cloudapi.NewClient(&c).UpdateCloudsCredentials(credsToUpdate, true)
-	if err != nil {
-		return nil, err
-	}
-
-	if out[0].Error != nil {
-		// Unlike many other places, we want to return something valid here to provide more details.
-		return out[0].Models, out[0].Error
-	}
-	return out[0].Models, nil
+// UpdateCloudsCredentialForce updates the given credential on the controller.
+// It calls UpdateCloudsCredentials, and adapts it to:
+// 1. Take a single credential
+// 2. Always force the update (force=true).
+// As such, the credential will always be upgraded if possible irrespective
+// of whether it will break existing models (this is a forced update).
+// If the caller wants to check that a credential will work with existing models
+// then CheckCredentialModels should be used first.
+func (c Connection) UpdateCloudsCredentialForce(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+	return cloudapi.NewClient(&c).UpdateCloudsCredentials(
+		map[string]jujucloud.Credential{
+			cred.Tag: jujucloud.NewCredential(jujucloud.AuthType(cred.Credential.AuthType), cred.Credential.Attributes),
+		},
+		true,
+	)
 }
 
 // RevokeCredential removes the given credential on the controller. The

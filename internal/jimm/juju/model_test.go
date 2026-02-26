@@ -34,7 +34,7 @@ import (
 var addModelTests = []struct {
 	name                string
 	env                 string
-	updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	updateCredential    func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error)
 	grantJIMMModelAdmin func(context.Context, names.ModelTag) error
 	createModel         func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)
 	username            string
@@ -96,8 +96,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -206,8 +206,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -317,8 +317,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -423,8 +423,8 @@ users:
 - username: bob@canonical.com
   controller-access: login
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -523,8 +523,8 @@ users:
 - username: bob@canonical.com
   controller-access: login
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -590,8 +590,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -665,8 +665,8 @@ models:
   cloud-credential: test-credential-1
   controller: controller-1
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -733,7 +733,7 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		return nil, errors.E("a silly error")
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
@@ -798,8 +798,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -877,8 +877,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -993,8 +993,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1063,8 +1063,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1168,8 +1168,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1229,8 +1229,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1272,8 +1272,8 @@ controllers:
     region: test-region-1
     priority: 0
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1343,8 +1343,8 @@ controllers:
   - user: alice@canonical.com
     access: add-model
 `[1:],
-	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-		return nil, nil
+	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1413,9 +1413,9 @@ func TestAddModel(t *testing.T) {
 			j := newTestJujuManager(c, &parameters{
 				Dialer: &jimmtest.Dialer{
 					API: &jimmtest.API{
-						UpdateCredential_:    test.updateCredential,
-						GrantJIMMModelAdmin_: test.grantJIMMModelAdmin,
-						CreateModel_:         test.createModel,
+						UpdateCloudsCredentialForce_: test.updateCredential,
+						GrantJIMMModelAdmin_:         test.grantJIMMModelAdmin,
+						CreateModel_:                 test.createModel,
 					},
 				},
 			})
@@ -3116,7 +3116,7 @@ models:
 var updateModelCredentialTests = []struct {
 	name                  string
 	env                   string
-	updateCredential      func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	updateCredential      func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error)
 	changeModelCredential func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error
 	dialError             error
 	username              string
@@ -3128,11 +3128,11 @@ var updateModelCredentialTests = []struct {
 }{{
 	name: "success",
 	env:  updateModelCredentialTestEnv,
-	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
-		return nil, nil
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
@@ -3175,11 +3175,11 @@ var updateModelCredentialTests = []struct {
 }, {
 	name: "user not admin",
 	env:  updateModelCredentialTestEnv,
-	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
-		return nil, nil
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
@@ -3206,11 +3206,11 @@ var updateModelCredentialTests = []struct {
 }, {
 	name: "credential not found",
 	env:  updateModelCredentialTestEnv,
-	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
-		return nil, nil
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
@@ -3229,7 +3229,7 @@ var updateModelCredentialTests = []struct {
 }, {
 	name: "update credential returns an error",
 	env:  updateModelCredentialTestEnv,
-	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		return nil, errors.E("an error")
 	},
 	username:    "alice@canonical.com",
@@ -3239,11 +3239,11 @@ var updateModelCredentialTests = []struct {
 }, {
 	name: "change model credential returns an error",
 	env:  updateModelCredentialTestEnv,
-	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
 			return nil, errors.E("bad cloud credential tag")
 		}
-		return nil, nil
+		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		return errors.E("an error")
@@ -3263,8 +3263,8 @@ func TestUpdateModelCredential(t *testing.T) {
 
 			dialer := &jimmtest.Dialer{
 				API: &jimmtest.API{
-					UpdateCredential_:      test.updateCredential,
-					ChangeModelCredential_: test.changeModelCredential,
+					UpdateCloudsCredentialForce_: test.updateCredential,
+					ChangeModelCredential_:       test.changeModelCredential,
 				},
 				Err: test.dialError,
 			}
@@ -3314,8 +3314,8 @@ func TestAddModelDeletedController(t *testing.T) {
 	c := qt.New(t)
 
 	api := &jimmtest.API{
-		UpdateCredential_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-			return nil, nil
+		UpdateCloudsCredentialForce_: func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+			return []jujuparams.UpdateCredentialResult{{}}, nil
 		},
 		GrantJIMMModelAdmin_: func(ctx context.Context, mt names.ModelTag) error {
 			return nil

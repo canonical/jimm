@@ -204,7 +204,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
-		models, err := j.updateControllerCloudCredential(ctx, &credential, api.UpdateCredential)
+		models, err := j.updateControllerCloudCredential(ctx, &credential, api.UpdateCloudsCredentialForce)
 		if err != nil {
 			return err
 		}
@@ -237,7 +237,7 @@ func (j *JujuManager) updateCredential(ctx context.Context, credential *dbmodel.
 func (j *JujuManager) updateControllerCloudCredential(
 	ctx context.Context,
 	cred *dbmodel.CloudCredential,
-	f func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error),
+	f func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error),
 ) ([]jujuparams.UpdateCredentialModelResult, error) {
 
 	attr, err := j.getCloudCredentialAttributes(ctx, cred)
@@ -245,17 +245,31 @@ func (j *JujuManager) updateControllerCloudCredential(
 		return nil, errors.E(err)
 	}
 
-	models, err := f(ctx, jujuparams.TaggedCredential{
+	out, err := f(ctx, jujuparams.TaggedCredential{
 		Tag: cred.Tag().String(),
 		Credential: jujuparams.CloudCredential{
 			AuthType:   cred.AuthType,
 			Attributes: attr,
 		},
 	})
+
 	if err != nil {
-		return models, errors.E(err)
+		return nil, errors.E(err)
 	}
-	return models, nil
+
+	// Shouldn't happen, the Juju client presumes that
+	// the returned slice will always contain a result
+	// for each credential passed in, but handle it just
+	// in case.
+	if len(out) == 0 {
+		return nil, nil
+	}
+
+	if out[0].Error != nil {
+		return out[0].Models, errors.E(out[0].Error)
+	}
+
+	return out[0].Models, nil
 }
 
 // ForEachUserCloudCredential iterates through every credential owned by

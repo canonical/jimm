@@ -132,7 +132,7 @@ type API struct {
 	AddCloud_                          func(names.CloudTag, jujucloud.Cloud, bool) error
 	AdoptResources_                    func(modelUUID string, controllerVersion version.Number) error
 	ChangeModelCredential_             func(context.Context, names.ModelTag, names.CloudCredentialTag) error
-	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error)
 	CheckMachines_                     func(modelUUID string) ([]error, error)
 	Close_                             func() error
 	Cloud_                             func(names.CloudTag) (jujucloud.Cloud, error)
@@ -163,7 +163,7 @@ type API struct {
 	SupportsModelSummaryWatcher_       bool
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
 	UpdateCloud_                       func(names.CloudTag, jujucloud.Cloud) error
-	UpdateCredential_                  func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
+	UpdateCloudsCredentialForce_       func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error)
 	ValidateModelUpgrade_              func(context.Context, names.ModelTag, bool) error
 	WatchAllModelSummaries_            func(context.Context) (jujuclient.SummaryWatcher, error)
 	ListFilesystems_                   func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error)
@@ -203,7 +203,7 @@ func (a *API) AdoptResources(modelUUID string, controllerVersion version.Number)
 	return a.AdoptResources_(modelUUID, controllerVersion)
 }
 
-func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 	if a.CheckCredentialModels_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
@@ -407,11 +407,11 @@ func (a *API) UpdateCloud(tag names.CloudTag, cloud jujucloud.Cloud) error {
 	return a.UpdateCloud_(tag, cloud)
 }
 
-func (a *API) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-	if a.UpdateCredential_ == nil {
+func (a *API) UpdateCloudsCredentialForce(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+	if a.UpdateCloudsCredentialForce_ == nil {
 		return nil, errors.E(errors.CodeNotImplemented)
 	}
-	return a.UpdateCredential_(ctx, cred)
+	return a.UpdateCloudsCredentialForce_(ctx, cred)
 }
 
 func (a *API) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
