@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/core/network"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -646,6 +646,8 @@ func (r *controllerRoot) StopBootstrap(ctx context.Context, req apiparams.StopBo
 	return nil
 }
 
+var builtInClouds = []string{"microk8s", "localhost"}
+
 // StartBootstrap starts a bootstrap job.
 func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.BootstrapParams) (apiparams.StartBootstrapResponse, error) {
 
@@ -653,13 +655,10 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	// Check built in clouds.
-	builtinClouds, err := common.BuiltInClouds()
-	if err != nil {
-		return apiparams.StartBootstrapResponse{}, errors.E(errors.CodeIncompatibleClouds, "unauthorized")
-	}
-
-	if _, isABuiltinCloud := builtinClouds[req.CloudName]; isABuiltinCloud {
+	// Validate request is not for a built in cloud.
+	// Using a fixed slice over `juju/cmd/juju/common.BuiltInClouds()` as that
+	// function requires providers to be registered in the environs global.
+	if slices.Contains(builtInClouds, req.CloudName) {
 		return apiparams.StartBootstrapResponse{},
 			errors.E(errors.CodeIncompatibleClouds, fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", req.CloudName))
 	}
