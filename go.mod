@@ -10,7 +10,7 @@ require (
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
 	github.com/juju/http/v2 v2.0.1
-	github.com/juju/juju v0.0.0-20260218083301-8829b2da5a21 // Tip of 3.6
+	github.com/juju/juju v0.0.0-20260223163124-957e67d923d5 // Tip of 3.6
 	github.com/juju/loggo v1.0.0 // indirect
 	github.com/juju/names/v4 v4.0.0
 	github.com/juju/names/v5 v5.0.0
@@ -282,16 +282,22 @@ require (
 )
 
 require (
+	github.com/GehirnInc/crypt v0.0.0-20230320061759-8cc1b52080c5 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
+	github.com/canonical/go-flags v0.0.0-20230403090104-105d09a091b8 // indirect
+	github.com/canonical/pebble v1.29.0 // indirect
+	github.com/canonical/x-go v0.0.0-20251013153820-eed72624b6ac // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/juju/packaging/v4 v4.0.0 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
+	github.com/pkg/term v1.1.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.30.0 // indirect
 	github.com/riverqueue/river/rivershared v0.30.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
