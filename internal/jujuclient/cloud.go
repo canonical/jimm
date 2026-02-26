@@ -84,32 +84,8 @@ func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.Tagged
 // break existing models (this is a forced revoke). If the caller wants
 // to check that removing the credential will break existing models then
 // CheckCredentialModels should be used first.
-//
-// This method will call the first available procedure from:
-//   - Cloud(3).RevokeCredentialsCheckModels
-//   - Cloud(1).RevokeCredentials
-//
-// Any error that represents a Juju API failure will be of type
-// *APIError.
 func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCredentialTag) error {
-
-	out := jujuparams.ErrorResults{
-		Results: make([]jujuparams.ErrorResult, 1),
-	}
-	in := jujuparams.RevokeCredentialArgs{
-		Credentials: []jujuparams.RevokeCredentialArg{{
-			Tag:   cred.String(),
-			Force: true,
-		}},
-	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7}, "", "RevokeCredentialsCheckModels", &in, &out); err != nil {
-		return errors.E(jujuerrors.Cause(err))
-	}
-
-	if out.Results[0].Error != nil {
-		return errors.E(out.Results[0].Error)
-	}
-	return nil
+	return cloudapi.NewClient(&c).RevokeCredential(cred, true)
 }
 
 // Cloud retrieves information about the given cloud. Cloud uses the
