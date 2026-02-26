@@ -5,36 +5,36 @@ package jujuclient
 import (
 	"context"
 
-	jujuerrors "github.com/juju/errors"
 	cloudapi "github.com/juju/juju/api/client/cloud"
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-
-	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // CheckCredentialModels checks that the given credential would be
 // accepted as a valid credential by all models currently using that
 // credential. This method uses the CheckCredentialsModel procedure on
-// the Cloud. Any error that represents a Juju API
-// failure will be of type *APIError.
+// the Cloud.
+//
+// If the same cloud is on many controllers, we need to know
+// ahead of time that the credential will work for all models on all controllers
+// under this cloud. Once we are sure via CheckCredentialModels that the credential
+// will work for all models, only then can we safely update the credential.
+// For this reason, UpdateCredentialsCheckModels alone is insufficient as it
+// checks a single credential is safe and is is not suitable when updating
+// the cloud's credential across many controllers.
 func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
-
-	in := jujuparams.TaggedCredentials{
-		Credentials: []jujuparams.TaggedCredential{cred},
+	in := jujuparams.TaggedCredentials{Credentials: []jujuparams.TaggedCredential{cred}}
+	out, err := cloudapi.NewClient(&c).CheckCredentialsModels(in)
+	if err != nil {
+		return nil, err
 	}
 
-	out := jujuparams.UpdateCredentialResults{
-		Results: make([]jujuparams.UpdateCredentialResult, 1),
+	if out[0].Error != nil {
+		// Unlike many other places, we want to return something valid here to provide more details.
+		return out[0].Models, out[0].Error
 	}
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7}, "", "CheckCredentialsModels", &in, &out); err != nil {
-		return nil, errors.E(jujuerrors.Cause(err))
-	}
-	if out.Results[0].Error != nil {
-		return out.Results[0].Models, errors.E(out.Results[0].Error)
-	}
-	return out.Results[0].Models, nil
+	return out[0].Models, nil
 }
 
 // UpdateCredential updates the given credential on the controller. The
@@ -42,41 +42,21 @@ func (c Connection) CheckCredentialModels(ctx context.Context, cred jujuparams.T
 // it will break existing models (this is a forced update). If the caller
 // wants to check that a credential will work with existing models then
 // CheckCredentialModels should be used first.
-//
-// This method will call the first available procedure from:
-//   - Cloud(7).UpdateCredentialsCheckModels
-//   - Cloud(3).UpdateCredentialsCheckModels
-//   - Cloud(1).UpdateCredentials
-//
-// Any error that represents a Juju API failure will be of type
-// *APIError.
 func (c Connection) UpdateCredential(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error) {
+	jujuCredTag := cred.Tag
+	jujuCred := jujucloud.NewCredential(jujucloud.AuthType(cred.Credential.AuthType), cred.Credential.Attributes)
+	credsToUpdate := map[string]jujucloud.Credential{jujuCredTag: jujuCred}
 
-	creds := jujuparams.TaggedCredentials{
-		Credentials: []jujuparams.TaggedCredential{cred},
-	}
-
-	update := jujuparams.UpdateCredentialArgs{
-		Credentials: creds.Credentials,
-		Force:       true,
-	}
-
-	out := jujuparams.UpdateCredentialResults{
-		Results: make([]jujuparams.UpdateCredentialResult, 1),
+	out, err := cloudapi.NewClient(&c).UpdateCloudsCredentials(credsToUpdate, true)
+	if err != nil {
+		return nil, err
 	}
 
-	// Cloud(1).UpdateCredentials actually returns
-	// jujuparams.ErrorResults rather than
-	// jujuparams.UpdateCredentialsResults, but the former will still
-	// unmarshal correctly into the latter so there is no need to use
-	// a different response type.
-	if err := c.CallHighestFacadeVersion(ctx, "Cloud", []int{7}, "", "UpdateCredentialsCheckModels", &update, &out); err != nil {
-		return nil, errors.E(jujuerrors.Cause(err))
+	if out[0].Error != nil {
+		// Unlike many other places, we want to return something valid here to provide more details.
+		return out[0].Models, out[0].Error
 	}
-	if out.Results[0].Error != nil {
-		return out.Results[0].Models, errors.E(out.Results[0].Error)
-	}
-	return out.Results[0].Models, nil
+	return out[0].Models, nil
 }
 
 // RevokeCredential removes the given credential on the controller. The
