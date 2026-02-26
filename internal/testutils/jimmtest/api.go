@@ -135,7 +135,7 @@ type API struct {
 	CheckCredentialModels_             func(context.Context, jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialModelResult, error)
 	CheckMachines_                     func(modelUUID string) ([]error, error)
 	Close_                             func() error
-	Cloud_                             func(names.CloudTag, *jujucloud.Cloud) error
+	Cloud_                             func(names.CloudTag) (jujucloud.Cloud, error)
 	Clouds_                            func() (map[names.CloudTag]jujucloud.Cloud, error)
 	CloudSpec_                         func(context.Context) (cloudspec.CloudSpec, error)
 	ControllerConfig_                  func(context.Context) (jujucontroller.Config, error)
@@ -224,11 +224,11 @@ func (a *API) Close() error {
 	return a.Close_()
 }
 
-func (a *API) Cloud(tag names.CloudTag, ci *jujucloud.Cloud) error {
+func (a *API) Cloud(tag names.CloudTag) (jujucloud.Cloud, error) {
 	if a.Cloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return jujucloud.Cloud{}, errors.E(errors.CodeNotImplemented)
 	}
-	return a.Cloud_(tag, ci)
+	return a.Cloud_(tag)
 }
 
 func (a *API) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {

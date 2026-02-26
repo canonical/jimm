@@ -392,7 +392,7 @@ var addHostedCloudTests = []struct {
 	name            string
 	dialError       error
 	addCloud        func(names.CloudTag, jujucloud.Cloud, bool) error
-	cloud_          func(names.CloudTag, *jujucloud.Cloud) error
+	cloud_          func(names.CloudTag) (jujucloud.Cloud, error)
 	username        string
 	cloudName       string
 	cloud           jujucloud.Cloud
@@ -404,7 +404,8 @@ var addHostedCloudTests = []struct {
 	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
+	cloud_: func(_ names.CloudTag) (jujucloud.Cloud, error) {
+		cld := jujucloud.Cloud{}
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-provider/test-region"
 		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
@@ -419,7 +420,7 @@ var addHostedCloudTests = []struct {
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
-		return nil
+		return cld, nil
 	},
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
@@ -460,7 +461,8 @@ var addHostedCloudTests = []struct {
 	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
+	cloud_: func(_ names.CloudTag) (jujucloud.Cloud, error) {
+		cld := jujucloud.Cloud{}
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-cloud/test-region"
 		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
@@ -475,7 +477,7 @@ var addHostedCloudTests = []struct {
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
-		return nil
+		return cld, nil
 	},
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
@@ -516,7 +518,8 @@ var addHostedCloudTests = []struct {
 	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
+	cloud_: func(_ names.CloudTag) (jujucloud.Cloud, error) {
+		cld := jujucloud.Cloud{}
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-cloud/test-region"
 		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
@@ -531,7 +534,7 @@ var addHostedCloudTests = []struct {
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
-		return nil
+		return cld, nil
 	},
 	username:  "bob@canonical.com",
 	cloudName: "new-cloud",
@@ -736,7 +739,7 @@ var addHostedCloudToControllerTests = []struct {
 	name            string
 	dialError       error
 	addCloud        func(names.CloudTag, jujucloud.Cloud, bool) error
-	cloud_          func(names.CloudTag, *jujucloud.Cloud) error
+	cloud_          func(names.CloudTag) (jujucloud.Cloud, error)
 	username        string
 	controllerName  string
 	cloudName       string
@@ -749,7 +752,8 @@ var addHostedCloudToControllerTests = []struct {
 	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
+	cloud_: func(_ names.CloudTag) (jujucloud.Cloud, error) {
+		cld := jujucloud.Cloud{}
 		cld.Type = "maas"
 		cld.HostCloudRegion = "test-provider/test-region"
 		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
@@ -764,7 +768,7 @@ var addHostedCloudToControllerTests = []struct {
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
-		return nil
+		return cld, nil
 	},
 	username:       "alice@canonical.com",
 	controllerName: "test-controller",
@@ -805,7 +809,8 @@ var addHostedCloudToControllerTests = []struct {
 	addCloud: func(names.CloudTag, jujucloud.Cloud, bool) error {
 		return nil
 	},
-	cloud_: func(_ names.CloudTag, cld *jujucloud.Cloud) error {
+	cloud_: func(_ names.CloudTag) (jujucloud.Cloud, error) {
+		cld := jujucloud.Cloud{}
 		cld.Type = "kubernetes"
 		cld.HostCloudRegion = "test-provider/test-region"
 		cld.AuthTypes = jujucloud.AuthTypes{jujucloud.EmptyAuthType, jujucloud.UserPassAuthType}
@@ -820,7 +825,7 @@ var addHostedCloudToControllerTests = []struct {
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
-		return nil
+		return cld, nil
 	},
 	username:       "alice@canonical.com",
 	controllerName: "no-such-controller",

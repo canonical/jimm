@@ -114,47 +114,36 @@ func (c Connection) RevokeCredential(ctx context.Context, cred names.CloudCreden
 
 // Cloud retrieves information about the given cloud. Cloud uses the
 // Cloud procedure on the Cloud facade.
-func (c Connection) Cloud(tag names.CloudTag, cloud *jujucloud.Cloud) error {
-	cloudAPI := cloudapi.NewClient(&c)
-	res, err := cloudAPI.Cloud(tag)
-	if err != nil {
-		return err
-	}
-	*cloud = res
-	return nil
+func (c Connection) Cloud(tag names.CloudTag) (jujucloud.Cloud, error) {
+	return cloudapi.NewClient(&c).Cloud(tag)
 }
 
 // Clouds retrieves information about all available clouds. Clouds uses the
 // Clouds procedure on the Cloud facade.
 func (c Connection) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {
-	cloudAPI := cloudapi.NewClient(&c)
-	return cloudAPI.Clouds()
+	return cloudapi.NewClient(&c).Clouds()
 }
 
 // AddCloud adds the given cloud to a controller with the given name.
 // AddCloud uses the AddCloud procedure on the Cloud facade.
 func (c Connection) AddCloud(tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
-	cloudAPI := cloudapi.NewClient(&c)
-	return cloudAPI.AddCloud(cloud, force)
+	return cloudapi.NewClient(&c).AddCloud(cloud, force)
 }
 
 // RemoveCloud removes the given cloud from the controller. RemoveCloud
 // uses the RemoveClouds procedure on the Cloud facade.
 func (c Connection) RemoveCloud(tag names.CloudTag) error {
-	cloudAPI := cloudapi.NewClient(&c)
-	return cloudAPI.RemoveCloud(tag.Id())
+	return cloudapi.NewClient(&c).RemoveCloud(tag.Id())
 }
 
 // UpdateCloud updates the given cloud with the given cloud definition.
 // UpdateCloud uses the UpdateCloud procedure on the cloud facade.
 func (c Connection) UpdateCloud(tag names.CloudTag, cloud jujucloud.Cloud) error {
-	cloudAPI := cloudapi.NewClient(&c)
-	return cloudAPI.UpdateCloud(cloud)
+	return cloudapi.NewClient(&c).UpdateCloud(cloud)
 }
 
 // CredentialContents returns contents of the credential values for the specified
 // cloud and credential name. Secrets will be included if requested.
 func (c Connection) CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
-	cloudAPI := cloudapi.NewClient(&c)
-	return cloudAPI.CredentialContents(cloud, credential, withSecrets)
+	return cloudapi.NewClient(&c).CredentialContents(cloud, credential, withSecrets)
 }

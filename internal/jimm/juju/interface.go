@@ -72,7 +72,7 @@ type API interface {
 	Close() error
 
 	// Cloud fetches the cloud data for the given cloud.
-	Cloud(names.CloudTag, *jujucloud.Cloud) error
+	Cloud(names.CloudTag) (jujucloud.Cloud, error)
 
 	// Clouds returns the set of clouds supported by the controller.
 	Clouds() (map[names.CloudTag]jujucloud.Cloud, error)
