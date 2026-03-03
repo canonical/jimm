@@ -634,8 +634,10 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 	// Juju API handlers
 	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
 	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
-	// Uploading local charms
-	mountHandler("/model/{uuid}/{type:charms|applications}", jimmhttp.NewHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager))
+	// Uploading local charms (s3 compatible endpoint and legacy HTTP endpoint, respectively)
+	proxyHandler := jimmhttp.NewHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager)
+	mountHandler("/model-{uuid}/charms/{charmref}", proxyHandler)
+	mountHandler("/model/{uuid}/{type:charms|applications}", proxyHandler)
 	// HTTP Migration endpoints
 	mountHandler("/migrate", jimmhttp.NewMigrationHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager))
 	// Log transfer endpoint

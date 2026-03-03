@@ -37,17 +37,18 @@ const (
 
 // NewHTTPProxyHandler creates a proxy http handler.
 func NewHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore) *HTTPProxyHandler {
-	return &HTTPProxyHandler{
+	h := &HTTPProxyHandler{
 		Router:          chi.NewRouter(),
 		authenicator:    authenticator,
 		credentialStore: credentialStore,
 	}
+	h.SetupMiddleware()
+	h.Router.HandleFunc(ProxyEndpoints, h.ProxyHTTP)
+	return h
 }
 
 // Routes returns the grouped routers routes with group specific middlewares.
 func (hph *HTTPProxyHandler) Routes() chi.Router {
-	hph.SetupMiddleware()
-	hph.Router.HandleFunc(ProxyEndpoints, hph.ProxyHTTP)
 	return hph.Router
 }
 
