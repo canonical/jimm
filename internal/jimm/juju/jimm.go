@@ -130,18 +130,16 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 			return err
 		}
 
-		// if c.UnavailableSince is valid, then we can delete is
-		// if c.UnavailableSince is no valid, then we can't delete is
-		// if force is true, we can always delete is
-		if !force && !c.UnavailableSince.Valid {
-			return errors.E(errors.CodeStillAlive, "controller is still alive")
-		}
-
 		models, err := db.GetModelsByController(ctx, c)
 		if err != nil {
 			return err
 		}
-		// Delete its models first.
+		if len(models) > 0 && !force {
+			return errors.E(errors.CodeStillAlive, "controller still has models")
+		}
+
+		// Remove all models associated with the controller. If force is false,
+		// we can only reach here with an empty list of models.
 		for _, model := range models {
 			err := db.DeleteModel(ctx, &model)
 			if err != nil {

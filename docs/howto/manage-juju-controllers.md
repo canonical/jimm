@@ -177,6 +177,9 @@ These options include:
 1. Use the `jaas` plugin to first unregister the controller then use the `juju` CLI to destroy it.
 2. Use the `jaas` plugin destroy the controller via an API call to JIMM, allowing for greater automation.
 
+Removing a controller can only be done once the controller is not hosting
+any models known to JIMM. Migrate or destroy these models before destroying the controller.
+
 ````{dropdown} Unregister and destroy
 
 Switch to the JIMM controller and unregister your controller from JIMM:
@@ -196,8 +199,6 @@ juju destroy-controller mycontroller
 ````{dropdown} JIMM destroy
 Switch to the JIMM controller and destroy the controller.
 
-Note that this command will return an error if the controller is still hosting
-any models. Migrate or destroy these models before destroying the controller.
 ```text
 juju switch jimm
 juju jaas destroy-controller mycontroller

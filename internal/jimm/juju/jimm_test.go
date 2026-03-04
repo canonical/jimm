@@ -231,7 +231,7 @@ func TestSetControllerDeprecated(t *testing.T) {
 	}
 }
 
-const removeControllerTestEnv = `clouds:
+const removeControllerWithModelsTestEnv = `clouds:
 - name: test-cloud
   type: test-provider
   regions:
@@ -270,53 +270,63 @@ models:
     access: read
 `
 
+const removeControllerWithoutModelsTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: cred-1
+  cloud: test-cloud
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+`
+
 func TestRemoveController(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
 
 	tests := []struct {
-		about            string
-		user             string
-		unavailableSince *time.Time
-		force            bool
-		expectedError    string
+		about         string
+		user          string
+		force         bool
+		env           string
+		expectedError string
 	}{{
-		about:            "remove an unavailable controller",
-		user:             "alice@canonical.com",
-		unavailableSince: &now,
-		force:            true,
-	}, {
-		about: "remove a live controller with force",
+		about: "remove a controller without models",
 		user:  "alice@canonical.com",
 		force: true,
+		env:   removeControllerWithoutModelsTestEnv,
 	}, {
-		about:         "error when removing a live controller",
+		about: "remove a controller with models with force",
+		user:  "alice@canonical.com",
+		force: true,
+		env:   removeControllerWithModelsTestEnv,
+	}, {
+		about:         "error when removing a controller with models",
 		user:          "alice@canonical.com",
 		force:         false,
-		expectedError: "controller is still alive",
+		expectedError: "controller still has models",
+		env:           removeControllerWithModelsTestEnv,
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
 			j := newTestJujuManager(c, nil)
 
-			env := jimmtest.ParseEnvironment(c, removeControllerTestEnv)
+			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDB(c, j.Database)
 
 			dbUser := env.User(test.user).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, nil)
-
-			if test.unavailableSince != nil {
-				// make the controller unavailable
-				controller := env.Controller("controller-1").DBObject(c, j.Database)
-				controller.UnavailableSince = sql.NullTime{
-					Valid: true,
-					Time:  *test.unavailableSince,
-				}
-				err := j.Database.UpdateController(ctx, &controller)
-				c.Assert(err, qt.Equals, nil)
-			}
 
 			err := j.RemoveController(ctx, user, "controller-1", test.force)
 			if test.expectedError != "" {
