@@ -356,8 +356,8 @@ func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Contr
 			return nil, errors.E(err)
 		}
 	}
-	var result jujucloud.Cloud
-	if err := api.Cloud(tag, &result); err != nil {
+	result, err := api.Cloud(tag)
+	if err != nil {
 		return nil, errors.E(err)
 	}
 

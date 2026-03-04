@@ -359,10 +359,10 @@ func (c *MockAPIChangeModelCredentialCall) DoAndReturn(f func(context.Context, n
 }
 
 // CheckCredentialModels mocks base method.
-func (m *MockAPI) CheckCredentialModels(arg0 context.Context, arg1 params.TaggedCredential) ([]params.UpdateCredentialModelResult, error) {
+func (m *MockAPI) CheckCredentialModels(arg0 context.Context, arg1 params.TaggedCredential) ([]params.UpdateCredentialResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckCredentialModels", arg0, arg1)
-	ret0, _ := ret[0].([]params.UpdateCredentialModelResult)
+	ret0, _ := ret[0].([]params.UpdateCredentialResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -380,19 +380,19 @@ type MockAPICheckCredentialModelsCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPICheckCredentialModelsCall) Return(arg0 []params.UpdateCredentialModelResult, arg1 error) *MockAPICheckCredentialModelsCall {
+func (c *MockAPICheckCredentialModelsCall) Return(arg0 []params.UpdateCredentialResult, arg1 error) *MockAPICheckCredentialModelsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPICheckCredentialModelsCall) Do(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialModelResult, error)) *MockAPICheckCredentialModelsCall {
+func (c *MockAPICheckCredentialModelsCall) Do(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialResult, error)) *MockAPICheckCredentialModelsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPICheckCredentialModelsCall) DoAndReturn(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialModelResult, error)) *MockAPICheckCredentialModelsCall {
+func (c *MockAPICheckCredentialModelsCall) DoAndReturn(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialResult, error)) *MockAPICheckCredentialModelsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -475,17 +475,18 @@ func (c *MockAPICloseCall) DoAndReturn(f func() error) *MockAPICloseCall {
 }
 
 // Cloud mocks base method.
-func (m *MockAPI) Cloud(arg0 names.CloudTag, arg1 *cloud.Cloud) error {
+func (m *MockAPI) Cloud(arg0 names.CloudTag) (cloud.Cloud, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Cloud", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret := m.ctrl.Call(m, "Cloud", arg0)
+	ret0, _ := ret[0].(cloud.Cloud)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Cloud indicates an expected call of Cloud.
-func (mr *MockAPIMockRecorder) Cloud(arg0, arg1 any) *MockAPICloudCall {
+func (mr *MockAPIMockRecorder) Cloud(arg0 any) *MockAPICloudCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cloud", reflect.TypeOf((*MockAPI)(nil).Cloud), arg0, arg1)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cloud", reflect.TypeOf((*MockAPI)(nil).Cloud), arg0)
 	return &MockAPICloudCall{Call: call}
 }
 
@@ -495,19 +496,19 @@ type MockAPICloudCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPICloudCall) Return(arg0 error) *MockAPICloudCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockAPICloudCall) Return(arg0 cloud.Cloud, arg1 error) *MockAPICloudCall {
+	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPICloudCall) Do(f func(names.CloudTag, *cloud.Cloud) error) *MockAPICloudCall {
+func (c *MockAPICloudCall) Do(f func(names.CloudTag) (cloud.Cloud, error)) *MockAPICloudCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPICloudCall) DoAndReturn(f func(names.CloudTag, *cloud.Cloud) error) *MockAPICloudCall {
+func (c *MockAPICloudCall) DoAndReturn(f func(names.CloudTag) (cloud.Cloud, error)) *MockAPICloudCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1905,41 +1906,41 @@ func (c *MockAPIUpdateCloudCall) DoAndReturn(f func(names.CloudTag, cloud.Cloud)
 	return c
 }
 
-// UpdateCredential mocks base method.
-func (m *MockAPI) UpdateCredential(arg0 context.Context, arg1 params.TaggedCredential) ([]params.UpdateCredentialModelResult, error) {
+// UpdateCloudsCredentialForce mocks base method.
+func (m *MockAPI) UpdateCloudsCredentialForce(arg0 context.Context, arg1 params.TaggedCredential) ([]params.UpdateCredentialResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateCredential", arg0, arg1)
-	ret0, _ := ret[0].([]params.UpdateCredentialModelResult)
+	ret := m.ctrl.Call(m, "UpdateCloudsCredentialForce", arg0, arg1)
+	ret0, _ := ret[0].([]params.UpdateCredentialResult)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateCredential indicates an expected call of UpdateCredential.
-func (mr *MockAPIMockRecorder) UpdateCredential(arg0, arg1 any) *MockAPIUpdateCredentialCall {
+// UpdateCloudsCredentialForce indicates an expected call of UpdateCloudsCredentialForce.
+func (mr *MockAPIMockRecorder) UpdateCloudsCredentialForce(arg0, arg1 any) *MockAPIUpdateCloudsCredentialForceCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCredential", reflect.TypeOf((*MockAPI)(nil).UpdateCredential), arg0, arg1)
-	return &MockAPIUpdateCredentialCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudsCredentialForce", reflect.TypeOf((*MockAPI)(nil).UpdateCloudsCredentialForce), arg0, arg1)
+	return &MockAPIUpdateCloudsCredentialForceCall{Call: call}
 }
 
-// MockAPIUpdateCredentialCall wrap *gomock.Call
-type MockAPIUpdateCredentialCall struct {
+// MockAPIUpdateCloudsCredentialForceCall wrap *gomock.Call
+type MockAPIUpdateCloudsCredentialForceCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIUpdateCredentialCall) Return(arg0 []params.UpdateCredentialModelResult, arg1 error) *MockAPIUpdateCredentialCall {
+func (c *MockAPIUpdateCloudsCredentialForceCall) Return(arg0 []params.UpdateCredentialResult, arg1 error) *MockAPIUpdateCloudsCredentialForceCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIUpdateCredentialCall) Do(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialModelResult, error)) *MockAPIUpdateCredentialCall {
+func (c *MockAPIUpdateCloudsCredentialForceCall) Do(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialResult, error)) *MockAPIUpdateCloudsCredentialForceCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIUpdateCredentialCall) DoAndReturn(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialModelResult, error)) *MockAPIUpdateCredentialCall {
+func (c *MockAPIUpdateCloudsCredentialForceCall) DoAndReturn(f func(context.Context, params.TaggedCredential) ([]params.UpdateCredentialResult, error)) *MockAPIUpdateCloudsCredentialForceCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
