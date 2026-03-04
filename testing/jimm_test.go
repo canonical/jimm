@@ -361,6 +361,7 @@ func TestAddControllerCustomTLSHostname(t *testing.T) {
 func TestRemoveController(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
@@ -371,8 +372,9 @@ func TestRemoveController(t *testing.T) {
 	_, err := client.RemoveController(&apiparams.RemoveControllerRequest{
 		Name: name,
 	})
-	c.Check(err, qt.ErrorMatches, `controller is still alive \(still alive\)`)
+	c.Check(err, qt.ErrorMatches, `controller still has models.*`)
 	c.Check(jujuparams.ErrCode(err), qt.Equals, apiparams.CodeStillAlive)
+	s.DestroyModelAndDeleteFromDatabase(c, model.ResourceTag())
 
 	conn2 := s.Open(c, nil, "bob", nil)
 	defer conn2.Close()
@@ -385,8 +387,7 @@ func TestRemoveController(t *testing.T) {
 	c.Check(jujuparams.ErrCode(err), qt.Equals, jujuparams.CodeUnauthorized)
 
 	ci, err := client.RemoveController(&apiparams.RemoveControllerRequest{
-		Name:  name,
-		Force: true,
+		Name: name,
 	})
 	c.Assert(err, qt.Equals, nil)
 	ciExpected := apiparams.ControllerInfo{
