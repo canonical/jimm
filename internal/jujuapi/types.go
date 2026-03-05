@@ -271,13 +271,9 @@ func toModelInfo(modelInfo base.ModelInfo) jujuparams.ModelInfo {
 		})
 	}
 	for _, machine := range modelInfo.Machines {
-		mi.Machines = append(mi.Machines, jujuparams.ModelMachineInfo{
-			Id:          machine.Id,
-			InstanceId:  machine.InstanceId,
-			DisplayName: machine.DisplayName,
-			Status:      machine.Status,
-			Message:     machine.Message,
-			Hardware: &jujuparams.MachineHardware{
+		hardwareInfo := &jujuparams.MachineHardware{}
+		if machine.Hardware != nil {
+			hardwareInfo = &jujuparams.MachineHardware{
 				Arch:             machine.Hardware.Arch,
 				Cores:            machine.Hardware.CpuCores,
 				Mem:              machine.Hardware.Mem,
@@ -286,10 +282,18 @@ func toModelInfo(modelInfo base.ModelInfo) jujuparams.ModelInfo {
 				Tags:             machine.Hardware.Tags,
 				AvailabilityZone: machine.Hardware.AvailabilityZone,
 				VirtType:         machine.Hardware.VirtType,
-			},
-			HAPrimary: machine.HAPrimary,
-			HasVote:   machine.HasVote,
-			WantsVote: machine.WantsVote,
+			}
+		}
+		mi.Machines = append(mi.Machines, jujuparams.ModelMachineInfo{
+			Id:          machine.Id,
+			InstanceId:  machine.InstanceId,
+			DisplayName: machine.DisplayName,
+			Status:      machine.Status,
+			Message:     machine.Message,
+			Hardware:    hardwareInfo,
+			HAPrimary:   machine.HAPrimary,
+			HasVote:     machine.HasVote,
+			WantsVote:   machine.WantsVote,
 		})
 	}
 	return mi
