@@ -361,13 +361,22 @@ func TestAddControllerCustomTLSHostname(t *testing.T) {
 func TestRemoveController(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
-	model := s.CreateModelForBob(c)
 
 	conn := s.Open(c, nil, "alice", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
 
 	name, conf := s.GetOneControllerConfig(c)
+
+	// Create a model on the controller we are going to remove
+	model := s.CreateModel(c, jimmtest.AddModelArgs{
+		Name:                 petname.Generate(2, "-"),
+		Owner:                names.NewUserTag("bob@canonical.com"),
+		Cloud:                names.NewCloudTag(jimmtest.TestE2ECloudName),
+		Region:               jimmtest.TestE2ECloudRegionName,
+		Cred:                 s.BobCredential.ResourceTag(),
+		TargetControllerName: name,
+	})
 
 	_, err := client.RemoveController(&apiparams.RemoveControllerRequest{
 		Name: name,
