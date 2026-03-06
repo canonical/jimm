@@ -363,3 +363,69 @@ func TestToFullModelInfo(t *testing.T) {
 		},
 	}})
 }
+
+func TestToFullModelInfoNilSecretBackendError(t *testing.T) {
+	c := qt.New(t)
+
+	modelInfo := jujuclient.ModelInfo{
+		ModelInfo: base.ModelInfo{
+			Name:            "test-model",
+			Cloud:           "aws",
+			CloudCredential: "aws/alice@canonical.com/main-cred",
+			Owner:           "alice@canonical.com",
+		},
+		SecretBackends: []jujuclient.SecretBackendResult{{
+			Result: jujuclient.SecretBackend{
+				Name:        "vault",
+				BackendType: "vault",
+			},
+			ID:         "backend-1",
+			NumSecrets: 7,
+			Status:     "available",
+			Message:    "ready",
+			Error:      nil,
+		}},
+	}
+
+	got := toFullModelInfo(modelInfo)
+
+	c.Assert(got.SecretBackends, qt.DeepEquals, []jujuparams.SecretBackendResult{{
+		Result: jujuparams.SecretBackend{
+			Name:        "vault",
+			BackendType: "vault",
+		},
+		ID:         "backend-1",
+		NumSecrets: 7,
+		Status:     "available",
+		Message:    "ready",
+		Error:      nil,
+	}})
+}
+
+func TestToFullModelInfoNonNilSecretBackendError(t *testing.T) {
+	c := qt.New(t)
+
+	modelInfo := jujuclient.ModelInfo{
+		ModelInfo: base.ModelInfo{
+			Name:            "test-model",
+			Cloud:           "aws",
+			CloudCredential: "aws/alice@canonical.com/main-cred",
+			Owner:           "alice@canonical.com",
+		},
+		SecretBackends: []jujuclient.SecretBackendResult{{
+			Result: jujuclient.SecretBackend{
+				Name:        "vault",
+				BackendType: "vault",
+			},
+			Error: errors.E("an error", errors.CodeNotFound, map[string]any{"detail": "not found"}),
+		}},
+	}
+
+	got := toFullModelInfo(modelInfo)
+
+	c.Assert(got.SecretBackends, qt.HasLen, 1)
+	c.Assert(got.SecretBackends[0].Error, qt.IsNotNil)
+	c.Assert(got.SecretBackends[0].Error.Error(), qt.Equals, "an error")
+	c.Assert(got.SecretBackends[0].Error.Code, qt.Equals, string(errors.CodeNotFound))
+	c.Assert(got.SecretBackends[0].Error.Info, qt.DeepEquals, map[string]any{"detail": "not found"})
+}

@@ -325,7 +325,7 @@ func toFullModelInfo(modelInfo jujuclient.ModelInfo) jujuparams.ModelInfo {
 
 	var secretBackendResults []jujuparams.SecretBackendResult
 	for _, sb := range modelInfo.SecretBackends {
-		secretBackendResults = append(secretBackendResults, jujuparams.SecretBackendResult{
+		res := jujuparams.SecretBackendResult{
 			Result: jujuparams.SecretBackend{
 				Name:                sb.Result.Name,
 				BackendType:         sb.Result.BackendType,
@@ -336,12 +336,15 @@ func toFullModelInfo(modelInfo jujuclient.ModelInfo) jujuparams.ModelInfo {
 			NumSecrets: sb.NumSecrets,
 			Status:     sb.Status,
 			Message:    sb.Message,
-			Error: &jujuparams.Error{
+		}
+		if sb.Error != nil {
+			res.Error = &jujuparams.Error{
 				Message: sb.Error.Error(),
 				Code:    string(errors.ErrorCode(sb.Error)),
 				Info:    errors.ErrorInfo(sb.Error),
-			},
-		})
+			}
+		}
+		secretBackendResults = append(secretBackendResults, res)
 	}
 	modelInfoParams.SecretBackends = secretBackendResults
 
