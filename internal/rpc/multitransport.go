@@ -33,6 +33,25 @@ type multiBackendTransport struct {
 	currentURLIndex int
 }
 
+// readTrackingNoOpCloserBody wraps an io.ReadCloser to track whether it has been read from
+// and provides a no-op Close method to allow the original request body to be closed separately.
+// This is similar to the stdlib's net/http/transport.go readTrackingBody but adds a no-op closer.
+type readTrackingNoOpCloserBody struct {
+	io.ReadCloser
+	didRead bool
+}
+
+// Read tracks that the body has been read from and delegates to the underlying ReadCloser.
+func (r *readTrackingNoOpCloserBody) Read(data []byte) (int, error) {
+	r.didRead = true
+	return r.ReadCloser.Read(data)
+}
+
+// Close is a no-op to allow the original request body to be closed separately.
+func (r *readTrackingNoOpCloserBody) Close() error {
+	return nil
+}
+
 // newMultiBackendTransport creates a new MultiBackendTransport with the given
 // base transport and URLs.
 func newMultiBackendTransport(baseTransport http.RoundTripper, urls []*url.URL) (*multiBackendTransport, error) {
@@ -50,6 +69,18 @@ func newMultiBackendTransport(baseTransport http.RoundTripper, urls []*url.URL) 
 func (m *multiBackendTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	var lastErr error
 
+	// Track the original request body to determine if we can safely retry on failure
+	trackedRequest := req
+	var trackedBody *readTrackingNoOpCloserBody
+	if req.Body != nil {
+		// We do not close the original request body, this is done
+		// by the HTTP server that accepts the request, see the godoc
+		// for the http.Request Body field.
+		trackedBody = &readTrackingNoOpCloserBody{ReadCloser: req.Body}
+		trackedRequest = req.Clone(req.Context())
+		trackedRequest.Body = trackedBody
+	}
+
 	// Try each URL in succession
 	for i := 0; i < len(m.urls); i++ {
 		// Calculate the URL index to try (round-robin starting from currentURLIndex)
@@ -57,7 +88,7 @@ func (m *multiBackendTransport) RoundTrip(req *http.Request) (*http.Response, er
 		targetURL := m.urls[urlIndex]
 
 		// Clone the request to avoid modifying the original
-		clonedReq := req.Clone(req.Context())
+		clonedReq := trackedRequest.Clone(trackedRequest.Context())
 		clonedReq.URL.Scheme = targetURL.Scheme
 		clonedReq.URL.Host = targetURL.Host
 		newPath, err := url.JoinPath("/", targetURL.Path, clonedReq.URL.Path)
@@ -76,11 +107,9 @@ func (m *multiBackendTransport) RoundTrip(req *http.Request) (*http.Response, er
 			m.currentURLIndex = (urlIndex + 1) % len(m.urls)
 			return resp, nil
 		}
-		if errors.Is(err, io.EOF) {
-			// If we hit EOF, it likely means that we failed partway through
-			// the request and without the original body of the request
-			// stored, we cannot safely retry.
-			return nil, fmt.Errorf("backend failure during request: %w", err)
+		if trackedBody != nil && trackedBody.didRead {
+			// If we've read from the body we've lost some data and cannot retry, so return the error.
+			return nil, fmt.Errorf("non-retryable backend failure during request: %w", err)
 		}
 
 		// Log the failure and try the next URL

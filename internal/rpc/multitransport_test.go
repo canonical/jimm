@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"sync/atomic"
@@ -16,9 +17,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// TestMultiBackendTransport tests the multiBackendTransport
-// implementation by simulating various server responses and ensuring
-// that the transport correctly handles them specifically for failover scenarios.
+// TestMultiBackendTransport exercises multiBackendTransport through a
+// reverse proxy by simulating various backend responses and checking the
+// resulting proxy behaviour for failover scenarios.
 func TestMultiBackendTransport(t *testing.T) {
 	c := qt.New(t)
 	expectedBody := "this is the request body"
@@ -56,7 +57,7 @@ func TestMultiBackendTransport(t *testing.T) {
 			http.Error(w, "unexpected number of bytes read from request body", http.StatusInternalServerError)
 			return
 		}
-		panic("foo")
+		panic("intentional panic after partial read")
 	}))
 	defer partialReadServer.Close()
 
@@ -118,22 +119,31 @@ func TestMultiBackendTransport(t *testing.T) {
 
 	for _, test := range tests {
 		c.Run(test.description, func(c *qt.C) {
-			body := strings.NewReader(expectedBody)
-			limitReader := io.LimitReader(body, int64(len(expectedBody))) // Ensure we can only read the data once.
-			req, err := http.NewRequest("POST", test.path, limitReader)
-			c.Assert(err, qt.IsNil)
-
 			transport, err := rpc.NewMultiBackendTransport(http.DefaultTransport, test.urls)
 			c.Assert(err, qt.IsNil)
 
-			resp, err := transport.RoundTrip(req)
+			proxyServer := httptest.NewServer(&httputil.ReverseProxy{
+				Rewrite:   func(pr *httputil.ProxyRequest) {},
+				Transport: transport,
+				ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+					http.Error(w, err.Error(), http.StatusBadGateway)
+				},
+			})
+			defer proxyServer.Close()
+
+			body := strings.NewReader(expectedBody)
+			req, err := http.NewRequest("POST", proxyServer.URL+test.path, body)
+			c.Assert(err, qt.IsNil)
+
+			resp, err := proxyServer.Client().Do(req)
+			c.Assert(err, qt.IsNil)
+			defer resp.Body.Close()
+
 			if test.shouldError {
-				c.Assert(err, qt.IsNotNil)
+				c.Assert(resp.StatusCode, qt.Equals, http.StatusBadGateway)
 				return
 			}
 
-			c.Assert(err, qt.IsNil)
-			defer resp.Body.Close()
 			c.Assert(resp.StatusCode, qt.Equals, test.statusExpected)
 		})
 	}
