@@ -104,6 +104,11 @@ func ProxyHTTP(ctx context.Context, ctl ConnectionDetails, w http.ResponseWriter
 		},
 		Transport: multiBackendTransport,
 		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			zapctx.Error(ctx, "HTTP proxy error", zap.Error(err))
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = fmt.Fprintf(w, "proxy error: %v", err)
+		},
 	}
 	proxy.ServeHTTP(w, req)
 }

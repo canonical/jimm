@@ -76,15 +76,15 @@ func (m *multiBackendTransport) RoundTrip(req *http.Request) (*http.Response, er
 			m.currentURLIndex = (urlIndex + 1) % len(m.urls)
 			return resp, nil
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			// If we hit EOF, it likely means that we failed partway through
 			// the request and without the original body of the request
 			// stored, we cannot safely retry.
-			return nil, errors.New("backend failure during request")
+			return nil, fmt.Errorf("backend failure during request: %w", err)
 		}
 
 		// Log the failure and try the next URL
-		zapctx.Debug(context.Background(), "request to backend failed, trying next",
+		zapctx.Error(context.Background(), "request to backend failed, trying next",
 			zap.String("backend", targetURL.String()),
 			zap.Error(err),
 			zap.Int("attempt", i+1),
