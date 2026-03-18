@@ -15,7 +15,7 @@ require (
 	github.com/juju/names/v4 v4.0.0
 	github.com/juju/names/v5 v5.0.0
 	github.com/juju/rpcreflect v1.2.0
-	github.com/juju/testing v1.2.0
+	github.com/juju/testing v1.2.0 // indirect
 	github.com/juju/utils/v4 v4.0.5
 	github.com/juju/version/v2 v2.0.1
 	github.com/juju/zaputil v0.0.0-20190326175239-ef53049637ac
@@ -59,7 +59,7 @@ require (
 	go.uber.org/zap v1.27.1
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.19.0
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/errgo.v1 v1.0.1
 	gopkg.in/httprequest.v1 v1.2.1
 	gopkg.in/macaroon.v2 v2.1.0
@@ -282,22 +282,16 @@ require (
 )
 
 require (
-	github.com/GehirnInc/crypt v0.0.0-20230320061759-8cc1b52080c5 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
-	github.com/canonical/go-flags v0.0.0-20230403090104-105d09a091b8 // indirect
-	github.com/canonical/pebble v1.29.0 // indirect
-	github.com/canonical/x-go v0.0.0-20251013153820-eed72624b6ac // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/juju/packaging/v4 v4.0.0 // indirect
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/pkg/term v1.1.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.30.0 // indirect
 	github.com/riverqueue/river/rivershared v0.30.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

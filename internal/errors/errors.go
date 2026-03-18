@@ -1,4 +1,4 @@
-// Copyright 2026 Canonical.
+// Copyright 2025 Canonical.
 
 // Package errors contains types to help handle errors in the system.
 package errors
@@ -31,7 +31,7 @@ type Error struct {
 }
 
 // Error implements the error interface.
-func (e *Error) Error() string {
+func (e Error) Error() string {
 	if e.Message != "" {
 		return e.Message
 	}
@@ -45,17 +45,17 @@ func (e *Error) Error() string {
 }
 
 // Unwrap implements the Unwrap method used by errors.Unwrap.
-func (e *Error) Unwrap() error {
+func (e Error) Unwrap() error {
 	return e.Err
 }
 
 // ErrorCode returns the value of this error's Code.
-func (e *Error) ErrorCode() string {
+func (e Error) ErrorCode() string {
 	return string(e.Code)
 }
 
 // ErrorInfo returns the value of this error's Info.
-func (e *Error) ErrorInfo() map[string]any {
+func (e Error) ErrorInfo() map[string]any {
 	return e.Info
 }
 
@@ -93,7 +93,7 @@ func E(args ...interface{}) error {
 		}
 	}
 	if setCode {
-		return &e
+		return e
 	}
 
 	// If the caller didn't explicitly set the code/info for this error, attempt
@@ -110,7 +110,46 @@ func E(args ...interface{}) error {
 			e.Info = info
 		}
 	}
-	return &e
+	return e
+}
+
+// New creates a new Error with the given message.
+func New(msg string) Error {
+	return Error{Message: msg}
+}
+
+// Newf creates a new Error with a formatted message.
+func Newf(format string, args ...any) Error {
+	return Error{Message: fmt.Sprintf(format, args...)}
+}
+
+// Wrap creates a new Error with err as the underlying error.
+//
+// Useful for wrapping an error with a custom message, code, or info,
+// while preserving the original error in the chain.
+func Wrap(err error) Error {
+	return Error{Err: err}
+}
+
+// Wrap sets the given error as the underlying error of this Error.
+//
+// Use this method to wrap an existing error with a new message, code, or info,
+// while preserving the original error in the chain.
+func (e Error) Wrap(err error) Error {
+	e.Err = err
+	return e
+}
+
+// WithCode sets the given code on this Error.
+func (e Error) WithCode(code Code) Error {
+	e.Code = code
+	return e
+}
+
+// WithInfo sets the given info on this Error.
+func (e Error) WithInfo(info map[string]any) Error {
+	e.Info = info
+	return e
 }
 
 // A Code is a code which describes the class of error. Where possible
