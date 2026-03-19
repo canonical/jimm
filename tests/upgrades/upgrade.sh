@@ -13,7 +13,7 @@ source "local/jimm/detect-jaas.sh"
 # See: https://warthogs.atlassian.net/browse/JUJU-8938
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
 UPGRADE_CONTROLLER="upgrade-source-controller"
-SOURCE_CONTROLLER_VERSION="3.6.11"
+SOURCE_CONTROLLER_VERSION="3.6.19"
 # Generate a random 4-character suffix for the model name.
 RAND_SUFFIX=$(tr -dc 'a-z0-9' </dev/urandom | head -c 4 || true)
 UPGRADING_MODEL_NAME="upgrading-model-$RAND_SUFFIX"
