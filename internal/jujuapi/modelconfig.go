@@ -20,7 +20,7 @@ func init() {
 
 		// Juju 4
 		r.AddMethod("ModelConfig", 4, "ModelGet", modelGetMethod)
-		return []int{3}
+		return []int{3, 4}
 	}
 }
 
