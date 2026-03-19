@@ -110,6 +110,32 @@ func (c *Client) SetControllerDeprecated(req *params.SetControllerDeprecatedRequ
 	return info, err
 }
 
+// SaveControllerProfile creates or replaces a saved controller profile.
+func (c *Client) SaveControllerProfile(req *params.SaveControllerProfileRequest) (params.SaveControllerProfileResponse, error) {
+	var response params.SaveControllerProfileResponse
+	err := c.caller.APICall("JIMM", 4, "", "SaveControllerProfile", req, &response)
+	return response, err
+}
+
+// GetControllerProfile retrieves a saved controller profile by name.
+func (c *Client) GetControllerProfile(req *params.GetControllerProfileRequest) (params.GetControllerProfileResponse, error) {
+	var response params.GetControllerProfileResponse
+	err := c.caller.APICall("JIMM", 4, "", "GetControllerProfile", req, &response)
+	return response, err
+}
+
+// ListControllerProfiles lists all saved controller profiles.
+func (c *Client) ListControllerProfiles(req *params.ListControllerProfilesRequest) ([]params.ControllerProfileSummary, error) {
+	var response params.ListControllerProfilesResponse
+	err := c.caller.APICall("JIMM", 4, "", "ListControllerProfiles", req, &response)
+	return response.Profiles, err
+}
+
+// RemoveControllerProfile removes a saved controller profile by name.
+func (c *Client) RemoveControllerProfile(req *params.RemoveControllerProfileRequest) error {
+	return c.caller.APICall("JIMM", 4, "", "RemoveControllerProfile", req, nil)
+}
+
 // UpgradeTo initiates a controller upgrade to the specified version.
 func (c *Client) UpgradeTo(req *params.UpgradeToRequest) (params.UpgradeToResponse, error) {
 	var resp params.UpgradeToResponse

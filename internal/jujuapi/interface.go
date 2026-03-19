@@ -46,6 +46,7 @@ type JIMM interface {
 	JujuManager() JujuManager
 	ConfigManager() ConfigManager
 	BootstrapManager() BootstrapManager
+	ControllerProfileManager() ControllerProfileManager
 	UpgradeManager() UpgradeManager
 	JobManager() JobManager
 
@@ -322,6 +323,14 @@ type BootstrapManager interface {
 	BootstrapController(ctx context.Context, p bootstrap.RunBootstrapArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
 	// DestroyController destroys a Juju controller.
 	DestroyController(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error
+}
+
+// ControllerProfileManager provides methods to manage saved controller profiles.
+type ControllerProfileManager interface {
+	SaveControllerProfile(ctx context.Context, profile *dbmodel.ControllerProfile) error
+	GetControllerProfile(ctx context.Context, name string) (*dbmodel.ControllerProfile, error)
+	ListControllerProfiles(ctx context.Context) ([]dbmodel.ControllerProfile, error)
+	RemoveControllerProfile(ctx context.Context, name string) error
 }
 
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.

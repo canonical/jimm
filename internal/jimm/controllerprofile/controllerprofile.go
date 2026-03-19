@@ -1,0 +1,58 @@
+// Copyright 2026 Canonical.
+
+package controllerprofile
+
+import (
+	"context"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+)
+
+// ControllerProfileManager provides a means to manage controller profiles within JIMM.
+type ControllerProfileManager struct {
+	store *db.Database
+}
+
+// NewControllerProfileManager returns a new controller profile manager backed by the provided store.
+func NewControllerProfileManager(store *db.Database) (*ControllerProfileManager, error) {
+	if store == nil {
+		return nil, errors.E("controller profile store cannot be nil")
+	}
+	return &ControllerProfileManager{store: store}, nil
+}
+
+// SaveControllerProfile creates or replaces a saved controller profile.
+func (m *ControllerProfileManager) SaveControllerProfile(ctx context.Context, profile *dbmodel.ControllerProfile) error {
+	if err := m.store.CreateOrReplaceControllerProfile(ctx, profile); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// GetControllerProfile retrieves a saved controller profile by name.
+func (m *ControllerProfileManager) GetControllerProfile(ctx context.Context, name string) (*dbmodel.ControllerProfile, error) {
+	profile := &dbmodel.ControllerProfile{Name: name}
+	if err := m.store.GetControllerProfile(ctx, profile); err != nil {
+		return nil, errors.E(err)
+	}
+	return profile, nil
+}
+
+// ListControllerProfiles lists all saved controller profiles.
+func (m *ControllerProfileManager) ListControllerProfiles(ctx context.Context) ([]dbmodel.ControllerProfile, error) {
+	profiles, err := m.store.ListControllerProfiles(ctx)
+	if err != nil {
+		return nil, errors.E(err)
+	}
+	return profiles, nil
+}
+
+// RemoveControllerProfile removes a saved controller profile by name.
+func (m *ControllerProfileManager) RemoveControllerProfile(ctx context.Context, name string) error {
+	if err := m.store.RemoveControllerProfile(ctx, name); err != nil {
+		return errors.E(err)
+	}
+	return nil
+}

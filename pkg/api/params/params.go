@@ -246,6 +246,131 @@ type SetControllerDeprecatedRequest struct {
 	Deprecated bool `json:"deprecated"`
 }
 
+// ControllerProfile stores reusable, non-secret controller bootstrap settings.
+type ControllerProfile struct {
+	// Name is the profile's name and must be unique across all profiles.
+	Name string `json:"name" yaml:"name"`
+	// Description is an optional human-readable summary of the profile.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// Version must be provided when updating an existing profile.
+	Version uint `json:"version" yaml:"version"`
+	// CreatedAt is the time the profile was first created.
+	CreatedAt string `json:"created-at,omitempty" yaml:"created-at,omitempty"`
+	// UpdatedAt is the time the profile was last updated.
+	UpdatedAt string `json:"updated-at,omitempty" yaml:"updated-at,omitempty"`
+	// Cloud stores the cloud definition for the profile.
+	Cloud ControllerProfileCloud `json:"cloud" yaml:"cloud"`
+	// BootstrapOptions holds the reusable bootstrap settings saved in the profile.
+	BootstrapOptions ControllerProfileBootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
+}
+
+// ControllerProfileSummary contains the fields returned when listing controller profiles.
+type ControllerProfileSummary struct {
+	// Name is the profile's name and must be unique across all profiles.
+	Name string `json:"name" yaml:"name"`
+	// Description is an optional human-readable summary of the profile.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// CreatedAt is the time the profile was first created.
+	CreatedAt string `json:"created-at,omitempty" yaml:"created-at,omitempty"`
+	// UpdatedAt is the time the profile was last updated.
+	UpdatedAt string `json:"updated-at,omitempty" yaml:"updated-at,omitempty"`
+}
+
+// ControllerProfileCloud stores the cloud definition persisted in a controller profile.
+type ControllerProfileCloud struct {
+	// Name is the cloud's name, e.g. "aws", "azure", "gcp", "localhost", etc.
+	Name string `json:"name" yaml:"name"`
+	// Type is the cloud's type, e.g. "ec2", "azure", "openstack", etc.
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	// AuthTypes contains the supported cloud auth types.
+	AuthTypes []string `json:"auth-types,omitempty" yaml:"auth-types,omitempty"`
+	// CACertificates contains the cloud CA certificates.
+	CACertificates []string `json:"ca-certificates,omitempty" yaml:"ca-certificates,omitempty"`
+	// Config contains cloud-specific configuration.
+	Config map[string]any `json:"config,omitempty" yaml:"config,omitempty"`
+	// Endpoint contains the cloud API endpoint, if needed.
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	// HostCloudRegion contains the host cloud region for the cloud, if any.
+	HostCloudRegion string `json:"host-cloud-region,omitempty" yaml:"host-cloud-region,omitempty"`
+	// Region contains the cloud region definition for the profile's bootstrap region.
+	Region ControllerProfileCloudRegion `json:"region" yaml:"region"`
+}
+
+// ControllerProfileCloudRegion stores the single bootstrap region definition for a profile.
+type ControllerProfileCloudRegion struct {
+	// Name is the region's name, e.g. "us-east-1".
+	Name string `json:"name" yaml:"name"`
+	// Endpoint contains the region-specific cloud API endpoint, if needed.
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	// IdentityEndpoint contains the region-specific cloud identity API endpoint, if needed.
+	IdentityEndpoint string `json:"identity-endpoint,omitempty" yaml:"identity-endpoint,omitempty"`
+	// StorageEndpoint contains the region-specific cloud storage API endpoint, if needed.
+	StorageEndpoint string `json:"storage-endpoint,omitempty" yaml:"storage-endpoint,omitempty"`
+}
+
+// ControllerProfileBootstrapOptions stores the reusable bootstrap settings supported by a profile.
+type ControllerProfileBootstrapOptions struct {
+	// BootstrapBase specifies the base of the bootstrap machine, e.g. "ubuntu@24.04".
+	BootstrapBase string `json:"bootstrap-base,omitempty" yaml:"bootstrap-base,omitempty"`
+	// BootstrapConstraints specifies bootstrap machine constraints.
+	BootstrapConstraints map[string]string `json:"bootstrap-constraints,omitempty" yaml:"bootstrap-constraints,omitempty"`
+	// ModelConstraints sets the default constraints for workload machines in the controller model.
+	ModelConstraints map[string]string `json:"model-constraints,omitempty" yaml:"model-constraints,omitempty"`
+	// ModelDefault specifies default model configuration values.
+	ModelDefault map[string]string `json:"model-default,omitempty" yaml:"model-default,omitempty"`
+	// StoragePool holds the options for an initial storage pool created in the controller model.
+	StoragePool *ControllerProfileStoragePool `json:"storage-pool,omitempty" yaml:"storage-pool,omitempty"`
+	// BootstrapConfig holds bootstrap configuration values.
+	BootstrapConfig map[string]string `json:"bootstrap-config,omitempty" yaml:"bootstrap-config,omitempty"`
+	// ControllerConfig holds controller configuration.
+	ControllerConfig map[string]string `json:"controller-config,omitempty" yaml:"controller-config,omitempty"`
+	// ControllerModelConfig holds model configuration values that apply only to the controller model.
+	ControllerModelConfig map[string]string `json:"controller-model-config,omitempty" yaml:"controller-model-config,omitempty"`
+}
+
+// ControllerProfileStoragePool stores the optional storage pool configuration for a profile.
+type ControllerProfileStoragePool struct {
+	// Name is the storage pool name and is required.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	// Type is the storage pool type and is required.
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	// Attributes holds additional storage pool attributes.
+	Attributes map[string]string `json:"attributes,omitempty" yaml:"attributes,omitempty"`
+}
+
+// SaveControllerProfileRequest saves or replaces a named controller profile.
+type SaveControllerProfileRequest struct {
+	ControllerProfile
+}
+
+// SaveControllerProfileResponse contains the saved controller profile.
+type SaveControllerProfileResponse struct {
+	ControllerProfile
+}
+
+// GetControllerProfileRequest retrieves a controller profile by name.
+type GetControllerProfileRequest struct {
+	Name string `json:"name" yaml:"name"`
+}
+
+// GetControllerProfileResponse contains a single controller profile.
+type GetControllerProfileResponse struct {
+	ControllerProfile
+}
+
+// ListControllerProfilesRequest lists all saved controller profiles.
+type ListControllerProfilesRequest struct{}
+
+// ListControllerProfilesResponse contains the summary fields for all saved controller profiles.
+type ListControllerProfilesResponse struct {
+	Profiles []ControllerProfileSummary `json:"profiles" yaml:"profiles"`
+}
+
+// RemoveControllerProfileRequest removes a controller profile by name.
+type RemoveControllerProfileRequest struct {
+	Name string `json:"name" yaml:"name"`
+}
+
 // UpgradeToRequest holds the parameters for phase 1 for automated upgrades.
 type UpgradeToRequest struct {
 	// ModelTag is the tag of the model to upgrade.

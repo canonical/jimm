@@ -70,6 +70,10 @@ func init() {
 		stopBootstrap := rpc.Method(r.StopBootstrap)
 		startBootstrap := rpc.Method(r.StartBootstrap)
 		startDestroyController := rpc.Method(r.StartDestroyController)
+		saveControllerProfile := rpc.Method(r.SaveControllerProfile)
+		getControllerProfile := rpc.Method(r.GetControllerProfile)
+		listControllerProfiles := rpc.Method(r.ListControllerProfiles)
+		removeControllerProfile := rpc.Method(r.RemoveControllerProfile)
 		upgradeToMethod := rpc.Method(r.UpgradeTo)
 		listUserCloudsMethod := rpc.Method(r.ListUserClouds)
 		modelControllerInfoMethod := rpc.Method(r.ModelControllerInfo)
@@ -128,6 +132,11 @@ func init() {
 		// Job management
 		r.AddMethod("JIMM", 4, "JobInfo", jobInfoMethod)
 		r.AddMethod("JIMM", 4, "ListJobs", listJobsMethod)
+		// JIMM Controller Profiles
+		r.AddMethod("JIMM", 4, "GetControllerProfile", getControllerProfile)
+		r.AddMethod("JIMM", 4, "ListControllerProfiles", listControllerProfiles)
+		r.AddMethod("JIMM", 4, "RemoveControllerProfile", removeControllerProfile)
+		r.AddMethod("JIMM", 4, "SaveControllerProfile", saveControllerProfile)
 
 		return []int{4}
 	}

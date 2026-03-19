@@ -55,6 +55,10 @@ func (j *JIMMAdapter) BootstrapManager() BootstrapManager {
 	return j.j.BootstrapManager
 }
 
+func (j *JIMMAdapter) ControllerProfileManager() ControllerProfileManager {
+	return j.j.ControllerProfileManager
+}
+
 func (j *JIMMAdapter) UpgradeManager() UpgradeManager {
 	return j.j.UpgradeManager
 }
