@@ -1,0 +1,158 @@
+// Copyright 2026 Canonical.
+
+package db
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/servermon"
+)
+
+func validateControllerProfile(profile *dbmodel.ControllerProfile) error {
+	if profile.Cloud.Name == "" {
+		return errors.E(errors.CodeBadRequest, "controller profile cloud name must be provided")
+	}
+	if profile.Cloud.Region.Name == "" {
+		return errors.E(errors.CodeBadRequest, "controller profile cloud region name must be provided")
+	}
+	storagePool := profile.BootstrapOptions.StoragePool
+	if (storagePool.Name == "") != (storagePool.Type == "") {
+		return errors.E(errors.CodeBadRequest, "controller profile storage pool requires both name and type")
+	}
+	return nil
+}
+
+// CreateOrReplaceControllerProfile creates a new controller profile or replaces
+// an existing one with the same name.
+//
+// New profiles must be created with Version set to 0. Replacing an existing
+// profile requires Version to match the last value read by the caller.
+func (d *Database) CreateOrReplaceControllerProfile(ctx context.Context, profile *dbmodel.ControllerProfile) (err error) {
+	const op = "db.CreateOrReplaceControllerProfile"
+	if err := d.ready(); err != nil {
+		return errors.E(err)
+	}
+	if profile.Name == "" {
+		return errors.E(errors.CodeBadRequest, "controller profile name must be provided")
+	}
+	if err := validateControllerProfile(profile); err != nil {
+		return err
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	err = d.Transaction(func(d *Database) error {
+		current := dbmodel.ControllerProfile{Name: profile.Name}
+		err := d.ForUpdate().GetControllerProfile(ctx, &current)
+		if err != nil {
+			if errors.ErrorCode(err) != errors.CodeNotFound {
+				return errors.E(err)
+			}
+			// When creating a new profile, Version must be 0. The database will assign Version 1 to the new profile.
+			if profile.Version != 0 {
+				return errors.E(errors.CodeBadRequest, fmt.Sprintf("controller profile %q does not exist", profile.Name))
+			}
+			profile.Version = 1
+			if err := d.DB.WithContext(ctx).Create(profile).Error; err != nil {
+				return errors.E(dbError(err))
+			}
+			return nil
+		}
+
+		if profile.Version != current.Version {
+			return errors.E(
+				errors.CodeBadRequest,
+				fmt.Sprintf("controller profile %q version mismatch: expected %d, got %d", profile.Name, current.Version, profile.Version),
+			)
+		}
+
+		updated := *profile
+		updated.ID = current.ID
+		updated.CreatedAt = current.CreatedAt
+		updated.Version = current.Version + 1
+		if err := d.DB.WithContext(ctx).Save(&updated).Error; err != nil {
+			return errors.E(dbError(err))
+		}
+		*profile = updated
+		return nil
+	})
+	if err != nil {
+		return errors.E(err)
+	}
+	return nil
+}
+
+// GetControllerProfile fills profile using the stored profile with the same
+// name.
+func (d *Database) GetControllerProfile(ctx context.Context, profile *dbmodel.ControllerProfile) (err error) {
+	const op = "db.GetControllerProfile"
+	if err := d.ready(); err != nil {
+		return errors.E(err)
+	}
+	if profile.Name == "" {
+		return errors.E(errors.CodeBadRequest, "controller profile name must be provided")
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	db := d.DB.WithContext(ctx).Where("name = ?", profile.Name)
+	if err := db.First(profile).Error; err != nil {
+		err := dbError(err)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.E(fmt.Sprintf("controller profile %q not found", profile.Name), err)
+		}
+		return errors.E(err)
+	}
+	return nil
+}
+
+// ListControllerProfiles retrieves all saved controller profiles ordered by
+// name.
+func (d *Database) ListControllerProfiles(ctx context.Context) (_ []dbmodel.ControllerProfile, err error) {
+	const op = "db.ListControllerProfiles"
+	if err := d.ready(); err != nil {
+		return nil, errors.E(err)
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	var profiles []dbmodel.ControllerProfile
+	if err := d.DB.WithContext(ctx).Order("name asc").Find(&profiles).Error; err != nil {
+		return nil, errors.E(dbError(err))
+	}
+	return profiles, nil
+}
+
+// RemoveControllerProfile deletes the saved controller profile with the given
+// name.
+func (d *Database) RemoveControllerProfile(ctx context.Context, name string) (err error) {
+	const op = "db.RemoveControllerProfile"
+	if err := d.ready(); err != nil {
+		return errors.E(err)
+	}
+	if name == "" {
+		return errors.E(errors.CodeBadRequest, "controller profile name must be provided")
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	query := d.DB.WithContext(ctx).Where("name = ?", name).Delete(&dbmodel.ControllerProfile{})
+	if query.Error != nil {
+		return errors.E(dbError(query.Error))
+	}
+	if query.RowsAffected == 0 {
+		return errors.E(errors.CodeNotFound, fmt.Sprintf("controller profile %q not found", name))
+	}
+	return nil
+}
