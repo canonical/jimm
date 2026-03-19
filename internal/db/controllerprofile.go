@@ -12,6 +12,9 @@ import (
 )
 
 func validateControllerProfile(profile *dbmodel.ControllerProfile) error {
+	if profile.Name == "" {
+		return errors.E(errors.CodeBadRequest, "controller profile name must be provided")
+	}
 	if profile.Cloud.Name == "" {
 		return errors.E(errors.CodeBadRequest, "controller profile cloud name must be provided")
 	}
@@ -34,9 +37,6 @@ func (d *Database) CreateOrReplaceControllerProfile(ctx context.Context, profile
 	const op = "db.CreateOrReplaceControllerProfile"
 	if err := d.ready(); err != nil {
 		return errors.E(err)
-	}
-	if profile.Name == "" {
-		return errors.E(errors.CodeBadRequest, "controller profile name must be provided")
 	}
 	if err := validateControllerProfile(profile); err != nil {
 		return err
