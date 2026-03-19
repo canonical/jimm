@@ -15,9 +15,18 @@ func init() {
 	facadeInit["ModelConfig"] = func(r *controllerRoot) []int {
 		modelGetMethod := rpc.Method(r.ModelGet)
 
+		// Juju 3
 		r.AddMethod("ModelConfig", 3, "ModelGet", modelGetMethod)
+
+		// Juju 4
+		r.AddMethod("ModelConfig", 4, "ModelGet", modelGetMethod)
 		return []int{3}
 	}
+}
+
+// ModelGetV4 returns the model configuration.
+func (r *controllerRoot) ModelGetV4(ctx context.Context) (params.ModelConfigResults, error) {
+	return r.ModelGet(ctx)
 }
 
 // ModelGet returns the model configuration in JIMM's case, this is used to return the "controller" model config.

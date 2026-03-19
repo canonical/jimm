@@ -41,6 +41,7 @@ func init() {
 		latestLogTime := rpc.Method(r.LatestLogTime)
 		abort := rpc.Method(r.Abort)
 
+		// Juju 3
 		r.AddMethod("MigrationTarget", 6, "Prechecks", preChecks)
 		r.AddMethod("MigrationTarget", 6, "CACert", caCert)
 		r.AddMethod("MigrationTarget", 6, "Activate", activate)
@@ -50,8 +51,35 @@ func init() {
 		r.AddMethod("MigrationTarget", 6, "Import", importMethod)
 		r.AddMethod("MigrationTarget", 6, "LatestLogTime", latestLogTime)
 
-		return []int{6}
+		// Juju 4
+		r.AddMethod("MigrationTarget", 7, "Prechecks", preChecks)
+		r.AddMethod("MigrationTarget", 7, "CACert", caCert)
+		r.AddMethod("MigrationTarget", 7, "Activate", activate)
+		r.AddMethod("MigrationTarget", 7, "AdoptResources", adoptResources)
+		r.AddMethod("MigrationTarget", 7, "Abort", abort)
+		r.AddMethod("MigrationTarget", 7, "CheckMachines", checkMachines)
+		r.AddMethod("MigrationTarget", 7, "Import", importMethod)
+		r.AddMethod("MigrationTarget", 7, "LatestLogTime", latestLogTime)
+
+		return []int{6, 7}
 	}
+}
+
+// CACert implements the CACert method of the MigrationTarget facade.
+// It is used by the source Juju controller to retrieve the CA cert of
+// the target controller during model migration, if the client did not
+// send a CA cert to the source controller (possible if the controller
+// uses a public CA rather than a self-signed cert).
+//
+// The above is nonsensical because if the source controller can reach
+// the target controller (and because Juju enforces WSS), it already has
+// everything it needs i.e. it either has the self-signed CA cert or it
+// was able to connect thanks to a public CA.
+//
+// However, because the source controller requires this call to be successful,
+// but doesn't actually require the result to have len() > 0, we can return an empty result.
+func (r *controllerRoot) CACertV4() (jujuparams.BytesResult, error) {
+	return r.CACert()
 }
 
 // CACert implements the CACert method of the MigrationTarget facade.
@@ -69,6 +97,10 @@ func init() {
 // but doesn't actually require the result to have len() > 0, we can return an empty result.
 func (r *controllerRoot) CACert() (jujuparams.BytesResult, error) {
 	return jujuparams.BytesResult{}, nil
+}
+
+func (r *controllerRoot) CheckMachinesV4(ctx context.Context, args jujuparams.ModelArgs) (jujuparams.ErrorResults, error) {
+	return r.CheckMachines(ctx, args)
 }
 
 func (r *controllerRoot) CheckMachines(ctx context.Context, args jujuparams.ModelArgs) (jujuparams.ErrorResults, error) {
@@ -98,6 +130,12 @@ func (r *controllerRoot) CheckMachines(ctx context.Context, args jujuparams.Mode
 
 // Abort implements the Abort method of the MigrationTarget facade.
 // It is used by the source Juju controller to abort a model migration.
+func (r *controllerRoot) AbortV4(ctx context.Context, args jujuparams.ModelArgs) error {
+	return r.Abort(ctx, args)
+}
+
+// Abort implements the Abort method of the MigrationTarget facade.
+// It is used by the source Juju controller to abort a model migration.
 func (r *controllerRoot) Abort(ctx context.Context, args jujuparams.ModelArgs) error {
 	if !r.user.JimmAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -108,6 +146,15 @@ func (r *controllerRoot) Abort(ctx context.Context, args jujuparams.ModelArgs) e
 		return errors.E(err)
 	}
 	return r.jimm.JujuManager().AbortMigration(ctx, r.user, modelTag.Id())
+}
+
+// AdoptResources implements the AdoptResources method of the MigrationTarget facade.
+// It is used by the source Juju controller to update the tags of the
+// resources of a model that has been migrated to a new controller.
+// This prevents the resources from being destroyed if the source controller
+// is destroyed after the model is migrated away.
+func (r *controllerRoot) AdoptResourcesV4(ctx context.Context, args jujuparams.AdoptResourcesArgs) error {
+	return r.AdoptResources(ctx, args)
 }
 
 // AdoptResources implements the AdoptResources method of the MigrationTarget facade.
@@ -130,6 +177,13 @@ func (r *controllerRoot) AdoptResources(ctx context.Context, args jujuparams.Ado
 // LatestLogTime implements the LatestLogTime method of the MigrationTarget facade.
 // It is used by the source Juju controller to retrieve the time of the
 // latest log record it has seen.
+func (r *controllerRoot) LatestLogTimeV4(ctx context.Context, args jujuparams.ModelArgs) (time.Time, error) {
+	return r.LatestLogTime(ctx, args)
+}
+
+// LatestLogTime implements the LatestLogTime method of the MigrationTarget facade.
+// It is used by the source Juju controller to retrieve the time of the
+// latest log record it has seen.
 func (r *controllerRoot) LatestLogTime(ctx context.Context, args jujuparams.ModelArgs) (time.Time, error) {
 	if !r.user.JimmAdmin {
 		return time.Time{}, errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -145,6 +199,11 @@ func (r *controllerRoot) LatestLogTime(ctx context.Context, args jujuparams.Mode
 		return time.Time{}, errors.E(err)
 	}
 	return t, nil
+}
+
+// Prechecks implements the Prechecks method of the MigrationTarget facade.
+func (r *controllerRoot) PrechecksV4(ctx context.Context, args jujuparams.MigrationModelInfo) error {
+	return r.Prechecks(ctx, args)
 }
 
 // Prechecks implements the Prechecks method of the MigrationTarget facade.
@@ -172,6 +231,11 @@ func (r *controllerRoot) Prechecks(ctx context.Context, args jujuparams.Migratio
 		return errors.E(err)
 	}
 	return nil
+}
+
+// Activate is the implementation of the Activate method of the MigrationTarget facade.
+func (r *controllerRoot) ActivateV4(ctx context.Context, args jujuparams.ActivateModelArgs) error {
+	return r.Activate(ctx, args)
 }
 
 // Activate is the implementation of the Activate method of the MigrationTarget facade.
@@ -208,6 +272,12 @@ func (r *controllerRoot) Activate(ctx context.Context, args jujuparams.ActivateM
 		return err
 	}
 	return nil
+}
+
+// Import implements the Import method of the MigrationTarget facade.
+// It imports resources into JIMM and proxies the import request to the target Juju controller.
+func (r *controllerRoot) ImportV4(ctx context.Context, serialized jujuparams.SerializedModel) error {
+	return r.Import(ctx, serialized)
 }
 
 // Import implements the Import method of the MigrationTarget facade.

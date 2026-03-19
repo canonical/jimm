@@ -28,6 +28,7 @@ func init() {
 		findOffersMethod := rpc.Method(r.FindApplicationOffers)
 		applicationOffersMethod := rpc.Method(r.ApplicationOffers)
 
+		// Juju 3
 		r.AddMethod("ApplicationOffers", 5, "Offer", offerMethod)
 		r.AddMethod("ApplicationOffers", 5, "GetConsumeDetails", getConsumeDetailsMethod)
 		r.AddMethod("ApplicationOffers", 5, "ListApplicationOffers", listOffersMethod)
@@ -36,8 +37,22 @@ func init() {
 		r.AddMethod("ApplicationOffers", 5, "FindApplicationOffers", findOffersMethod)
 		r.AddMethod("ApplicationOffers", 5, "ApplicationOffers", applicationOffersMethod)
 
-		return []int{5}
+		// Juju 4
+		r.AddMethod("ApplicationOffers", 6, "Offer", offerMethod)
+		r.AddMethod("ApplicationOffers", 6, "GetConsumeDetails", getConsumeDetailsMethod)
+		r.AddMethod("ApplicationOffers", 6, "ListApplicationOffers", listOffersMethod)
+		r.AddMethod("ApplicationOffers", 6, "ModifyOfferAccess", modifyOfferAccessMethod)
+		r.AddMethod("ApplicationOffers", 6, "DestroyOffers", destroyOffersMethod)
+		r.AddMethod("ApplicationOffers", 6, "FindApplicationOffers", findOffersMethod)
+		r.AddMethod("ApplicationOffers", 6, "ApplicationOffers", applicationOffersMethod)
+
+		return []int{5, 6}
 	}
+}
+
+// Offer creates a new ApplicationOffer.
+func (r *controllerRoot) OfferV4(ctx context.Context, args jujuparams.AddApplicationOffers) (jujuparams.ErrorResults, error) {
+	return r.Offer(ctx, args)
 }
 
 // Offer creates a new ApplicationOffer.
@@ -73,6 +88,12 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 		return errors.E(err)
 	}
 	return nil
+}
+
+// GetConsumeDetailsV4 implements the GetConsumeDetails procedure of the
+// ApplicationOffers facade.
+func (r *controllerRoot) GetConsumeDetailsV4(ctx context.Context, args jujuparams.ConsumeOfferDetailsArg) (jujuparams.ConsumeOfferDetailsResults, error) {
+	return r.GetConsumeDetails(ctx, args)
 }
 
 // GetConsumeDetails implements the GetConsumeDetails procedure of the
@@ -123,6 +144,11 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 	return details, nil
 }
 
+// ListApplicationOffersV4 returns all offers matching the specified filters.
+func (r *controllerRoot) ListApplicationOffersV4(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
+	return r.ListApplicationOffers(ctx, args)
+}
+
 // ListApplicationOffers returns all offers matching the specified filters.
 func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
 
@@ -136,6 +162,13 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 	results.Results = offersToParams(offers)
 
 	return results, nil
+}
+
+// FindApplicationOffersV4 returns all offers matching the specified filters
+// as long as the user has read access to each offer. It also omits details
+// on users and connections.
+func (r *controllerRoot) FindApplicationOffersV4(ctx context.Context, args jujuparams.OfferFilters) (jujuparams.QueryApplicationOffersResultsV5, error) {
+	return r.FindApplicationOffers(ctx, args)
 }
 
 // FindApplicationOffers returns all offers matching the specified filters
@@ -153,6 +186,11 @@ func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujupar
 	results.Results = offersToParams(offers)
 
 	return results, nil
+}
+
+// ModifyOfferAccessV4 modifies application offer access.
+func (r *controllerRoot) ModifyOfferAccessV4(ctx context.Context, args jujuparams.ModifyOfferAccessRequest) (jujuparams.ErrorResults, error) {
+	return r.ModifyOfferAccess(ctx, args)
 }
 
 // ModifyOfferAccess modifies application offer access.
@@ -189,6 +227,11 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 	}
 }
 
+// DestroyOffersV4 removes specified application offers.
+func (r *controllerRoot) DestroyOffersV4(ctx context.Context, args jujuparams.DestroyApplicationOffers) (jujuparams.ErrorResults, error) {
+	return r.DestroyOffers(ctx, args)
+}
+
 // DestroyOffers removes specified application offers.
 func (r *controllerRoot) DestroyOffers(ctx context.Context, args jujuparams.DestroyApplicationOffers) (jujuparams.ErrorResults, error) {
 	results := jujuparams.ErrorResults{
@@ -199,6 +242,11 @@ func (r *controllerRoot) DestroyOffers(ctx context.Context, args jujuparams.Dest
 		results.Results[i].Error = r.mapError(ctx, r.jimm.JujuManager().DestroyOffer(ctx, r.user, offerURL, args.Force))
 	}
 	return results, nil
+}
+
+// ApplicationOffersV4 returns details of the specified application offers.
+func (r *controllerRoot) ApplicationOffersV4(ctx context.Context, args jujuparams.OfferURLs) (jujuparams.ApplicationOffersResults, error) {
+	return r.ApplicationOffers(ctx, args)
 }
 
 func (r *controllerRoot) ApplicationOffers(ctx context.Context, args jujuparams.OfferURLs) (jujuparams.ApplicationOffersResults, error) {
