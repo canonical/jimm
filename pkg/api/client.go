@@ -124,7 +124,8 @@ func (c *Client) GetControllerProfile(req *params.GetControllerProfileRequest) (
 	return response, err
 }
 
-// ListControllerProfiles lists all saved controller profiles.
+// ListControllerProfiles lists saved controller profiles, optionally filtered
+// by Juju version.
 func (c *Client) ListControllerProfiles(req *params.ListControllerProfilesRequest) ([]params.ControllerProfileSummary, error) {
 	var response params.ListControllerProfilesResponse
 	err := c.caller.APICall("JIMM", 4, "", "ListControllerProfiles", req, &response)

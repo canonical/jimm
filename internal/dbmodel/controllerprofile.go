@@ -2,7 +2,10 @@
 
 package dbmodel
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ControllerProfile stores reusable, non-secret controller bootstrap settings.
 //
@@ -16,10 +19,26 @@ type ControllerProfile struct {
 
 	Name        string `gorm:"not null;uniqueIndex"`
 	Description string
-	Version     uint `gorm:"not null"`
+	JujuVersion string `gorm:"column:juju_version;not null"`
+	Version     uint   `gorm:"not null"`
 
 	Cloud            ControllerProfileCloud            `gorm:"embedded"`
 	BootstrapOptions ControllerProfileBootstrapOptions `gorm:"embedded"`
+}
+
+// PartialJujuVersionPrefixes returns the progressive prefixes of a Juju
+// version string. Callers are expected to validate the version before use if
+// needed.
+func PartialJujuVersionPrefixes(version string) []string {
+	if version == "" {
+		return nil
+	}
+	parts := strings.Split(version, ".")
+	prefixes := make([]string, 0, len(parts))
+	for i := 1; i <= len(parts); i++ {
+		prefixes = append(prefixes, strings.Join(parts[:i], "."))
+	}
+	return prefixes
 }
 
 // ControllerProfileCloud stores the cloud definition persisted in a controller

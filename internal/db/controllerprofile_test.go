@@ -16,6 +16,7 @@ func testControllerProfile() dbmodel.ControllerProfile {
 	return dbmodel.ControllerProfile{
 		Name:        "openstack-production",
 		Description: "Reusable bootstrap settings for OpenStack production controllers",
+		JujuVersion: "3.6",
 		Cloud: dbmodel.ControllerProfileCloud{
 			Name:            "my-private-cloud",
 			Type:            "openstack",
@@ -75,7 +76,7 @@ func (s *dbSuite) TestControllerProfileCRUD(c *qt.C) {
 	c.Assert(s.Database.GetControllerProfile(ctx, &lookup), qt.IsNil)
 	c.Check(lookup, controllerProfileEquals, profile)
 
-	profiles, err := s.Database.ListControllerProfiles(ctx)
+	profiles, err := s.Database.ListControllerProfiles(ctx, "")
 	c.Assert(err, qt.IsNil)
 	c.Assert(profiles, qt.HasLen, 1)
 	c.Check(profiles[0], controllerProfileEquals, profile)
@@ -110,6 +111,39 @@ func (s *dbSuite) TestCreateOrReplaceControllerProfileRequiresCurrentVersion(c *
 	c.Assert(s.Database.GetControllerProfile(ctx, &lookup), qt.IsNil)
 	c.Check(lookup.Description, qt.Equals, "fresh update")
 	c.Check(lookup.Version, qt.Equals, uint(2))
+}
+
+func (s *dbSuite) TestListControllerProfilesFiltersByJujuVersion(c *qt.C) {
+	ctx := context.Background()
+	c.Assert(s.Database.Migrate(ctx), qt.IsNil)
+
+	for _, tc := range []struct {
+		name        string
+		jujuVersion string
+	}{
+		{name: "profile-3", jujuVersion: "3"},
+		{name: "profile-3-6", jujuVersion: "3.6"},
+		{name: "profile-3-6-4", jujuVersion: "3.6.4"},
+		{name: "profile-4", jujuVersion: "4"},
+	} {
+		profile := testControllerProfile()
+		profile.Name = tc.name
+		profile.JujuVersion = tc.jujuVersion
+		c.Assert(s.Database.CreateOrReplaceControllerProfile(ctx, &profile), qt.IsNil)
+	}
+
+	profiles, err := s.Database.ListControllerProfiles(ctx, "3.6.4")
+	c.Assert(err, qt.IsNil)
+	c.Assert(profiles, qt.HasLen, 3)
+	c.Check(profiles[0].Name, qt.Equals, "profile-3")
+	c.Check(profiles[1].Name, qt.Equals, "profile-3-6")
+	c.Check(profiles[2].Name, qt.Equals, "profile-3-6-4")
+
+	profiles, err = s.Database.ListControllerProfiles(ctx, "3.6")
+	c.Assert(err, qt.IsNil)
+	c.Assert(profiles, qt.HasLen, 2)
+	c.Check(profiles[0].Name, qt.Equals, "profile-3")
+	c.Check(profiles[1].Name, qt.Equals, "profile-3-6")
 }
 
 func (s *dbSuite) TestControllerProfileNameMustBeUnique(c *qt.C) {

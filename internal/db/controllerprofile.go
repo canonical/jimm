@@ -114,8 +114,9 @@ func (d *Database) GetControllerProfile(ctx context.Context, profile *dbmodel.Co
 }
 
 // ListControllerProfiles retrieves all saved controller profiles ordered by
-// name.
-func (d *Database) ListControllerProfiles(ctx context.Context) (_ []dbmodel.ControllerProfile, err error) {
+// name. When jujuVersion is provided, only profiles whose saved juju-version
+// is a prefix of the requested version are returned.
+func (d *Database) ListControllerProfiles(ctx context.Context, jujuVersion string) (_ []dbmodel.ControllerProfile, err error) {
 	const op = "db.ListControllerProfiles"
 	if err := d.ready(); err != nil {
 		return nil, errors.E(err)
@@ -126,7 +127,11 @@ func (d *Database) ListControllerProfiles(ctx context.Context) (_ []dbmodel.Cont
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	var profiles []dbmodel.ControllerProfile
-	if err := d.DB.WithContext(ctx).Order("name asc").Find(&profiles).Error; err != nil {
+	query := d.DB.WithContext(ctx).Order("name asc")
+	if jujuVersion != "" {
+		query = query.Where("juju_version IN ?", dbmodel.PartialJujuVersionPrefixes(jujuVersion))
+	}
+	if err := query.Find(&profiles).Error; err != nil {
 		return nil, errors.E(dbError(err))
 	}
 	return profiles, nil

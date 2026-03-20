@@ -1,5 +1,7 @@
 // Copyright 2026 Canonical.
 
+// Package controllerprofile provides an implementation
+// for managing controller profiles within JIMM.
 package controllerprofile
 
 import (
@@ -40,9 +42,10 @@ func (m *ControllerProfileManager) GetControllerProfile(ctx context.Context, nam
 	return profile, nil
 }
 
-// ListControllerProfiles lists all saved controller profiles.
-func (m *ControllerProfileManager) ListControllerProfiles(ctx context.Context) ([]dbmodel.ControllerProfile, error) {
-	profiles, err := m.store.ListControllerProfiles(ctx)
+// ListControllerProfiles lists saved controller profiles, optionally filtered
+// by Juju version.
+func (m *ControllerProfileManager) ListControllerProfiles(ctx context.Context, jujuVersion string) ([]dbmodel.ControllerProfile, error) {
+	profiles, err := m.store.ListControllerProfiles(ctx, jujuVersion)
 	if err != nil {
 		return nil, errors.E(err)
 	}

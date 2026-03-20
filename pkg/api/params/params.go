@@ -252,6 +252,8 @@ type ControllerProfile struct {
 	Name string `json:"name" yaml:"name"`
 	// Description is an optional human-readable summary of the profile.
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// JujuVersion is the Juju version(s) this profile is intended for e.g. 3, 3.6, 3.6.1.
+	JujuVersion string `json:"juju-version" yaml:"juju-version"`
 	// Version must be provided when updating an existing profile.
 	Version uint `json:"version" yaml:"version"`
 	// CreatedAt is the time the profile was first created.
@@ -358,8 +360,16 @@ type GetControllerProfileResponse struct {
 	ControllerProfile
 }
 
-// ListControllerProfilesRequest lists all saved controller profiles.
-type ListControllerProfilesRequest struct{}
+// ListControllerProfilesRequest lists saved controller profiles and can filter
+// them by Juju version.
+type ListControllerProfilesRequest struct {
+	// JujuVersion allows clients to filter profiles to those appropriate for the
+	// Juju version(s) they are intending to use. The filter matches profiles that
+	// specify a Juju version that is a prefix of the provided version. For example,
+	// a filter value of "3.6.7" will show profiles with juju-version set to "3",
+	// "3.6", and "3.6.7" but not "3.6.5", or "3.7", or "4".
+	JujuVersion string `json:"juju-version,omitempty" yaml:"juju-version,omitempty"`
+}
 
 // ListControllerProfilesResponse contains the summary fields for all saved controller profiles.
 type ListControllerProfilesResponse struct {

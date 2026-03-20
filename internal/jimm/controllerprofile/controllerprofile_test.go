@@ -25,6 +25,7 @@ func testControllerProfile(name string) dbmodel.ControllerProfile {
 	return dbmodel.ControllerProfile{
 		Name:        name,
 		Description: "Reusable profile",
+		JujuVersion: "3.6",
 		Cloud: dbmodel.ControllerProfileCloud{
 			Name:           "aws",
 			Type:           "ec2",
@@ -118,11 +119,38 @@ func TestListControllerProfiles(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 	}
 
-	profiles, err := env.manager.ListControllerProfiles(ctx)
+	profiles, err := env.manager.ListControllerProfiles(ctx, "")
 	c.Assert(err, qt.IsNil)
 	c.Assert(profiles, qt.HasLen, 2)
 	c.Assert(profiles[0].Name, qt.Equals, "profile-a")
 	c.Assert(profiles[1].Name, qt.Equals, "profile-b")
+}
+
+func TestListControllerProfilesFiltersByJujuVersion(t *testing.T) {
+	c := qt.New(t)
+	t.Parallel()
+	env := setupControllerProfileTestEnv(c)
+	ctx := context.Background()
+
+	for _, tc := range []struct {
+		name        string
+		jujuVersion string
+	}{
+		{name: "profile-3", jujuVersion: "3"},
+		{name: "profile-3-6", jujuVersion: "3.6"},
+		{name: "profile-4", jujuVersion: "4"},
+	} {
+		profile := testControllerProfile(tc.name)
+		profile.JujuVersion = tc.jujuVersion
+		err := env.db.CreateOrReplaceControllerProfile(ctx, &profile)
+		c.Assert(err, qt.IsNil)
+	}
+
+	profiles, err := env.manager.ListControllerProfiles(ctx, "3.6.4")
+	c.Assert(err, qt.IsNil)
+	c.Assert(profiles, qt.HasLen, 2)
+	c.Assert(profiles[0].Name, qt.Equals, "profile-3")
+	c.Assert(profiles[1].Name, qt.Equals, "profile-3-6")
 }
 
 func TestRemoveControllerProfile(t *testing.T) {

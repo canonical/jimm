@@ -17,6 +17,7 @@ func testControllerProfileRequest(name string) apiparams.SaveControllerProfileRe
 		ControllerProfile: apiparams.ControllerProfile{
 			Name:        name,
 			Description: "Reusable bootstrap settings",
+			JujuVersion: "3.6",
 			Cloud: apiparams.ControllerProfileCloud{
 				Name:           "aws",
 				Type:           "ec2",
@@ -109,6 +110,67 @@ func TestControllerProfileValidation(t *testing.T) {
 	malformedPool.BootstrapOptions.StoragePool = &apiparams.ControllerProfileStoragePool{Name: "controller-pool"}
 	_, err = client.SaveControllerProfile(&malformedPool)
 	c.Assert(err, qt.ErrorMatches, ".*storage pool requires both name and type.*")
+
+	missingVersion := testControllerProfileRequest("missing-version")
+	missingVersion.JujuVersion = ""
+	_, err = client.SaveControllerProfile(&missingVersion)
+	c.Assert(err, qt.ErrorMatches, ".*juju version must be provided.*")
+
+	invalidVersion := testControllerProfileRequest("invalid-version")
+	invalidVersion.JujuVersion = "3.6.x"
+	_, err = client.SaveControllerProfile(&invalidVersion)
+	c.Assert(err, qt.ErrorMatches, ".*partial/full version string with one, two, or three dot-separated numeric components.*")
+
+	buildVersion := testControllerProfileRequest("build-version")
+	buildVersion.JujuVersion = "3.6.4.1"
+	_, err = client.SaveControllerProfile(&buildVersion)
+	c.Assert(err, qt.ErrorMatches, ".*partial/full version string with one, two, or three dot-separated numeric components.*")
+
+	taggedVersion := testControllerProfileRequest("tagged-version")
+	taggedVersion.JujuVersion = "3.6-beta1"
+	_, err = client.SaveControllerProfile(&taggedVersion)
+	c.Assert(err, qt.ErrorMatches, ".*partial/full version string with one, two, or three dot-separated numeric components.*")
+
+	_, err = client.ListControllerProfiles(&apiparams.ListControllerProfilesRequest{JujuVersion: "3.6.x"})
+	c.Assert(err, qt.ErrorMatches, ".*juju version filter must be a partial/full version string with one, two, or three dot-separated numeric components.*")
+
+	_, err = client.ListControllerProfiles(&apiparams.ListControllerProfilesRequest{JujuVersion: "3.6.4.1"})
+	c.Assert(err, qt.ErrorMatches, ".*juju version filter must be a partial/full version string with one, two, or three dot-separated numeric components.*")
+
+	_, err = client.ListControllerProfiles(&apiparams.ListControllerProfilesRequest{JujuVersion: "3.6-beta1"})
+	c.Assert(err, qt.ErrorMatches, ".*juju version filter must be a partial/full version string with one, two, or three dot-separated numeric components.*")
+}
+
+func TestControllerProfileListFiltering(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	conn := s.Open(c, nil, "alice", nil)
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	for _, tc := range []struct {
+		name        string
+		jujuVersion string
+	}{
+		{name: "profile-3", jujuVersion: "3"},
+		{name: "profile-3-6", jujuVersion: "3.6"},
+		{name: "profile-3-6-4", jujuVersion: "3.6.4"},
+		{name: "profile-4", jujuVersion: "4"},
+	} {
+		req := testControllerProfileRequest(tc.name)
+		req.JujuVersion = tc.jujuVersion
+		_, err := client.SaveControllerProfile(&req)
+		c.Assert(err, qt.IsNil)
+	}
+
+	profiles, err := client.ListControllerProfiles(&apiparams.ListControllerProfilesRequest{JujuVersion: "3.6.4"})
+	c.Assert(err, qt.IsNil)
+	c.Assert(profiles, qt.HasLen, 3)
+	c.Assert(profiles[0].Name, qt.Equals, "profile-3")
+	c.Assert(profiles[1].Name, qt.Equals, "profile-3-6")
+	c.Assert(profiles[2].Name, qt.Equals, "profile-3-6-4")
 }
 
 func TestControllerProfileUnauthorized(t *testing.T) {

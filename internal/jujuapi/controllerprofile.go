@@ -6,12 +6,17 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
+
+	jujuversion "github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
+
+const partialJujuVersionFormatMessage = "must be a partial/full version string with one, two, or three dot-separated numeric components"
 
 // SaveControllerProfile creates or replaces a saved controller profile.
 func (r *controllerRoot) SaveControllerProfile(ctx context.Context, req apiparams.SaveControllerProfileRequest) (apiparams.SaveControllerProfileResponse, error) {
@@ -43,12 +48,16 @@ func (r *controllerRoot) GetControllerProfile(ctx context.Context, req apiparams
 	return apiparams.GetControllerProfileResponse{ControllerProfile: controllerProfileToParams(*profile)}, nil
 }
 
-// ListControllerProfiles lists all saved controller profiles.
-func (r *controllerRoot) ListControllerProfiles(ctx context.Context, _ apiparams.ListControllerProfilesRequest) (apiparams.ListControllerProfilesResponse, error) {
+// ListControllerProfiles lists saved controller profiles, optionally filtered
+// by Juju version.
+func (r *controllerRoot) ListControllerProfiles(ctx context.Context, req apiparams.ListControllerProfilesRequest) (apiparams.ListControllerProfilesResponse, error) {
 	if !r.user.JimmAdmin {
 		return apiparams.ListControllerProfilesResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
-	profiles, err := r.jimm.ControllerProfileManager().ListControllerProfiles(ctx)
+	if err := validateListControllerProfilesRequest(req); err != nil {
+		return apiparams.ListControllerProfilesResponse{}, errors.E(err)
+	}
+	profiles, err := r.jimm.ControllerProfileManager().ListControllerProfiles(ctx, req.JujuVersion)
 	if err != nil {
 		return apiparams.ListControllerProfilesResponse{}, errors.E(fmt.Errorf("failed to list controller profiles: %w", err))
 	}
@@ -72,6 +81,9 @@ func (r *controllerRoot) RemoveControllerProfile(ctx context.Context, req apipar
 }
 
 func validateSaveControllerProfileRequest(req apiparams.SaveControllerProfileRequest) error {
+	if err := validatePartialJujuVersion(req.JujuVersion, "controller profile juju version", false); err != nil {
+		return err
+	}
 	if slices.Contains(builtInClouds, req.Cloud.Name) {
 		return errors.E(errors.CodeIncompatibleClouds, fmt.Errorf("controller profiles do not support built-in clouds like %q", req.Cloud.Name))
 	}
@@ -82,10 +94,31 @@ func validateSaveControllerProfileRequest(req apiparams.SaveControllerProfileReq
 	return nil
 }
 
+func validateListControllerProfilesRequest(req apiparams.ListControllerProfilesRequest) error {
+	return validatePartialJujuVersion(req.JujuVersion, "controller profile juju version filter", true)
+}
+
+func validatePartialJujuVersion(versionString, fieldName string, allowEmpty bool) error {
+	if versionString == "" {
+		if allowEmpty {
+			return nil
+		}
+		return errors.E(errors.CodeBadRequest, fmt.Sprintf("%s must be provided", fieldName))
+	}
+	if _, err := jujuversion.ParseNonStrict(versionString); err != nil {
+		return errors.E(errors.CodeBadRequest, fmt.Sprintf("%s %s", fieldName, partialJujuVersionFormatMessage))
+	}
+	if strings.Contains(versionString, "-") || len(strings.Split(versionString, ".")) > 3 {
+		return errors.E(errors.CodeBadRequest, fmt.Sprintf("%s %s", fieldName, partialJujuVersionFormatMessage))
+	}
+	return nil
+}
+
 func controllerProfileFromParams(profile apiparams.ControllerProfile) dbmodel.ControllerProfile {
 	return dbmodel.ControllerProfile{
 		Name:        profile.Name,
 		Description: profile.Description,
+		JujuVersion: profile.JujuVersion,
 		Version:     profile.Version,
 		Cloud: dbmodel.ControllerProfileCloud{
 			Name:            profile.Cloud.Name,
@@ -130,6 +163,7 @@ func controllerProfileToParams(profile dbmodel.ControllerProfile) apiparams.Cont
 	return apiparams.ControllerProfile{
 		Name:        profile.Name,
 		Description: profile.Description,
+		JujuVersion: profile.JujuVersion,
 		Version:     profile.Version,
 		CreatedAt:   profile.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   profile.UpdatedAt.Format(time.RFC3339),

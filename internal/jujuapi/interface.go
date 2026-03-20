@@ -329,7 +329,7 @@ type BootstrapManager interface {
 type ControllerProfileManager interface {
 	SaveControllerProfile(ctx context.Context, profile *dbmodel.ControllerProfile) error
 	GetControllerProfile(ctx context.Context, name string) (*dbmodel.ControllerProfile, error)
-	ListControllerProfiles(ctx context.Context) ([]dbmodel.ControllerProfile, error)
+	ListControllerProfiles(ctx context.Context, jujuVersion string) ([]dbmodel.ControllerProfile, error)
 	RemoveControllerProfile(ctx context.Context, name string) error
 }
 

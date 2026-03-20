@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS controller_profiles (
     updated_at TIMESTAMP WITH TIME ZONE,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
+    juju_version VARCHAR(20) NOT NULL,
     version BIGINT NOT NULL CHECK (version > 0),
     cloud_name VARCHAR(255) NOT NULL,
     cloud_type VARCHAR(255),
