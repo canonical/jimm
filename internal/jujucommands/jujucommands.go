@@ -21,6 +21,17 @@ const (
 	CommandKillDelay = time.Minute * 40
 )
 
+var proxyEnvKeys = []string{
+	"HTTP_PROXY",
+	"HTTPS_PROXY",
+	"NO_PROXY",
+	"ALL_PROXY",
+	"http_proxy",
+	"https_proxy",
+	"no_proxy",
+	"all_proxy",
+}
+
 // OutputLine represents a line of output from a juju command.
 type OutputLine struct {
 	Line string
@@ -64,7 +75,7 @@ func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan O
 	// will kick in and kill the process. We set it to the same
 	// as our bootstrap lock.
 	cmd.WaitDelay = CommandKillDelay
-	cmd.Env = append(cmd.Env, "JUJU_DATA="+b.jujuDataDir)
+	cmd.Env = buildCommandEnv(b.jujuDataDir)
 	cmd.Cancel = func() error {
 		err := cmd.Process.Signal(os.Interrupt)
 		if err != nil {
@@ -117,4 +128,18 @@ func (b *CommandRunner) RunJujuCmd(ctx context.Context, args []string) (<-chan O
 	}()
 
 	return outputCh, nil
+}
+
+// buildCommandEnv builds the environment variables for the juju command,
+// including proxy settings and JUJU_DATA directory. We intentionally
+// avoid passing all environment variables from the parent process to
+// the Juju command to avoid leaking sensitive values.
+func buildCommandEnv(jujuDataDir string) []string {
+	env := make([]string, 0, len(proxyEnvKeys)+1)
+	for _, key := range proxyEnvKeys {
+		if value, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+value)
+		}
+	}
+	return append(env, "JUJU_DATA="+jujuDataDir)
 }

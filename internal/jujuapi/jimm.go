@@ -692,7 +692,16 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 			false,
 		),
 
-		UserConfig: req.Config,
+		BootstrapOptions: bootstrap.BootstrapOptions{
+			BootstrapBase:         req.BootstrapOptions.BootstrapBase,
+			BootstrapConstraints:  req.BootstrapOptions.BootstrapConstraints,
+			ModelConstraints:      req.BootstrapOptions.ModelConstraints,
+			ModelDefault:          req.BootstrapOptions.ModelDefault,
+			StoragePool:           bootstrapStoragePoolFromParams(req.BootstrapOptions.StoragePool),
+			BootstrapConfig:       req.BootstrapOptions.BootstrapConfig,
+			ControllerConfig:      req.BootstrapOptions.ControllerConfig,
+			ControllerModelConfig: req.BootstrapOptions.ControllerModelConfig,
+		},
 	}
 
 	jobID, err := r.jimm.BootstrapManager().StartBootstrapJob(ctx, r.user, params)
@@ -702,6 +711,17 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 	return apiparams.StartBootstrapResponse{
 		JobID: strconv.FormatInt(jobID, 10),
 	}, nil
+}
+
+func bootstrapStoragePoolFromParams(pool *apiparams.BootstrapStoragePool) *bootstrap.StoragePool {
+	if pool == nil {
+		return nil
+	}
+	return &bootstrap.StoragePool{
+		Name:       pool.Name,
+		Type:       pool.Type,
+		Attributes: pool.Attributes,
+	}
 }
 
 // StartDestroyController starts a destroy-controller job.

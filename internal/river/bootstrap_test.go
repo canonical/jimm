@@ -61,7 +61,9 @@ func TestBootstrapWorker(t *testing.T) {
 			c.Assert(p.CloudNameAndRegion, qt.Equals, "aws/us-east-1")
 			c.Assert(p.CLIVersion, qt.Equals, "3.6.1")
 			c.Assert(p.LoginTokenRefreshURL, qt.Equals, "https://jimm.example.com/refresh")
-			c.Assert(p.UserConfig["some"], qt.Equals, "value")
+			c.Assert(p.BootstrapOptions.BootstrapBase, qt.Equals, "ubuntu@24.04")
+			c.Assert(p.BootstrapOptions.BootstrapConfig["some"], qt.Equals, "value")
+			c.Assert(p.BootstrapOptions.ControllerConfig["audit-log-enabled"], qt.Equals, "true")
 			c.Assert(p.JujuDataDir, qt.Not(qt.Equals), "")
 			st, err := os.Stat(p.JujuDataDir)
 			c.Assert(err, qt.IsNil)
@@ -86,8 +88,10 @@ func TestBootstrapWorker(t *testing.T) {
 		ControllerName:       "controller-name",
 		AgentVersion:         "3.6.0",
 		LoginTokenRefreshURL: "https://jimm.example.com/refresh",
-		UserConfig: map[string]string{
-			"some": "value",
+		BootstrapOptions: rivertypes.BootstrapOptions{
+			BootstrapBase:    "ubuntu@24.04",
+			BootstrapConfig:  map[string]string{"some": "value"},
+			ControllerConfig: map[string]string{"audit-log-enabled": "true"},
 		},
 	}, nil)
 

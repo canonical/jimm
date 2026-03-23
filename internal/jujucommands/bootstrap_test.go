@@ -35,29 +35,35 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_Validate(c *qt.C) {
 
 	p.AgentVersion = "1.1.1"
 	c.Assert(p.Validate(), qt.IsNil)
+
+	p.BootstrapOptions.StoragePool = &jujucommands.StoragePool{Name: "pool-only-name"}
+	c.Assert(p.Validate(), qt.ErrorMatches, "storage pool requires both name and type")
 }
 
-func (s *jujucommandsSuite) TestBootstrapCmdParams_LoginTokenRefreshURLOverrideFromUserConfig(c *qt.C) {
+func (s *jujucommandsSuite) TestBootstrapCmdParams_LoginTokenRefreshURLOverrideFromBootstrapConfig(c *qt.C) {
 	p := jujucommands.BootstrapCmdParams{
 		CloudNameAndRegion:   "testregion/testcloud",
 		ControllerName:       "my-controller",
 		DefaultLoginTokenURL: "https://default.example/.well-known/jwks.json",
-		UserConfig: map[string]string{
-			"bootstrap-timeout":       "1000",
-			"login-token-refresh-url": "https://override.example/.well-known/jwks.json",
+		BootstrapOptions: jujucommands.BootstrapOptions{
+			BootstrapConfig: map[string]string{
+				"bootstrap-timeout":       "1000",
+				"login-token-refresh-url": "https://override.example/.well-known/jwks.json",
+			},
 		},
 	}
 
 	args := p.BuildBootstrapCmdArgs()
 	c.Assert(args, qt.DeepEquals, []string{
 		"bootstrap",
+		"--bootstrap-constraints",
+		fmt.Sprintf("arch=%s", runtime.GOARCH),
 		"--config",
 		"login-token-refresh-url=https://override.example/.well-known/jwks.json",
 		"--config",
 		"bootstrap-timeout=1000",
 		"testregion/testcloud",
 		"my-controller",
-		fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 	})
 }
 
@@ -74,20 +80,49 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				ControllerName:       "my-controller",
 				AgentVersion:         "1.1.1",
 				DefaultLoginTokenURL: "myurl.com",
-				UserConfig: map[string]string{
-					"bootstrap-timeout": "1000",
+				BootstrapOptions: jujucommands.BootstrapOptions{
+					BootstrapBase:        "ubuntu@24.04",
+					BootstrapConstraints: map[string]string{"mem": "8G"},
+					ModelConstraints:     map[string]string{"arch": "amd64"},
+					ModelDefault:         map[string]string{"logging-config": "<root>=INFO"},
+					StoragePool: &jujucommands.StoragePool{
+						Name:       "controller-pool",
+						Type:       "ebs",
+						Attributes: map[string]string{"volume-type": "gp3"},
+					},
+					BootstrapConfig:       map[string]string{"bootstrap-timeout": "1000"},
+					ControllerConfig:      map[string]string{"audit-log-enabled": "true"},
+					ControllerModelConfig: map[string]string{"image-stream": "released"},
 				},
 			},
 			expect: []string{
 				"bootstrap",
+				"--agent-version=1.1.1",
+				"--bootstrap-base=ubuntu@24.04",
+				"--bootstrap-constraints",
+				fmt.Sprintf("arch=%s", runtime.GOARCH),
+				"--bootstrap-constraints",
+				"mem=8G",
+				"--constraints",
+				"arch=amd64",
+				"--model-default",
+				"logging-config=<root>=INFO",
+				"--storage-pool",
+				"name=controller-pool",
+				"--storage-pool",
+				"type=ebs",
+				"--storage-pool",
+				"volume-type=gp3",
 				"--config",
 				"login-token-refresh-url=myurl.com",
-				"--agent-version=1.1.1",
+				"--config",
+				"audit-log-enabled=true",
 				"--config",
 				"bootstrap-timeout=1000",
+				"--config",
+				"image-stream=released",
 				"testregion/testcloud",
 				"my-controller",
-				fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 			},
 		},
 		{
@@ -97,19 +132,22 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 				ControllerName:       "my-controller",
 				AgentVersion:         "",
 				DefaultLoginTokenURL: "myurl.com",
-				UserConfig: map[string]string{
-					"bootstrap-timeout": "1000",
+				BootstrapOptions: jujucommands.BootstrapOptions{
+					BootstrapConfig: map[string]string{
+						"bootstrap-timeout": "1000",
+					},
 				},
 			},
 			expect: []string{
 				"bootstrap",
+				"--bootstrap-constraints",
+				fmt.Sprintf("arch=%s", runtime.GOARCH),
 				"--config",
 				"login-token-refresh-url=myurl.com",
 				"--config",
 				"bootstrap-timeout=1000",
 				"testregion/testcloud",
 				"my-controller",
-				fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 			},
 		},
 		{
@@ -122,11 +160,12 @@ func (s *jujucommandsSuite) TestBootstrapCmdParams_BuildBootstrapCmdArgs(c *qt.C
 			},
 			expect: []string{
 				"bootstrap",
+				"--bootstrap-constraints",
+				fmt.Sprintf("arch=%s", runtime.GOARCH),
 				"--config",
 				"login-token-refresh-url=myurl.com",
 				"testregion/testcloud",
 				"my-controller",
-				fmt.Sprintf("--bootstrap-constraints=arch=%s", runtime.GOARCH),
 			},
 		},
 	}

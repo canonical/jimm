@@ -32,7 +32,7 @@ func testControllerProfileRequest(name string) apiparams.SaveControllerProfileRe
 					StorageEndpoint:  "https://storage.example.com",
 				},
 			},
-			BootstrapOptions: apiparams.ControllerProfileBootstrapOptions{
+			BootstrapOptions: apiparams.BootstrapOptions{
 				BootstrapBase:         "ubuntu@24.04",
 				BootstrapConstraints:  map[string]string{"mem": "8G", "cores": "2"},
 				ModelConstraints:      map[string]string{"arch": "amd64"},
@@ -40,7 +40,7 @@ func testControllerProfileRequest(name string) apiparams.SaveControllerProfileRe
 				BootstrapConfig:       map[string]string{"bootstrap-timeout": "20m"},
 				ControllerConfig:      map[string]string{"audit-log-enabled": "true"},
 				ControllerModelConfig: map[string]string{"logging-config": "<root>=INFO"},
-				StoragePool: &apiparams.ControllerProfileStoragePool{
+				StoragePool: &apiparams.BootstrapStoragePool{
 					Name:       "controller-pool",
 					Type:       "ebs",
 					Attributes: map[string]string{"volume-type": "gp3"},
@@ -107,7 +107,7 @@ func TestControllerProfileValidation(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".*built-in clouds like \"localhost\".*")
 
 	malformedPool := testControllerProfileRequest("bad-storage-pool")
-	malformedPool.BootstrapOptions.StoragePool = &apiparams.ControllerProfileStoragePool{Name: "controller-pool"}
+	malformedPool.BootstrapOptions.StoragePool = &apiparams.BootstrapStoragePool{Name: "controller-pool"}
 	_, err = client.SaveControllerProfile(&malformedPool)
 	c.Assert(err, qt.ErrorMatches, ".*storage pool requires both name and type.*")
 

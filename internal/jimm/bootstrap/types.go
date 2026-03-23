@@ -23,7 +23,27 @@ type BootstrapParams struct {
 	CloudCred jujucloud.Credential
 	Cloud     jujucloud.Cloud
 
-	UserConfig map[string]string
+	BootstrapOptions BootstrapOptions
+}
+
+// BootstrapOptions defines the supported bootstrap settings carried through the
+// bootstrap manager and worker payload.
+type BootstrapOptions struct {
+	BootstrapBase         string
+	BootstrapConstraints  map[string]string
+	ModelConstraints      map[string]string
+	ModelDefault          map[string]string
+	StoragePool           *StoragePool
+	BootstrapConfig       map[string]string
+	ControllerConfig      map[string]string
+	ControllerModelConfig map[string]string
+}
+
+// StoragePool defines the optional bootstrap storage pool.
+type StoragePool struct {
+	Name       string
+	Type       string
+	Attributes map[string]string
 }
 
 // RunnerArgs defines the parameters required for running a bootstrap or destroy-controller job.
@@ -63,6 +83,9 @@ func (p BootstrapParams) validate() error {
 	}
 	if p.ControllerName == "" {
 		msgs = append(msgs, "controller name cannot be empty")
+	}
+	if pool := p.BootstrapOptions.StoragePool; pool != nil && (pool.Name == "" || pool.Type == "") {
+		msgs = append(msgs, "storage pool requires both name and type")
 	}
 
 	// Don't validate cloud or cloud cred. Juju knows better how to validate those.

@@ -161,9 +161,11 @@ func TestBootstrapApiParams(t *testing.T) {
 				AuthType:   string(jujucloud.UserPassAuthType),
 				Attributes: map[string]string{},
 			},
-			Config: map[string]string{
-				"bootstrap-timeout": "60",
-				"string-option":     "value",
+			BootstrapOptions: params.BootstrapOptions{
+				BootstrapConfig: map[string]string{
+					"bootstrap-timeout": "60",
+					"string-option":     "value",
+				},
 			},
 			ControllerVersion: "controller-version",
 		}
@@ -172,7 +174,7 @@ func TestBootstrapApiParams(t *testing.T) {
 		c.Check(bsp.RegionName, qt.Equals, expected.RegionName)
 		c.Check(bsp.Cloud, qt.DeepEquals, expected.Cloud)
 		c.Check(bsp.Credential, qt.DeepEquals, expected.Credential)
-		c.Check(bsp.Config, qt.DeepEquals, expected.Config)
+		c.Check(bsp.BootstrapOptions, qt.DeepEquals, expected.BootstrapOptions)
 		c.Check(bsp.ControllerVersion, qt.Equals, expected.ControllerVersion)
 
 		return &params.StartBootstrapResponse{

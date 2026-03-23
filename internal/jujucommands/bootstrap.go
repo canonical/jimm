@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"runtime"
 	"slices"
+	"sort"
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
@@ -38,8 +40,27 @@ type BootstrapCmdParams struct {
 	// The credential to use for the cloud.
 	CloudCred jujucloud.Credential
 
-	// UserConfig holds user defined config for bootstrap.
-	UserConfig map[string]string
+	// BootstrapOptions holds the supported bootstrap settings.
+	BootstrapOptions BootstrapOptions
+}
+
+// BootstrapOptions holds the supported bootstrap settings rendered into Juju CLI flags.
+type BootstrapOptions struct {
+	BootstrapBase         string
+	BootstrapConstraints  map[string]string
+	ModelConstraints      map[string]string
+	ModelDefault          map[string]string
+	StoragePool           *StoragePool
+	BootstrapConfig       map[string]string
+	ControllerConfig      map[string]string
+	ControllerModelConfig map[string]string
+}
+
+// StoragePool describes an initial controller-model storage pool.
+type StoragePool struct {
+	Name       string
+	Type       string
+	Attributes map[string]string
 }
 
 // Validate validates the BootstrapCmdParams.
@@ -64,6 +85,14 @@ func (b BootstrapCmdParams) Validate() error {
 		return errors.New("missing login token refresh URL, this value should be automatically set by JIMM")
 	}
 
+	if pool := b.BootstrapOptions.StoragePool; pool != nil && (pool.Name == "" || pool.Type == "") {
+		return errors.New("storage pool requires both name and type")
+	}
+
+	if arch, ok := b.BootstrapOptions.BootstrapConstraints["arch"]; ok && arch != runtime.GOARCH {
+		return fmt.Errorf("bootstrap constraint arch must be %q", runtime.GOARCH)
+	}
+
 	return nil
 }
 
@@ -72,36 +101,95 @@ func (b BootstrapCmdParams) BuildBootstrapCmdArgs() []string {
 	var args []string
 	args = append(args, "bootstrap")
 
-	args = append(args, "--config")
-
-	// Allow the user to override the login token refresh URL.
-	// Skip adding it later to avoid duplication.
-	loginTokenRefreshURL := b.DefaultLoginTokenURL
-	if v, ok := b.UserConfig[loginTokenRefreshURLKey]; ok {
-		loginTokenRefreshURL = v
-	}
-	args = append(args, fmt.Sprintf("login-token-refresh-url=%s", loginTokenRefreshURL))
-
 	// Conditionally add --agent-version if set
 	if b.AgentVersion != "" {
 		args = append(args, fmt.Sprintf("--agent-version=%s", b.AgentVersion))
 	}
 
-	for k, v := range b.UserConfig {
-		if k == loginTokenRefreshURLKey {
-			continue
-		}
-		args = append(args, "--config")
-		args = append(args, fmt.Sprintf("%s=%s", k, fmt.Sprint(v)))
+	if b.BootstrapOptions.BootstrapBase != "" {
+		args = append(args, fmt.Sprintf("--bootstrap-base=%s", b.BootstrapOptions.BootstrapBase))
 	}
+
+	args = appendKeyValueFlags(args, "bootstrap-constraints", withBootstrapArch(b.BootstrapOptions.BootstrapConstraints))
+	args = appendKeyValueFlags(args, "constraints", b.BootstrapOptions.ModelConstraints)
+	args = appendKeyValueFlags(args, "model-default", b.BootstrapOptions.ModelDefault)
+	args = appendStoragePoolFlags(args, b.BootstrapOptions.StoragePool)
+	args = appendConfigFlags(args, mergedBootstrapConfig(b.DefaultLoginTokenURL, b.BootstrapOptions))
 
 	// Always add controller name & cloud at the end
 	args = append(args, b.CloudNameAndRegion, b.ControllerName)
 
+	return args
+}
+
+func withBootstrapArch(constraints map[string]string) map[string]string {
+	merged := maps.Clone(constraints)
+	if merged == nil {
+		merged = make(map[string]string, 1)
+	}
 	// Add architecture constraint to ensure juju bootstraps with the correct arch.
 	// Without this, the controller application that is deployed can be deployed with the wrong architecture.
-	args = append(args, fmt.Sprintf("--bootstrap-constraints=%s", fmt.Sprintf("arch=%s", runtime.GOARCH)))
+	merged["arch"] = runtime.GOARCH
+	return merged
+}
 
+func mergedBootstrapConfig(defaultLoginTokenURL string, options BootstrapOptions) map[string]string {
+	merged := make(map[string]string)
+	for _, configMap := range []map[string]string{options.ControllerConfig, options.ControllerModelConfig, options.BootstrapConfig} {
+		for key, value := range configMap {
+			merged[key] = value
+		}
+	}
+	if _, ok := merged[loginTokenRefreshURLKey]; !ok {
+		merged[loginTokenRefreshURLKey] = defaultLoginTokenURL
+	}
+	return merged
+}
+
+func appendConfigFlags(args []string, config map[string]string) []string {
+	if len(config) == 0 {
+		return args
+	}
+	if value, ok := config[loginTokenRefreshURLKey]; ok {
+		args = append(args, "--config", fmt.Sprintf("%s=%s", loginTokenRefreshURLKey, value))
+	}
+	remaining := maps.Clone(config)
+	delete(remaining, loginTokenRefreshURLKey)
+	return appendKeyValueFlags(args, "config", remaining)
+}
+
+func appendKeyValueFlags(args []string, flagName string, values map[string]string) []string {
+	if len(values) == 0 {
+		return args
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		args = append(args, fmt.Sprintf("--%s", flagName), fmt.Sprintf("%s=%s", key, values[key]))
+	}
+	return args
+}
+
+func appendStoragePoolFlags(args []string, pool *StoragePool) []string {
+	if pool == nil {
+		return args
+	}
+	args = append(args, "--storage-pool", fmt.Sprintf("name=%s", pool.Name))
+	args = append(args, "--storage-pool", fmt.Sprintf("type=%s", pool.Type))
+	if len(pool.Attributes) == 0 {
+		return args
+	}
+	keys := make([]string, 0, len(pool.Attributes))
+	for key := range pool.Attributes {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		args = append(args, "--storage-pool", fmt.Sprintf("%s=%s", key, pool.Attributes[key]))
+	}
 	return args
 }
 

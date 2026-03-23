@@ -56,8 +56,63 @@ func defaultBootstrapArgs() bootstrap.RunBootstrapArgs {
 			CloudCred:            jujucloud.Credential{},
 			Cloud:                jujucloud.Cloud{},
 			LoginTokenRefreshURL: loginTokenRefreshURLParam,
-			UserConfig:           map[string]string{},
+			BootstrapOptions:     defaultRiverBootstrapOptions(),
 		},
+	}
+}
+
+func defaultBootstrapOptions() bootstrap.BootstrapOptions {
+	return bootstrap.BootstrapOptions{
+		BootstrapBase:        "ubuntu@24.04",
+		BootstrapConstraints: map[string]string{"mem": "8G"},
+		ModelConstraints:     map[string]string{"arch": "amd64"},
+		ModelDefault:         map[string]string{"logging-config": "<root>=INFO"},
+		StoragePool: &bootstrap.StoragePool{
+			Name:       "controller-pool",
+			Type:       "ebs",
+			Attributes: map[string]string{"volume-type": "gp3"},
+		},
+		BootstrapConfig:       map[string]string{"foo": "bar"},
+		ControllerConfig:      map[string]string{"audit-log-enabled": "true"},
+		ControllerModelConfig: map[string]string{"image-stream": "released"},
+	}
+}
+
+func defaultRiverBootstrapOptions() rivertypes.BootstrapOptions {
+	return expectedRiverBootstrapOptions(defaultBootstrapOptions())
+}
+
+func expectedRiverBootstrapOptions(options bootstrap.BootstrapOptions) rivertypes.BootstrapOptions {
+	return rivertypes.BootstrapOptions{
+		BootstrapBase:        options.BootstrapBase,
+		BootstrapConstraints: options.BootstrapConstraints,
+		ModelConstraints:     options.ModelConstraints,
+		ModelDefault:         options.ModelDefault,
+		StoragePool: &rivertypes.BootstrapStoragePool{
+			Name:       options.StoragePool.Name,
+			Type:       options.StoragePool.Type,
+			Attributes: options.StoragePool.Attributes,
+		},
+		BootstrapConfig:       options.BootstrapConfig,
+		ControllerConfig:      options.ControllerConfig,
+		ControllerModelConfig: options.ControllerModelConfig,
+	}
+}
+
+func expectedCommandBootstrapOptions(args bootstrap.RunBootstrapArgs) jujucommands.BootstrapOptions {
+	return jujucommands.BootstrapOptions{
+		BootstrapBase:        args.BootstrapOptions.BootstrapBase,
+		BootstrapConstraints: args.BootstrapOptions.BootstrapConstraints,
+		ModelConstraints:     args.BootstrapOptions.ModelConstraints,
+		ModelDefault:         args.BootstrapOptions.ModelDefault,
+		StoragePool: &jujucommands.StoragePool{
+			Name:       args.BootstrapOptions.StoragePool.Name,
+			Type:       args.BootstrapOptions.StoragePool.Type,
+			Attributes: args.BootstrapOptions.StoragePool.Attributes,
+		},
+		BootstrapConfig:       args.BootstrapOptions.BootstrapConfig,
+		ControllerConfig:      args.BootstrapOptions.ControllerConfig,
+		ControllerModelConfig: args.BootstrapOptions.ControllerModelConfig,
 	}
 }
 
@@ -141,18 +196,19 @@ func (s *bootstrapManagerSuite) TestStartBootstrapJob_EnqueuesJob(c *qt.C) {
 		ControllerName:     "a",
 		CloudCred:          jujucloud.Credential{},
 		Cloud:              jujucloud.Cloud{},
-		UserConfig:         map[string]string{"foo": "bar"},
+		BootstrapOptions:   defaultBootstrapOptions(),
 	}
 
 	mocks.jobQueue.EXPECT().EnqueueBootstrap(gomock.Any(), rivertypes.BootstrapArgs{
 		Username:             "bob@canonical.com",
 		CLIVersion:           requested.CLIVersion,
+		AgentVersion:         requested.CLIVersion,
 		CloudNameAndRegion:   requested.CloudNameAndRegion,
 		ControllerName:       requested.ControllerName,
 		CloudCred:            requested.CloudCred,
 		Cloud:                requested.Cloud,
 		LoginTokenRefreshURL: loginTokenRefreshURLParam,
-		UserConfig:           requested.UserConfig,
+		BootstrapOptions:     expectedRiverBootstrapOptions(requested.BootstrapOptions),
 	}).Return(&rivertype.JobInsertResult{
 		Job: &rivertype.JobRow{
 			ID: 99,
@@ -372,7 +428,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -561,7 +617,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorFails(c *qt.C) {
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -623,7 +679,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -690,7 +746,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -793,7 +849,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -896,7 +952,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -1024,7 +1080,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).Return(
 		func() chan jujucommands.OutputLine {
@@ -1125,7 +1181,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions:     expectedCommandBootstrapOptions(p),
 		},
 	).DoAndReturn(func(ctx context.Context, _ jujucommands.BootstrapCmdParams) (<-chan jujucommands.OutputLine, jujuclient.ClientStore, func(), error) {
 		cancel()

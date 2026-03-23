@@ -263,7 +263,7 @@ type ControllerProfile struct {
 	// Cloud stores the cloud definition for the profile.
 	Cloud ControllerProfileCloud `json:"cloud" yaml:"cloud"`
 	// BootstrapOptions holds the reusable bootstrap settings saved in the profile.
-	BootstrapOptions ControllerProfileBootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
+	BootstrapOptions BootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
 }
 
 // ControllerProfileSummary contains the fields returned when listing controller profiles.
@@ -310,8 +310,9 @@ type ControllerProfileCloudRegion struct {
 	StorageEndpoint string `json:"storage-endpoint,omitempty" yaml:"storage-endpoint,omitempty"`
 }
 
-// ControllerProfileBootstrapOptions stores the reusable bootstrap settings supported by a profile.
-type ControllerProfileBootstrapOptions struct {
+// BootstrapOptions stores the supported bootstrap settings shared by
+// controller profiles and bootstrap requests.
+type BootstrapOptions struct {
 	// BootstrapBase specifies the base of the bootstrap machine, e.g. "ubuntu@24.04".
 	BootstrapBase string `json:"bootstrap-base,omitempty" yaml:"bootstrap-base,omitempty"`
 	// BootstrapConstraints specifies bootstrap machine constraints.
@@ -321,7 +322,7 @@ type ControllerProfileBootstrapOptions struct {
 	// ModelDefault specifies default model configuration values.
 	ModelDefault map[string]string `json:"model-default,omitempty" yaml:"model-default,omitempty"`
 	// StoragePool holds the options for an initial storage pool created in the controller model.
-	StoragePool *ControllerProfileStoragePool `json:"storage-pool,omitempty" yaml:"storage-pool,omitempty"`
+	StoragePool *BootstrapStoragePool `json:"storage-pool,omitempty" yaml:"storage-pool,omitempty"`
 	// BootstrapConfig holds bootstrap configuration values.
 	BootstrapConfig map[string]string `json:"bootstrap-config,omitempty" yaml:"bootstrap-config,omitempty"`
 	// ControllerConfig holds controller configuration.
@@ -330,8 +331,9 @@ type ControllerProfileBootstrapOptions struct {
 	ControllerModelConfig map[string]string `json:"controller-model-config,omitempty" yaml:"controller-model-config,omitempty"`
 }
 
-// ControllerProfileStoragePool stores the optional storage pool configuration for a profile.
-type ControllerProfileStoragePool struct {
+// BootstrapStoragePool stores the optional storage pool configuration used by
+// bootstrap settings.
+type BootstrapStoragePool struct {
 	// Name is the storage pool name and is required.
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// Type is the storage pool type and is required.
@@ -786,8 +788,8 @@ type BootstrapParams struct {
 
 	// ControllerName specifies the name of the controller as recorded in JIMM.
 	ControllerName string `json:"controller-name"`
-	// Config holds configuration options for the bootstrap job.
-	Config map[string]string `json:"config"`
+	// BootstrapOptions holds the supported bootstrap settings for the job.
+	BootstrapOptions BootstrapOptions `json:"bootstrap-options"`
 
 	// ControllerVersion is the version of the controller to be bootstrapped.
 	ControllerVersion string `json:"controller-version"`

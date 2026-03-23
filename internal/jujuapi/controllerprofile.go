@@ -148,7 +148,7 @@ func controllerProfileFromParams(profile apiparams.ControllerProfile) dbmodel.Co
 	}
 }
 
-func storagePoolFromParams(pool *apiparams.ControllerProfileStoragePool) dbmodel.ControllerProfileStoragePool {
+func storagePoolFromParams(pool *apiparams.BootstrapStoragePool) dbmodel.ControllerProfileStoragePool {
 	if pool == nil {
 		return dbmodel.ControllerProfileStoragePool{}
 	}
@@ -182,7 +182,7 @@ func controllerProfileToParams(profile dbmodel.ControllerProfile) apiparams.Cont
 				StorageEndpoint:  profile.Cloud.Region.StorageEndpoint,
 			},
 		},
-		BootstrapOptions: apiparams.ControllerProfileBootstrapOptions{
+		BootstrapOptions: apiparams.BootstrapOptions{
 			BootstrapBase:         profile.BootstrapOptions.BootstrapBase,
 			BootstrapConstraints:  map[string]string(profile.BootstrapOptions.BootstrapConstraints),
 			ModelConstraints:      map[string]string(profile.BootstrapOptions.ModelConstraints),
@@ -204,11 +204,11 @@ func controllerProfileSummaryToParams(profile dbmodel.ControllerProfile) apipara
 	}
 }
 
-func storagePoolToParams(pool dbmodel.ControllerProfileStoragePool) *apiparams.ControllerProfileStoragePool {
+func storagePoolToParams(pool dbmodel.ControllerProfileStoragePool) *apiparams.BootstrapStoragePool {
 	if pool.Name == "" && pool.Type == "" && len(pool.Attributes) == 0 {
 		return nil
 	}
-	return &apiparams.ControllerProfileStoragePool{
+	return &apiparams.BootstrapStoragePool{
 		Name:       pool.Name,
 		Type:       pool.Type,
 		Attributes: map[string]string(pool.Attributes),

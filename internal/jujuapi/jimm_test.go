@@ -353,11 +353,13 @@ func TestBootstrapStart(t *testing.T) {
 
 	ctx := c.Context()
 	var startBootstrapErr error
+	var gotParams bootstrap.BootstrapParams
 
 	jimm := &jimmtest.JIMM{
 		BootstapManager_: func() jujuapi.BootstrapManager {
 			return &mocks.BootstapManager{
 				StartBootstrapJob_: func(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
+					gotParams = params
 					if startBootstrapErr != nil {
 						return 0, startBootstrapErr
 					}
@@ -369,10 +371,23 @@ func TestBootstrapStart(t *testing.T) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	params := apiparams.BootstrapParams{
-		ControllerName:    "controller",
-		CloudName:         "cloud",
-		RegionName:        "region",
-		Config:            map[string]string{},
+		ControllerName: "controller",
+		CloudName:      "cloud",
+		RegionName:     "region",
+		BootstrapOptions: apiparams.BootstrapOptions{
+			BootstrapBase:        "ubuntu@24.04",
+			BootstrapConstraints: map[string]string{"mem": "8G"},
+			ModelConstraints:     map[string]string{"arch": "amd64"},
+			ModelDefault:         map[string]string{"logging-config": "<root>=INFO"},
+			StoragePool: &apiparams.BootstrapStoragePool{
+				Name:       "controller-pool",
+				Type:       "ebs",
+				Attributes: map[string]string{"volume-type": "gp3"},
+			},
+			BootstrapConfig:       map[string]string{"bootstrap-timeout": "20m"},
+			ControllerConfig:      map[string]string{"audit-log-enabled": "true"},
+			ControllerModelConfig: map[string]string{"image-stream": "released"},
+		},
 		Cloud:             jujuparams.Cloud{},
 		Credential:        jujuparams.CloudCredential{},
 		ControllerVersion: "3.6.9",
@@ -381,6 +396,21 @@ func TestBootstrapStart(t *testing.T) {
 	response, err := root.StartBootstrap(ctx, params)
 	c.Assert(err, qt.IsNil)
 	c.Assert(response.JobID, qt.Not(qt.Equals), "")
+	c.Assert(gotParams.CLIVersion, qt.Equals, params.ControllerVersion)
+	c.Assert(gotParams.CloudNameAndRegion, qt.Equals, "cloud/region")
+	c.Assert(gotParams.ControllerName, qt.Equals, params.ControllerName)
+	c.Assert(gotParams.BootstrapOptions.BootstrapBase, qt.Equals, params.BootstrapOptions.BootstrapBase)
+	c.Assert(gotParams.BootstrapOptions.BootstrapConstraints, qt.DeepEquals, params.BootstrapOptions.BootstrapConstraints)
+	c.Assert(gotParams.BootstrapOptions.ModelConstraints, qt.DeepEquals, params.BootstrapOptions.ModelConstraints)
+	c.Assert(gotParams.BootstrapOptions.ModelDefault, qt.DeepEquals, params.BootstrapOptions.ModelDefault)
+	c.Assert(gotParams.BootstrapOptions.BootstrapConfig, qt.DeepEquals, params.BootstrapOptions.BootstrapConfig)
+	c.Assert(gotParams.BootstrapOptions.ControllerConfig, qt.DeepEquals, params.BootstrapOptions.ControllerConfig)
+	c.Assert(gotParams.BootstrapOptions.ControllerModelConfig, qt.DeepEquals, params.BootstrapOptions.ControllerModelConfig)
+	c.Assert(gotParams.BootstrapOptions.StoragePool, qt.DeepEquals, &bootstrap.StoragePool{
+		Name:       "controller-pool",
+		Type:       "ebs",
+		Attributes: map[string]string{"volume-type": "gp3"},
+	})
 
 	// Test start bootstrap fails
 	startBootstrapErr = errors.E("foo")

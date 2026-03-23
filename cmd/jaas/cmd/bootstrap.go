@@ -223,7 +223,9 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 			Attributes: bootstrapCred.Attributes(),
 			AuthType:   string(bootstrapCred.AuthType()),
 		},
-		Config: stringConfigValues,
+		BootstrapOptions: apiparams.BootstrapOptions{
+			BootstrapConfig: stringConfigValues,
+		},
 	}
 
 	client, err := c.getJIMMAPI()
