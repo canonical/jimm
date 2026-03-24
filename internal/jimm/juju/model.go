@@ -286,7 +286,7 @@ func (j *JujuManager) reactToModelInfoSuccess(ctx context.Context, model *dbmode
 		if modelInfo.MigrationStatus != nil && modelInfo.MigrationStatus.End != nil {
 			model.MigrationFailed()
 			if err := j.Database.UpdateModel(ctx, model); err != nil {
-				return jujuclient.ModelInfo{}, errors.E(fmt.Errorf("failed to update model after failed migration: %w", err))
+				return jujuclient.ModelInfo{}, fmt.Errorf("failed to update model after failed migration: %w", err)
 			}
 			return modelInfo, nil
 		}

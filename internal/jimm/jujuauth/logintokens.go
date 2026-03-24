@@ -126,7 +126,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	ctl.SetTag(auth.ct)
 	err := auth.database.GetController(ctx, &ctl)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to fetch controller: %w", err))
+		return nil, fmt.Errorf("failed to fetch controller: %w", err)
 	}
 	clouds := make(map[names.CloudTag]bool)
 	for _, cloudRegion := range ctl.CloudRegions {
@@ -135,7 +135,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	for cloudTag := range clouds {
 		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
 		if err != nil {
-			return nil, errors.E(fmt.Errorf("failed to check user's cloud access: %w", err))
+			return nil, fmt.Errorf("failed to check user's cloud access: %w", err)
 		}
 		auth.accessMapCache[cloudTag.String()] = accessLevel
 	}

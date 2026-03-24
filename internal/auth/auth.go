@@ -243,7 +243,7 @@ func (as *AuthenticationService) Exchange(ctx context.Context, code string) (*oa
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("authorisation code exchange failed: %v", err))
+		return nil, fmt.Errorf("authorisation code exchange failed: %v", err)
 	}
 
 	return t, nil
@@ -270,7 +270,7 @@ func (as *AuthenticationService) Device(ctx context.Context) (*oauth2.DeviceAuth
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("device auth call failed: %v", err))
+		return nil, fmt.Errorf("device auth call failed: %v", err)
 	}
 
 	return resp, nil
@@ -288,7 +288,7 @@ func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oau
 		oauth2.SetAuthURLParam("client_secret", as.oauthConfig.ClientSecret),
 	)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("device access token call failed: %v", err))
+		return nil, fmt.Errorf("device access token call failed: %v", err)
 	}
 
 	return t, nil
@@ -310,7 +310,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 	token, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to verify id token: %v", err))
+		return nil, fmt.Errorf("failed to verify id token: %v", err)
 	}
 
 	return token, nil
@@ -328,7 +328,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 	}
 
 	if err := idToken.Claims(&claims); err != nil {
-		return "", errors.E(fmt.Errorf("failed to extract claims: %v", err))
+		return "", fmt.Errorf("failed to extract claims: %v", err)
 	}
 
 	return claims.Email, nil
@@ -343,12 +343,12 @@ func (as *AuthenticationService) MintSessionToken(email string) (string, error) 
 		Expiration(time.Now().Add(as.sessionTokenExpiry)).
 		Build()
 	if err != nil {
-		return "", errors.E(fmt.Errorf("failed to build access token: %v", err))
+		return "", fmt.Errorf("failed to build access token: %v", err)
 	}
 
 	freshToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
-		return "", errors.E(fmt.Errorf("failed to sign access token: %v", err))
+		return "", fmt.Errorf("failed to sign access token: %v", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(freshToken), nil
@@ -368,12 +368,12 @@ func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username
 		Expiration(time.Now().Add(migrationTokenExpiry)).
 		Build()
 	if err != nil {
-		return "", errors.E(fmt.Errorf("failed to mint migration token: %v", err))
+		return "", fmt.Errorf("failed to mint migration token: %v", err)
 	}
 
 	migrationToken, err := jwt.Sign(token, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
-		return "", errors.E(fmt.Errorf("failed to sign migration token: %v", err))
+		return "", fmt.Errorf("failed to sign migration token: %v", err)
 	}
 
 	return base64.StdEncoding.EncodeToString(migrationToken), nil
@@ -528,7 +528,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		return ctx, errors.E(fmt.Errorf("failed to retrieve session: %v", err))
+		return ctx, fmt.Errorf("failed to retrieve session: %v", err)
 	}
 	session = sessionCrossOriginSafe(session, as.secureCookies)
 
@@ -541,7 +541,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	if err != nil {
 		// If the user's access token AND refresh token have expired
 		// then we will fail authentication here.
-		return ctx, errors.E(fmt.Errorf("failed to validate and update status token: %v", err))
+		return ctx, fmt.Errorf("failed to validate and update status token: %v", err)
 	}
 
 	ctx = ContextWithSessionIdentity(ctx, identityId)
@@ -562,7 +562,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 
 	session, err := as.sessionStore.Get(req, SessionName)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to retrieve session: %v", err))
+		return fmt.Errorf("failed to retrieve session: %v", err)
 	}
 
 	identityId, ok := session.Values[SessionIdentityKey]
@@ -576,7 +576,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 	}
 
 	if err := as.deleteSession(session, w, req); err != nil {
-		return errors.E(fmt.Errorf("failed to delete session: %v", err))
+		return fmt.Errorf("failed to delete session: %v", err)
 	}
 
 	if err := as.UpdateIdentity(ctx, identityIdStr, &oauth2.Token{
@@ -585,7 +585,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 		Expiry:       time.Now(),
 		TokenType:    "",
 	}); err != nil {
-		return errors.E(fmt.Errorf("failed to update identity: %v", err))
+		return fmt.Errorf("failed to update identity: %v", err)
 	}
 
 	return nil

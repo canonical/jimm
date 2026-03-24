@@ -182,7 +182,7 @@ func (r *controllerRoot) Activate(ctx context.Context, args jujuparams.ActivateM
 
 	modelTag, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(fmt.Errorf("invalid model tag: %w", err))
+		return fmt.Errorf("invalid model tag: %w", err)
 	}
 	// The controller tag is optional, so we parse it only if provided.
 	// It is only provided when args.CrossModelUUIDs is not empty.
@@ -191,7 +191,7 @@ func (r *controllerRoot) Activate(ctx context.Context, args jujuparams.ActivateM
 		controllerTag, err = names.ParseControllerTag(args.ControllerTag)
 		if err != nil {
 
-			return errors.E(fmt.Errorf("invalid controller tag: %w", err))
+			return fmt.Errorf("invalid controller tag: %w", err)
 		}
 	}
 
@@ -220,7 +220,7 @@ func (r *controllerRoot) Import(ctx context.Context, serialized jujuparams.Seria
 
 	err := r.jimm.JujuManager().Import(ctx, r.user, serialized)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to import model: %w", err))
+		return fmt.Errorf("failed to import model: %w", err)
 	}
 	return nil
 }

@@ -53,20 +53,20 @@ func CreateRandomKeycloakUser() (*KeycloakUser, error) {
 
 	adminCLIToken, err := getAdminCLIAccessToken()
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to authenticate admin CLI user: %w", err))
+		return nil, fmt.Errorf("failed to authenticate admin CLI user: %w", err)
 	}
 
 	if err := addKeycloakUser(adminCLIToken, email, username); err != nil {
-		return nil, errors.E(fmt.Errorf("failed to add keycloak user (%q, %q): %w", email, username, err))
+		return nil, fmt.Errorf("failed to add keycloak user (%q, %q): %w", email, username, err)
 	}
 
 	id, err := getKeycloakUserId(adminCLIToken, username)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to retrieve ID for newly added keycloak user (%q, %q): %w", email, username, err))
+		return nil, fmt.Errorf("failed to retrieve ID for newly added keycloak user (%q, %q): %w", email, username, err)
 	}
 
 	if err := setKeycloakUserPassword(adminCLIToken, id, password); err != nil {
-		return nil, errors.E(fmt.Errorf("failed to set password for newly added keycloak user (%q, %q, %q): %w", email, username, password, err))
+		return nil, fmt.Errorf("failed to set password for newly added keycloak user (%q, %q, %q): %w", email, username, password, err)
 	}
 	return &KeycloakUser{
 		Id:       id,

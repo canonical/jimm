@@ -261,7 +261,7 @@ func (r *controllerRoot) AddController(ctx context.Context, req apiparams.AddCon
 		AdminPassword:     req.Password,
 	}
 	if err := r.jimm.JujuManager().AddController(ctx, r.user, &ctl, ctlCreds); err != nil {
-		return apiparams.ControllerInfo{}, errors.E(fmt.Errorf("failed to add controller: %w", err))
+		return apiparams.ControllerInfo{}, fmt.Errorf("failed to add controller: %w", err)
 	}
 	return ctl.ToAPIControllerInfo(), nil
 }
@@ -641,7 +641,7 @@ func (r *controllerRoot) StopBootstrap(ctx context.Context, req apiparams.StopBo
 
 	err = r.jimm.BootstrapManager().StopJob(ctx, r.user, jobID)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to stop job: %v", err))
+		return fmt.Errorf("failed to stop job: %v", err)
 	}
 	return nil
 }
@@ -688,7 +688,7 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 
 	jobID, err := r.jimm.BootstrapManager().StartBootstrapJob(ctx, r.user, params)
 	if err != nil {
-		return apiparams.StartBootstrapResponse{}, errors.E(fmt.Errorf("failed to start bootstrap job: %v", err))
+		return apiparams.StartBootstrapResponse{}, fmt.Errorf("failed to start bootstrap job: %v", err)
 	}
 	return apiparams.StartBootstrapResponse{
 		JobID: strconv.FormatInt(jobID, 10),
@@ -704,7 +704,7 @@ func (r *controllerRoot) StartDestroyController(ctx context.Context, req apipara
 
 	ctrl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.ControllerName)
 	if err != nil {
-		return apiparams.StartBootstrapResponse{}, errors.E(fmt.Errorf("failed to fetch controller info: %w", err))
+		return apiparams.StartBootstrapResponse{}, fmt.Errorf("failed to fetch controller info: %w", err)
 	}
 
 	if len(ctrl.Models) != 0 {
@@ -722,7 +722,7 @@ func (r *controllerRoot) StartDestroyController(ctx context.Context, req apipara
 		CACertificate:  ctrl.CACertificate,
 	})
 	if err != nil {
-		return apiparams.StartBootstrapResponse{}, errors.E(fmt.Errorf("failed to start destroy-controller job: %v", err))
+		return apiparams.StartBootstrapResponse{}, fmt.Errorf("failed to start destroy-controller job: %v", err)
 	}
 
 	return apiparams.StartBootstrapResponse{
@@ -826,7 +826,7 @@ func (r *controllerRoot) JobInfo(ctx context.Context, req apiparams.JobInfoReque
 
 	jobInfo, err := r.jimm.JobManager().GetJobInfo(ctx, jobID)
 	if err != nil {
-		return apiparams.JobInfoResponse{}, errors.E(fmt.Errorf("failed to get job info: %v", err))
+		return apiparams.JobInfoResponse{}, fmt.Errorf("failed to get job info: %v", err)
 	}
 
 	return toJobInfoParams(jobInfo), nil

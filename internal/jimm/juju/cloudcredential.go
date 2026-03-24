@@ -225,10 +225,10 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 func (j *JujuManager) updateCredential(ctx context.Context, credential *dbmodel.CloudCredential, attr map[string]string) error {
 
 	if err := j.Database.SetCloudCredential(ctx, credential); err != nil {
-		return errors.E(fmt.Errorf("failed to store credential id: %w", err))
+		return fmt.Errorf("failed to store credential id: %w", err)
 	}
 	if err := j.CredentialStore.Put(ctx, credential.ResourceTag(), attr); err != nil {
-		return errors.E(fmt.Errorf("failed to store credentials: %w", err))
+		return fmt.Errorf("failed to store credentials: %w", err)
 	}
 
 	return nil

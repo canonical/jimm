@@ -38,7 +38,7 @@ func SetupBackend(ctx context.Context, jimm jujuapi.JIMM) (*rebac_handlers.ReBAC
 		RolesErrorMapper:        securityEventLogger,
 	})
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to create rebac admin backend: %w", err))
+		return nil, fmt.Errorf("failed to create rebac admin backend: %w", err)
 	}
 
 	return rebacBackend, nil

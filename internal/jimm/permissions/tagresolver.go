@@ -318,7 +318,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	ctx := context.Background()
 	resolver, tagKind, err := newTagResolver(tag)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to setup tag resolver: %w", err))
+		return nil, fmt.Errorf("failed to setup tag resolver: %w", err)
 	}
 
 	switch tagKind {

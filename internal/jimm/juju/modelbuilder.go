@@ -437,7 +437,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name))
 			return b
 		} else {
-			b.err = errors.E(fmt.Errorf("failed to store model information: %w", err))
+			b.err = fmt.Errorf("failed to store model information: %w", err)
 			return b
 		}
 	}

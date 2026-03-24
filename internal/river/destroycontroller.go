@@ -65,7 +65,7 @@ func (w *destroyControllerWorker) Work(ctx context.Context, job *river.Job[river
 
 	temp, err := os.MkdirTemp("", "juju-data-dir")
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to create temporary directory for Juju data: %w", err))
+		return fmt.Errorf("failed to create temporary directory for Juju data: %w", err)
 	}
 	defer func() {
 		if err := os.RemoveAll(temp); err != nil {

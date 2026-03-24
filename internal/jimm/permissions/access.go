@@ -248,7 +248,7 @@ func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 	// Check if the user is jimm administrator.
 	isAdmin, err := openfga.IsAdministrator(ctx, targetUserTag, j.jimmTag)
 	if err != nil {
-		return "", errors.E(fmt.Errorf("failed to check access rights: %w", err))
+		return "", fmt.Errorf("failed to check access rights: %w", err)
 	}
 	if isAdmin {
 		return "superuser", nil
@@ -320,7 +320,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 			zap.String("cloud", string(ct.Id())),
 			zap.String("access", string(access)),
 		)
-		return errors.E(fmt.Errorf("failed to set cloud access: %w", err))
+		return fmt.Errorf("failed to set cloud access: %w", err)
 	}
 	return nil
 }
@@ -398,7 +398,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 			zap.String("cloud", string(ct.Id())),
 			zap.String("access", string(access)),
 		)
-		return errors.E(fmt.Errorf("failed to unset cloud access: %w", err))
+		return fmt.Errorf("failed to unset cloud access: %w", err)
 	}
 
 	return nil
@@ -471,7 +471,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 			zap.String("model", string(mt.Id())),
 			zap.String("access", string(access)),
 		)
-		return errors.E(fmt.Errorf("failed to set model access: %w", err))
+		return fmt.Errorf("failed to set model access: %w", err)
 	}
 	return nil
 }
@@ -560,7 +560,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 			zap.String("model", string(mt.Id())),
 			zap.String("access", string(access)),
 		)
-		return errors.E(fmt.Errorf("failed to unset model access: %w", err))
+		return fmt.Errorf("failed to unset model access: %w", err)
 	}
 	return nil
 }

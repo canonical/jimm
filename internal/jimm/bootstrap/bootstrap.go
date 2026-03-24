@@ -246,7 +246,7 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	}
 
 	if err := params.validate(); err != nil {
-		return 0, errors.E(fmt.Errorf("invalid bootstrap parameters: %v", err))
+		return 0, fmt.Errorf("invalid bootstrap parameters: %v", err)
 	}
 
 	bootstrapArgs := rivertypes.BootstrapArgs{
@@ -265,7 +265,7 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	}
 	job, err := b.jobQueue.EnqueueBootstrap(ctx, bootstrapArgs)
 	if err != nil {
-		return 0, errors.E(fmt.Errorf("failed to enqueue bootstrap job: %w", err))
+		return 0, fmt.Errorf("failed to enqueue bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
 		return 0, errors.E(fmt.Errorf("a bootstrap job is already in progress - please wait for it to complete before starting a new one"), errors.CodeInProgress)
@@ -342,7 +342,7 @@ func (b *BootstrapManager) BootstrapController(
 		return errors.E(errors.CodeAlreadyExists, fmt.Errorf("controller %q already exists", p.ControllerName))
 	}
 	if errors.ErrorCode(err) != errors.CodeNotFound {
-		return errors.E(fmt.Errorf("failed to check if controller exists: %w", err))
+		return fmt.Errorf("failed to check if controller exists: %w", err)
 	}
 
 	b.writeJobLog(ctx, p.JobID,
@@ -360,7 +360,7 @@ func (b *BootstrapManager) BootstrapController(
 		},
 	)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
+		return fmt.Errorf("failed to get Juju binary: %w", err)
 	}
 	zapctx.Debug(ctx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 	defer binaryDone(binary)
@@ -368,7 +368,7 @@ func (b *BootstrapManager) BootstrapController(
 	jujuCmds := cmdFactory.New(binary.FullPath, p.JujuDataDir)
 
 	if err := b.runBootstrap(ctx, p, jujuCmds, user); err != nil {
-		return errors.E(fmt.Errorf("run bootstrap failed: %w", err))
+		return fmt.Errorf("run bootstrap failed: %w", err)
 	}
 	return nil
 }
@@ -401,7 +401,7 @@ func (b *BootstrapManager) runBootstrap(
 		},
 	)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to run bootstrap command: %w", err))
+		return fmt.Errorf("failed to run bootstrap command: %w", err)
 	}
 	defer cleanup()
 
@@ -421,8 +421,8 @@ func (b *BootstrapManager) runBootstrap(
 	controllerCleanup := func(err error, controllerDetails *jujuclient.ControllerDetails) error {
 		cleanupErr := b.tryCleanupController(ctx, executor, p.JobID, p.ControllerName)
 		if cleanupErr == nil {
-			return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
-				"the controller has been automatically destroyed", err))
+			return fmt.Errorf("error post-bootstrap: %w\n"+
+				"the controller has been automatically destroyed", err)
 		}
 		var controllerDetailsStr string
 		if controllerDetails != nil {
@@ -432,13 +432,13 @@ func (b *BootstrapManager) runBootstrap(
 
 		zapctx.Error(ctx, "failed to cleanup controller after failing to add it to JIMM",
 			zap.NamedError("BootstrapError", err), zap.NamedError("CleanupError", cleanupErr))
-		return errors.E(fmt.Errorf("error post-bootstrap: %w\n"+
+		return fmt.Errorf("error post-bootstrap: %w\n"+
 			"automatic cleanup of the controller also failed: %w\n"+
 			"\n"+
 			"WARNING: resources associated with the controller may remain dangling in your environment.\n"+
 			"Manual intervention is required, either attach the controller to JIMM or destroy it.\n"+
 			"\n"+
-			"Controller details:\n%s", err, cleanupErr, controllerDetailsStr))
+			"Controller details:\n%s", err, cleanupErr, controllerDetailsStr)
 
 	}
 
@@ -498,7 +498,7 @@ func (b *BootstrapManager) tryCleanupController(ctx context.Context, jujuCmd Juj
 		},
 	)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to run destroy-controller command: %w", err))
+		return fmt.Errorf("failed to run destroy-controller command: %w", err)
 	}
 
 	err = b.consumeCommandOutput(ctx, outputCh, jobID)
@@ -513,7 +513,7 @@ func (b *BootstrapManager) consumeCommandOutput(ctx context.Context, outputCh <-
 	for output := range outputCh {
 		if output.Err != nil {
 			b.writeJobLog(ctx, jobId, output.Err.Error())
-			return errors.E(fmt.Errorf("command failed: %w", output.Err))
+			return fmt.Errorf("command failed: %w", output.Err)
 		}
 		zapctx.Debug(ctx, "command output", zap.Int64("job-id", jobId), zap.String("line", output.Line))
 		b.writeJobLog(ctx, jobId, output.Line)
@@ -549,7 +549,7 @@ func (b *BootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 
 	job, err := b.jobQueue.EnqueueDestroyController(ctx, destroyArgs)
 	if err != nil {
-		return 0, errors.E(fmt.Errorf("failed to start bootstrap job: %w", err))
+		return 0, fmt.Errorf("failed to start bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
 		return 0, errors.E(fmt.Errorf("a destroy job is already in progress - please wait for it to complete before starting a new one"), errors.CodeInProgress)
@@ -588,7 +588,7 @@ func (b *BootstrapManager) DestroyController(
 		},
 	)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to get Juju binary: %w", err))
+		return fmt.Errorf("failed to get Juju binary: %w", err)
 	}
 	zapctx.Debug(ctx, "Juju binary downloaded, using Juju binary", zap.String("binary-path", binary.FullPath))
 	defer func() {
@@ -599,7 +599,7 @@ func (b *BootstrapManager) DestroyController(
 
 	username, password, err := b.credentialStore.GetControllerCredentials(ctx, p.ControllerName)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to get controller credentials: %w", err))
+		return fmt.Errorf("failed to get controller credentials: %w", err)
 	}
 
 	// Update the context from this point to prevent it from being cancelled when the parent is cancelled.
@@ -627,7 +627,7 @@ func (b *BootstrapManager) DestroyController(
 		},
 	)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to run destroy-controller command: %w", err))
+		return fmt.Errorf("failed to run destroy-controller command: %w", err)
 	}
 	err = b.consumeCommandOutput(ctx, outputCh, p.JobID)
 	if err != nil {
@@ -638,7 +638,7 @@ func (b *BootstrapManager) DestroyController(
 	zapctx.Debug(ctx, "controller destroyed, removing from jimm")
 	err = b.jujuManager.RemoveController(ctx, user, p.ControllerName, true)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to remove controller: %w", err))
+		return fmt.Errorf("failed to remove controller: %w", err)
 	}
 
 	return nil

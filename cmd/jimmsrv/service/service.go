@@ -421,7 +421,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 
 	publicDNS, err := parseURLWithOptionalScheme(p.PublicDNSName)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to parse public DNS name: %v", err))
+		return nil, fmt.Errorf("failed to parse public DNS name: %v", err)
 	}
 
 	if p.DSN == "" {
@@ -521,7 +521,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		},
 	)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to setup authentication service: %w", err))
+		return nil, fmt.Errorf("failed to setup authentication service: %w", err)
 	}
 	deps.OAuthAuthenticator = authSvc
 	deps.MigrationTokenGenerator = authSvc
@@ -533,7 +533,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
 		})
 		if err != nil {
-			return nil, errors.E(fmt.Errorf("failed to setup authentication handler: %w", err))
+			return nil, fmt.Errorf("failed to setup authentication handler: %w", err)
 		}
 	} else {
 		zapctx.Warn(ctx, "Dashboard final redirect URL not set, OAuth HTTP handler will not be configured")
@@ -619,7 +619,7 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 		ControllerUUID:         deps.ControllerUUID,
 	}, deps.Database, s.jimm.OfferAuthorizer)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to set up discharger: %v", err))
+		return nil, fmt.Errorf("failed to set up discharger: %v", err)
 	}
 	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
@@ -751,7 +751,7 @@ func setupSessionStore(sessionSecret []byte, db *db.Database) (*pgstore.PGStore,
 
 	store, err := pgstore.NewPGStoreFromPool(sqlDb, sessionSecret)
 	if err != nil {
-		return nil, nil, errors.E(fmt.Errorf("failed to create session store: %w", err))
+		return nil, nil, fmt.Errorf("failed to create session store: %w", err)
 	}
 
 	// Cleanup expired session every 30 minutes
@@ -800,7 +800,7 @@ func setupCredentialStore(ctx context.Context, p Params, db *db.Database) (jimmc
 
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("vault store error: %v", err))
+		return nil, fmt.Errorf("vault store error: %v", err)
 	}
 	if vs != nil {
 		return vs, nil

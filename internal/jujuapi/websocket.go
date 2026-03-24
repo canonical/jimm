@@ -214,7 +214,7 @@ func controllerConnectionFunc(s apiModelProxier, jwtGenerator *jujuauth.LoginTok
 		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
 		uuid, finalPath, err := modelInfoFromPath(path)
 		if err != nil {
-			return rpcproxy.WebsocketConnectionWithMetadata{}, errors.E(fmt.Errorf("error parsing path: %w", err))
+			return rpcproxy.WebsocketConnectionWithMetadata{}, fmt.Errorf("error parsing path: %w", err)
 		}
 		m := dbmodel.Model{
 			UUID: sql.NullString{

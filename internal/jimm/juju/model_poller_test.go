@@ -123,7 +123,7 @@ func TestModelCleanup(t *testing.T) {
 				case s.env.Models[1].UUID:
 					return jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: model.Id()}}, nil
 				case s.env.Models[2].UUID:
-					return jujuclient.ModelInfo{}, errors.E(fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id()))
+					return jujuclient.ModelInfo{}, fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id())
 				default:
 					return jujuclient.ModelInfo{}, errors.E("new error")
 				}

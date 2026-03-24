@@ -105,7 +105,7 @@ func (j *AuditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, bef
 	}
 	count, err := j.store.DeleteAuditLogsBefore(ctx, before)
 	if err != nil {
-		return 0, errors.E(fmt.Errorf("failed to purge logs: %w", err))
+		return 0, fmt.Errorf("failed to purge logs: %w", err)
 	}
 	return count, nil
 }

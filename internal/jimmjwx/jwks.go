@@ -16,8 +16,6 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
-
-	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // CredentialStore defines the interface for a store that can manage
@@ -96,7 +94,7 @@ func rotateJWKS(ctx context.Context, credStore CredentialStore, initialExpiryTim
 			if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
 				zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
 			}
-			return errors.E(fmt.Errorf("failed to put JWKS: %w", err))
+			return fmt.Errorf("failed to put JWKS: %w", err)
 		}
 	} else {
 		// Check it has expired.
@@ -109,7 +107,7 @@ func rotateJWKS(ctx context.Context, credStore CredentialStore, initialExpiryTim
 				if jwksErr := credStore.CleanupJWKS(ctx); jwksErr != nil {
 					zapctx.Error(ctx, "failed to cleanup jwks", zap.Error(jwksErr))
 				}
-				return errors.E(fmt.Errorf("failed to put JWKS: %w", err))
+				return fmt.Errorf("failed to put JWKS: %w", err)
 			}
 			zapctx.Debug(ctx, "set a new JWKS", zap.String("expiry", expires.String()))
 		}
@@ -133,7 +131,7 @@ func (jwks *JWKSService) StartJWKSRotator(ctx context.Context, checkRotateRequir
 	credStore := jwks.credentialStore
 
 	if err := rotateJWKS(ctx, credStore, initialRotateRequiredTime); err != nil {
-		return errors.E(fmt.Errorf("rotate jwks: %w", err))
+		return fmt.Errorf("rotate jwks: %w", err)
 	}
 
 	// The rotation method is as follows, if an expiry is not present, we know

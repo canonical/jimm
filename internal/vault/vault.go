@@ -475,12 +475,12 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 		roleSecretID,
 	)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("unable to initialize approle auth method: %w", err))
+		return nil, fmt.Errorf("unable to initialize approle auth method: %w", err)
 	}
 
 	authInfo, err := s.Client.Auth().Login(ctx, appRoleAuth)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("unable to login to approle auth method: %w", err))
+		return nil, fmt.Errorf("unable to login to approle auth method: %w", err)
 	}
 	if authInfo == nil {
 		return nil, errors.E("no auth info was returned after login")

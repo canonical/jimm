@@ -25,7 +25,7 @@ func (r *controllerRoot) AddRole(ctx context.Context, req apiparams.AddRoleReque
 
 	roleEntry, err := r.jimm.RoleManager().AddRole(ctx, r.user, req.Name)
 	if err != nil {
-		return resp, errors.E(fmt.Errorf("failed to add role: %w", err))
+		return resp, fmt.Errorf("failed to add role: %w", err)
 	}
 	resp = apiparams.AddRoleResponse{Role: apiparams.Role{
 		Name:      roleEntry.Name,
@@ -55,7 +55,7 @@ func (r *controllerRoot) GetRole(ctx context.Context, req apiparams.GetRoleReque
 		return apiparams.Role{}, errors.E(errors.CodeBadRequest, "no UUID or Name provided")
 	}
 	if err != nil {
-		return apiparams.Role{}, errors.E(fmt.Errorf("failed to get role: %w", err))
+		return apiparams.Role{}, fmt.Errorf("failed to get role: %w", err)
 	}
 
 	return apiparams.Role{
@@ -74,7 +74,7 @@ func (r *controllerRoot) RenameRole(ctx context.Context, req apiparams.RenameRol
 	}
 
 	if err := r.jimm.RoleManager().RenameRole(ctx, r.user, req.Name, req.NewName); err != nil {
-		return errors.E(fmt.Errorf("failed to rename role: %w", err))
+		return fmt.Errorf("failed to rename role: %w", err)
 	}
 	return nil
 }
@@ -87,7 +87,7 @@ func (r *controllerRoot) RemoveRole(ctx context.Context, req apiparams.RemoveRol
 	}
 
 	if err := r.jimm.RoleManager().RemoveRole(ctx, r.user, req.Name); err != nil {
-		return errors.E(fmt.Errorf("failed to remove role: %w", err))
+		return fmt.Errorf("failed to remove role: %w", err)
 	}
 	return nil
 }

@@ -328,7 +328,7 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 		if msg.Response != nil {
 			err := json.Unmarshal(msg.Response, &allErrors)
 			if err != nil {
-				return errors.E(fmt.Errorf("failed to unmarshal message response: %w", err))
+				return fmt.Errorf("failed to unmarshal message response: %w", err)
 			}
 		}
 		singleError := jujuparams.ErrorResult{Error: &jujuparams.Error{Message: msg.Error, Code: msg.ErrorCode, Info: msg.ErrorInfo}}

@@ -128,12 +128,12 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, nil
 		}
-		return nil, errors.E(fmt.Errorf("failed to get secret data: %w", err))
+		return nil, fmt.Errorf("failed to get secret data: %w", err)
 	}
 	var attr map[string]string
 	err = json.Unmarshal(secret.Data, &attr)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to unmarshal secret data: %w", err))
+		return nil, fmt.Errorf("failed to unmarshal secret data: %w", err)
 	}
 	return attr, nil
 }
@@ -152,7 +152,7 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 
 	dataJson, err := json.Marshal(attr)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to marshal secret data: %w", err))
+		return fmt.Errorf("failed to marshal secret data: %w", err)
 	}
 	secret := dbmodel.NewSecret(tag.Kind(), tag.String(), dataJson)
 	return d.UpsertSecret(ctx, &secret)
@@ -177,12 +177,12 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 		return "", "", nil
 	}
 	if err != nil {
-		return "", "", errors.E(fmt.Errorf("failed to get secret data: %w", err))
+		return "", "", fmt.Errorf("failed to get secret data: %w", err)
 	}
 	var secretData map[string]string
 	err = json.Unmarshal(secret.Data, &secretData)
 	if err != nil {
-		return "", "", errors.E(fmt.Errorf("failed to unmarshal secret data: %w", err))
+		return "", "", fmt.Errorf("failed to unmarshal secret data: %w", err)
 	}
 	username, ok := secretData[usernameKey]
 	if !ok {
@@ -212,7 +212,7 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 	secretData[passwordKey] = password
 	dataJson, err := json.Marshal(secretData)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to marshal secret data: %w", err))
+		return fmt.Errorf("failed to marshal secret data: %w", err)
 	}
 	secret := dbmodel.NewSecret(names.ControllerTagKind, controllerName, dataJson)
 	return d.UpsertSecret(ctx, &secret)
@@ -233,17 +233,17 @@ func (d *Database) CleanupJWKS(ctx context.Context) (err error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err = d.DeleteSecret(ctx, &secret)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to cleanup jwks public key: %w", err))
+		return fmt.Errorf("failed to cleanup jwks public key: %w", err)
 	}
 	secret = dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err = d.DeleteSecret(ctx, &secret)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to cleanup jwks private key: %w", err))
+		return fmt.Errorf("failed to cleanup jwks private key: %w", err)
 	}
 	secret = dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
 	err = d.DeleteSecret(ctx, &secret)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to cleanup jwks expiry info: %w", err))
+		return fmt.Errorf("failed to cleanup jwks expiry info: %w", err)
 	}
 	return nil
 }
@@ -263,11 +263,11 @@ func (d *Database) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to get jwks data: %w", err))
+		return nil, fmt.Errorf("failed to get jwks data: %w", err)
 	}
 	ks, err := jwk.ParseString(string(secret.Data))
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to parse jwk data: %w", err))
+		return nil, fmt.Errorf("failed to parse jwk data: %w", err)
 	}
 	return ks, nil
 }
@@ -287,12 +287,12 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) 
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to get jwks private key: %w", err))
+		return nil, fmt.Errorf("failed to get jwks private key: %w", err)
 	}
 	var pem []byte
 	err = json.Unmarshal(secret.Data, &pem)
 	if err != nil {
-		return nil, errors.E(fmt.Errorf("failed to unmarshal pem data: %w", err))
+		return nil, fmt.Errorf("failed to unmarshal pem data: %w", err)
 	}
 	return pem, nil
 }
@@ -312,12 +312,12 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, nil)
 	err = d.GetSecret(ctx, &secret)
 	if err != nil {
-		return time.Time{}, errors.E(fmt.Errorf("failed to get jwks expiry: %w", err))
+		return time.Time{}, fmt.Errorf("failed to get jwks expiry: %w", err)
 	}
 	var expiryTime time.Time
 	err = json.Unmarshal(secret.Data, &expiryTime)
 	if err != nil {
-		return time.Time{}, errors.E(fmt.Errorf("failed to unmarshal jwks expiry data: %w", err))
+		return time.Time{}, fmt.Errorf("failed to unmarshal jwks expiry data: %w", err)
 	}
 	return expiryTime, nil
 }
@@ -336,7 +336,7 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
 
 	jwksJson, err := json.Marshal(jwks)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to marshal jwks data: %w", err))
+		return fmt.Errorf("failed to marshal jwks data: %w", err)
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksPublicKeyTag, jwksJson)
 	return d.UpsertSecret(ctx, &secret)
@@ -357,7 +357,7 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err error
 
 	privateKeyJson, err := json.Marshal(pem)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to marshal jwks private key: %w", err))
+		return fmt.Errorf("failed to marshal jwks private key: %w", err)
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksPrivateKeyTag, privateKeyJson)
 	return d.UpsertSecret(ctx, &secret)
@@ -377,7 +377,7 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err err
 
 	expiryJson, err := json.Marshal(expiry)
 	if err != nil {
-		return errors.E(fmt.Errorf("failed to marshal jwks expiry data: %w", err))
+		return fmt.Errorf("failed to marshal jwks expiry data: %w", err)
 	}
 	secret := dbmodel.NewSecret(jwksKind, jwksExpiryTag, expiryJson)
 	return d.UpsertSecret(ctx, &secret)
@@ -397,11 +397,11 @@ func (d *Database) CleanupOAuthSecrets(ctx context.Context) (err error) {
 
 	secret := dbmodel.NewSecret(oauthKind, oauthKeyTag, nil)
 	if err := d.DeleteSecret(ctx, &secret); err != nil {
-		return errors.E(fmt.Errorf("failed to cleanup OAuth key: %w", err))
+		return fmt.Errorf("failed to cleanup OAuth key: %w", err)
 	}
 	secret = dbmodel.NewSecret(oauthKind, oauthSessionStoreSecretTag, nil)
 	if err := d.DeleteSecret(ctx, &secret); err != nil {
-		return errors.E(fmt.Errorf("failed to cleanup OAuth session store secret: %w", err))
+		return fmt.Errorf("failed to cleanup OAuth session store secret: %w", err)
 	}
 	return nil
 }
