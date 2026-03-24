@@ -59,6 +59,12 @@ func (e *Error) ErrorInfo() map[string]any {
 	return e.Info
 }
 
+// New constructs a new error with the given message.
+// It is a wrapper around the stdlib errors.New function.
+func New(text string) error {
+	return stderr.New(text)
+}
+
 // E constructs errors for use throughout the JIMM application. An error
 // is constructed by processing the given arguments. The meaning of the
 // arguments is as follows:
