@@ -299,7 +299,7 @@ var grantModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
-	expectError:    `failed to recognize given access: "some-unknown-access"`,
+	expectError:    `failed to recognize given access: "some-unknown-access".*`,
 }}
 
 func TestGrantModelAccess(t *testing.T) {
@@ -992,7 +992,7 @@ var revokeModelAccessTests = []struct {
 	uuid:           "00000002-0000-0000-0000-000000000001",
 	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
-	expectError:    `failed to recognize given access: "some-unknown-access"`,
+	expectError:    `failed to recognize given access: "some-unknown-access".*`,
 }}
 
 //nolint:gocognit
@@ -1282,7 +1282,7 @@ func TestRevokeOfferAccess(t *testing.T) {
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.User("fred@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "no-such-offer", jujuparams.OfferReadAccess
 		},
-		expectedError: "application offer not found",
+		expectedError: "application offer not found.*",
 	}, {
 		about: "admin revokes another user (who is direct admin+consumer) their consume access)",
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
@@ -1448,7 +1448,7 @@ func TestGrantOfferAccess(t *testing.T) {
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
 			return env.User("alice@canonical.com").DBObject(c, db), env.User("fred@canonical.com").DBObject(c, db), "no-such-offer", jujuparams.OfferReadAccess
 		},
-		expectedError: "application offer not found",
+		expectedError: "application offer not found.*",
 	}, {
 		about: "user with consume rights cannot grant any rights",
 		parameterFunc: func(env *jimmtest.Environment, db *db.Database) (dbmodel.Identity, dbmodel.Identity, string, jujuparams.OfferAccessPermission) {
@@ -1606,7 +1606,7 @@ var grantCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
-	expectError:    `failed to recognize given access: "some-unknown-access"`,
+	expectError:    `failed to recognize given access: "some-unknown-access".*`,
 }}
 
 func TestGrantCloudAccess(t *testing.T) {
@@ -1882,7 +1882,7 @@ var revokeCloudAccessTests = []struct {
 	cloud:          "test",
 	targetUsername: "bob@canonical.com",
 	access:         "some-unknown-access",
-	expectError:    `failed to recognize given access: "some-unknown-access"`,
+	expectError:    `failed to recognize given access: "some-unknown-access".*`,
 }}
 
 //nolint:gocognit

@@ -140,7 +140,7 @@ func TestAuthenticateViaBasicAuth(t *testing.T) {
 	loginManager := mocks.LoginManager{
 		LoginWithSessionToken_: func(ctx context.Context, sessionToken string) (*openfga.User, error) {
 			if sessionToken != "good" {
-					return nil, jimm_errors.ErrWithCode(nil, jimm_errors.CodeSessionTokenInvalid)
+				return nil, jimm_errors.ErrWithCode(nil, jimm_errors.CodeSessionTokenInvalid)
 			}
 			user := dbmodel.Identity{Name: testUser}
 			return &openfga.User{Identity: &user, JimmAdmin: true}, nil

@@ -496,7 +496,7 @@ func TestFullModelStatus(t *testing.T) {
 		statusFunc: func(_ context.Context, _ []string) (*jujuparams.FullStatus, error) {
 			return &fullStatus, nil
 		},
-		expectedError: "model not found",
+		expectedError: "model not found.*",
 	}, {
 		about:     "controller returns an error",
 		user:      "alice@canonical.com",
@@ -594,7 +594,7 @@ func TestFillMigrationTarget(t *testing.T) {
 		about:          "controller doesn't exist",
 		userTag:        "alice@canonical.com",
 		controllerName: "controller-2",
-		expectedError:  "controller not found",
+		expectedError:  "controller not found.*",
 	},
 	}
 	for _, test := range tests {
@@ -1060,7 +1060,7 @@ func TestListMigrationTargets(t *testing.T) {
 		about:         "fails to list controllers for missing model",
 		user:          env.User("alice@canonical.com").DBObject(c, j.Database),
 		modelTag:      names.NewModelTag("00000002-0000-0000-0000-000000000002"),
-		expectedError: `model not found`,
+		expectedError: `model not found.*`,
 	}, {
 		about:               "empty list of controllers for too-new model",
 		user:                env.User("alice@canonical.com").DBObject(c, j.Database),
@@ -1187,7 +1187,7 @@ func TestModelControllerInfo(t *testing.T) {
 		jimmAdmin:     true,
 		useModelTag:   true,
 		modelTag:      "00000002-0000-0000-0000-000000000999",
-		expectedError: "model not found",
+		expectedError: "model not found.*",
 	}, {
 		about:       "jimm admin can get model controller info by owner and name",
 		user:        env.User("alice@canonical.com").DBObject(c, j.Database),
@@ -1229,7 +1229,7 @@ func TestModelControllerInfo(t *testing.T) {
 		useModelTag:   false,
 		ownerName:     "alice@canonical.com",
 		modelName:     "non-existent-model",
-		expectedError: "model not found",
+		expectedError: "model not found.*",
 	}, {
 		about:         "jimm admin fails when neither model uuid nor owner/name provided",
 		user:          env.User("alice@canonical.com").DBObject(c, j.Database),

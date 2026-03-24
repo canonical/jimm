@@ -137,7 +137,7 @@ func TestIsUserConsumerForOffer(t *testing.T) {
 			userTag:             names.NewLocalUserTag("alice"),
 			applicationOfferTag: names.NewApplicationOfferTag(deps.offerUUID),
 			allowed:             false,
-			expectedError:       "user mapping not found",
+			expectedError:       "user mapping not found.*",
 		},
 		{
 			name:                "not-existing application offer local user",

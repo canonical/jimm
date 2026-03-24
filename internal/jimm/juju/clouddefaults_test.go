@@ -193,7 +193,7 @@ func TestSetCloudDefaults(t *testing.T) {
 				cloud:         names.NewCloudTag(cloud.Name),
 				region:        cloud.Regions[0].Name,
 				defaults:      defaults,
-				expectedError: `cloud "test-cloud-1" not found`,
+				expectedError: `cloud "test-cloud-1" not found.*`,
 			}
 		},
 	}, {

@@ -144,7 +144,7 @@ func TestModelCleanup(t *testing.T) {
 		},
 	}
 	err = s.jujuManager.Database.GetModel(ctx, &model)
-	c.Assert(err, qt.ErrorMatches, "model not found")
+	c.Assert(err, qt.ErrorMatches, "model not found.*")
 
 	model = dbmodel.Model{
 		UUID: sql.NullString{

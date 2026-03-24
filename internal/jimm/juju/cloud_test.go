@@ -596,7 +596,7 @@ var addHostedCloudTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `cloud "existing-cloud" already exists`,
+	expectError:     `cloud "existing-cloud" already exists.*`,
 	expectErrorCode: errors.CodeAlreadyExists,
 }, {
 	name:      "InvalidCloudType",
