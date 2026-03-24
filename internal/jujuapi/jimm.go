@@ -565,7 +565,7 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 	// Check each key is a valid local user and each value is a valid user and has a domain
 	for local, external := range args.UserMapping {
 		if !names.IsValidUserName(local) {
-			return resp, errors.New(fmt.Sprintf("%s is not a valid local user name", local))
+			return resp, fmt.Errorf("%s is not a valid local user name", local)
 		}
 
 		if external == "" {
@@ -575,7 +575,7 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 		}
 
 		if !names.IsValidUser(external) || !strings.Contains(external, "@") {
-			return resp, errors.New(fmt.Sprintf("%s is not a valid external user name", external))
+			return resp, fmt.Errorf("%s is not a valid external user name", external)
 		}
 	}
 

@@ -118,7 +118,7 @@ func (c *registerControllerCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 	if c.controllerName != params.Name {
-		return errors.New(fmt.Sprintf("provided controller name doesn't match, %s != %s", c.controllerName, params.Name))
+		return fmt.Errorf("provided controller name doesn't match, %s != %s", c.controllerName, params.Name)
 	}
 	if c.dryRun {
 		return c.out.Write(ctxt, params)

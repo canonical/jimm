@@ -400,7 +400,7 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 		if len(c.Regions) > 0 {
 			zapctx.Error(ctx, "number of controllers available for cloud/region", zap.Int("controllers", len(c.Regions[0].Controllers)))
 		}
-		return errors.New(fmt.Sprintf("cloud administration not available for %s", ct.Id()))
+		return fmt.Errorf("cloud administration not available for %s", ct.Id())
 	}
 	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{}, user)
 	if err != nil {

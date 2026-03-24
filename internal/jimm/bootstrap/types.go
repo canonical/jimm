@@ -9,7 +9,6 @@ import (
 
 	jujucloud "github.com/juju/juju/cloud"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/rivertypes"
 )
 
@@ -74,7 +73,7 @@ func (p BootstrapParams) validate() error {
 
 	// If there are validation errors, return them as a single error.
 	if msgs != nil {
-		return errors.New(fmt.Sprintf("invalid bootstrap parameters:\n%s", strings.Join(msgs, "\n")))
+		return fmt.Errorf("invalid bootstrap parameters:\n%s", strings.Join(msgs, "\n"))
 	}
 	return nil
 }

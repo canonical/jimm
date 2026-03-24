@@ -366,7 +366,7 @@ func (j *JujuManager) CopyCredential(ctx context.Context, originalUser *openfga.
 
 	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), newUser.Name, cred.Name())
 	if !names.IsValidCloudCredential(newCredID) {
-		return names.CloudCredentialTag{}, nil, errors.New(fmt.Sprintf("new credential ID %s is not a valid cloud credential tag", newCredID))
+		return names.CloudCredentialTag{}, nil, fmt.Errorf("new credential ID %s is not a valid cloud credential tag", newCredID)
 	}
 
 	newCredential := jujuparams.CloudCredential{

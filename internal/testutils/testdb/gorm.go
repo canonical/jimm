@@ -22,7 +22,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/db"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/logger"
 )
 
@@ -216,17 +215,17 @@ func DeleteDatabase(databaseName string) (err error) {
 
 	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return errors.New(fmt.Sprintf("error opening database: %s", err))
+		return fmt.Errorf("error opening database: %s", err)
 	}
 	db, err := gdb.DB()
 	if err != nil {
-		return errors.New(fmt.Sprintf("error getting db: %s", err))
+		return fmt.Errorf("error getting db: %s", err)
 	}
 	defer func() { err = db.Close() }()
 
 	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%s"`, databaseName)
 	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
-		return errors.New(fmt.Sprintf("failed to delete database (%s): %s", databaseName, err))
+		return fmt.Errorf("failed to delete database (%s): %s", databaseName, err)
 	}
 	return nil
 }

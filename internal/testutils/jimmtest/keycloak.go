@@ -12,8 +12,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-
-	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // These constants are based on the `docker-compose.yaml` and `local/keycloak/jimm-realm.json` content.
@@ -105,7 +103,7 @@ func getAdminCLIAccessToken() (string, error) {
 		return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response for admin CLI login (status-code: %d)", resp.StatusCode), err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.New(fmt.Sprintf("failed to login with keycloak admin CLI user (status-code: %d): %q", resp.StatusCode, string(body)))
+		return "", fmt.Errorf("failed to login with keycloak admin CLI user (status-code: %d): %q", resp.StatusCode, string(body))
 	}
 
 	m := map[string]any{}
@@ -149,7 +147,7 @@ func getKeycloakUsersMap(adminCLIToken string) (map[string]string, error) {
 		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response for list of users (status-code: %d)", resp.StatusCode), err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(fmt.Sprintf("failed to get users from keycloak (status-code: %d): %q", resp.StatusCode, string(body)))
+		return nil, fmt.Errorf("failed to get users from keycloak (status-code: %d): %q", resp.StatusCode, string(body))
 	}
 
 	var raw []struct {
@@ -175,7 +173,7 @@ func getKeycloakUserId(adminCLIToken, username string) (string, error) {
 	}
 
 	if id, ok := m[username]; !ok {
-		return "", errors.New(fmt.Sprintf("keycloak user not found: %q", username))
+		return "", fmt.Errorf("keycloak user not found: %q", username)
 	} else {
 		return id, nil
 	}
@@ -221,7 +219,7 @@ func addKeycloakUser(adminCLIToken, email, username string) error {
 		return fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response to add user (status-code: %d)", resp.StatusCode), err)
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return errors.New(fmt.Sprintf("failed to add user to keycloak (status-code: %d): %q", resp.StatusCode, string(body)))
+		return fmt.Errorf("failed to add user to keycloak (status-code: %d): %q", resp.StatusCode, string(body))
 	}
 	return nil
 }
@@ -264,7 +262,7 @@ func setKeycloakUserPassword(adminCLIToken, id, password string) error {
 		return fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response to set user password (status-code: %d)", resp.StatusCode), err)
 	}
 	if resp.StatusCode != http.StatusNoContent {
-		return errors.New(fmt.Sprintf("failed to set keycloak user password (status-code: %d): %q", resp.StatusCode, string(body)))
+		return fmt.Errorf("failed to set keycloak user password (status-code: %d): %q", resp.StatusCode, string(body))
 	}
 	return nil
 }
