@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	stderr "errors"
 	"testing"
 	"time"
 
@@ -147,7 +148,7 @@ func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {
 		return testError
 	})
 	c.Check(calls, qt.Equals, 1)
-	c.Check(err, qt.DeepEquals, testError)
+	c.Check(stderr.Is(err, testError), qt.IsTrue)
 }
 
 func (s *dbSuite) TestDeleteAuditLogsBefore(c *qt.C) {
