@@ -94,7 +94,7 @@ func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID ui
 	var models []dbmodel.Model
 	result := db.Where("cloud_credential_id = ?", credentialID).Preload("Controller").Find(&models)
 	if result.Error != nil {
-		return nil, errors.E(dbError(result.Error))
+		return nil, dbError(result.Error)
 	}
 	return models, nil
 }

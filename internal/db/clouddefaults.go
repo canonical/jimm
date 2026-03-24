@@ -177,7 +177,7 @@ func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Iden
 	var defaults []dbmodel.CloudDefaults
 	result := db.Preload("Identity").Preload("Cloud").Find(&defaults)
 	if result.Error != nil {
-		return nil, errors.E(dbError(result.Error))
+		return nil, dbError(result.Error)
 	}
 	return defaults, nil
 }

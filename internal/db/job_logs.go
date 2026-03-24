@@ -92,7 +92,7 @@ func (d *Database) QueryJobLog(ctx context.Context, jobId int64, offset int) (lo
 
 		result := query.Offset(offset).Order("line_number ASC").Find(&logs)
 		if result.Error != nil {
-			return errors.E(dbError(result.Error))
+			return dbError(result.Error)
 		}
 
 		// Get the next line number
