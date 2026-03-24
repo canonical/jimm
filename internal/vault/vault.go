@@ -69,12 +69,12 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (_ m
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.path(tag))
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	if secret == nil || secret.Data == nil {
 		return nil, nil
@@ -106,7 +106,7 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	data := make(map[string]interface{}, len(attr))
@@ -115,7 +115,7 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 	}
 	_, err = client.KVv2(s.KVPath).Put(ctx, s.path(tag), data)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -130,7 +130,7 @@ func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) (
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	err = client.KVv2(s.KVPath).Delete(ctx, s.path(tag))
 	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
@@ -138,7 +138,7 @@ func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) (
 		err = nil
 	}
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -154,12 +154,12 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return "", "", errors.E(err)
+		return "", "", err
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.controllerCredentialsPath(controllerName))
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return "", "", errors.E(err)
+		return "", "", err
 	}
 	if secret == nil || secret.Data == nil {
 		return "", "", nil
@@ -190,7 +190,7 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	data := map[string]interface{}{
@@ -199,7 +199,7 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 	}
 	_, err = client.KVv2(s.KVPath).Put(ctx, s.controllerCredentialsPath(controllerName), data)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -214,19 +214,19 @@ func (s *VaultStore) CleanupJWKS(ctx context.Context) (err error) {
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSExpiryPath()); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPath()); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPrivateKeyPath()); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -241,12 +241,12 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPath())
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	// This is how the current version of vaults API Read works,
@@ -265,7 +265,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 
 	ks, err := jwk.ParseString(jsonString)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return ks, nil
@@ -281,12 +281,12 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPrivateKeyPath())
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	if secret == nil || secret.Data == nil {
@@ -299,7 +299,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error
 
 	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return keyPem, nil
@@ -316,12 +316,12 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error)
 	now := time.Now()
 	client, err := s.client(ctx)
 	if err != nil {
-		return now, errors.E(err)
+		return now, err
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSExpiryPath())
 	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return now, errors.E(err)
+		return now, err
 	}
 
 	if secret == nil || secret.Data == nil {
@@ -337,7 +337,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error)
 
 	t, err := time.Parse(time.RFC3339, expiry)
 	if err != nil {
-		return now, errors.E(err)
+		return now, err
 	}
 
 	return t, nil
@@ -356,17 +356,17 @@ func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	jwksJson, err := json.Marshal(jwks)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	jwksData := map[string]any{jwksKey: string(jwksJson)}
 	if _, err = client.KVv2(s.KVPath).Put(ctx, s.getJWKSPath(), jwksData); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -382,12 +382,12 @@ func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err err
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	privateKeyData := map[string]interface{}{jwksPrivateKey: pem}
 	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSPrivateKeyPath(), privateKeyData); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -402,11 +402,11 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err e
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	expiryData := map[string]interface{}{jwksExpiryKey: expiry}
 	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSExpiryPath(), expiryData); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -444,7 +444,7 @@ func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controller
 
 	client, err := s.client(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	err = client.KVv2(s.KVPath).Delete(ctx, s.controllerCredentialsPath(controllerName))
 	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
@@ -452,7 +452,7 @@ func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controller
 		err = nil
 	}
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -488,15 +488,15 @@ func (s *VaultStore) client(ctx context.Context) (*api.Client, error) {
 
 	ttl, err := authInfo.TokenTTL()
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	tok, err := authInfo.TokenID()
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	s.client_, err = s.Client.Clone()
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	s.client_.SetToken(tok)
 	s.expires = now.Add(ttl - ttlLeeway)

@@ -159,7 +159,7 @@ func New(p Parameters) (*JIMM, error) {
 	jimmResourceTag := names.NewControllerTag(j.UUID)
 
 	if err := j.Database.Migrate(context.Background()); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	roleManager, err := role.NewRoleManager(j.Database, j.OpenFGAClient)

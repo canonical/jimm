@@ -195,7 +195,7 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model M
 
 	err = j.Database.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	api, err := j.dialController(ctx, &incomingModel.TargetController, user)
@@ -587,11 +587,11 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 
 	err := tx.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 	region, err := tx.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	var importedModel *dbmodel.Model
@@ -686,13 +686,13 @@ func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migratio
 		// Delete the incoming model migration record.
 		err := j.Database.DeleteIncomingModelMigration(ctx, &migration)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 
 		// Delete user mappings for the model.
 		err = j.Database.DeleteUserMappingsByModelUUID(ctx, migration.ModelUUID.String)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 
 		// Delete the model record from JIMM's state.
@@ -704,7 +704,7 @@ func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migratio
 		}
 		err = j.Database.DeleteModel(ctx, &model)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		return nil
 	})

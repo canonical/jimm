@@ -220,7 +220,7 @@ func (u *UpgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 
 	m, err := u.jujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if m.Controller.Name == targetControllerName {
 		zapctx.Info(ctx, "model is already on target controller, skipping migration", zap.String("model-uuid", modelUUID), zap.String("controller-name", targetControllerName))

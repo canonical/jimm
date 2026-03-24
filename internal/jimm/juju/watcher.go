@@ -71,7 +71,7 @@ func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Dura
 		if err != nil {
 			// Ignore temporary database errors.
 			if errors.ErrorCode(err) != errors.CodeDatabaseLocked {
-				return errors.E(err)
+				return err
 			}
 			zapctx.Warn(ctx, "temporary error polling for controllers", zap.Error(err))
 		}
@@ -111,7 +111,7 @@ func (w *Watcher) dialController(ctx context.Context, ctl *dbmodel.Controller) (
 		ctl.UnavailableSince = db.Now()
 		updateController = true
 
-		return nil, errors.E(err)
+		return nil, err
 	}
 	if ctl.UnavailableSince.Valid {
 		ctl.UnavailableSince = sql.NullTime{}
@@ -130,7 +130,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	// connect to the controller
 	api, err := w.dialController(ctx, ctl)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	defer api.Close()
 
@@ -141,7 +141,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	// start the model summary watcher
 	watcher, err := api.WatchAllModelSummaries(ctx)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	defer func() {
 		if err := watcher.Stop(); err != nil {
@@ -158,7 +158,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 		// wait for updates from the all model summary watcher.
 		modelSummaries, err := watcher.Next()
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		// Sanitize the model abstracts.
 		for _, summary := range modelSummaries {

@@ -16,7 +16,7 @@ func (d *Database) AddAuditLogEntry(ctx context.Context, ale *dbmodel.AuditLogEn
 	const op = "db.AddAuditLogEntry"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -72,7 +72,7 @@ type AuditLogFilter struct {
 func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilter, f func(*dbmodel.AuditLogEntry) error) (err error) {
 	const op = "db.ForEachAuditLogEntry"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -107,13 +107,13 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 
 	rows, err := db.Rows()
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var ale dbmodel.AuditLogEntry
 		if err := db.ScanRows(rows, &ale); err != nil {
-			return errors.E(err)
+			return err
 		}
 		if err := f(&ale); err != nil {
 			return err
@@ -131,7 +131,7 @@ func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) 
 	const op = "db.DeleteAuditLogsBefore"
 
 	if err := d.ready(); err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

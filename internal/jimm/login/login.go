@@ -126,26 +126,26 @@ func (j *LoginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthRes
 
 	token, err := j.oAuthAuthenticator.DeviceAccessToken(ctx, deviceOAuthResponse)
 	if err != nil {
-		return "", errors.E(err)
+		return "", err
 	}
 
 	idToken, err := j.oAuthAuthenticator.ExtractAndVerifyIDToken(ctx, token)
 	if err != nil {
-		return "", errors.E(err)
+		return "", err
 	}
 
 	email, err := j.oAuthAuthenticator.Email(idToken)
 	if err != nil {
-		return "", errors.E(err)
+		return "", err
 	}
 
 	if err := j.oAuthAuthenticator.UpdateIdentity(ctx, email, token); err != nil {
-		return "", errors.E(err)
+		return "", err
 	}
 
 	encToken, err := j.oAuthAuthenticator.MintSessionToken(email)
 	if err != nil {
-		return "", errors.E(err)
+		return "", err
 	}
 
 	return string(encToken), nil
@@ -212,7 +212,7 @@ func (j *LoginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 	user, err := j.UserLogin(ctx, identityID)
 	if err != nil {
 		logger.LogFailedLogin(ctx, identityID)
-		return nil, errors.E(err)
+		return nil, err
 	}
 	logger.LogSuccessfulLogin(ctx, identityID)
 	return user, nil
@@ -230,7 +230,7 @@ func (j *LoginManager) UserLogin(ctx context.Context, identifier string) (*openf
 	}
 	err = j.updateLastLogin(ctx, ofgaUser.Identity)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return ofgaUser, nil
 }
@@ -239,7 +239,7 @@ func (j *LoginManager) GetOrCreateIdentity(ctx context.Context, identifier strin
 
 	identity, err := dbmodel.NewIdentity(identifier)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	if err := j.store.GetIdentity(ctx, identity); err != nil {
@@ -249,7 +249,7 @@ func (j *LoginManager) GetOrCreateIdentity(ctx context.Context, identifier strin
 
 	isJimmAdmin, err := openfga.IsAdministrator(ctx, ofgaUser, j.jimmTag)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	ofgaUser.JimmAdmin = isJimmAdmin
 

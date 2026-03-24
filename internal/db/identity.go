@@ -31,7 +31,7 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -53,7 +53,7 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 
 	// If we didn't create it, it must exist (or we raced and lost). Fetch it.
 	if err = d.DB.WithContext(ctx).Where("name = ?", u.Name).First(&u).Error; err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -71,7 +71,7 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err 
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -80,7 +80,7 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err 
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Where("name = ?", u.Name).First(&u).Error; err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err 
 func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err error) {
 	const op = "db.UpdateIdentity"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -108,7 +108,7 @@ func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("ApplicationOffers").Omit("Clouds").Omit("CloudCredentials").Omit("Models")
 	if err := db.Save(u).Error; err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -122,7 +122,7 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	}
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -132,7 +132,7 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	var credentials []dbmodel.CloudCredential
 	db := d.DB.WithContext(ctx)
 	if err := db.Model(u).Where("cloud_name = ?", cloud).Association("CloudCredentials").Find(&credentials); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return credentials, nil
 }
@@ -142,7 +142,7 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 func (d *Database) ListIdentities(ctx context.Context, limit, offset int, match string) (_ []dbmodel.Identity, err error) {
 	const op = "db.ListIdentities"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -172,7 +172,7 @@ func (d *Database) CountIdentities(ctx context.Context) (_ int, err error) {
 	const op = "db.CountIdentities"
 
 	if err := d.ready(); err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -182,7 +182,7 @@ func (d *Database) CountIdentities(ctx context.Context) (_ int, err error) {
 	db := d.DB.WithContext(ctx)
 	var count int64
 	if err := db.Model(&dbmodel.Identity{}).Count(&count).Error; err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 	return int(count), nil
 }

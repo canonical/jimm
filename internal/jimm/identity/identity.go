@@ -35,7 +35,7 @@ func (j *IdentityManager) FetchIdentity(ctx context.Context, id string) (*openfg
 
 	identity, err := dbmodel.NewIdentity(id)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	if err := j.store.FetchIdentity(ctx, identity); err != nil {
@@ -59,7 +59,7 @@ func (j *IdentityManager) ListIdentities(ctx context.Context, user *openfga.User
 		users = append(users, *openfga.NewUser(&id, j.authSvc))
 	}
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return users, nil
 }
@@ -73,7 +73,7 @@ func (j *IdentityManager) CountIdentities(ctx context.Context, user *openfga.Use
 
 	count, err := j.store.CountIdentities(ctx)
 	if err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 	return count, nil
 }

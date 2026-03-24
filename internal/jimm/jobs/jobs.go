@@ -40,7 +40,7 @@ func NewJobManager(jobQuerier JobQuerier) (*JobManager, error) {
 func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (JobInfo, error) {
 	jobRow, err := j.jobQuerier.GetJobInfo(ctx, jobID)
 	if err != nil {
-		return JobInfo{}, errors.E(err)
+		return JobInfo{}, err
 	}
 	var jobErrors []JobError
 	for _, err := range jobRow.Errors {
@@ -97,7 +97,7 @@ func (j *JobManager) ListJobs(ctx context.Context, req apiparams.ListJobsRequest
 
 	jobListResult, err := j.jobQuerier.ListJobs(ctx, p)
 	if err != nil {
-		return apiparams.ListJobsResponse{}, errors.E(err)
+		return apiparams.ListJobsResponse{}, err
 	}
 
 	jobs := make([]apiparams.ListJobInfo, len(jobListResult.Jobs))

@@ -321,7 +321,7 @@ func (j *JujuManager) EarliestControllerVersion(ctx context.Context) (version.Nu
 		return nil
 	})
 	if err != nil {
-		return version.Number{}, errors.E(err)
+		return version.Number{}, err
 	}
 	if v == nil {
 		return version.Number{}, nil
@@ -413,7 +413,7 @@ func (m *modelImporter) setModelOwner(ctx context.Context) error {
 
 	err := m.jimm.Database.GetIdentity(ctx, &owner)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	m.model.SetOwner(&owner)
 
@@ -532,19 +532,19 @@ func (j *JujuManager) ImportModel(ctx context.Context, user *openfga.User, contr
 
 	importer, err := newModelImporter(j, newOwner)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := importer.fetchModelInfo(ctx, user, controllerName, modelTag); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := importer.setModelOwner(ctx); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := importer.addPermissions(ctx); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	// TODO(CSS-5458): Remove the below section on cloud credentials once we no longer persist the relation between
@@ -552,15 +552,15 @@ func (j *JujuManager) ImportModel(ctx context.Context, user *openfga.User, contr
 	// Update: We need to investigate this further, if a user updates their cloud-credential it will update the credential
 	// on this model.
 	if err := importer.setCloudCredential(ctx); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := importer.setModelCloud(ctx); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := importer.save(ctx); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -585,7 +585,7 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E("model not found", errors.CodeModelNotFound)
 		}
-		return errors.E(err)
+		return err
 	}
 
 	targetController := dbmodel.Controller{
@@ -596,19 +596,19 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E("controller not found", errors.CodeNotFound)
 		}
-		return errors.E(err)
+		return err
 	}
 
 	// check the model is known to the controller
 	api, err := j.dial(ctx, &targetController, names.ModelTag{}, nil)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	defer api.Close()
 
 	_, err = api.ModelInfo(ctx, modelTag)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	model.InternalMigrationSuccess(targetController.ID)
@@ -670,7 +670,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 	err = j.Database.Transaction(func(tx *db.Database) error {
 		err := tx.ForUpdate().GetModel(ctx, &model)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 
 		if model.MigrationMode != dbmodel.MigrationModeNone {
@@ -719,7 +719,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 	}, false)
 	if err != nil {
 		rollbackMigrationMode()
-		return result, errors.E(err)
+		return result, err
 	}
 
 	return result, nil
@@ -730,18 +730,18 @@ func (j *JujuManager) ControllerConfig(ctx context.Context, user *openfga.User, 
 
 	controller, err := j.getControllerByName(ctx, controllerName)
 	if err != nil {
-		return jujucontroller.Config{}, errors.E(err)
+		return jujucontroller.Config{}, err
 	}
 
 	api, err := j.dialController(ctx, controller, user)
 	if err != nil {
-		return jujucontroller.Config{}, errors.E(err)
+		return jujucontroller.Config{}, err
 	}
 	defer api.Close()
 
 	cfg, err := api.ControllerConfig(ctx)
 	if err != nil {
-		return cfg, errors.E(err)
+		return cfg, err
 	}
 	return cfg, nil
 }
@@ -761,12 +761,12 @@ func (j *JujuManager) ControllerDetailsForModel(ctx context.Context, modelUUID s
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return ControllerConnectionDetails{}, errors.E(errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
 		}
-		return ControllerConnectionDetails{}, errors.E(err)
+		return ControllerConnectionDetails{}, err
 	}
 
 	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, model.Controller.Name)
 	if err != nil {
-		return ControllerConnectionDetails{}, errors.E(err)
+		return ControllerConnectionDetails{}, err
 	}
 
 	if username == "" || password == "" {

@@ -439,7 +439,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 	p.connectController.Do(func() {
 		connWithMetadata, err := p.createControllerConn(ctx)
 		if err != nil {
-			createConnErr = errors.E(err)
+			createConnErr = err
 			return
 		}
 
@@ -639,12 +639,12 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 	}
 	var lr jujuparams.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	jwt, err := tokenGen.MakeToken(ctx, permissions)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
@@ -653,7 +653,7 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 	// Marshal it again to JSON.
 	data, err := json.Marshal(lr)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	// And add it to the message.
 	msg.Params = data

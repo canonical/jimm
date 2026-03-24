@@ -38,7 +38,7 @@ const (
 func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) (err error) {
 	const op = "db.AddSecret"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -65,7 +65,7 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err e
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -95,7 +95,7 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) (er
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -115,7 +115,7 @@ func (d *Database) Get(ctx context.Context, tag names.CloudCredentialTag) (_ map
 	const op = "database.Get"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -143,7 +143,7 @@ func (d *Database) Put(ctx context.Context, tag names.CloudCredentialTag, attr m
 	const op = "database.Put"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -164,7 +164,7 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 	const op = "database.GetControllerCredentials"
 
 	if err := d.ready(); err != nil {
-		return "", "", errors.E(err)
+		return "", "", err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -200,7 +200,7 @@ func (d *Database) PutControllerCredentials(ctx context.Context, controllerName 
 	const op = "database.PutControllerCredentials"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -223,7 +223,7 @@ func (d *Database) CleanupJWKS(ctx context.Context) (err error) {
 	const op = "database.CleanupJWKS"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -253,7 +253,7 @@ func (d *Database) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 	const op = "database.GetJWKS"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -277,7 +277,7 @@ func (d *Database) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) 
 	const op = "database.GetJWKSPrivateKey"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -302,7 +302,7 @@ func (d *Database) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
 	const op = "database.GetJWKSExpiry"
 
 	if err := d.ready(); err != nil {
-		return time.Time{}, errors.E(err)
+		return time.Time{}, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -327,7 +327,7 @@ func (d *Database) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
 	const op = "database.PutJWKS"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -348,7 +348,7 @@ func (d *Database) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err error
 	const op = "database.PutJWKSPrivateKey"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -368,7 +368,7 @@ func (d *Database) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err err
 	const op = "database.PutJWKSExpiry"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -388,7 +388,7 @@ func (d *Database) CleanupOAuthSecrets(ctx context.Context) (err error) {
 	const op = "database.CleanupOAuthSecrets"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

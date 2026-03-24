@@ -90,7 +90,7 @@ func (j *AuditLogManager) FindAuditEvents(ctx context.Context, user *openfga.Use
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return entries, nil

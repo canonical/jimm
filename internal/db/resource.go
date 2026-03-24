@@ -74,7 +74,7 @@ type Resource struct {
 func (d *Database) ListResources(ctx context.Context, limit, offset int, namePrefixFilter, typeFilter string) (_ []Resource, err error) {
 	const op = "db.ListResources"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

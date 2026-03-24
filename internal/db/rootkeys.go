@@ -33,7 +33,7 @@ func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
 		if err == gorm.ErrRecordNotFound {
 			return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 		}
-		return dbrootkeystore.RootKey{}, errors.E(err)
+		return dbrootkeystore.RootKey{}, err
 	}
 	return dbrootkeystore.RootKey{
 		Id:      rk.ID,
@@ -78,7 +78,7 @@ func (d *Database) InsertKey(key dbrootkeystore.RootKey) (err error) {
 	const op = "db.InsertKey"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

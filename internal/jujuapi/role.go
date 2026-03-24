@@ -98,7 +98,7 @@ func (r *controllerRoot) ListRoles(ctx context.Context, req apiparams.ListRolesR
 	pagination := pagination.NewOffsetFilter(req.Limit, req.Offset)
 	roles, err := r.jimm.RoleManager().ListRoles(ctx, r.user, pagination, "")
 	if err != nil {
-		return apiparams.ListRoleResponse{}, errors.E(err)
+		return apiparams.ListRoleResponse{}, err
 	}
 	rolesResponse := make([]apiparams.Role, len(roles))
 	for i, g := range roles {

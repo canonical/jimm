@@ -18,7 +18,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 	const op = "db.SetCloudDefaults"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -46,7 +46,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 				}
 				return nil
 			}
-			return errors.E(err)
+			return err
 		}
 
 		// update defaults
@@ -66,7 +66,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -76,7 +76,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 	const op = "db.UpsertCloudDefaults"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -97,7 +97,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		// try to fetch cloud defaults from the db
 		err := d.CloudDefaults(ctx, &dbDefaults)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 
 		// update defaults
@@ -117,7 +117,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -127,7 +127,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 	const op = "db.CloudDefaults"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -151,7 +151,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(errors.CodeNotFound, "cloudregiondefaults not found", err)
 		}
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -161,7 +161,7 @@ func (d *Database) ModelDefaultsForCloud(ctx context.Context, user *dbmodel.Iden
 	const op = "db.ModelDefaultsForCloud"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

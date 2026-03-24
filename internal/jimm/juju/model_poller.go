@@ -33,7 +33,7 @@ func (j *JujuManager) PollModels(ctx context.Context) (err error) {
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	// Step 2: Loop over controllers and process their models

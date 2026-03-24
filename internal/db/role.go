@@ -14,7 +14,7 @@ import (
 func (d *Database) AddRole(ctx context.Context, name string) (re *dbmodel.RoleEntry, err error) {
 	const op = "db.AddRole"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -36,7 +36,7 @@ func (d *Database) AddRole(ctx context.Context, name string) (re *dbmodel.RoleEn
 func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err error) {
 	const op = "db.GetRole"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -72,7 +72,7 @@ func (d *Database) UpdateRoleName(ctx context.Context, oldName, name string) (er
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -97,7 +97,7 @@ func (d *Database) RemoveRole(ctx context.Context, role *dbmodel.RoleEntry) (err
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -115,7 +115,7 @@ func (d *Database) RemoveRole(ctx context.Context, role *dbmodel.RoleEntry) (err
 func (d *Database) ListRoles(ctx context.Context, limit, offset int, match string) (_ []dbmodel.RoleEntry, err error) {
 	const op = "db.ListRoles"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -144,7 +144,7 @@ func (d *Database) ListRoles(ctx context.Context, limit, offset int, match strin
 func (d *Database) CountRoles(ctx context.Context) (count int, err error) {
 	const op = "db.CountRoles"
 	if err := d.ready(); err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()

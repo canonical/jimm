@@ -36,7 +36,7 @@ func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return &credential, nil
@@ -59,7 +59,7 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 			// It is not an error to revoke an non-existent credential
 			return nil
 		}
-		return errors.E(err)
+		return err
 	}
 
 	credential.Valid = sql.NullBool{
@@ -69,7 +69,7 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	// Before we accepted the force flag to remove the credential regardless of the references count.
 	// Now we want to ensure that the credential is not used by any models before removing it to maintain
@@ -82,7 +82,7 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 		Name: credential.CloudName,
 	}
 	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	var controllers []dbmodel.Controller
@@ -106,7 +106,7 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 	})
 
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	err = j.Database.DeleteCloudCredential(ctx, &credential)
@@ -139,7 +139,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 		var u2 dbmodel.Identity
 		u2.SetTag(args.CredentialTag.Owner())
 		if err := j.Database.GetIdentity(ctx, &u2); err != nil {
-			return result, errors.E(err)
+			return result, err
 		}
 	}
 
@@ -148,19 +148,19 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return result, errors.E(err)
+		return result, err
 	}
 
 	// Confirm the cloud exists.
 	var cloud dbmodel.Cloud
 	cloud.SetTag(names.NewCloudTag(credential.CloudName))
 	if err = j.Database.GetCloud(ctx, &cloud); err != nil {
-		return result, errors.E(err)
+		return result, err
 	}
 
 	models, err := j.Database.GetModelsUsingCredential(ctx, credential.ID)
 	if err != nil {
-		return result, errors.E(err)
+		return result, err
 	}
 	var controllers []dbmodel.Controller
 	seen := make(map[uint]bool)
@@ -183,7 +183,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 			return err
 		})
 		if err != nil {
-			return result, errors.E(err)
+			return result, err
 		}
 	}
 	var modelsErr bool
@@ -200,7 +200,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 	}
 
 	if err := j.updateCredential(ctx, &credential, args.Credential.Attributes); err != nil {
-		return result, errors.E(err)
+		return result, err
 	}
 
 	err = j.forEachController(ctx, controllers, func(ctl *dbmodel.Controller, api API) error {
@@ -216,7 +216,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 		return nil
 	})
 	if err != nil {
-		return result, errors.E(err)
+		return result, err
 	}
 	return result, nil
 }
@@ -242,7 +242,7 @@ func (j *JujuManager) updateControllerCloudCredential(
 
 	attr, err := j.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	out, err := f(ctx, jujuparams.TaggedCredential{
@@ -254,7 +254,7 @@ func (j *JujuManager) updateControllerCloudCredential(
 	})
 
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	// Shouldn't happen, the Juju client presumes that
@@ -296,8 +296,6 @@ func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel
 	})
 	if err == errStop {
 		err = iterErr
-	} else if err != nil {
-		err = errors.E(err)
 	}
 	return err
 }
@@ -323,7 +321,6 @@ func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, user *op
 
 	attrs, err = j.getCloudCredentialAttributes(ctx, cred)
 	if err != nil {
-		err = errors.E(err)
 		return
 	}
 	if len(attrs) == 0 {
@@ -350,7 +347,7 @@ func (j *JujuManager) getCloudCredentialAttributes(ctx context.Context, cred *db
 
 	attr, err := j.CredentialStore.Get(ctx, cred.ResourceTag())
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return attr, nil
 }
@@ -359,12 +356,12 @@ func (j *JujuManager) getCloudCredentialAttributes(ctx context.Context, cred *db
 func (j *JujuManager) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 	credential, err := j.GetCloudCredential(ctx, originalUser, cred)
 	if err != nil {
-		return names.CloudCredentialTag{}, nil, errors.E(err)
+		return names.CloudCredentialTag{}, nil, err
 	}
 
 	attr, err := j.getCloudCredentialAttributes(ctx, credential)
 	if err != nil {
-		return names.CloudCredentialTag{}, nil, errors.E(err)
+		return names.CloudCredentialTag{}, nil, err
 	}
 
 	newCredID := fmt.Sprintf("%s/%s/%s", cred.Cloud().Id(), newUser.Name, cred.Name())

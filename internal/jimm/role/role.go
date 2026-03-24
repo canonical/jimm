@@ -37,7 +37,7 @@ func (rm *RoleManager) AddRole(ctx context.Context, user *openfga.User, roleName
 
 	re, err := rm.store.AddRole(ctx, roleName)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return re, nil
 }
@@ -63,18 +63,18 @@ func (rm *RoleManager) RemoveRole(ctx context.Context, user *openfga.User, roleN
 	}
 	err := rm.store.GetRole(ctx, re)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	// TODO(ale8k):
 	// Would be nice to have a way to create a transaction to get, remove tuples, if successful, delete role
 	// somehow. We could pass a callback and change the db methods?
 	if err := rm.authSvc.RemoveRole(ctx, re.ResourceTag()); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := rm.store.RemoveRole(ctx, re); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -88,7 +88,7 @@ func (rm *RoleManager) RenameRole(ctx context.Context, user *openfga.User, oldNa
 
 	err := rm.store.UpdateRoleName(ctx, oldName, newName)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -103,7 +103,7 @@ func (rm *RoleManager) ListRoles(ctx context.Context, user *openfga.User, pagina
 
 	res, err := rm.store.ListRoles(ctx, pagination.Limit(), pagination.Offset(), match)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -115,7 +115,7 @@ func (rm *RoleManager) CountRoles(ctx context.Context, user *openfga.User) (int,
 	}
 	count, err := rm.store.CountRoles(ctx)
 	if err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 	return count, nil
 }
@@ -127,7 +127,7 @@ func (rm *RoleManager) getRole(ctx context.Context, user *openfga.User, role *db
 	}
 
 	if err := rm.store.GetRole(ctx, role); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return role, nil

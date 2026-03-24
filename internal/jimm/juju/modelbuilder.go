@@ -404,7 +404,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	}
 
 	if err := b.selectController(); err != nil {
-		b.err = errors.E(err)
+		b.err = err
 		return b
 	}
 	// if controller is still not selected, there's nothing
@@ -543,7 +543,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 
 	api, err := b.jujuManager.dial(b.ctx, b.controller, names.ModelTag{}, b.ofgaUser)
 	if err != nil {
-		b.err = errors.E(err)
+		b.err = err
 		return b
 	}
 	defer api.Close()
@@ -557,7 +557,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 
 	args, err := b.jujuModelCreateArgs()
 	if err != nil {
-		b.err = errors.E(err)
+		b.err = err
 		return b
 	}
 
@@ -595,7 +595,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	// JWTs because Juju returns a different result on migrated models otherwise.
 	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
 		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = errors.E(err)
+		b.err = err
 		return b
 	}
 

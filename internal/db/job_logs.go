@@ -21,7 +21,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId int64, logLine string) (
 	const op = "db.AddJobLog"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -68,7 +68,7 @@ func (d *Database) QueryJobLog(ctx context.Context, jobId int64, offset int) (lo
 	const op = "db.QueryJobLog"
 
 	if err := d.ready(); err != nil {
-		return loggies, nextOffsetValue, errors.E(err)
+		return loggies, nextOffsetValue, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

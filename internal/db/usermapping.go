@@ -14,7 +14,7 @@ import (
 func (d *Database) AddUserMapping(ctx context.Context, userMapping *dbmodel.UserMapping) (err error) {
 	const op = "db.AddUserMapping"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -33,7 +33,7 @@ func (d *Database) AddUserMapping(ctx context.Context, userMapping *dbmodel.User
 func (d *Database) GetUserMapping(ctx context.Context, userMapping *dbmodel.UserMapping) (err error) {
 	const op = "db.GetUserMapping"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -66,7 +66,7 @@ func (d *Database) GetUserMapping(ctx context.Context, userMapping *dbmodel.User
 func (d *Database) DeleteUserMapping(ctx context.Context, userMapping *dbmodel.UserMapping) (err error) {
 	const op = "db.DeleteUserMapping"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -84,7 +84,7 @@ func (d *Database) DeleteUserMapping(ctx context.Context, userMapping *dbmodel.U
 func (d *Database) DeleteUserMappingsByModelUUID(ctx context.Context, modelUUID string) (err error) {
 	const op = "db.DeleteUserMappingsByModelUUID"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

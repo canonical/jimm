@@ -129,7 +129,7 @@ func (r *controllerRoot) setupUUIDGenerator() error {
 	var err error
 	r.generator, err = fastuuid.NewGenerator()
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }

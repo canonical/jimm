@@ -70,7 +70,7 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 		Endpoints:              args.Endpoints,
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -118,7 +118,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 		},
 	}
 	if err := r.jimm.JujuManager().GetApplicationOfferConsumeDetails(ctx, user, &details, v); err != nil {
-		return jujuparams.ConsumeOfferDetails{}, errors.E(err)
+		return jujuparams.ConsumeOfferDetails{}, err
 	}
 	return details, nil
 }
@@ -131,7 +131,7 @@ func (r *controllerRoot) ListApplicationOffers(ctx context.Context, args jujupar
 
 	offers, err := r.jimm.JujuManager().ListApplicationOffers(ctx, r.user, filters...)
 	if err != nil {
-		return results, errors.E(err)
+		return results, err
 	}
 	results.Results = offersToParams(offers)
 
@@ -148,7 +148,7 @@ func (r *controllerRoot) FindApplicationOffers(ctx context.Context, args jujupar
 
 	offers, err := r.jimm.JujuManager().FindApplicationOffers(ctx, r.user, filters...)
 	if err != nil {
-		return results, errors.E(err)
+		return results, err
 	}
 	results.Results = offersToParams(offers)
 
@@ -176,12 +176,12 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
 		if err := r.jimm.PermissionManager().GrantOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
-			return errors.E(err)
+			return err
 		}
 		return nil
 	case jujuparams.RevokeOfferAccess:
 		if err := r.jimm.PermissionManager().RevokeOfferAccess(ctx, r.user, change.OfferURL, ut, change.Access); err != nil {
-			return errors.E(err)
+			return err
 		}
 		return nil
 	default:

@@ -82,7 +82,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 
 	err := d.migrateFromSource(ctx, dbmodel.SQL, path.Join("sql", d.DB.Name()))
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }

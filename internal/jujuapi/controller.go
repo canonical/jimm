@@ -98,7 +98,7 @@ func (r *controllerRoot) ControllerVersion(ctx context.Context) (jujuparams.Cont
 
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.ControllerVersionResults{}, errors.E(err)
+		return jujuparams.ControllerVersionResults{}, err
 	}
 	result := jujuparams.ControllerVersionResults{
 		Version:   srvVersion.String(),
@@ -113,7 +113,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 
 	err := r.setupUUIDGenerator()
 	if err != nil {
-		return jujuparams.SummaryWatcherID{}, errors.E(err)
+		return jujuparams.SummaryWatcherID{}, err
 	}
 
 	id := fmt.Sprintf("%v", r.generator.Next())
@@ -121,7 +121,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 	getModels := func(ctx context.Context) ([]string, error) {
 		models, err := r.allModels(ctx)
 		if err != nil {
-			return nil, errors.E(err)
+			return nil, err
 		}
 		modelUUIDs := make([]string, len(models.UserModels))
 		for i, model := range models.UserModels {
@@ -131,7 +131,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 	}
 	watcher, err := newModelSummaryWatcher(ctx, id, r.jimm.PubSubHub(), getModels)
 	if err != nil {
-		return jujuparams.SummaryWatcherID{}, errors.E(err)
+		return jujuparams.SummaryWatcherID{}, err
 	}
 	r.watchers.register(watcher)
 
@@ -150,7 +150,7 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 
 	err := r.setupUUIDGenerator()
 	if err != nil {
-		return jujuparams.SummaryWatcherID{}, errors.E(err)
+		return jujuparams.SummaryWatcherID{}, err
 	}
 
 	id := fmt.Sprintf("%v", r.generator.Next())
@@ -162,14 +162,14 @@ func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams
 			return nil
 		})
 		if err != nil {
-			return nil, errors.E(err)
+			return nil, err
 		}
 		return modelUUIDs, nil
 	}
 
 	watcher, err := newModelSummaryWatcher(ctx, id, r.jimm.PubSubHub(), getAllModels)
 	if err != nil {
-		return jujuparams.SummaryWatcherID{}, errors.E(err)
+		return jujuparams.SummaryWatcherID{}, err
 	}
 	r.watchers.register(watcher)
 
@@ -195,7 +195,7 @@ func (r *controllerRoot) allModels(ctx context.Context) (jujuparams.UserModelLis
 		return nil
 	})
 	if err != nil {
-		return jujuparams.UserModelList{}, errors.E(err)
+		return jujuparams.UserModelList{}, err
 	}
 	return jujuparams.UserModelList{
 		UserModels: models,
@@ -216,7 +216,7 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 		}
 		status, err := r.jimm.JujuManager().ModelStatus(ctx, r.user, mt)
 		if err != nil {
-			results[i].Error = r.mapError(ctx, errors.E(err))
+			results[i].Error = r.mapError(ctx, err)
 			continue
 		}
 		results[i] = toModelStatusParams(status)
@@ -231,7 +231,7 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 
 	config, err := r.jimm.ConfigManager().GetConfig()
 	if err != nil {
-		return jujuparams.ControllerConfigResult{}, errors.E(err)
+		return jujuparams.ControllerConfigResult{}, err
 	}
 	cfg := make(map[string]interface{})
 	cfg[jujucontroller.ControllerUUIDKey] = config.ControllerUUID
@@ -257,7 +257,7 @@ func (r *controllerRoot) GetControllerAccess(ctx context.Context, args jujuparam
 		}
 		access, err := r.jimm.PermissionManager().GetJimmControllerAccess(ctx, r.user, tag)
 		if err != nil {
-			results[i].Error = r.mapError(ctx, errors.E(err))
+			results[i].Error = r.mapError(ctx, err)
 			continue
 		}
 		results[i].Result = &jujuparams.UserAccess{
@@ -279,7 +279,7 @@ func (r *controllerRoot) InitiateMigration(ctx context.Context, args jujuparams.
 	for i, spec := range args.Specs {
 		result, err := r.jimm.JujuManager().InitiateMigration(ctx, r.user, spec)
 		if err != nil {
-			result.Error = r.mapError(ctx, errors.E(err))
+			result.Error = r.mapError(ctx, err)
 		}
 		results[i] = result
 	}

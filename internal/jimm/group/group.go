@@ -40,7 +40,7 @@ func (j *GroupManager) AddGroup(ctx context.Context, user *openfga.User, name st
 
 	ge, err := j.store.AddGroup(ctx, name)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return ge, nil
 }
@@ -53,7 +53,7 @@ func (j *GroupManager) CountGroups(ctx context.Context, user *openfga.User) (int
 	}
 	count, err := j.store.CountGroups(ctx)
 	if err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 	return count, nil
 }
@@ -65,7 +65,7 @@ func (j *GroupManager) getGroup(ctx context.Context, user *openfga.User, group *
 		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	if err := j.store.GetGroup(ctx, group); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return group, nil
 }
@@ -103,7 +103,7 @@ func (j *GroupManager) RenameGroup(ctx context.Context, user *openfga.User, oldN
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -130,12 +130,12 @@ func (j *GroupManager) RemoveGroup(ctx context.Context, user *openfga.User, name
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	err = j.authSvc.RemoveGroup(ctx, group.ResourceTag())
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func (j *GroupManager) ListGroups(ctx context.Context, user *openfga.User, pagin
 
 	groups, err := j.store.ListGroups(ctx, pagination.Limit(), pagination.Offset(), match)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return groups, nil
 }

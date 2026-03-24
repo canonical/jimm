@@ -18,7 +18,7 @@ import (
 func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = "db.AddModel"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -38,7 +38,7 @@ func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) (err erro
 func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = "db.GetModel"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -46,7 +46,7 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	db := d.DB.WithContext(ctx)
@@ -83,7 +83,7 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID uint) (_ []dbmodel.Model, err error) {
 	const op = "db.GetModelsUsingCredential"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -103,7 +103,7 @@ func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID ui
 func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = "db.UpdateModel"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -121,7 +121,7 @@ func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err e
 func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = "db.DeleteModel"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -150,7 +150,7 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 	const op = "db.ForEachModel"
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -181,7 +181,7 @@ func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) (_ 
 	const op = "db.GetModelsByUUID"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -224,7 +224,7 @@ func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Contro
 	const op = "db.GetModelsByController"
 
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -243,7 +243,7 @@ func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Cont
 	const op = "db.CountModelsByController"
 
 	if err := d.ready(); err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

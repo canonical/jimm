@@ -159,7 +159,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 		var err error
 		argsb, err = json.Marshal(args)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 	}
 	req := &message{
@@ -185,7 +185,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 	req.RequestID = c.reqID
 	if err := c.conn.WriteJSON(req); err != nil {
 		c.broken = true
-		return errors.E(err)
+		return err
 	}
 	ch := make(chan struct{})
 	//nolint:staticcheck // Not sure why Martin made this a **. Ignore for now.
@@ -211,7 +211,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 		}
 		if resp != nil {
 			if err := json.Unmarshal([]byte((*respMsg).Response), &resp); err != nil {
-				return errors.E(err)
+				return err
 			}
 		}
 		return nil

@@ -155,12 +155,12 @@ func (j *PermissionManager) GrantAuditLogAccess(ctx context.Context, user *openf
 	targetUser.SetTag(targetUserTag)
 	err := j.store.GetIdentity(ctx, targetUser)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	err = openfga.NewUser(targetUser, j.authSvc).SetControllerAccess(ctx, j.jimmTag, ofganames.AuditLogViewerRelation)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -177,12 +177,12 @@ func (j *PermissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 	targetUser.SetTag(targetUserTag)
 	err := j.store.GetIdentity(ctx, targetUser)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	err = openfga.NewUser(targetUser, j.authSvc).UnsetAuditLogViewerAccess(ctx, j.jimmTag)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.U
 			}
 			check, err := openfga.CheckRelation(ctx, user, tag, relation)
 			if err != nil {
-				return cachedPerms, errors.E(err)
+				return cachedPerms, err
 			}
 			if !check {
 				return cachedPerms, errors.E(fmt.Sprintf("Missing permission for %s:%s", key, val))
@@ -277,7 +277,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
@@ -345,7 +345,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
@@ -423,7 +423,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 
 	modelAdmin, err := user.HasModelRelation(ctx, mt, ofganames.AdministratorRelation)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if !modelAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -501,7 +501,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 
 	modelAdmin, err := user.HasModelRelation(ctx, mt, requiredAccess)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if !modelAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -570,7 +570,7 @@ func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.
 
 	identity, err := dbmodel.NewIdentity(ut.Id())
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	offer := dbmodel.ApplicationOffer{
@@ -578,12 +578,12 @@ func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.
 	}
 	if err := j.store.GetApplicationOffer(ctx, &offer); err != nil {
 		// If the offer is not found, we leak information about the existence of offers that do exist.
-		return errors.E(err)
+		return err
 	}
 
 	isOfferAdmin, err := openfga.IsAdministrator(ctx, user, offer.ResourceTag())
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if !isOfferAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -599,11 +599,11 @@ func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.
 	if targetAccessLevel != currentAccessLevel {
 		relation, err := ToOfferRelation(targetAccessLevel)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		err = targetUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), relation)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 	}
 
@@ -640,7 +640,7 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 
 	identity, err := dbmodel.NewIdentity(ut.Id())
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	offer := dbmodel.ApplicationOffer{
@@ -648,12 +648,12 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 	}
 	if err := j.store.GetApplicationOffer(ctx, &offer); err != nil {
 		// If the offer is not found, we leak information about the existence of offers that do exist.
-		return errors.E(err)
+		return err
 	}
 
 	isOfferAdmin, err := openfga.IsAdministrator(ctx, user, offer.ResourceTag())
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	if !isOfferAdmin {
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
@@ -662,7 +662,7 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 	targetUser := openfga.NewUser(identity, j.authSvc)
 	targetRelation, err := ToOfferRelation(string(access))
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	err = targetUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation)
 	if err != nil {

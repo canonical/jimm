@@ -100,7 +100,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 	// Get server version for LoginResult
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(err)
+		return jujuparams.LoginResult{}, err
 	}
 
 	return jujuparams.LoginResult{
@@ -122,7 +122,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	user, err := r.jimm.LoginManager().LoginWithSessionToken(ctx, req.SessionToken)
 	if err != nil {
 		// Avoid masking the error code on err below. The Juju CLI uses it to determine when to initiate login see [OAuthAuthenticator.VerifySessionToken].
-		return jujuparams.LoginResult{}, errors.E(err)
+		return jujuparams.LoginResult{}, err
 	}
 
 	// TODO(ale8k): This isn't needed I don't think as controller roots are unique
@@ -134,7 +134,7 @@ func (r *controllerRoot) LoginWithSessionToken(ctx context.Context, req params.L
 	// Get server version for LoginResult
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(err)
+		return jujuparams.LoginResult{}, err
 	}
 
 	return jujuparams.LoginResult{
@@ -162,7 +162,7 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 	// Get server version for LoginResult
 	srvVersion, err := r.jimm.JujuManager().EarliestControllerVersion(ctx)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.E(err)
+		return jujuparams.LoginResult{}, err
 	}
 
 	return jujuparams.LoginResult{

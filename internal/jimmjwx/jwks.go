@@ -168,7 +168,7 @@ func generateJWK(ctx context.Context) (jwk.Set, []byte, error) {
 	// and accept any negligible wire cost.
 	keySet, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	privateKeyPEM := pem.EncodeToMemory(
@@ -181,32 +181,32 @@ func generateJWK(ctx context.Context) (jwk.Set, []byte, error) {
 	// We also use the same methodology of generating UUIDs for our KID
 	kid, err := uuid.NewRandom()
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	jwks, err := jwk.FromRaw(keySet.PublicKey)
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 	err = jwks.Set(jwk.KeyIDKey, kid.String())
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	err = jwks.Set(jwk.KeyUsageKey, "sig") // Couldn't find const for this...
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	err = jwks.Set(jwk.AlgorithmKey, jwa.RS256)
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	ks := jwk.NewSet()
 	err = ks.AddKey(jwks)
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	return ks, privateKeyPEM, nil

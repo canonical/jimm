@@ -38,7 +38,7 @@ func (r *controllerRoot) ModelSummaryWatcherNext(ctx context.Context, objID stri
 
 	w, err := r.watchers.get(objID)
 	if err != nil {
-		return jujuparams.SummaryWatcherNextResults{}, errors.E(err)
+		return jujuparams.SummaryWatcherNextResults{}, err
 	}
 	return w.Next()
 }
@@ -49,7 +49,7 @@ func (r *controllerRoot) ModelSummaryWatcherStop(ctx context.Context, objID stri
 
 	w, err := r.watchers.get(objID)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return w.Stop()
@@ -122,7 +122,7 @@ func newModelSummaryWatcher(ctx context.Context, id string, pubsub *pubsub.Hub, 
 	cleanupFunction, err := pubsub.SubscribeMatch(accessWatcher.match, watcher.pubsubHandler)
 	if err != nil {
 		cancelContext()
-		return nil, errors.E(err)
+		return nil, err
 	}
 	watcher.cleanup = func() {
 		cancelContext()

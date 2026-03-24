@@ -71,7 +71,7 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 		Access:     permissions,
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	jwtString := base64.StdEncoding.EncodeToString(jwt)
 
@@ -101,7 +101,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	var loginRequest *jujuparams.LoginRequest
 	loginRequest, err = d.createLoginRequest(ctx, ctl, modelTag, user)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	var res jujuparams.LoginResult
@@ -318,7 +318,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 
 	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	ok = names.IsValidUser(user)
 	if !ok {
@@ -327,7 +327,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
 	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader, attrs)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return conn, nil
 }
@@ -341,7 +341,7 @@ func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extr
 
 	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	header := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
@@ -353,7 +353,7 @@ func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extr
 
 	conn, err := rpc.Dial(c.ctx, c.ctl, names.ModelTag{}, path, header, attrs)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return conn, nil

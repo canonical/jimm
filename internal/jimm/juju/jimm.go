@@ -62,7 +62,7 @@ func (j *JujuManager) ControllerInfo(ctx context.Context, name string) (*dbmodel
 		Name: name,
 	}
 	if err := j.Database.GetController(ctx, &ctl); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return &ctl, nil
 }
@@ -83,7 +83,7 @@ func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) (
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return controllers, nil
@@ -111,7 +111,7 @@ func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga
 		return db.UpdateController(ctx, &c)
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -151,7 +151,7 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 		return db.DeleteController(ctx, &c)
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -171,17 +171,17 @@ func (j *JujuManager) FullModelStatus(ctx context.Context, user *openfga.User, m
 	}
 	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	api, err := j.dial(ctx, &model.Controller, modelTag, nil)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	status, err := api.Status(ctx, patterns)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return status, nil
@@ -227,7 +227,7 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 
 	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetController)
 	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(err)
+		return jujuparams.InitiateMigrationResult{}, err
 	}
 
 	model := dbmodel.Model{}
@@ -258,12 +258,12 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 
 	err = j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(err)
+		return jujuparams.InitiateMigrationResult{}, err
 	}
 	spec := jujuparams.MigrationSpec{ModelTag: model.ResourceTag().String(), TargetInfo: migrationTarget}
 	result, err := initiateInternalMigration(ctx, j, user, spec)
 	if err != nil {
-		return result, errors.E(err)
+		return result, err
 	}
 	return result, nil
 }
@@ -326,24 +326,24 @@ func (j *JujuManager) ListMigrationTargets(ctx context.Context, user *openfga.Us
 	var model dbmodel.Model
 	model.SetTag(modelTag)
 	if err := j.Database.GetModel(ctx, &model); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	currentVersion, err := version.Parse(model.Controller.AgentVersion)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	cloudRegion, err := j.Database.FindRegionByCloudName(ctx, model.CloudRegion.CloudName, model.CloudRegion.Name)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	var controllers []dbmodel.Controller
 	for _, ctl := range cloudRegion.Controllers {
 		candidateVersion, err := version.Parse(ctl.Controller.AgentVersion)
 		if err != nil {
-			return nil, errors.E(err)
+			return nil, err
 		}
 
 		if model.Controller.ID != ctl.Controller.ID &&
@@ -394,7 +394,7 @@ func (j *JujuManager) ModelControllerInfo(ctx context.Context, user *openfga.Use
 
 	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return &apiparams.ModelControllerInfo{

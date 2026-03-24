@@ -78,7 +78,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 		}
 		tempMap := make(map[string]any)
 		if err := json.Unmarshal(fb, &tempMap); err != nil {
-			return results, errors.E(err)
+			return results, err
 		}
 
 		queryCtx, cancel := context.WithTimeout(ctx, j.crossModelQueryTimeout)

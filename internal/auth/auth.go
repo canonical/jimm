@@ -429,7 +429,7 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	// TODO(ale8k): Add test case for this
 	u, err := dbmodel.NewIdentity(email)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	// TODO(babakks): If user does not exist, we will create one with an empty
@@ -438,7 +438,7 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	// this should be changed and split apart so it is intentional what entities
 	// we are creating or fetching.
 	if err := db.GetIdentity(ctx, u); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	u.AccessToken = token.AccessToken
@@ -446,7 +446,7 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	u.AccessTokenExpiry = token.Expiry
 	u.AccessTokenType = token.TokenType
 	if err := db.UpdateIdentity(ctx, u); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -499,7 +499,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 
 	session, err := as.sessionStore.Get(r, SessionName)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	session.IsNew = true                            // Sets cookie to a fresh new cookie
@@ -508,7 +508,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 
 	session.Values[SessionIdentityKey] = email
 	if err = session.Save(r, w); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -547,7 +547,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 	ctx = ContextWithSessionIdentity(ctx, identityId)
 
 	if err := as.extendSession(session, w, req); err != nil {
-		return ctx, errors.E(err)
+		return ctx, err
 	}
 
 	return ctx, nil
@@ -604,11 +604,11 @@ func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResp
 	// TODO(ale8k) CSS-8227: Add test case for this
 	u, err := dbmodel.NewIdentity(identityId)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	if err := as.db.GetIdentity(ctx, u); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	return &params.WhoamiResponse{
@@ -632,11 +632,11 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 	// TODO(ale8k) CSS-8228: Add test case for this
 	u, err := dbmodel.NewIdentity(emailStr)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if err := db.GetIdentity(ctx, u); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	t := &oauth2.Token{
@@ -653,7 +653,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 	}
 
 	if err := as.refreshIdentitiesToken(ctx, emailStr, t); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -683,7 +683,7 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 func (as *AuthenticationService) deleteSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 
 	if err := as.modifySession(session, w, req, -1); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -692,7 +692,7 @@ func (as *AuthenticationService) deleteSession(session *sessions.Session, w http
 func (as *AuthenticationService) extendSession(session *sessions.Session, w http.ResponseWriter, req *http.Request) error {
 
 	if err := as.modifySession(session, w, req, as.sessionCookieMaxAge); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
@@ -703,7 +703,7 @@ func (as *AuthenticationService) modifySession(session *sessions.Session, w http
 	session.Options.MaxAge = maxAge
 
 	if err := session.Save(req, w); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil

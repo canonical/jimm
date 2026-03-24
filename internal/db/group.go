@@ -18,7 +18,7 @@ var newUUID = uuid.NewString
 func (d *Database) AddGroup(ctx context.Context, name string) (ge *dbmodel.GroupEntry, err error) {
 	const op = "db.AddGroup"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -40,7 +40,7 @@ func (d *Database) AddGroup(ctx context.Context, name string) (ge *dbmodel.Group
 func (d *Database) CountGroups(ctx context.Context) (count int, err error) {
 	const op = "db.CountGroups"
 	if err := d.ready(); err != nil {
-		return 0, errors.E(err)
+		return 0, err
 	}
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
 	defer durationObserver()
@@ -59,7 +59,7 @@ func (d *Database) CountGroups(ctx context.Context) (count int, err error) {
 func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err error) {
 	const op = "db.GetGroup"
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if group.UUID == "" && group.Name == "" {
@@ -91,7 +91,7 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err
 func (d *Database) ListGroups(ctx context.Context, limit, offset int, match string) (_ []dbmodel.GroupEntry, err error) {
 	const op = "db.ListGroups"
 	if err := d.ready(); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -125,7 +125,7 @@ func (d *Database) UpdateGroupName(ctx context.Context, uuid, name string) (err 
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -149,7 +149,7 @@ func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) (
 	}
 
 	if err := d.ready(); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)

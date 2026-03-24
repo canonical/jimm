@@ -34,7 +34,7 @@ func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User,
 	}
 	parsedTuples, err := j.parseTuples(ctx, tuples)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	for i := 0; i < len(parsedTuples); i += BATCH_SIZE_OPENFGA {
 		end := i + BATCH_SIZE_OPENFGA
@@ -61,7 +61,7 @@ func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 	}
 	parsedTuples, err := j.parseTuples(ctx, tuples)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	for i := 0; i < len(parsedTuples); i += BATCH_SIZE_OPENFGA {
 		end := i + BATCH_SIZE_OPENFGA
@@ -86,7 +86,7 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 	allowed := false
 	parsedTuple, err := j.parseTuple(ctx, tuple)
 	if err != nil {
-		return false, errors.E(err)
+		return false, err
 	}
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == user.Name
 	// Admins can check any relation, non-admins can only check their own.
@@ -133,7 +133,7 @@ func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *op
 	if tuple.TargetObject != "" {
 		parsedTuple, err = j.parseTuple(ctx, tuple)
 		if err != nil {
-			return nil, "", errors.E(err)
+			return nil, "", err
 		}
 	} else if tuple.Object != "" {
 		return nil, "", errors.E(errors.CodeBadRequest, "it is invalid to pass an object without a target object.")
@@ -141,7 +141,7 @@ func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *op
 
 	responseTuples, ct, err := j.authSvc.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)
 	if err != nil {
-		return nil, "", errors.E(err)
+		return nil, "", err
 	}
 	return responseTuples, ct, nil
 }
@@ -158,7 +158,7 @@ func (j *PermissionManager) ListObjectRelations(ctx context.Context, user *openf
 	}
 	responseTuples, nextToken, err := j.getObjectRelationsPage(ctx, object, pageSize, entitlementToken)
 	if err != nil {
-		return nil, e, errors.E(err)
+		return nil, e, err
 	}
 	// verify next page contains some entries. Otherwise return empty nextToken.
 	if len(responseTuples) == int(pageSize) && nextToken.String() != "" {
@@ -229,7 +229,7 @@ func (j *PermissionManager) parseTuples(ctx context.Context, tuples []apiparams.
 	for _, tuple := range tuples {
 		key, err := j.parseTuple(ctx, tuple)
 		if err != nil {
-			return nil, errors.E(err)
+			return nil, err
 		}
 		keys = append(keys, *key)
 	}

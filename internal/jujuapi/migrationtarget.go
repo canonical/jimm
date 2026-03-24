@@ -78,12 +78,12 @@ func (r *controllerRoot) CheckMachines(ctx context.Context, args jujuparams.Mode
 
 	modelTag, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return jujuparams.ErrorResults{}, errors.E(err)
+		return jujuparams.ErrorResults{}, err
 	}
 
 	results, err := r.jimm.JujuManager().CheckMachines(ctx, r.user, modelTag.Id())
 	if err != nil {
-		return jujuparams.ErrorResults{}, errors.E(err)
+		return jujuparams.ErrorResults{}, err
 	}
 	var errorResults []jujuparams.ErrorResult
 	for _, result := range results {
@@ -105,7 +105,7 @@ func (r *controllerRoot) Abort(ctx context.Context, args jujuparams.ModelArgs) e
 
 	modelTag, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return r.jimm.JujuManager().AbortMigration(ctx, r.user, modelTag.Id())
 }
@@ -122,7 +122,7 @@ func (r *controllerRoot) AdoptResources(ctx context.Context, args jujuparams.Ado
 
 	modelTag, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return r.jimm.JujuManager().AdoptResources(ctx, r.user, modelTag.Id(), args.SourceControllerVersion)
 }
@@ -137,12 +137,12 @@ func (r *controllerRoot) LatestLogTime(ctx context.Context, args jujuparams.Mode
 
 	modelTag, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return time.Time{}, errors.E(err)
+		return time.Time{}, err
 	}
 
 	t, err := r.jimm.JujuManager().LatestLogTime(ctx, r.user, modelTag.Id())
 	if err != nil {
-		return time.Time{}, errors.E(err)
+		return time.Time{}, err
 	}
 	return t, nil
 }
@@ -156,7 +156,7 @@ func (r *controllerRoot) Prechecks(ctx context.Context, args jujuparams.Migratio
 
 	ownerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	model := juju.MigratingModelInfo{
@@ -169,7 +169,7 @@ func (r *controllerRoot) Prechecks(ctx context.Context, args jujuparams.Migratio
 	}
 	err = r.jimm.JujuManager().Prechecks(ctx, r.user, model)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }

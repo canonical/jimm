@@ -430,7 +430,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 
 	database, err := openDB(ctx, p.DSN, p.LogSQL)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	db := &db.Database{DB: database}
 
@@ -441,7 +441,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 
 	openFGAclient, err := newOpenFGAClient(ctx, p.OpenFGAParams)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	if err := ensureControllerAdministrators(ctx, openFGAclient, controllerUUID, p.ControllerAdmins); err != nil {
@@ -450,7 +450,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 
 	credentialStore, err := setupCredentialStore(ctx, p, db)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	jwtExpiry := p.JWTExpiryDuration
@@ -494,7 +494,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 
 	sessionStore, cleanupFuncs, err := setupSessionStore(p.CookieSessionKey, db)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	deps.cleanupFuncs = append(deps.cleanupFuncs, cleanupFuncs...)
 
@@ -577,7 +577,7 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 	var err error
 	s.jimm, err = jimm.New(jimmParameters)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	s.mux = chi.NewRouter()
@@ -599,7 +599,7 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 
 	rebacBackend, err := rebac_admin.SetupBackend(ctx, jujuapi.NewJIMMAdapter(s.jimm))
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	s.mux.Mount("/rebac", middleware.AuthenticateRebac("/rebac", rebacBackend.Handler(""), s.jimm.LoginManager))
@@ -746,7 +746,7 @@ func (s *Service) StartServices(ctx context.Context, svc *service.Service) {
 func setupSessionStore(sessionSecret []byte, db *db.Database) (*pgstore.PGStore, []func() error, error) {
 	sqlDb, err := db.DB.DB()
 	if err != nil {
-		return nil, nil, errors.E(err)
+		return nil, nil, err
 	}
 
 	store, err := pgstore.NewPGStoreFromPool(sqlDb, sessionSecret)
@@ -848,7 +848,7 @@ func newOpenFGAClient(ctx context.Context, p OpenFGAParams) (*openfga.OFGAClient
 		AuthModelID: p.AuthModel,
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return openfga.NewOpenFGAClient(cofgaClient), nil
 }
@@ -864,12 +864,12 @@ func ensureControllerAdministrators(ctx context.Context, client *openfga.OFGACli
 		userTag := names.NewUserTag(username)
 		i, err := dbmodel.NewIdentity(userTag.Id())
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		user := openfga.NewUser(i, client)
 		isAdmin, err := openfga.IsAdministrator(ctx, user, controller)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		if !isAdmin {
 			tuples = append(tuples, openfga.Tuple{

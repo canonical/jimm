@@ -58,12 +58,12 @@ type ModelCreateArgs struct {
 func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *ModelCreateArgs) (base.ModelInfo, error) {
 	owner, err := dbmodel.NewIdentity(args.Owner.Id())
 	if err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	err = j.Database.GetIdentity(ctx, owner)
 	if err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	// Only JIMM admins are able to add models on behalf of other users.
@@ -76,7 +76,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	builder = builder.WithAuthorizer(user)
 	builder = builder.WithName(args.Name)
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	if args.ControllerName != "" {
@@ -85,17 +85,17 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 		builder = builder.WithAnyController()
 	}
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	builder = builder.WithCloud(user, args.Cloud)
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	builder = builder.WithCloudRegion(args.CloudRegion)
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 	// fetch cloud defaults
 	cloudDefaults := dbmodel.CloudDefaults{
@@ -127,23 +127,23 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	if args.CloudCredential != (names.CloudCredentialTag{}) {
 		builder = builder.WithCloudCredential(args.CloudCredential)
 		if err := builder.Error(); err != nil {
-			return base.ModelInfo{}, errors.E(err)
+			return base.ModelInfo{}, err
 		}
 	}
 	builder = builder.CreateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 	defer builder.Cleanup()
 
 	builder = builder.CreateControllerModel()
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	builder = builder.UpdateDatabaseModel()
 	if err := builder.Error(); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 
 	mi := builder.JujuModelInfo()
@@ -153,7 +153,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	controllerTag := builder.controller.ResourceTag()
 
 	if err := j.addModelPermissions(ctx, ownerUser, modelTag, controllerTag); err != nil {
-		return base.ModelInfo{}, errors.E(err)
+		return base.ModelInfo{}, err
 	}
 	return mi, nil
 }
@@ -207,7 +207,7 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 	var m dbmodel.Model
 	m.SetTag(mt)
 	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return jujuclient.ModelInfo{}, errors.E(err)
+		return jujuclient.ModelInfo{}, err
 	}
 
 	if ok, err := user.IsModelReader(ctx, mt); !ok || err != nil {
@@ -216,13 +216,13 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, user)
 	if err != nil {
-		return jujuclient.ModelInfo{}, errors.E(err)
+		return jujuclient.ModelInfo{}, err
 	}
 	defer api.Close()
 
 	modelInfo, err := j.modelInfo(ctx, user, &m, api)
 	if err != nil {
-		return jujuclient.ModelInfo{}, errors.E(err)
+		return jujuclient.ModelInfo{}, err
 	}
 
 	return j.mergeModelInfo(ctx, user, modelInfo, m)
@@ -340,7 +340,7 @@ func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User
 		return nil
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 
 	// we query the model summaries for each controller
@@ -390,7 +390,7 @@ func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, mo
 	} {
 		usersWithSpecifiedRelation, err := openfga.ListUsersWithAccess(ctx, j.OpenFGAClient, jimmModel.ResourceTag(), relation)
 		if err != nil {
-			return jujuclient.ModelInfo{}, errors.E(err)
+			return jujuclient.ModelInfo{}, err
 		}
 		for _, u := range usersWithSpecifiedRelation {
 			// Since we are checking user relations in decreasing level of
@@ -404,7 +404,7 @@ func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, mo
 
 	modelAccess, err := j.permissionManager.GetUserModelAccess(ctx, user, jimmModel.ResourceTag())
 	if err != nil {
-		return jujuclient.ModelInfo{}, errors.E(err)
+		return jujuclient.ModelInfo{}, err
 	}
 
 	users := make([]base.UserInfo, 0, len(userAccess))
@@ -456,7 +456,7 @@ func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt na
 		return nil
 	})
 	if err != nil {
-		return ms, errors.E(err)
+		return ms, err
 	}
 	return ms, nil
 }
@@ -499,7 +499,7 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 
 		access, err := j.permissionManager.GetUserModelAccess(ctx, user, model.ResourceTag())
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		if access == "read" || access == "write" || access == "admin" {
 			if err := f(&model, access); err != nil {
@@ -516,7 +516,7 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 	case errStop:
 		return iterErr
 	default:
-		return errors.E(err)
+		return err
 	}
 }
 
@@ -547,7 +547,7 @@ func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f fu
 	case errStop:
 		return iterErr
 	default:
-		return errors.E(err)
+		return err
 	}
 }
 
@@ -575,7 +575,7 @@ func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt n
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	// NOTE (alesstimec) If we remove OpenFGA relation now, the user
@@ -598,7 +598,7 @@ func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt name
 		return err
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return dump, nil
 }
@@ -614,7 +614,7 @@ func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt na
 		return err
 	})
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return dump, nil
 }
@@ -630,7 +630,7 @@ func (j *JujuManager) ValidateModelUpgrade(ctx context.Context, user *openfga.Us
 		return api.ValidateModelUpgrade(ctx, mt, force)
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -656,12 +656,12 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 	m.SetTag(mt)
 
 	if err := j.Database.GetModel(ctx, &m); err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	hasAccess, err := user.HasModelRelation(ctx, mt, requireRelation)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	if !hasAccess {
@@ -672,11 +672,11 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, user)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 	defer api.Close()
 	if err := f(&m, api); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -693,32 +693,32 @@ func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.U
 
 	err := j.Database.GetCloudCredential(ctx, &credential)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	var m *dbmodel.Model
 	err = j.doModelAdmin(ctx, user, modelTag, func(model *dbmodel.Model, api API) error {
 		_, err = j.updateControllerCloudCredential(ctx, &credential, api.UpdateCloudsCredentialForce)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 
 		err = api.ChangeModelCredential(ctx, modelTag, cloudCredentialTag)
 		if err != nil {
-			return errors.E(err)
+			return err
 		}
 		m = model
 		return nil
 	})
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	m.CloudCredential = credential
 	m.CloudCredentialID = credential.ID
 	err = j.Database.UpdateModel(ctx, m)
 	if err != nil {
-		return errors.E(err)
+		return err
 	}
 
 	return nil
