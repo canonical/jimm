@@ -24,12 +24,12 @@ func (r *controllerRoot) SaveControllerProfile(ctx context.Context, req apiparam
 		return apiparams.SaveControllerProfileResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	if err := validateSaveControllerProfileRequest(req); err != nil {
-		return apiparams.SaveControllerProfileResponse{}, errors.E(err)
+		return apiparams.SaveControllerProfileResponse{}, err
 	}
 
 	profile := controllerProfileFromParams(req.ControllerProfile)
 	if err := r.jimm.ControllerProfileManager().SaveControllerProfile(ctx, &profile); err != nil {
-		return apiparams.SaveControllerProfileResponse{}, errors.E(fmt.Errorf("failed to save controller profile: %w", err))
+		return apiparams.SaveControllerProfileResponse{}, fmt.Errorf("failed to save controller profile: %w", err)
 	}
 
 	return apiparams.SaveControllerProfileResponse{ControllerProfile: controllerProfileToParams(profile)}, nil
@@ -42,7 +42,7 @@ func (r *controllerRoot) GetControllerProfile(ctx context.Context, req apiparams
 	}
 	profile, err := r.jimm.ControllerProfileManager().GetControllerProfile(ctx, req.Name)
 	if err != nil {
-		return apiparams.GetControllerProfileResponse{}, errors.E(fmt.Errorf("failed to get controller profile: %w", err))
+		return apiparams.GetControllerProfileResponse{}, fmt.Errorf("failed to get controller profile: %w", err)
 	}
 
 	return apiparams.GetControllerProfileResponse{ControllerProfile: controllerProfileToParams(*profile)}, nil
@@ -55,11 +55,11 @@ func (r *controllerRoot) ListControllerProfiles(ctx context.Context, req apipara
 		return apiparams.ListControllerProfilesResponse{}, errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	if err := validateListControllerProfilesRequest(req); err != nil {
-		return apiparams.ListControllerProfilesResponse{}, errors.E(err)
+		return apiparams.ListControllerProfilesResponse{}, err
 	}
 	profiles, err := r.jimm.ControllerProfileManager().ListControllerProfiles(ctx, req.JujuVersion)
 	if err != nil {
-		return apiparams.ListControllerProfilesResponse{}, errors.E(fmt.Errorf("failed to list controller profiles: %w", err))
+		return apiparams.ListControllerProfilesResponse{}, fmt.Errorf("failed to list controller profiles: %w", err)
 	}
 
 	resp := apiparams.ListControllerProfilesResponse{Profiles: make([]apiparams.ControllerProfileSummary, len(profiles))}
@@ -75,7 +75,7 @@ func (r *controllerRoot) RemoveControllerProfile(ctx context.Context, req apipar
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 	if err := r.jimm.ControllerProfileManager().RemoveControllerProfile(ctx, req.Name); err != nil {
-		return errors.E(fmt.Errorf("failed to remove controller profile: %w", err))
+		return fmt.Errorf("failed to remove controller profile: %w", err)
 	}
 	return nil
 }

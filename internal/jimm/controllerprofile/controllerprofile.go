@@ -28,7 +28,7 @@ func NewControllerProfileManager(store *db.Database) (*ControllerProfileManager,
 // SaveControllerProfile creates or replaces a saved controller profile.
 func (m *ControllerProfileManager) SaveControllerProfile(ctx context.Context, profile *dbmodel.ControllerProfile) error {
 	if err := m.store.CreateOrReplaceControllerProfile(ctx, profile); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
@@ -37,7 +37,7 @@ func (m *ControllerProfileManager) SaveControllerProfile(ctx context.Context, pr
 func (m *ControllerProfileManager) GetControllerProfile(ctx context.Context, name string) (*dbmodel.ControllerProfile, error) {
 	profile := &dbmodel.ControllerProfile{Name: name}
 	if err := m.store.GetControllerProfile(ctx, profile); err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return profile, nil
 }
@@ -47,7 +47,7 @@ func (m *ControllerProfileManager) GetControllerProfile(ctx context.Context, nam
 func (m *ControllerProfileManager) ListControllerProfiles(ctx context.Context, jujuVersion string) ([]dbmodel.ControllerProfile, error) {
 	profiles, err := m.store.ListControllerProfiles(ctx, jujuVersion)
 	if err != nil {
-		return nil, errors.E(err)
+		return nil, err
 	}
 	return profiles, nil
 }
@@ -55,7 +55,7 @@ func (m *ControllerProfileManager) ListControllerProfiles(ctx context.Context, j
 // RemoveControllerProfile removes a saved controller profile by name.
 func (m *ControllerProfileManager) RemoveControllerProfile(ctx context.Context, name string) error {
 	if err := m.store.RemoveControllerProfile(ctx, name); err != nil {
-		return errors.E(err)
+		return err
 	}
 	return nil
 }
