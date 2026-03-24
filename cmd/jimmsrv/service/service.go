@@ -261,28 +261,28 @@ type ServiceDependencies struct {
 // Validate checks that all required dependencies are present and returns an error if any are missing.
 func (s *ServiceDependencies) Validate() error {
 	if s.Database == nil {
-		return errors.E("missing database")
+		return errors.New("missing database")
 	}
 	if s.RiverClient == nil {
-		return errors.E("missing river client")
+		return errors.New("missing river client")
 	}
 	if s.OpenFGAClient == nil {
-		return errors.E("missing openfga client")
+		return errors.New("missing openfga client")
 	}
 	if s.CredentialStore == nil {
-		return errors.E("missing credential store")
+		return errors.New("missing credential store")
 	}
 	if s.JWTService == nil {
-		return errors.E("missing jwt service")
+		return errors.New("missing jwt service")
 	}
 	if s.JWKSService == nil {
-		return errors.E("missing jwks service")
+		return errors.New("missing jwks service")
 	}
 	if s.OAuthAuthenticator == nil {
-		return errors.E("missing oauth authenticator")
+		return errors.New("missing oauth authenticator")
 	}
 	if s.MigrationTokenGenerator == nil {
-		return errors.E("missing migration token generator")
+		return errors.New("missing migration token generator")
 	}
 	return nil
 }
@@ -407,10 +407,10 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	if p.AuditLogRetentionPeriodInDays != "" {
 		retentionPeriod, err := strconv.Atoi(p.AuditLogRetentionPeriodInDays)
 		if err != nil {
-			return nil, errors.E("failed to parse audit log retention period")
+			return nil, errors.New("failed to parse audit log retention period")
 		}
 		if retentionPeriod < 0 {
-			return nil, errors.E("retention period cannot be less than 0")
+			return nil, errors.New("retention period cannot be less than 0")
 		}
 		auditLogRetentionDays = retentionPeriod
 	}
@@ -425,7 +425,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 
 	if p.DSN == "" {
-		return nil, errors.E("missing DSN")
+		return nil, errors.New("missing DSN")
 	}
 
 	database, err := openDB(ctx, p.DSN, p.LogSQL)
@@ -546,7 +546,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 // Callers can use this to inject mock dependencies while keeping handler setup identical.
 func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) (*Service, error) {
 	if deps == nil {
-		return nil, errors.E("missing service dependencies")
+		return nil, errors.New("missing service dependencies")
 	}
 	if err := deps.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid service dependencies: %w", err)
@@ -806,7 +806,7 @@ func setupCredentialStore(ctx context.Context, p Params, db *db.Database) (jimmc
 		return vs, nil
 	}
 
-	return nil, errors.E("jimm cannot start without a credential store")
+	return nil, errors.New("jimm cannot start without a credential store")
 }
 
 func newVaultStore(ctx context.Context, p Params) (jimmcreds.CredentialStore, error) {

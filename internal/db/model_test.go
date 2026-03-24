@@ -540,7 +540,7 @@ func (s *dbSuite) TestForEachModel(c *qt.C) {
 	env := jimmtest.ParseEnvironment(c, testForEachModelEnv)
 	env.PopulateDB(c, s.Database)
 
-	testError := errors.E("test error")
+	testError := errors.New("test error")
 	err = s.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		return testError
 	})

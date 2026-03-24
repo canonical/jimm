@@ -176,7 +176,7 @@ func mustGetSubexpIndex(regex *regexp.Regexp, name string) int {
 func modelInfoFromPath(path string) (uuid string, finalPath string, err error) {
 	matches := extractPathInfo.FindStringSubmatch(path)
 	if len(matches) != 3 {
-		return "", "", errors.E("invalid path")
+		return "", "", errors.New("invalid path")
 	}
 	return matches[modelIndex], matches[finalPathIndex], nil
 }

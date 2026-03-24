@@ -22,13 +22,13 @@ import (
 // newDestroyControllerWorker creates a new destroyControllerWorker.
 func newDestroyControllerWorker(openfgaClient *openfga.OFGAClient, store Store, bootstrapManager BootstrapManager) (*destroyControllerWorker, error) {
 	if openfgaClient == nil {
-		return nil, errors.E("openfgaClient is required")
+		return nil, errors.New("openfgaClient is required")
 	}
 	if bootstrapManager == nil {
-		return nil, errors.E("bootstrapManager is required")
+		return nil, errors.New("bootstrapManager is required")
 	}
 	if store == nil {
-		return nil, errors.E("store is required")
+		return nil, errors.New("store is required")
 	}
 
 	return &destroyControllerWorker{

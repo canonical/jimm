@@ -44,7 +44,7 @@ func (d *Database) GetRole(ctx context.Context, role *dbmodel.RoleEntry) (err er
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if role.UUID == "" && role.Name == "" {
-		return errors.E("must specify uuid or name")
+		return errors.New("must specify uuid or name")
 	}
 
 	db := d.DB.WithContext(ctx)
@@ -68,7 +68,7 @@ func (d *Database) UpdateRoleName(ctx context.Context, oldName, name string) (er
 	const op = "db.UpdateRole"
 
 	if oldName == "" {
-		return errors.E("name must be specified")
+		return errors.New("name must be specified")
 	}
 
 	if err := d.ready(); err != nil {

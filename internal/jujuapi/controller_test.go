@@ -52,7 +52,7 @@ func TestInitiateMigration(t *testing.T) {
 	}, {
 		about: "controller returns an error",
 		initiateMigration: func(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
-			return jujuparams.InitiateMigrationResult{}, errors.E("a silly error")
+			return jujuparams.InitiateMigrationResult{}, errors.New("a silly error")
 		},
 		args: jujuparams.InitiateMigrationArgs{
 			Specs: []jujuparams.MigrationSpec{{

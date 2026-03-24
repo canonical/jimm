@@ -301,7 +301,7 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 	// Extract the ID Token from oauth2 token.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, errors.E("failed to extract id token")
+		return nil, errors.New("failed to extract id token")
 	}
 
 	verifier := as.provider.Verifier(&oidc.Config{
@@ -324,7 +324,7 @@ func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
 		EmailVerified bool   `json:"email_verified"` // TODO(ale8k): Add verification logic
 	}
 	if idToken == nil {
-		return "", errors.E("id token is nil")
+		return "", errors.New("id token is nil")
 	}
 
 	if err := idToken.Claims(&claims); err != nil {
@@ -567,7 +567,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return errors.E("session is missing identity key")
+		return errors.New("session is missing identity key")
 	}
 
 	identityIdStr, ok := identityId.(string)
@@ -598,7 +598,7 @@ func (as *AuthenticationService) Whoami(ctx context.Context) (*params.WhoamiResp
 
 	identityId := SessionIdentityFromContext(ctx)
 	if identityId == "" {
-		return nil, errors.E("no identity in context")
+		return nil, errors.New("no identity in context")
 	}
 
 	// TODO(ale8k) CSS-8227: Add test case for this

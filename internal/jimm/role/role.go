@@ -21,10 +21,10 @@ type RoleManager struct {
 // NewRoleManager returns a new RoleManager that persists the roles in the provided store.
 func NewRoleManager(store *db.Database, authSvc *openfga.OFGAClient) (*RoleManager, error) {
 	if store == nil {
-		return nil, errors.E("role store cannot be nil")
+		return nil, errors.New("role store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("role authorisation service cannot be nil")
+		return nil, errors.New("role authorisation service cannot be nil")
 	}
 	return &RoleManager{store, authSvc}, nil
 }

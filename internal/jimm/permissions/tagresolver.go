@@ -179,7 +179,7 @@ func (t *tagResolver) userTag(ctx context.Context) (*ofga.Entity, error) {
 	valid := names.IsValidUser(t.trailer)
 	if !valid {
 		// TODO(ale8k): Return custom error for validation check at JujuAPI
-		return nil, errors.E("invalid user")
+		return nil, errors.New("invalid user")
 	}
 	return ofganames.ConvertTagWithRelation(names.NewUserTag(t.trailer), t.relation), nil
 }
@@ -219,7 +219,7 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 
 	err := db.GetController(ctx, &controller)
 	if err != nil {
-		return nil, errors.E("controller not found")
+		return nil, errors.New("controller not found")
 	}
 	return ofganames.ConvertTagWithRelation(controller.ResourceTag(), t.relation), nil
 }
@@ -256,14 +256,14 @@ func (t *tagResolver) modelTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	model := dbmodel.Model{}
 	matches := modelOwnerAndNameMatcher.FindStringSubmatch(t.trailer)
 	if len(matches) != 3 {
-		return nil, errors.E("model name format incorrect, expected <model-owner>/<model-name>")
+		return nil, errors.New("model name format incorrect, expected <model-owner>/<model-name>")
 	}
 	model.OwnerIdentityName = matches[1]
 	model.Name = matches[2]
 
 	err := db.GetModel(ctx, &model)
 	if err != nil {
-		return nil, errors.E("model not found")
+		return nil, errors.New("model not found")
 	}
 
 	return ofganames.ConvertTagWithRelation(model.ResourceTag(), t.relation), nil
@@ -282,7 +282,7 @@ func (t *tagResolver) applicationOfferTag(ctx context.Context, db *db.Database) 
 
 	err := db.GetApplicationOffer(ctx, &offer)
 	if err != nil {
-		return nil, errors.E("application offer not found")
+		return nil, errors.New("application offer not found")
 	}
 
 	return ofganames.ConvertTagWithRelation(offer.ResourceTag(), t.relation), nil
@@ -301,7 +301,7 @@ func (t *tagResolver) cloudTag(ctx context.Context, db *db.Database) (*ofga.Enti
 
 	err := db.GetCloud(ctx, &cloud)
 	if err != nil {
-		return nil, errors.E("cloud not found")
+		return nil, errors.New("cloud not found")
 	}
 
 	return ofganames.ConvertTagWithRelation(cloud.ResourceTag(), t.relation), nil

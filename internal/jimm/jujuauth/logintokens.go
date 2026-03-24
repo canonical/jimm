@@ -93,7 +93,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	defer auth.mu.Unlock()
 
 	if user == nil {
-		return nil, errors.E("user not specified")
+		return nil, errors.New("user not specified")
 	}
 	auth.user = user
 
@@ -103,7 +103,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 
 	var modelAccess string
 	if auth.mt.Id() == "" {
-		return nil, errors.E("model not set")
+		return nil, errors.New("model not set")
 	}
 	modelAccess, authErr = auth.accessChecker.GetUserModelAccess(ctx, auth.user, auth.mt)
 	if authErr != nil {
@@ -113,7 +113,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	auth.accessMapCache[auth.mt.String()] = modelAccess
 
 	if auth.ct.Id() == "" {
-		return nil, errors.E("controller not set")
+		return nil, errors.New("controller not set")
 	}
 	var controllerAccess string
 	controllerAccess, authErr = auth.accessChecker.GetUserControllerAccess(ctx, auth.user, auth.ct)
@@ -156,11 +156,11 @@ func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap ma
 	defer auth.mu.Unlock()
 
 	if auth.callCount >= 10 {
-		return nil, errors.E("Permission check limit exceeded")
+		return nil, errors.New("Permission check limit exceeded")
 	}
 	auth.callCount++
 	if auth.user == nil {
-		return nil, errors.E("User authorization missing.")
+		return nil, errors.New("User authorization missing.")
 	}
 	if permissionMap != nil {
 		var err error

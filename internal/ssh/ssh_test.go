@@ -129,7 +129,7 @@ func (s *sshSuite) Init(c *qt.C) {
 			},
 			DialInfo_: func(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.DialInfo, error) {
 				if modelUUID != s.virtualHostname.ModelUUID() {
-					return jimmssh.DialInfo{}, errors.E("permission denied")
+					return jimmssh.DialInfo{}, errors.New("permission denied")
 				}
 				return jimmssh.DialInfo{}, nil
 			},

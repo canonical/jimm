@@ -22,13 +22,13 @@ import (
 // newBootstrapWorker creates a new bootstrapWorker.
 func newBootstrapWorker(openfgaClient *openfga.OFGAClient, store Store, bootstrapManager BootstrapManager) (*bootstrapWorker, error) {
 	if openfgaClient == nil {
-		return nil, errors.E("openfgaClient is required")
+		return nil, errors.New("openfgaClient is required")
 	}
 	if bootstrapManager == nil {
-		return nil, errors.E("bootstrapManager is required")
+		return nil, errors.New("bootstrapManager is required")
 	}
 	if store == nil {
-		return nil, errors.E("store is required")
+		return nil, errors.New("store is required")
 	}
 
 	return &bootstrapWorker{

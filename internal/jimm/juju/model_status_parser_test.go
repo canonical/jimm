@@ -408,7 +408,7 @@ func TestQueryModelsJq(t *testing.T) {
 						return &model5, nil
 					},
 					ListFilesystems_: func(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
-						return []jujuparams.FilesystemDetailsListResult{}, errors.E("forcing an error on model 5")
+						return []jujuparams.FilesystemDetailsListResult{}, errors.New("forcing an error on model 5")
 					},
 					ListVolumes_: func(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 						return []jujuparams.VolumeDetailsListResult{}, nil

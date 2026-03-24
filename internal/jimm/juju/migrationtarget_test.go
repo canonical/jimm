@@ -561,7 +561,7 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 
 	api := &jimmtest.API{
 		Prechecks_: func(mmi params.MigrationModelInfo) error {
-			return errors.E("controller unreachable")
+			return errors.New("controller unreachable")
 		},
 	}
 
@@ -843,7 +843,7 @@ func TestActivate_APIFailure(t *testing.T) {
 	// Simulate an API failure.
 	api := &jimmtest.API{
 		Activate_: func(modelUUID string, sourceInfo migration.SourceControllerInfo, relatedModels []string) error {
-			return errors.E("API failure")
+			return errors.New("API failure")
 		},
 	}
 
@@ -1265,7 +1265,7 @@ func TestImport_APIFailure(t *testing.T) {
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
 		Import_: func(bytes []byte) error {
-			return errors.E("API failure")
+			return errors.New("API failure")
 		},
 	}
 

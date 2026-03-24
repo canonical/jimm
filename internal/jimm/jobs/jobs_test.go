@@ -75,7 +75,7 @@ func TestGetJobInfo_QueryError(t *testing.T) {
 	jobID := int64(123)
 
 	deps.jobQuerier.EXPECT().GetJobInfo(gomock.Any(), int64(123)).
-		Return(nil, errors.E("query error"))
+		Return(nil, errors.New("query error"))
 
 	_, err := deps.jobManager.GetJobInfo(ctx, jobID)
 	c.Assert(err, quicktest.IsNotNil)

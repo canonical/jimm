@@ -1139,7 +1139,7 @@ func TestUpdateMigratedModel(t *testing.T) {
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "controller-2",
 		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
-			return jujuclient.ModelInfo{}, errors.E("an error")
+			return jujuclient.ModelInfo{}, errors.New("an error")
 		},
 		expectedError: "an error",
 		jimmAdmin:     true,
@@ -1335,7 +1335,7 @@ func TestInitiateMigration(t *testing.T) {
 			},
 		},
 		initiateMigrationResults: []result{{
-			err: errors.E("mocked error"),
+			err: errors.New("mocked error"),
 		}},
 		expectedError: "mocked error",
 	}, {

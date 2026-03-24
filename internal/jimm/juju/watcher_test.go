@@ -226,7 +226,7 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 			DB: testdb.PostgresDB(c, nil),
 		},
 		&jimmtest.Dialer{
-			Err: errors.E("test error"),
+			Err: errors.New("test error"),
 		},
 		&testPublisher{},
 		controllerUnavailableChannel,
@@ -355,7 +355,7 @@ func TestWatcherUpdatesControllerVersion(t *testing.T) {
 				SupportsModelSummaryWatcher_: true,
 				WatchAllModelSummaries_: func(ctx context.Context) (jujuclient.SummaryWatcher, error) {
 					dialerCalled <- struct{}{}
-					return nil, errors.E("some-error")
+					return nil, errors.New("some-error")
 				},
 			},
 			AgentVersion: "3.6.12",

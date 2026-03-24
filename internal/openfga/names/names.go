@@ -114,7 +114,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 			Kind: cofga.Kind(kind),
 		}, nil
 	default:
-		return nil, errors.E("unknown tag kind")
+		return nil, errors.New("unknown tag kind")
 	}
 }
 
@@ -136,11 +136,11 @@ func ConvertJujuRelation(relation string) (cofga.Relation, error) {
 	// Below are controller specific permissions that
 	// are not represented in JIMM's OpenFGA model.
 	case string(permission.LoginAccess):
-		return NoRelation, errors.E("login access unused")
+		return NoRelation, errors.New("login access unused")
 	case string(permission.SuperuserAccess):
-		return NoRelation, errors.E("superuser access unused")
+		return NoRelation, errors.New("superuser access unused")
 	default:
-		return NoRelation, errors.E("unknown relation")
+		return NoRelation, errors.New("unknown relation")
 	}
 }
 

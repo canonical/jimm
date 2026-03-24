@@ -40,7 +40,7 @@ func TestGrantAuditLogAccessRun_APIError(t *testing.T) {
 
 	cmdMocks.client.EXPECT().
 		GrantAuditLogAccess(gomock.Any()).
-		Return(errors.E("unauthorised access")).
+		Return(errors.New("unauthorised access")).
 		Times(1)
 
 	cmdMocks.client.EXPECT().Close()

@@ -17,13 +17,13 @@ import (
 // newMigrationWorker creates a new upgradeMigrationWorker.
 func newMigrationWorker(openfgaClient *openfga.OFGAClient, store Store, upgradeManager UpgradeManager) (*migrationWorker, error) {
 	if openfgaClient == nil {
-		return nil, errors.E("openfgaClient is required")
+		return nil, errors.New("openfgaClient is required")
 	}
 	if store == nil {
-		return nil, errors.E("store is required")
+		return nil, errors.New("store is required")
 	}
 	if upgradeManager == nil {
-		return nil, errors.E("upgradeManager is required")
+		return nil, errors.New("upgradeManager is required")
 	}
 
 	return &migrationWorker{

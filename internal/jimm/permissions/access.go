@@ -76,7 +76,7 @@ func ToControllerRelation(accessLevel string) (openfga.Relation, error) {
 	case "superuser":
 		return ofganames.AdministratorRelation, nil
 	default:
-		return ofganames.NoRelation, errors.E("unknown controller access")
+		return ofganames.NoRelation, errors.New("unknown controller access")
 	}
 }
 
@@ -91,7 +91,7 @@ func ToCloudRelation(accessLevel string) (openfga.Relation, error) {
 	case "add-model":
 		return ofganames.CanAddModelRelation, nil
 	default:
-		return ofganames.NoRelation, errors.E("unknown cloud access")
+		return ofganames.NoRelation, errors.New("unknown cloud access")
 	}
 }
 
@@ -105,7 +105,7 @@ func ToModelRelation(accessLevel string) (openfga.Relation, error) {
 	case "read":
 		return ofganames.ReaderRelation, nil
 	default:
-		return ofganames.NoRelation, errors.E("unknown model access")
+		return ofganames.NoRelation, errors.New("unknown model access")
 	}
 }
 
@@ -121,7 +121,7 @@ func ToOfferRelation(accessLevel string) (openfga.Relation, error) {
 	case string(jujuparams.OfferReadAccess):
 		return ofganames.ReaderRelation, nil
 	default:
-		return ofganames.NoRelation, errors.E("unknown application offer access")
+		return ofganames.NoRelation, errors.New("unknown application offer access")
 	}
 }
 
@@ -692,7 +692,7 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 	}
 
 	if stillHasAccess {
-		return errors.E("unable to completely revoke given access due to other relations; try to remove them as well")
+		return errors.New("unable to completely revoke given access due to other relations; try to remove them as well")
 	}
 	return nil
 }

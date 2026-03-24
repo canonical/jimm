@@ -31,7 +31,7 @@ type JobManager struct {
 // abilities for asynchronous jobs within JIMM.
 func NewJobManager(jobQuerier JobQuerier) (*JobManager, error) {
 	if jobQuerier == nil {
-		return nil, errors.E("job querier cannot be nil")
+		return nil, errors.New("job querier cannot be nil")
 
 	}
 	return &JobManager{jobQuerier}, nil

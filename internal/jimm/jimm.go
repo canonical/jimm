@@ -102,43 +102,43 @@ type Parameters struct {
 
 func (p *Parameters) Validate() error {
 	if p.Database == nil {
-		return errors.E("missing database")
+		return errors.New("missing database")
 	}
 
 	if p.Dialer == nil {
-		return errors.E("missing dialer")
+		return errors.New("missing dialer")
 	}
 
 	if p.CredentialStore == nil {
-		return errors.E("missing credential store")
+		return errors.New("missing credential store")
 	}
 
 	if p.Pubsub == nil {
-		return errors.E("missing pubsub hub")
+		return errors.New("missing pubsub hub")
 	}
 
 	if p.UUID == "" {
-		return errors.E("missing uuid")
+		return errors.New("missing uuid")
 	}
 
 	if p.OpenFGAClient == nil {
-		return errors.E("missing openfga client")
+		return errors.New("missing openfga client")
 	}
 
 	if p.JWTService == nil {
-		return errors.E("missing jwt service")
+		return errors.New("missing jwt service")
 	}
 
 	if p.OAuthAuthenticator == nil {
-		return errors.E("missing oauth authenticator")
+		return errors.New("missing oauth authenticator")
 	}
 
 	if p.MigrationTokenGenerator == nil {
-		return errors.E("missing migration token generator")
+		return errors.New("missing migration token generator")
 	}
 
 	if p.CrossModelQueryTimeout <= 0 {
-		return errors.E("missing cross model query timeout")
+		return errors.New("missing cross model query timeout")
 	}
 
 	return nil

@@ -58,7 +58,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 	// FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
 	var a juju.ModelCreateArgs
 	if args.Name == "" {
-		return nil, errors.E("name not specified")
+		return nil, errors.New("name not specified")
 	}
 	a.Name = args.Name
 	a.Config = args.Config
@@ -87,7 +87,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 			return nil, errors.E(err, "invalid cloud credential tag")
 		}
 		if a.Cloud.Id() != "" && ct.Cloud().Id() != a.Cloud.Id() {
-			return nil, errors.E("cloud credential cloud mismatch")
+			return nil, errors.New("cloud credential cloud mismatch")
 		}
 
 		a.CloudCredential = ct

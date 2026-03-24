@@ -206,7 +206,7 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 		return jujuparams.MigrationTargetInfo{}, 0, err
 	}
 	if adminUser == "" || adminPass == "" {
-		return jujuparams.MigrationTargetInfo{}, 0, errors.E("missing target controller credentials")
+		return jujuparams.MigrationTargetInfo{}, 0, errors.New("missing target controller credentials")
 	}
 	// Should we verify controller can access the cloud where the model is currently hosted?
 	apiControllerInfo := dbController.ToAPIControllerInfo()
@@ -236,15 +236,15 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 	if err != nil {
 		s := strings.Split(modelNameOrUUID, "/")
 		if len(s) != 2 {
-			return jujuparams.InitiateMigrationResult{}, errors.E("invalid model target")
+			return jujuparams.InitiateMigrationResult{}, errors.New("invalid model target")
 		}
 
 		owner, name := s[0], s[1]
 		if !names.IsValidUser(owner) {
-			return jujuparams.InitiateMigrationResult{}, errors.E("invalid user name")
+			return jujuparams.InitiateMigrationResult{}, errors.New("invalid user name")
 		}
 		if !names.IsValidModelName(name) {
-			return jujuparams.InitiateMigrationResult{}, errors.E("invalid model name")
+			return jujuparams.InitiateMigrationResult{}, errors.New("invalid model name")
 		}
 
 		model.Name = name
@@ -292,7 +292,7 @@ func (j *JujuManager) PrepareModelMigration(
 		}
 		err := d.GetModel(ctx, model)
 		if err == nil {
-			return errors.E("model migration for the specified model is already in progress/completed")
+			return errors.New("model migration for the specified model is already in progress/completed")
 		} else if errors.ErrorCode(err) != errors.CodeNotFound {
 			return err
 		}

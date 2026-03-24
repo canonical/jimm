@@ -111,13 +111,13 @@ func NewBootstrapManager(
 	credentialStore CredentialStore,
 ) (*BootstrapManager, error) {
 	if store == nil {
-		return nil, errors.E("store cannot be nil")
+		return nil, errors.New("store cannot be nil")
 	}
 	if jujuManager == nil {
-		return nil, errors.E("juju manager cannot be nil")
+		return nil, errors.New("juju manager cannot be nil")
 	}
 	if binaryStore == nil {
-		return nil, errors.E("binary store cannot be nil")
+		return nil, errors.New("binary store cannot be nil")
 	}
 	// validate the JWKs endpoint URL if provided.
 	if jimmWellknownJWKSEndpoint != "" {
@@ -127,10 +127,10 @@ func NewBootstrapManager(
 		}
 	}
 	if credentialStore == nil {
-		return nil, errors.E("credential store cannot be nil")
+		return nil, errors.New("credential store cannot be nil")
 	}
 	if jobQueue == nil {
-		return nil, errors.E("job queue cannot be nil")
+		return nil, errors.New("job queue cannot be nil")
 	}
 	return &BootstrapManager{
 		store:                     store,
@@ -194,7 +194,7 @@ func toParamsJobState(ctx context.Context, state rivertype.JobState) params.JobS
 func (b *BootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobID int64) error {
 
 	if user == nil {
-		return errors.E("user cannot be nil")
+		return errors.New("user cannot be nil")
 	}
 
 	_, err := b.jobQueue.CancelJob(ctx, jobID)
@@ -242,7 +242,7 @@ func (b *BootstrapManager) WaitForJobCompletion(ctx context.Context, jobId int64
 func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params BootstrapParams) (int64, error) {
 
 	if b.jimmWellknownJWKSEndpoint == "" {
-		return 0, errors.E("bootstrap login token refresh URL is not configured. Cannot proceed with bootstrap. Please configure it and try again.")
+		return 0, errors.New("bootstrap login token refresh URL is not configured. Cannot proceed with bootstrap. Please configure it and try again.")
 	}
 
 	if err := params.validate(); err != nil {
@@ -331,7 +331,7 @@ func (b *BootstrapManager) BootstrapController(
 	// Lock the bootstrap concurrently with destroy to avoid misuse of the store commands.
 	isLocked := jujuCLILock.TryLock()
 	if !isLocked {
-		return errors.E("another bootstrap or destroy operation is currently running, please wait for it to finish before starting a new one")
+		return errors.New("another bootstrap or destroy operation is currently running, please wait for it to finish before starting a new one")
 	}
 	defer jujuCLILock.Unlock()
 
@@ -569,7 +569,7 @@ func (b *BootstrapManager) DestroyController(
 	// Lock the destroy concurrently with bootstrap to avoid misuse of the store commands.
 	isLocked := jujuCLILock.TryLock()
 	if !isLocked {
-		return errors.E("another bootstrap or destroy operation is currently running, please wait for it to finish before starting a new one")
+		return errors.New("another bootstrap or destroy operation is currently running, please wait for it to finish before starting a new one")
 	}
 	defer jujuCLILock.Unlock()
 

@@ -779,7 +779,7 @@ func TestOffer(t *testing.T) {
 			return nil, nil
 		},
 		offer: func(context.Context, jujuclient.OfferParams) error {
-			return errors.E("a silly error")
+			return errors.New("a silly error")
 		},
 		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, juju.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
@@ -1063,7 +1063,7 @@ func TestOffer(t *testing.T) {
 	}, {
 		about: "fail to fetch application offer details",
 		getApplicationOffer: func(ctx context.Context, s string) (*crossmodel.ApplicationOfferDetails, error) {
-			return nil, errors.E("a silly error")
+			return nil, errors.New("a silly error")
 		},
 		offer: func(context.Context, jujuclient.OfferParams) error {
 			return nil
@@ -1150,7 +1150,7 @@ func TestOffer(t *testing.T) {
 			return nil, nil
 		},
 		offer: func(context.Context, jujuclient.OfferParams) error {
-			return errors.E("application offer already exists")
+			return errors.New("application offer already exists")
 		},
 		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, juju.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()

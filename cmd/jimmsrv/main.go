@@ -95,17 +95,17 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	if parsedIssuerURL.Scheme == "" {
-		return errors.E("oauth issuer url has no scheme")
+		return errors.New("oauth issuer url has no scheme")
 	}
 
 	clientID := os.Getenv("JIMM_OAUTH_CLIENT_ID")
 	if clientID == "" {
-		return errors.E("no oauth client id")
+		return errors.New("no oauth client id")
 	}
 
 	clientSecret := os.Getenv("JIMM_OAUTH_CLIENT_SECRET")
 	if clientSecret == "" {
-		return errors.E("no oauth client secret")
+		return errors.New("no oauth client secret")
 	}
 
 	scopes := os.Getenv("JIMM_OAUTH_SCOPES")
@@ -115,7 +115,7 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 	zapctx.Info(ctx, "oauth scopes", zap.Any("scopes", scopesParsed))
 	if len(scopesParsed) == 0 {
-		return errors.E("no oauth client scopes present")
+		return errors.New("no oauth client scopes present")
 	}
 
 	insecureSecretStorage := false
@@ -137,29 +137,29 @@ func start(ctx context.Context, s *service.Service) error {
 	sessionCookieMaxAge := os.Getenv("JIMM_SESSION_COOKIE_MAX_AGE")
 	sessionCookieMaxAgeInt, err := strconv.Atoi(sessionCookieMaxAge)
 	if err != nil {
-		return errors.E("unable to parse jimm session cookie max age")
+		return errors.New("unable to parse jimm session cookie max age")
 	}
 	if sessionCookieMaxAgeInt < 0 {
-		return errors.E("jimm session cookie max age cannot be less than 0")
+		return errors.New("jimm session cookie max age cannot be less than 0")
 	}
 
 	sessionSecretKey := os.Getenv("JIMM_SESSION_SECRET_KEY")
 	if len(sessionSecretKey) < 64 {
-		return errors.E("jimm session store secret must be at least 64 characters")
+		return errors.New("jimm session store secret must be at least 64 characters")
 	}
 
 	hostKeyRaw := os.Getenv("JIMM_SSH_HOST_KEY")
 	if hostKeyRaw == "" {
-		return errors.E("empty hostkey from env variable")
+		return errors.New("empty hostkey from env variable")
 	}
 	maxConcurrentConnections, _ := strconv.Atoi(os.Getenv("JIMM_SSH_MAX_CONCURRENT_CONNECTIONS"))
 	publicHostKey, err := ssh.GetPublicKeyFromPrivateKey([]byte(hostKeyRaw))
 	if err != nil {
-		return errors.E("cannot parse hostkey from env variable")
+		return errors.New("cannot parse hostkey from env variable")
 	}
 	fingerprints, err := ssh.GetFingerprintsFromPrivateKey([]byte(hostKeyRaw))
 	if err != nil {
-		return errors.E("cannot parse hostkey from env variable")
+		return errors.New("cannot parse hostkey from env variable")
 	}
 
 	corsAllowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), " ")
@@ -168,7 +168,7 @@ func start(ctx context.Context, s *service.Service) error {
 
 	sshPort := os.Getenv("JIMM_SSH_PORT")
 	if sshPort == "" {
-		return errors.E("empty ssh port from env variable")
+		return errors.New("empty ssh port from env variable")
 	}
 	sshPortInt, err := strconv.Atoi(sshPort)
 	if err != nil {
@@ -181,7 +181,7 @@ func start(ctx context.Context, s *service.Service) error {
 	if crossModelQueryTimeoutRaw != "" {
 		expiry, err := time.ParseDuration(crossModelQueryTimeoutRaw)
 		if err != nil {
-			return errors.E("cannot parse cross model query timeout into duration")
+			return errors.New("cannot parse cross model query timeout into duration")
 		} else {
 			crossModelQueryTimeout = expiry
 		}

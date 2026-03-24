@@ -21,10 +21,10 @@ type IdentityManager struct {
 // NewIdentityManager returns a new identityManager that persists the roles in the provided store.
 func NewIdentityManager(store *db.Database, authSvc *openfga.OFGAClient) (*IdentityManager, error) {
 	if store == nil {
-		return nil, errors.E("identity store cannot be nil")
+		return nil, errors.New("identity store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("identity authorisation service cannot be nil")
+		return nil, errors.New("identity authorisation service cannot be nil")
 	}
 	return &IdentityManager{store, authSvc}, nil
 }

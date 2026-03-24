@@ -42,25 +42,25 @@ func NewJujuManager(
 	migrationTokenGenerator MigrationTokenGenerator,
 ) (*JujuManager, error) {
 	if store == nil {
-		return nil, errors.E("role store cannot be nil")
+		return nil, errors.New("role store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("role authorisation service cannot be nil")
+		return nil, errors.New("role authorisation service cannot be nil")
 	}
 	if credentialStore == nil {
-		return nil, errors.E("credential store cannot be nil")
+		return nil, errors.New("credential store cannot be nil")
 	}
 	if permissionManager == nil {
-		return nil, errors.E("permission manager cannot be nil")
+		return nil, errors.New("permission manager cannot be nil")
 	}
 	if resourceTag.Id() == "" {
-		return nil, errors.E("invalid jimm controller tag")
+		return nil, errors.New("invalid jimm controller tag")
 	}
 	if crossModelQueryTimeout <= 0 {
-		return nil, errors.E("cross model query timeout must be greater than 0")
+		return nil, errors.New("cross model query timeout must be greater than 0")
 	}
 	if migrationTokenGenerator == nil {
-		return nil, errors.E("migration token generator cannot be nil")
+		return nil, errors.New("migration token generator cannot be nil")
 	}
 	return &JujuManager{
 		Database:                store,

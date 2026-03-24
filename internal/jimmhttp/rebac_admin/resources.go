@@ -89,7 +89,7 @@ func validateAndConvertResourceFilter(typeFilter string) (string, error) {
 	case Model:
 		return db.ModelsQueryKey, nil
 	default:
-		return "", errors.E("this resource type is not supported")
+		return "", errors.New("this resource type is not supported")
 
 	}
 }

@@ -69,10 +69,10 @@ type BrowserOAuthAuthenticator interface {
 // NewOAuthHandler returns a new OAuth handler.
 func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 	if p.Authenticator == nil {
-		return nil, errors.E("nil authenticator")
+		return nil, errors.New("nil authenticator")
 	}
 	if p.DashboardFinalRedirectURL == "" {
-		return nil, errors.E("final redirect url not specified")
+		return nil, errors.New("final redirect url not specified")
 	}
 	return &OAuthHandler{
 		Router:                    chi.NewRouter(),
@@ -120,20 +120,20 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	stateByCookie, err := r.Cookie(auth.StateKey)
 	if err != nil {
-		usrErr := errors.E("no state cookie present")
+		usrErr := errors.New("no state cookie present")
 		writeError(ctx, w, http.StatusForbidden, usrErr, "no state cookie present")
 		return
 	}
 	stateByURL := r.URL.Query().Get("state")
 	if stateByCookie.Value != stateByURL {
-		err := errors.E("state does not match")
+		err := errors.New("state does not match")
 		writeError(ctx, w, http.StatusForbidden, err, "state does not match")
 		return
 	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		err := errors.E("missing auth code")
+		err := errors.New("missing auth code")
 		writeError(ctx, w, http.StatusForbidden, err, "no authorisation code present")
 		return
 	}

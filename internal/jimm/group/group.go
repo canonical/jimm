@@ -23,10 +23,10 @@ type GroupManager struct {
 // creation, modification, and removal.
 func NewGroupManager(store *db.Database, authSvc *openfga.OFGAClient) (*GroupManager, error) {
 	if store == nil {
-		return nil, errors.E("group store cannot be nil")
+		return nil, errors.New("group store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("group authorisation service cannot be nil")
+		return nil, errors.New("group authorisation service cannot be nil")
 	}
 	return &GroupManager{store, authSvc}, nil
 }

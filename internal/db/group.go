@@ -63,7 +63,7 @@ func (d *Database) GetGroup(ctx context.Context, group *dbmodel.GroupEntry) (err
 	}
 
 	if group.UUID == "" && group.Name == "" {
-		return errors.E("must specify uuid or name")
+		return errors.New("must specify uuid or name")
 	}
 
 	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
@@ -121,7 +121,7 @@ func (d *Database) UpdateGroupName(ctx context.Context, uuid, name string) (err 
 	const op = "db.UpdateGroup"
 
 	if uuid == "" {
-		return errors.E("uuid must be specified")
+		return errors.New("uuid must be specified")
 	}
 
 	if err := d.ready(); err != nil {

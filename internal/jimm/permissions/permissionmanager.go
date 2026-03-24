@@ -23,10 +23,10 @@ type PermissionManager struct {
 // permission handling and resolution of JAAS tags.
 func NewManager(store *db.Database, authSvc *openfga.OFGAClient, uuid string, tag names.ControllerTag) (*PermissionManager, error) {
 	if store == nil {
-		return nil, errors.E("permission store cannot be nil")
+		return nil, errors.New("permission store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("permission authorisation service cannot be nil")
+		return nil, errors.New("permission authorisation service cannot be nil")
 	}
 	return &PermissionManager{store, authSvc, uuid, tag}, nil
 }

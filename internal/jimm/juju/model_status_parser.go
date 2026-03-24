@@ -45,7 +45,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 
 	models, err := j.Database.GetModelsByUUID(ctx, modelUUIDs)
 	if err != nil {
-		return results, errors.E("failed to get models for user")
+		return results, errors.New("failed to get models for user")
 	}
 
 	for _, model := range models {
@@ -163,7 +163,7 @@ func (f *formatterParamsRetriever) GetParams(ctx context.Context, model dbmodel.
 func (f *formatterParamsRetriever) dialModel(ctx context.Context) error {
 	modelTag, ok := f.model.Tag().(names.ModelTag)
 	if !ok {
-		return errors.E("failed to parse model tag")
+		return errors.New("failed to parse model tag")
 	}
 	api, err := f.jujuManager.dial(ctx, &f.model.Controller, modelTag, nil)
 	if err != nil {

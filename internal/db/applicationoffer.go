@@ -51,7 +51,7 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	case offer.URL != "":
 		db = db.Where("url = ?", offer.URL)
 	default:
-		return errors.E("missing offer UUID or URL")
+		return errors.New("missing offer UUID or URL")
 	}
 
 	db = db.Preload("Model").Preload("Model.Controller")

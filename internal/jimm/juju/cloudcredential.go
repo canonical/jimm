@@ -285,7 +285,7 @@ func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel
 		cloud = ct.Id()
 	}
 
-	errStop := errors.E("stop")
+	errStop := errors.New("stop")
 	var iterErr error
 	err := j.Database.ForEachCloudCredential(ctx, u.Name, cloud, func(cred *dbmodel.CloudCredential) error {
 		iterErr = f(cred)

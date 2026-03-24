@@ -125,7 +125,7 @@ func TestModelCleanup(t *testing.T) {
 				case s.env.Models[2].UUID:
 					return jujuclient.ModelInfo{}, fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id())
 				default:
-					return jujuclient.ModelInfo{}, errors.E("new error")
+					return jujuclient.ModelInfo{}, errors.New("new error")
 				}
 			},
 			DestroyModel_: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
@@ -249,7 +249,7 @@ func TestPollModelsDyingControllerErrors(t *testing.T) {
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
 			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
-				return jujuclient.ModelInfo{}, errors.E("controller not available")
+				return jujuclient.ModelInfo{}, errors.New("controller not available")
 			},
 			DestroyModel_: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 				return nil

@@ -76,19 +76,19 @@ type SSHManagerParams struct {
 
 func (p *SSHManagerParams) validate() error {
 	if p.IdentityManager == nil {
-		return errors.E("identityManager cannot be nil")
+		return errors.New("identityManager cannot be nil")
 	}
 	if p.JujuManager == nil {
-		return errors.E("jujuManager cannot be nil")
+		return errors.New("jujuManager cannot be nil")
 	}
 	if p.SSHKeyManager == nil {
-		return errors.E("sshManager cannot be nil")
+		return errors.New("sshManager cannot be nil")
 	}
 	if p.JWTFactory == nil {
-		return errors.E("jwtFactory cannot be nil")
+		return errors.New("jwtFactory cannot be nil")
 	}
 	if p.Dialer == nil {
-		return errors.E("dialer cannot be nil")
+		return errors.New("dialer cannot be nil")
 	}
 	return nil
 }
@@ -166,7 +166,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 
 	publicKey, _ := ctx.Value(ssh.ContextKeyPublicKey).(ssh.PublicKey)
 	if publicKey == nil {
-		return DialInfo{}, errors.E("cannot find user's public key")
+		return DialInfo{}, errors.New("cannot find user's public key")
 	}
 
 	tokenArgs := jujuauth.SSHTokenArgs{

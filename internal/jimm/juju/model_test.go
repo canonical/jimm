@@ -597,7 +597,7 @@ controllers:
 		return nil
 	},
 	createModel: func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
-		return base.ModelInfo{}, errors.E("a test error")
+		return base.ModelInfo{}, errors.New("a test error")
 	},
 	username:     "alice@canonical.com",
 	jimmAdmin:    true,
@@ -734,7 +734,7 @@ controllers:
     access: add-model
 `[1:],
 	updateCredential: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
-		return nil, errors.E("a silly error")
+		return nil, errors.New("a silly error")
 	},
 	grantJIMMModelAdmin: func(_ context.Context, _ names.ModelTag) error {
 		return nil
@@ -1592,7 +1592,7 @@ func createModel(template string) func(context.Context, *jujuclient.CreateModelA
 func assertConfig(config map[string]interface{}, fnc func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error)) func(context.Context, *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 	return func(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 		if args.Cloud == "" {
-			return base.ModelInfo{}, errors.E("cloud not specified")
+			return base.ModelInfo{}, errors.New("cloud not specified")
 		}
 		if len(config) != len(args.Config) {
 			return base.ModelInfo{}, errors.E(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
@@ -2119,7 +2119,7 @@ var modelStatusTests = []struct {
 	env:  modelStatusTestEnv,
 	modelStatus: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
 		if modelTag.Id() != "00000002-0000-0000-0000-000000000001" {
-			return base.ModelStatus{}, errors.E("incorrect model tag")
+			return base.ModelStatus{}, errors.New("incorrect model tag")
 		}
 		ms := base.ModelStatus{}
 		ms.UUID = modelTag.Id()
@@ -2146,7 +2146,7 @@ var modelStatusTests = []struct {
 	name: "APIError",
 	env:  modelStatusTestEnv,
 	modelStatus: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
-		return base.ModelStatus{}, errors.E("test error")
+		return base.ModelStatus{}, errors.New("test error")
 	},
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
@@ -2326,7 +2326,7 @@ func TestForEachModel(t *testing.T) {
 	bob := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	err := j.ForEachModel(ctx, bob, func(_ *dbmodel.Model, _ jujuparams.UserAccessPermission) error {
-		return errors.E("function called unexpectedly")
+		return errors.New("function called unexpectedly")
 	})
 	c.Check(err, qt.ErrorMatches, `unauthorized`)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
@@ -2667,19 +2667,19 @@ var destroyModelTests = []struct {
 	env:  destroyModelTestEnv,
 	destroyModel: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
 		if tag.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("incorrect model uuid")
+			return errors.New("incorrect model uuid")
 		}
 		if destroyStorage == nil || *destroyStorage != true {
-			return errors.E("invalid destroyStorage")
+			return errors.New("invalid destroyStorage")
 		}
 		if force == nil || *force != false {
-			return errors.E("invalid force")
+			return errors.New("invalid force")
 		}
 		if maxWait == nil || *maxWait != time.Second {
-			return errors.E("invalid maxWait")
+			return errors.New("invalid maxWait")
 		}
 		if timeout == nil || *timeout != time.Second {
-			return errors.E("invalid timeout")
+			return errors.New("invalid timeout")
 		}
 		return nil
 	},
@@ -2702,7 +2702,7 @@ var destroyModelTests = []struct {
 }, {
 	name:         "DialError",
 	env:          destroyModelTestEnv,
-	dialError:    errors.E("dial error"),
+	dialError:    errors.New("dial error"),
 	username:     "alice@canonical.com",
 	uuid:         "00000002-0000-0000-0000-000000000001",
 	expectError:  `dial error`,
@@ -2711,7 +2711,7 @@ var destroyModelTests = []struct {
 	name: "APIError",
 	env:  destroyModelTestEnv,
 	destroyModel: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
-		return errors.E("api error")
+		return errors.New("api error")
 	},
 	username:     "charlie@canonical.com",
 	uuid:         "00000002-0000-0000-0000-000000000001",
@@ -2798,10 +2798,10 @@ var dumpModelTests = []struct {
 	env:  destroyModelTestEnv,
 	dumpModel: func(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
 		if tag.Id() != "00000002-0000-0000-0000-000000000001" {
-			return nil, errors.E("incorrect model uuid")
+			return nil, errors.New("incorrect model uuid")
 		}
 		if simplified != true {
-			return nil, errors.E("invalid simplified")
+			return nil, errors.New("invalid simplified")
 		}
 		return map[string]interface{}{}, nil
 	},
@@ -2819,7 +2819,7 @@ var dumpModelTests = []struct {
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
-	dialError:   errors.E("dial error"),
+	dialError:   errors.New("dial error"),
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
@@ -2827,7 +2827,7 @@ var dumpModelTests = []struct {
 	name: "APIError",
 	env:  destroyModelTestEnv,
 	dumpModel: func(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
-		return map[string]interface{}{}, errors.E("api error")
+		return map[string]interface{}{}, errors.New("api error")
 	},
 	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
@@ -2901,7 +2901,7 @@ var dumpModelDBTests = []struct {
 	env:  destroyModelTestEnv,
 	dumpModelDB: func(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
 		if tag.Id() != "00000002-0000-0000-0000-000000000001" {
-			return nil, errors.E("incorrect model uuid")
+			return nil, errors.New("incorrect model uuid")
 		}
 		return map[string]interface{}{"model": "dump"}, nil
 	},
@@ -2920,7 +2920,7 @@ var dumpModelDBTests = []struct {
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
-	dialError:   errors.E("dial error"),
+	dialError:   errors.New("dial error"),
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
@@ -2928,7 +2928,7 @@ var dumpModelDBTests = []struct {
 	name: "APIError",
 	env:  destroyModelTestEnv,
 	dumpModelDB: func(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
-		return nil, errors.E("api error")
+		return nil, errors.New("api error")
 	},
 	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
@@ -3003,10 +3003,10 @@ var validateModelUpgradeTests = []struct {
 	env:  destroyModelTestEnv,
 	validateModelUpgrade: func(ctx context.Context, model names.ModelTag, force bool) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("incorrect model uuid")
+			return errors.New("incorrect model uuid")
 		}
 		if force != true {
-			return errors.E("incorrect force")
+			return errors.New("incorrect force")
 		}
 		return nil
 	},
@@ -3018,7 +3018,7 @@ var validateModelUpgradeTests = []struct {
 	env:  destroyModelTestEnv,
 	validateModelUpgrade: func(ctx context.Context, model names.ModelTag, force bool) error {
 		if force != false {
-			return errors.E("incorrect force")
+			return errors.New("incorrect force")
 		}
 		return nil
 	},
@@ -3027,7 +3027,7 @@ var validateModelUpgradeTests = []struct {
 }, {
 	name:        "DialError",
 	env:         destroyModelTestEnv,
-	dialError:   errors.E("dial error"),
+	dialError:   errors.New("dial error"),
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: `dial error`,
@@ -3035,7 +3035,7 @@ var validateModelUpgradeTests = []struct {
 	name: "APIError",
 	env:  destroyModelTestEnv,
 	validateModelUpgrade: func(ctx context.Context, model names.ModelTag, force bool) error {
-		return errors.E("api error")
+		return errors.New("api error")
 	},
 	username:    "charlie@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
@@ -3130,16 +3130,16 @@ var updateModelCredentialTests = []struct {
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
-			return nil, errors.E("bad cloud credential tag")
+			return nil, errors.New("bad cloud credential tag")
 		}
 		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
+			return errors.New("bad model tag")
 		}
 		if credential.Id() != "test-cloud/alice@canonical.com/cred-2" {
-			return errors.E("bad cloud credential tag")
+			return errors.New("bad cloud credential tag")
 		}
 		return nil
 	},
@@ -3177,16 +3177,16 @@ var updateModelCredentialTests = []struct {
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
-			return nil, errors.E("bad cloud credential tag")
+			return nil, errors.New("bad cloud credential tag")
 		}
 		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
+			return errors.New("bad model tag")
 		}
 		if credential.Id() != "test-cloud/alice@canonical.com/cred-2" {
-			return errors.E("bad cloud credential tag")
+			return errors.New("bad cloud credential tag")
 		}
 		return nil
 	},
@@ -3208,16 +3208,16 @@ var updateModelCredentialTests = []struct {
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
-			return nil, errors.E("bad cloud credential tag")
+			return nil, errors.New("bad cloud credential tag")
 		}
 		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 		if model.Id() != "00000002-0000-0000-0000-000000000001" {
-			return errors.E("bad model tag")
+			return errors.New("bad model tag")
 		}
 		if credential.Id() != "test-cloud/alice@canonical.com/cred-2" {
-			return errors.E("bad cloud credential tag")
+			return errors.New("bad cloud credential tag")
 		}
 		return nil
 	},
@@ -3230,7 +3230,7 @@ var updateModelCredentialTests = []struct {
 	name: "update credential returns an error",
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
-		return nil, errors.E("an error")
+		return nil, errors.New("an error")
 	},
 	username:    "alice@canonical.com",
 	credential:  "test-cloud/alice@canonical.com/cred-2",
@@ -3241,12 +3241,12 @@ var updateModelCredentialTests = []struct {
 	env:  updateModelCredentialTestEnv,
 	updateCredential: func(_ context.Context, taggedCredential jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 		if taggedCredential.Tag != "cloudcred-test-cloud_alice@canonical.com_cred-2" {
-			return nil, errors.E("bad cloud credential tag")
+			return nil, errors.New("bad cloud credential tag")
 		}
 		return []jujuparams.UpdateCredentialResult{{}}, nil
 	},
 	changeModelCredential: func(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
-		return errors.E("an error")
+		return errors.New("an error")
 	},
 	username:    "alice@canonical.com",
 	credential:  "test-cloud/alice@canonical.com/cred-2",
@@ -3583,7 +3583,7 @@ var modelListTests = []struct {
 		expectedError:      "failed to list models.*",
 		listModelsMockByControllerName: map[string]func(context.Context) ([]base.UserModel, error){
 			"controller-1": func(ctx context.Context) ([]base.UserModel, error) {
-				return []base.UserModel{}, errors.E("test error")
+				return []base.UserModel{}, errors.New("test error")
 			},
 		},
 	},

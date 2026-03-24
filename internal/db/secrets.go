@@ -186,11 +186,11 @@ func (d *Database) GetControllerCredentials(ctx context.Context, controllerName 
 	}
 	username, ok := secretData[usernameKey]
 	if !ok {
-		return "", "", errors.E("missing username")
+		return "", "", errors.New("missing username")
 	}
 	password, ok := secretData[passwordKey]
 	if !ok {
-		return "", "", errors.E("missing password")
+		return "", "", errors.New("missing password")
 	}
 	return username, password, nil
 }

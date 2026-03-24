@@ -406,7 +406,7 @@ func (m *modelImporter) setModelOwner(ctx context.Context) error {
 	}
 
 	if ownerTag.IsLocal() {
-		return errors.E("cannot import model from local user, try --owner to switch the model owner")
+		return errors.New("cannot import model from local user, try --owner to switch the model owner")
 	}
 	owner := dbmodel.Identity{}
 	owner.SetTag(ownerTag)
@@ -477,7 +477,7 @@ func (m *modelImporter) setModelCloud(ctx context.Context) error {
 	if m.modelInfo.CloudRegion != "" {
 		cr := cloud.Region(m.modelInfo.CloudRegion)
 		if cr.Name != m.modelInfo.CloudRegion {
-			return errors.E("cloud region not found")
+			return errors.New("cloud region not found")
 		}
 
 		m.model.CloudRegionID = cr.ID

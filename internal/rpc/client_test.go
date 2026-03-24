@@ -100,7 +100,7 @@ func TestCallClosedWithoutResponse(t *testing.T) {
 		c.Check(req["type"], qt.Equals, "test")
 		c.Check(req["id"], qt.Equals, "1234")
 		c.Check(req["request"], qt.Equals, "Test")
-		return errors.E("test error")
+		return errors.New("test error")
 	})
 	defer srv.Close()
 	conn, err := srv.dialer.Dial(context.Background(), srv.URL, nil)

@@ -153,7 +153,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 		about:    "model access check fails",
 		username: "eve@canonical.com",
 		accessChecker: &testAccessChecker{
-			modelAccessCheckErr: errors.E("a test error"),
+			modelAccessCheckErr: errors.New("a test error"),
 		},
 		jwtService:    &testJWTService{},
 		expectedError: "a test error",
@@ -164,14 +164,14 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 			modelAccess: map[string]string{
 				mt.String(): "admin",
 			},
-			controllerAccessCheckErr: errors.E("a test error"),
+			controllerAccessCheckErr: errors.New("a test error"),
 		},
 		expectedError: "a test error",
 	}, {
 		about:    "get controller from db fails",
 		username: "eve@canonical.com",
 		database: &testDatabase{
-			err: errors.E("a test error"),
+			err: errors.New("a test error"),
 		},
 		accessChecker: &testAccessChecker{
 			modelAccess: map[string]string{
@@ -203,7 +203,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 			controllerAccess: map[string]string{
 				ct.String(): "superuser",
 			},
-			cloudAccessCheckErr: errors.E("a test error"),
+			cloudAccessCheckErr: errors.New("a test error"),
 		},
 		expectedError: "failed to check user's cloud access: a test error",
 	}, {
@@ -232,7 +232,7 @@ func TestJWTGeneratorMakeLoginToken(t *testing.T) {
 			},
 		},
 		jwtService: &testJWTService{
-			newJWTError: errors.E("a test error"),
+			newJWTError: errors.New("a test error"),
 		},
 		expectedError: "a test error",
 	}}
@@ -288,7 +288,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		permissions: map[string]interface{}{
 			"entity1": "access_level1",
 		},
-		checkPermissionsError: errors.E("a test error"),
+		checkPermissionsError: errors.New("a test error"),
 		expectedError:         "a test error",
 	}, {
 		about:      "additional permissions need checking",

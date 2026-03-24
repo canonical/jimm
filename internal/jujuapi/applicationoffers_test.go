@@ -272,7 +272,7 @@ func TestDestroyOffers(t *testing.T) {
 		DestroyOffer_: func(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
 			called++
 			if offerURL == "owner@canonical.com/test-model.fail" {
-				return errors.E("cannot destroy offer")
+				return errors.New("cannot destroy offer")
 			}
 			c.Check(force, qt.IsTrue)
 			return nil

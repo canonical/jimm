@@ -67,16 +67,16 @@ func NewUpgradeManager(
 	enqueuer UpgradeEnqueuer,
 ) (*UpgradeManager, error) {
 	if jujumanager == nil {
-		return nil, errors.E("juju manager cannot be nil")
+		return nil, errors.New("juju manager cannot be nil")
 	}
 	if store == nil {
-		return nil, errors.E("store cannot be nil")
+		return nil, errors.New("store cannot be nil")
 	}
 	if dialer == nil {
-		return nil, errors.E("dialer cannot be nil")
+		return nil, errors.New("dialer cannot be nil")
 	}
 	if enqueuer == nil {
-		return nil, errors.E("enqueuer cannot be nil")
+		return nil, errors.New("enqueuer cannot be nil")
 	}
 	return &UpgradeManager{
 		jujuManager: jujumanager,
@@ -127,7 +127,7 @@ func (u *UpgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 				// UpgradeModel is safe to call multiple times.
 				_, err = api.UpgradeModel(modelUUID, targetVersion, "", false, false)
 				if jujuparams.IsCodeUpgradeInProgress(err) {
-					err = errors.E("upgrade in progress")
+					err = errors.New("upgrade in progress")
 				}
 				if jujuerrors.Is(err, jujuerrors.AlreadyExists) {
 					// Model is already upgraded
@@ -233,7 +233,7 @@ func (u *UpgradeManager) MigrateModel(ctx context.Context, user *openfga.User, m
 		return fmt.Errorf("failed to initiate internal migration: %w", err)
 	}
 
-	modelNotMigratedErr := errors.E("model has not yet migrated to target controller")
+	modelNotMigratedErr := errors.New("model has not yet migrated to target controller")
 
 	if err := retry.Call(
 		retry.CallArgs{

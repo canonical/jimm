@@ -32,13 +32,13 @@ type AuditLogManager struct {
 // creation, and removal.
 func NewAuditLogManager(store *db.Database, authSvc *openfga.OFGAClient, jimmTag names.ControllerTag, retentionDays int) (*AuditLogManager, error) {
 	if store == nil {
-		return nil, errors.E("auditlog store cannot be nil")
+		return nil, errors.New("auditlog store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("auditlog authorisation service cannot be nil")
+		return nil, errors.New("auditlog authorisation service cannot be nil")
 	}
 	if jimmTag.String() == "" {
-		return nil, errors.E("auditlog jimm tag cannot be empty")
+		return nil, errors.New("auditlog jimm tag cannot be empty")
 	}
 	return &AuditLogManager{store, authSvc, jimmTag, retentionDays}, nil
 }

@@ -15,7 +15,7 @@ import (
 
 func newUpgradeWorker(upgradeManager UpgradeManager) (*upgradeWorker, error) {
 	if upgradeManager == nil {
-		return nil, errors.E("upgradeManager is required")
+		return nil, errors.New("upgradeManager is required")
 	}
 
 	return &upgradeWorker{

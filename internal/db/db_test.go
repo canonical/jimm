@@ -96,7 +96,7 @@ func TestTransactionUnconfiguredDatabase(t *testing.T) {
 
 	var database db.Database
 	err := database.Transaction(func(d *db.Database) error {
-		return errors.E("unexpected function call")
+		return errors.New("unexpected function call")
 	})
 	c.Check(err, qt.ErrorMatches, `database not configured`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
@@ -104,7 +104,7 @@ func TestTransactionUnconfiguredDatabase(t *testing.T) {
 
 func (s *dbSuite) TestTransaction(c *qt.C) {
 	err := s.Database.Transaction(func(d *db.Database) error {
-		return errors.E("unexpected function call")
+		return errors.New("unexpected function call")
 	})
 	c.Check(err, qt.ErrorMatches, `upgrade in progress`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUpgradeInProgress)
@@ -120,7 +120,7 @@ func (s *dbSuite) TestTransaction(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.Transaction(func(d *db.Database) error {
-		return errors.E("test error")
+		return errors.New("test error")
 	})
 	c.Check(err, qt.ErrorMatches, `test error`)
 }

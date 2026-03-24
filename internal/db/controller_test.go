@@ -147,7 +147,7 @@ func (s *dbSuite) TestForEachController(c *qt.C) {
 	env := jimmtest.ParseEnvironment(c, testForEachControllerEnv)
 	env.PopulateDB(c, s.Database)
 
-	testError := errors.E("test error")
+	testError := errors.New("test error")
 	err = s.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
 		return testError
 	})
@@ -338,7 +338,7 @@ func (s *dbSuite) TestForEachControllerModel(c *qt.C) {
 	env.PopulateDB(c, s.Database)
 
 	ctl := env.Controller("test").DBObject(c, s.Database)
-	testError := errors.E("test error")
+	testError := errors.New("test error")
 	err = s.Database.ForEachControllerModel(ctx, &ctl, func(_ *dbmodel.Model) error {
 		return testError
 	})

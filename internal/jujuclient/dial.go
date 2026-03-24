@@ -313,7 +313,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 
 	modelTag, ok := c.ModelTag()
 	if !ok {
-		return nil, errors.E("no model found")
+		return nil, errors.New("no model found")
 	}
 
 	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
@@ -322,7 +322,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 	}
 	ok = names.IsValidUser(user)
 	if !ok {
-		return nil, errors.E("invalid/missing controller credentials")
+		return nil, errors.New("invalid/missing controller credentials")
 	}
 	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
 	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader, attrs)

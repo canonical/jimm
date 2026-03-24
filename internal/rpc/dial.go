@@ -143,7 +143,7 @@ func websocketURL(s string, mt names.ModelTag, finalPath string, attrs url.Value
 // connection.
 func dialAll(ctx context.Context, dialer *Dialer, urls []string, headers http.Header) (*websocket.Conn, error) {
 	if len(urls) == 0 {
-		return nil, errors.E("no urls to dial")
+		return nil, errors.New("no urls to dial")
 	}
 	conn, err := dialAllHelper(ctx, dialer, urls, headers)
 	if err != nil {

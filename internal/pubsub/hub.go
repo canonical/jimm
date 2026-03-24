@@ -99,10 +99,10 @@ func (h *Hub) SubscribeMatch(modelMatcher func(string) bool, handler HandlerFunc
 	defer h.mu.Unlock()
 
 	if handler == nil {
-		return func() {}, errors.E("handler not specified")
+		return func() {}, errors.New("handler not specified")
 	}
 	if modelMatcher == nil {
-		return func() {}, errors.E("model matcher not specified")
+		return func() {}, errors.New("model matcher not specified")
 	}
 	idx := h.idx
 	h.idx++

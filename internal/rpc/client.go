@@ -84,7 +84,7 @@ func (c *Client) recv() {
 		if msg.RequestID == 0 {
 			// Use a 0 request ID to indicate that the message
 			// received was not a valid RPC message.
-			c.handleError(errors.E("received invalid RPC message"))
+			c.handleError(errors.New("received invalid RPC message"))
 			break
 		}
 		if msg.isRequest() {

@@ -91,16 +91,16 @@ type LoginManager struct {
 // NewLoginManager returns a new loginManager that persists the roles in the provided store.
 func NewLoginManager(store *db.Database, authSvc *openfga.OFGAClient, oAuthAuthenticator OAuthAuthenticator, jimmTag names.ControllerTag) (*LoginManager, error) {
 	if store == nil {
-		return nil, errors.E("login store cannot be nil")
+		return nil, errors.New("login store cannot be nil")
 	}
 	if authSvc == nil {
-		return nil, errors.E("login authorisation service cannot be nil")
+		return nil, errors.New("login authorisation service cannot be nil")
 	}
 	if oAuthAuthenticator == nil {
-		return nil, errors.E("oauth service cannot be nil")
+		return nil, errors.New("oauth service cannot be nil")
 	}
 	if jimmTag.Id() == "" {
-		return nil, errors.E("invalid jimm controller tag")
+		return nil, errors.New("invalid jimm controller tag")
 	}
 	return &LoginManager{store, authSvc, oAuthAuthenticator, jimmTag}, nil
 }
@@ -207,7 +207,7 @@ func (j *LoginManager) LoginWithSessionToken(ctx context.Context, sessionToken s
 func (j *LoginManager) LoginWithSessionCookie(ctx context.Context, identityID string) (*openfga.User, error) {
 
 	if identityID == "" {
-		return nil, errors.E("missing cookie identity")
+		return nil, errors.New("missing cookie identity")
 	}
 	user, err := j.UserLogin(ctx, identityID)
 	if err != nil {

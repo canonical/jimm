@@ -22,7 +22,7 @@ type SSHKeyManager struct {
 // NewSSHKeyManager returns a new sshKeyManager that handles ssh keys.
 func NewSSHKeyManager(store *db.Database) (*SSHKeyManager, error) {
 	if store == nil {
-		return nil, errors.E("role store cannot be nil")
+		return nil, errors.New("role store cannot be nil")
 	}
 	return &SSHKeyManager{store}, nil
 }

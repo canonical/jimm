@@ -75,7 +75,7 @@ func TestDebugStatusStatusError(t *testing.T) {
 	c := qt.New(t)
 
 	rr := setupDebugHandlerAndRecorder(c, jimmhttp.MakeStatusCheck("Test", func(context.Context) (interface{}, error) {
-		return nil, errors.E("test error")
+		return nil, errors.New("test error")
 	}), "/status")
 
 	resp := rr.Result()

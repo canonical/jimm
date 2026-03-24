@@ -556,7 +556,7 @@ func (r *controllerRoot) PrepareModelMigration(ctx context.Context, args apipara
 	}
 
 	if !names.IsValidControllerName(args.BackingControllerName) {
-		return resp, errors.E("invalid controller name")
+		return resp, errors.New("invalid controller name")
 	}
 
 	// Check each key is a valid local user and each value is a valid user and has a domain

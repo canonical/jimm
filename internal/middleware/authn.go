@@ -132,7 +132,7 @@ func IdentityFromContext(ctx context.Context) (*openfga.User, error) {
 	identity := ctx.Value(identityContextKey{})
 	user, ok := identity.(*openfga.User)
 	if !ok {
-		return nil, errors.E("cannot extract user from context")
+		return nil, errors.New("cannot extract user from context")
 	}
 	return user, nil
 }

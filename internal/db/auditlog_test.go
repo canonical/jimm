@@ -44,7 +44,7 @@ func (s *dbSuite) TestAddAuditLogEntry(c *qt.C) {
 	var ale2 dbmodel.AuditLogEntry
 	err = s.Database.ForEachAuditLogEntry(ctx, db.AuditLogFilter{}, func(ale *dbmodel.AuditLogEntry) error {
 		if ale2.ID != 0 {
-			return errors.E("too many results")
+			return errors.New("too many results")
 		}
 		ale2 = *ale
 		return nil
@@ -141,7 +141,7 @@ func (s *dbSuite) TestForEachAuditLogEntry(c *qt.C) {
 	}
 
 	var calls int
-	testError := errors.E("a test error")
+	testError := errors.New("a test error")
 	err = s.Database.ForEachAuditLogEntry(context.Background(), db.AuditLogFilter{}, func(_ *dbmodel.AuditLogEntry) error {
 		calls++
 		return testError

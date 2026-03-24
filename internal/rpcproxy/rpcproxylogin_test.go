@@ -84,7 +84,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			RequestID: 1,
 			Error:     "a silly error",
 		},
-		oauthAuthenticatorError: errors.E("a silly error"),
+		oauthAuthenticatorError: errors.New("a silly error"),
 	}, {
 		about: "get device session token call - client gets response with a session token",
 		messageToSend: rpcproxy.Message{
@@ -109,7 +109,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 			RequestID: 1,
 			Error:     "a silly error",
 		},
-		oauthAuthenticatorError: errors.E("a silly error"),
+		oauthAuthenticatorError: errors.New("a silly error"),
 	}, {
 		about: "login with session token - a login message is sent to the controller",
 		messageToSend: rpcproxy.Message{
@@ -425,11 +425,11 @@ func (j *mockLoginService) LoginClientCredentials(ctx context.Context, clientID 
 		return nil, j.err
 	}
 	if clientID != j.clientID || clientSecret != j.clientSecret {
-		return nil, errors.E("invalid client credentials")
+		return nil, errors.New("invalid client credentials")
 	}
 	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
 	if err != nil {
-		return nil, errors.E("invalid client credential ID")
+		return nil, errors.New("invalid client credential ID")
 	}
 	identity, err := dbmodel.NewIdentity(clientIdWithDomain)
 	if err != nil {

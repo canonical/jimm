@@ -102,7 +102,7 @@ func publicAccessAdaptor(tt cofga.TimestampedTuple) cofga.TimestampedTuple {
 // Note that the action is idempotent (does not return error if the relation already exists).
 func (o *OFGAClient) setResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
 	if object == nil || target == nil {
-		return errors.E("missing object or target for relation")
+		return errors.New("missing object or target for relation")
 	}
 	err := o.AddRelation(ctx, Tuple{
 		Object:   ofganames.ConvertGenericTag(object),
@@ -125,7 +125,7 @@ func (o *OFGAClient) setResourceAccess(ctx context.Context, object, target names
 // Note that the action is idempotent (does not return error if the relation does not exist).
 func (o *OFGAClient) unsetResourceAccess(ctx context.Context, object, target names.Tag, relation Relation) error {
 	if object == nil || target == nil {
-		return errors.E("missing object or target for relation")
+		return errors.New("missing object or target for relation")
 	}
 	err := o.RemoveRelation(ctx, Tuple{
 		Object:   ofganames.ConvertGenericTag(object),

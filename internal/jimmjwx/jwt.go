@@ -122,7 +122,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 
 	pubKey, ok := jwkSet.Key(jwkSet.Len() - 1)
 	if !ok {
-		return nil, errors.E("no jwk found")
+		return nil, errors.New("no jwk found")
 	}
 	pkeyPem, err := j.Store.GetJWKSPrivateKey(ctx)
 	if err != nil {
@@ -167,7 +167,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 
 	for k, v := range params.ExtraClaims {
 		if k == accessClaim {
-			return nil, errors.E("access is a reserved claim")
+			return nil, errors.New("access is a reserved claim")
 		}
 		builder = builder.Claim(k, v)
 	}

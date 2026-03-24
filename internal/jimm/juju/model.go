@@ -104,7 +104,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	}
 	err = j.Database.CloudDefaults(ctx, &cloudDefaults)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return base.ModelInfo{}, errors.E("failed to fetch cloud defaults")
+		return base.ModelInfo{}, errors.New("failed to fetch cloud defaults")
 	}
 	builder = builder.WithConfig(cloudDefaults.Defaults)
 
@@ -116,7 +116,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 	}
 	err = j.Database.CloudDefaults(ctx, &cloudRegionDefaults)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return base.ModelInfo{}, errors.E("failed to fetch cloud defaults")
+		return base.ModelInfo{}, errors.New("failed to fetch cloud defaults")
 	}
 	builder = builder.WithConfig(cloudRegionDefaults.Defaults)
 
@@ -246,7 +246,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.U
 		err := j.maybeCleanupModel(ctx, errFromAPI, model)
 		if err != nil {
 			zapctx.Error(ctx, "error cleaning model", zap.Error(err))
-			return jujuclient.ModelInfo{}, errors.E("internal server error")
+			return jujuclient.ModelInfo{}, errors.New("internal server error")
 		}
 		// propagate the error to the caller.
 		return jujuclient.ModelInfo{}, errFromAPI
@@ -254,7 +254,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.U
 		err := j.checkModelMigratedInternal(ctx, errFromAPI, model)
 		if err != nil {
 			zapctx.Error(ctx, "error checking model migration", zap.Error(err))
-			return jujuclient.ModelInfo{}, errors.E("internal server error")
+			return jujuclient.ModelInfo{}, errors.New("internal server error")
 		}
 		// If the model has been migrated internally, we call api.ModelInfo again
 		// to get the updated model information from the new controller.
@@ -271,7 +271,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.U
 	case dbmodel.MigrationModeExporting, dbmodel.MigrationModeImporting:
 		return jujuclient.ModelInfo{}, errFromAPI
 	default:
-		return jujuclient.ModelInfo{}, errors.E("model in unsupported migration mode")
+		return jujuclient.ModelInfo{}, errors.New("model in unsupported migration mode")
 	}
 
 }
@@ -292,7 +292,7 @@ func (j *JujuManager) reactToModelInfoSuccess(ctx context.Context, model *dbmode
 		}
 		return modelInfo, nil
 	default:
-		return jujuclient.ModelInfo{}, errors.E("model in unsupported migration mode")
+		return jujuclient.ModelInfo{}, errors.New("model in unsupported migration mode")
 	}
 
 }
@@ -492,7 +492,7 @@ func (j *JujuManager) deleteModel(ctx context.Context, mt names.ModelTag) error 
 // returned unmodified and iteration will stop immediately. The given
 // function should not update the database.
 func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, string) error) error {
-	errStop := errors.E("stop")
+	errStop := errors.New("stop")
 	var iterErr error
 	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		model := *m
@@ -532,7 +532,7 @@ func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f fu
 		return errors.E(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	errStop := errors.E("stop")
+	errStop := errors.New("stop")
 	var iterErr error
 	err := j.Database.ForEachModel(ctx, func(m *dbmodel.Model) error {
 		if err := f(m, jujuparams.UserAccessPermission("admin")); err != nil {

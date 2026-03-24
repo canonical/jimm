@@ -93,7 +93,7 @@ func Deserialize(raw []byte, targetControllerVersion version.Number) (Model, err
 		}
 		return &migrationDescriptionV10{desc: desc}, nil
 	default:
-		return nil, errors.E("unsupported description version")
+		return nil, errors.New("unsupported description version")
 	}
 }
 

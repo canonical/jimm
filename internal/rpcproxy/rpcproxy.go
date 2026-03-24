@@ -112,16 +112,16 @@ type ProxyHelpers struct {
 func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 
 	if helpers.ConnectController == nil {
-		return errors.E("missing controller connect function")
+		return errors.New("missing controller connect function")
 	}
 	if helpers.AuditLog == nil {
-		return errors.E("missing audit log function")
+		return errors.New("missing audit log function")
 	}
 	if helpers.LoginService == nil {
-		return errors.E("missing login service function")
+		return errors.New("missing login service function")
 	}
 	if helpers.RedirectInfo == nil {
-		return errors.E("missing redirect info function")
+		return errors.New("missing redirect info function")
 	}
 	errChan := make(chan error, 2)
 	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
@@ -154,7 +154,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			zapctx.Debug(ctx, "Proxy error", zap.Error(err))
 		}
 	case <-ctx.Done():
-		err = errors.E("Context cancelled")
+		err = errors.New("Context cancelled")
 		zapctx.Debug(ctx, "Context cancelled")
 	}
 	// Close the client connection to ensure everything is cleaned up.
@@ -594,7 +594,7 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 			for k, v := range e.Error.Info {
 				accessLevel, ok := v.(string)
 				if !ok {
-					return nil, errors.E("unknown permission level")
+					return nil, errors.New("unknown permission level")
 				}
 				if permissionMap == nil {
 					permissionMap = make(map[string]any)
@@ -635,7 +635,7 @@ func addJWT(ctx context.Context, msg *message, permissions map[string]interface{
 
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
-		return errors.E("nil messsage")
+		return errors.New("nil messsage")
 	}
 	var lr jujuparams.LoginRequest
 	if err := json.Unmarshal(msg.Params, &lr); err != nil {

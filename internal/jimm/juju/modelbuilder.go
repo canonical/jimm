@@ -76,19 +76,19 @@ func (b *modelBuilder) Error() error {
 
 func (b *modelBuilder) jujuModelCreateArgs() (*jujuclient.CreateModelArgs, error) {
 	if b.name == "" {
-		return nil, errors.E("model name not specified")
+		return nil, errors.New("model name not specified")
 	}
 	if b.owner == nil {
-		return nil, errors.E("model owner not specified")
+		return nil, errors.New("model owner not specified")
 	}
 	if b.cloud == nil {
-		return nil, errors.E("cloud not specified")
+		return nil, errors.New("cloud not specified")
 	}
 	if b.cloudRegionID == 0 {
-		return nil, errors.E("cloud region not specified")
+		return nil, errors.New("cloud region not specified")
 	}
 	if b.credential == nil {
-		return nil, errors.E("credentials not specified")
+		return nil, errors.New("credentials not specified")
 	}
 
 	args := &jujuclient.CreateModelArgs{
@@ -154,7 +154,7 @@ func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
 		return b
 	}
 	if b.ofgaUser == nil {
-		b.err = errors.E("authorizer not specified")
+		b.err = errors.New("authorizer not specified")
 		return b
 	}
 	targetController := dbmodel.Controller{
@@ -188,7 +188,7 @@ func (b *modelBuilder) WithAnyController() *modelBuilder {
 		return b
 	}
 	if b.ofgaUser == nil {
-		b.err = errors.E("authorizer not specified")
+		b.err = errors.New("authorizer not specified")
 		return b
 	}
 	var candidateControllers []candidateController
@@ -216,7 +216,7 @@ func (b *modelBuilder) WithAnyController() *modelBuilder {
 	// Error early with a helpful message if no
 	// candidate controllers are available.
 	if len(b.candidates) == 0 {
-		b.err = errors.E("no available controllers - check permissions to controllers and list of available controllers")
+		b.err = errors.New("no available controllers - check permissions to controllers and list of available controllers")
 	}
 	return b
 }
@@ -229,7 +229,7 @@ func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *mode
 		return b
 	}
 	if b.ofgaUser == nil {
-		b.err = errors.E("authorizer not specified")
+		b.err = errors.New("authorizer not specified")
 		return b
 	}
 
@@ -310,7 +310,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 		return b
 	}
 	if b.cloud == nil {
-		b.err = errors.E("cloud not specified")
+		b.err = errors.New("cloud not specified")
 		return b
 	}
 
@@ -394,12 +394,12 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 
 	// if model name is not specified we error and abort
 	if b.name == "" {
-		b.err = errors.E("model name not specified")
+		b.err = errors.New("model name not specified")
 		return b
 	}
 	// if the model owner is not specified we error and abort
 	if b.owner == nil {
-		b.err = errors.E("owner not specified")
+		b.err = errors.New("owner not specified")
 		return b
 	}
 
@@ -411,7 +411,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	// we can do - either a cloud or a cloud region was specified
 	// by this point and a controller should've been selected
 	if b.controller == nil {
-		b.err = errors.E("unable to determine a suitable controller")
+		b.err = errors.New("unable to determine a suitable controller")
 		return b
 	}
 
@@ -509,10 +509,10 @@ func (b *modelBuilder) selectController() error {
 
 func (b *modelBuilder) selectCloudCredentials() error {
 	if b.owner == nil {
-		return errors.E("user not specified")
+		return errors.New("user not specified")
 	}
 	if b.cloud == nil {
-		return errors.E("cloud not specified")
+		return errors.New("cloud not specified")
 	}
 	credentials, err := b.jujuManager.Database.GetIdentityCloudCredentials(b.ctx, b.owner, b.cloud.Name)
 	if err != nil {
@@ -526,7 +526,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 		b.credential = &credential
 		return nil
 	}
-	return errors.E("valid cloud credentials not found")
+	return errors.New("valid cloud credentials not found")
 }
 
 // CreateControllerModel uses provided information to create a new
@@ -537,7 +537,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	}
 
 	if b.model == nil {
-		b.err = errors.E("model not specified")
+		b.err = errors.New("model not specified")
 		return b
 	}
 

@@ -49,7 +49,7 @@ func TestEWithInfo(t *testing.T) {
 	c.Check(err.(*errors.Error).Info, qt.DeepEquals, info)
 	c.Check(errors.ErrorInfo(err), qt.DeepEquals, info)
 
-	err = errors.E("plain-error")
+	err = errors.New("plain-error")
 	c.Check(err, qt.ErrorMatches, `plain-error`)
 	c.Check(errors.ErrorInfo(err), qt.DeepEquals, map[string]any(nil))
 }

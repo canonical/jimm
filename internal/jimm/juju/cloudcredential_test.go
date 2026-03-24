@@ -163,7 +163,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:                  "update credential error returned by controller",
 		jimmAdmin:              true,
-		updateCredentialErrors: []error{nil, errors.E("test error")},
+		updateCredentialErrors: []error{nil, errors.New("test error")},
 		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)
@@ -259,7 +259,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 	}, {
 		about:                  "check credential error returned by controller",
 		jimmAdmin:              true,
-		checkCredentialErrors:  []error{errors.E("test error")},
+		checkCredentialErrors:  []error{errors.New("test error")},
 		updateCredentialErrors: []error{nil},
 		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -475,7 +475,7 @@ func TestUpdateCloudCredential(t *testing.T) {
 		},
 	}, {
 		about:                 "skip check, which would return an error",
-		checkCredentialErrors: []error{errors.E("test error")},
+		checkCredentialErrors: []error{errors.New("test error")},
 		jimmAdmin:             true,
 		createEnv: func(c *qt.C, j *juju.JujuManager) (*dbmodel.Identity, juju.UpdateCloudCredentialArgs, dbmodel.CloudCredential, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
@@ -1138,7 +1138,7 @@ func TestRevokeCloudCredential(t *testing.T) {
 		},
 	}, {
 		about:                  "error revoking credential on controller",
-		revokeCredentialErrors: []error{errors.E("test error")},
+		revokeCredentialErrors: []error{errors.New("test error")},
 		createEnv: func(c *qt.C, j *juju.JujuManager, client *openfga.OFGAClient) (*dbmodel.Identity, names.CloudCredentialTag, string) {
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)

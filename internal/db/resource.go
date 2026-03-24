@@ -140,7 +140,7 @@ func buildQuery(db *gorm.DB, offset, limit int, namePrefixFilter, typeFilter str
 		query = modelsQuery
 	default:
 		// this shouldn't happen because we have validated the entityFilter at API layer
-		return nil, errors.E("this entityType does not exist")
+		return nil, errors.New("this entityType does not exist")
 	}
 	return query.Order("id").Offset(offset).Limit(limit), nil
 }
