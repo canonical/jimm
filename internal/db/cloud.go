@@ -115,7 +115,7 @@ func (d *Database) UpdateCloud(ctx context.Context, c *dbmodel.Cloud) (err error
 		return nil
 	})
 	if err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -170,7 +170,7 @@ func (d *Database) FindRegionByCloudType(ctx context.Context, providerType, regi
 
 	var region dbmodel.CloudRegion
 	if err := db.First(&region).Error; err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return &region, nil
 }
@@ -193,7 +193,7 @@ func (d *Database) FindRegionByCloudName(ctx context.Context, cloudName, regionN
 
 	var region dbmodel.CloudRegion
 	if err := db.First(&region).Error; err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return &region, nil
 }
@@ -212,7 +212,7 @@ func (d *Database) DeleteCloud(ctx context.Context, c *dbmodel.Cloud) (err error
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(c).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -231,7 +231,7 @@ func (d *Database) DeleteCloudRegionControllerPriority(ctx context.Context, c *d
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(c).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }

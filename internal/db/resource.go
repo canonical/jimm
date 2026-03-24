@@ -89,7 +89,7 @@ func (d *Database) ListResources(ctx context.Context, limit, offset int, namePre
 
 	var resources []Resource
 	if err := query.Find(&resources).Error; err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return resources, nil
 }

@@ -51,7 +51,7 @@ func (d *Database) UpsertSecret(ctx context.Context, secret *dbmodel.Secret) (er
 		DoUpdates: clause.AssignmentColumns([]string{"time", "data"}),
 	})
 	if err := db.Create(secret).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -81,7 +81,7 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err e
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(err, "secret not found")
 		}
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -105,7 +105,7 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) (er
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Unscoped().Where("tag = ? AND type = ?", secret.Tag, secret.Type).Delete(&dbmodel.Secret{}).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }

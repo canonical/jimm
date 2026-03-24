@@ -28,7 +28,7 @@ func (d *Database) AddModel(ctx context.Context, model *dbmodel.Model) (err erro
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Create(model).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return errors.E(err, "model not found")
 		}
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -112,7 +112,7 @@ func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err e
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Save(model).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -138,7 +138,7 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err e
 	}
 
 	if err := db.Delete(model).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -162,7 +162,7 @@ func (d *Database) ForEachModel(ctx context.Context, f func(m *dbmodel.Model) er
 
 	var models []dbmodel.Model
 	if err := db.Find(&models).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	for _, m := range models {
 		if err := f(&m); err != nil {
@@ -197,7 +197,7 @@ func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) (_ 
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return nil, errors.E(err, "model not found")
 		}
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return models, nil
 }
@@ -233,7 +233,7 @@ func (d *Database) GetModelsByController(ctx context.Context, ctl dbmodel.Contro
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Model(ctl).Association("Models").Find(&models); err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return models, nil
 }
@@ -254,7 +254,7 @@ func (d *Database) CountModelsByController(ctx context.Context, ctl dbmodel.Cont
 	asc := db.Model(ctl).Association("Models")
 	count = int(asc.Count())
 	if err := asc.Error; err != nil {
-		return 0, errors.E(dbError(err))
+		return 0, dbError(err)
 	}
 	return count, nil
 }

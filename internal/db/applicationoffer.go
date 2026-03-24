@@ -118,7 +118,7 @@ func (d *Database) FindApplicationOffersByModel(ctx context.Context, modelName, 
 		offer := offer
 		err := d.GetApplicationOffer(ctx, &offer)
 		if err != nil {
-			return nil, errors.E(dbError(err))
+			return nil, dbError(err)
 		}
 		offers[i] = offer
 	}

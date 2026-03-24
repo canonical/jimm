@@ -37,7 +37,7 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 		},
 		DoUpdates: clause.AssignmentColumns([]string{"auth_type", "label", "valid"}),
 	}).Create(&cred).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func (d *Database) ForEachCloudCredential(ctx context.Context, identityName, clo
 
 	var creds []dbmodel.CloudCredential
 	if err := db.Find(&creds).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	for _, c := range creds {
 		if err := f(&c); err != nil {

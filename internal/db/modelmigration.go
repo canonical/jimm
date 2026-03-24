@@ -42,7 +42,7 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 		db := d.DB.WithContext(ctx)
 
 		if err := db.Save(modelMigration).Error; err != nil {
-			return errors.E(dbError(err))
+			return dbError(err)
 		}
 
 		return nil
@@ -125,7 +125,7 @@ func (d *Database) DeleteIncomingModelMigration(ctx context.Context, modelMigrat
 
 	db := d.DB.WithContext(ctx)
 	if err := db.Delete(modelMigration).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -144,7 +144,7 @@ func (d *Database) GetIncomingModelMigrationsCreatedBefore(ctx context.Context, 
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Where("created_at < ?", createBefore).Find(&migrations).Error; err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return migrations, nil
 }

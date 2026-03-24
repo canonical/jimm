@@ -10,7 +10,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
@@ -63,7 +62,7 @@ func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.
 		if err == gorm.ErrRecordNotFound {
 			return dbrootkeystore.RootKey{}, nil
 		}
-		return dbrootkeystore.RootKey{}, errors.E(dbError(err))
+		return dbrootkeystore.RootKey{}, dbError(err)
 	}
 	return dbrootkeystore.RootKey{
 		Id:      rk.ID,
@@ -92,7 +91,7 @@ func (d *Database) InsertKey(key dbrootkeystore.RootKey) (err error) {
 		RootKey:   key.RootKey,
 	}
 	if err := d.DB.Create(&rk).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }

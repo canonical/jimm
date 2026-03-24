@@ -268,7 +268,7 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 		return 0, fmt.Errorf("failed to enqueue bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
-		return 0, errors.E(fmt.Errorf("a bootstrap job is already in progress - please wait for it to complete before starting a new one"), errors.CodeInProgress)
+		return 0, errors.E("a bootstrap job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
 	}
 
 	return job.Job.ID, nil
@@ -552,7 +552,7 @@ func (b *BootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 		return 0, fmt.Errorf("failed to start bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
-		return 0, errors.E(fmt.Errorf("a destroy job is already in progress - please wait for it to complete before starting a new one"), errors.CodeInProgress)
+		return 0, errors.E("a destroy job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
 	}
 
 	return job.Job.ID, nil

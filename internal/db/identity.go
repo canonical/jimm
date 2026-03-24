@@ -162,7 +162,7 @@ func (d *Database) ListIdentities(ctx context.Context, limit, offset int, match 
 	}
 	var identities []dbmodel.Identity
 	if err := db.Find(&identities).Error; err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 	return identities, nil
 }

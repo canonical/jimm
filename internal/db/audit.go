@@ -24,7 +24,7 @@ func (d *Database) AddAuditLogEntry(ctx context.Context, ale *dbmodel.AuditLogEn
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if err := d.DB.WithContext(ctx).Create(ale).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }

@@ -50,7 +50,7 @@ func (d *Database) RemoveSSHKeyByFingerprint(ctx context.Context, identityName s
 		Delete(&dbmodel.SSHKey{})
 
 	if err := query.Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 
 	if query.RowsAffected == 0 {
@@ -76,7 +76,7 @@ func (d *Database) RemoveSSHKeyByComment(ctx context.Context, identityName strin
 		Where("model_uuid = ?", model.ModelUUID).
 		Delete(&dbmodel.SSHKey{})
 	if err := query.Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 
 	if query.RowsAffected == 0 {
@@ -103,7 +103,7 @@ func (d *Database) ListSSHKeysForUser(ctx context.Context, identityName string, 
 	}
 	if err := query.
 		Find(&keys).Error; err != nil {
-		return nil, errors.E(dbError(err))
+		return nil, dbError(err)
 	}
 
 	return keys, nil

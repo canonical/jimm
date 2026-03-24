@@ -42,7 +42,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 			if errors.ErrorCode(err) == errors.CodeNotFound {
 				// if defaults do not exist, we create them
 				if err := db.Create(&defaults).Error; err != nil {
-					return errors.E(dbError(err))
+					return dbError(err)
 				}
 				return nil
 			}
@@ -61,7 +61,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {
-			return errors.E(dbError(err))
+			return dbError(err)
 		}
 		return nil
 	})
@@ -112,7 +112,7 @@ func (d *Database) UnsetCloudDefaults(ctx context.Context, defaults *dbmodel.Clo
 			},
 			DoUpdates: clause.AssignmentColumns([]string{"defaults"}),
 		}).Create(&dbDefaults).Error; err != nil {
-			return errors.E(dbError(err))
+			return dbError(err)
 		}
 		return nil
 	})

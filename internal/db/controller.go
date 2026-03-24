@@ -26,7 +26,7 @@ func (d *Database) AddController(ctx context.Context, controller *dbmodel.Contro
 	db := d.DB.WithContext(ctx)
 
 	if err := db.Create(controller).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -84,7 +84,7 @@ func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Con
 	db := d.DB.WithContext(ctx)
 	db = db.Omit("CloudRegions").Omit("Models")
 	if err := db.Save(controller).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	return nil
 }
@@ -137,7 +137,7 @@ func (d *Database) ForEachController(ctx context.Context, f func(*dbmodel.Contro
 
 	var controllers []dbmodel.Controller
 	if err := db.Order("name asc").Find(&controllers).Error; err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	for _, c := range controllers {
 		if err := f(&c); err != nil {
@@ -165,7 +165,7 @@ func (d *Database) ForEachControllerModel(ctx context.Context, ctl *dbmodel.Cont
 	var models []dbmodel.Model
 	db := d.DB.WithContext(ctx)
 	if err := db.Model(ctl).Association("Models").Find(&models); err != nil {
-		return errors.E(dbError(err))
+		return dbError(err)
 	}
 	for _, m := range models {
 		if err := f(&m); err != nil {
@@ -190,7 +190,7 @@ func (d *Database) CountControllers(ctx context.Context) (count int, err error) 
 	db := d.DB.WithContext(ctx)
 	var count64 int64
 	if err := db.Model(&dbmodel.Controller{}).Count(&count64).Error; err != nil {
-		return -1, errors.E(dbError(err))
+		return -1, dbError(err)
 	}
 	return int(count64), nil
 }
