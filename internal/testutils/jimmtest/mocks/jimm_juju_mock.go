@@ -77,87 +77,87 @@ func (j *JujuManager) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 func (j *JujuManager) AddCloudToController(ctx context.Context, user *openfga.User, controllerName string, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
 	if j.AddCloudToController_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.AddCloudToController_(ctx, user, controllerName, tag, cloud, force)
 }
 func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) error {
 	if j.AddHostedCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.AddHostedCloud_(ctx, user, tag, cloud, force)
 }
 func (j *JujuManager) CopyCredential(ctx context.Context, originalUser *openfga.User, newUser *openfga.User, cred names.CloudCredentialTag) (names.CloudCredentialTag, []jujuparams.UpdateCredentialModelResult, error) {
 	if j.CopyCredential_ == nil {
-		return names.CloudCredentialTag{}, nil, errors.E(errors.CodeNotImplemented)
+		return names.CloudCredentialTag{}, nil, errors.New("not implemented")
 	}
 	return j.CopyCredential_(ctx, originalUser, newUser, cred)
 }
 func (j *JujuManager) DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
 	if j.DestroyOffer_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.DestroyOffer_(ctx, user, offerURL, force)
 }
 func (j *JujuManager) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	if j.FindApplicationOffers_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.FindApplicationOffers_(ctx, user, filters...)
 }
 func (j *JujuManager) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	if j.FindAuditEvents_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.FindAuditEvents_(ctx, user, filter)
 }
 func (j *JujuManager) ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 	if j.ForEachCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.ForEachCloud_(ctx, user, f)
 }
 
 func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 	if j.ForEachUserCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.ForEachUserCloud_(ctx, user, f)
 }
 func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel.Identity, ct names.CloudTag, f func(cred *dbmodel.CloudCredential) error) error {
 	if j.ForEachUserCloudCredential_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.ForEachUserCloudCredential_(ctx, u, ct, f)
 }
 
 func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.User, offerURL string) (*crossmodel.ApplicationOfferDetails, error) {
 	if j.GetApplicationOffer_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.GetApplicationOffer_(ctx, user, offerURL)
 }
 func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, user *openfga.User, details *jujuparams.ConsumeOfferDetails, v bakery.Version) error {
 	if j.GetApplicationOfferConsumeDetails_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.GetApplicationOfferConsumeDetails_(ctx, user, details, v)
 }
 func (j *JujuManager) GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error) {
 	if j.GetCloud_ == nil {
-		return dbmodel.Cloud{}, errors.E(errors.CodeNotImplemented)
+		return dbmodel.Cloud{}, errors.New("not implemented")
 	}
 	return j.GetCloud_(ctx, u, tag)
 }
 func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 	if j.GetCloudCredential_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.GetCloudCredential_(ctx, user, tag)
 }
 func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error) {
 	if j.GetCloudCredentialAttributes_ == nil {
-		return nil, nil, errors.E(errors.CodeNotImplemented)
+		return nil, nil, errors.New("not implemented")
 	}
 	return j.GetCloudCredentialAttributes_(ctx, u, cred, hidden)
 }
@@ -171,79 +171,79 @@ func (j *JujuManager) GetCredentialStore() jimmcreds.CredentialStore {
 
 func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {
 	if j.InitiateMigration_ == nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
+		return jujuparams.InitiateMigrationResult{}, errors.New("not implemented")
 	}
 	return j.InitiateMigration_(ctx, user, spec)
 }
 func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
 	if j.InitiateInternalMigration_ == nil {
-		return jujuparams.InitiateMigrationResult{}, errors.E(errors.CodeNotImplemented)
+		return jujuparams.InitiateMigrationResult{}, errors.New("not implemented")
 	}
 	return j.InitiateInternalMigration_(ctx, user, modelNameOrUUID, targetController)
 }
 func (j *JujuManager) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	if j.ListApplicationOffers_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ListApplicationOffers_(ctx, user, filters...)
 }
 func (j *JujuManager) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error) {
 	if j.ListResources_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ListResources_(ctx, user, filter, namePrefixFilter, typeFilter)
 }
 func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer juju.AddApplicationOfferParams) error {
 	if j.Offer_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.Offer_(ctx, user, offer)
 }
 func (j *JujuManager) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	if j.PurgeLogs_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return j.PurgeLogs_(ctx, user, before)
 }
 func (j *JujuManager) RemoveCloud(ctx context.Context, u *openfga.User, ct names.CloudTag) error {
 	if j.RemoveCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RemoveCloud_(ctx, u, ct)
 }
 func (j *JujuManager) RemoveCloudFromController(ctx context.Context, u *openfga.User, controllerName string, ct names.CloudTag) error {
 	if j.RemoveCloudFromController_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RemoveCloudFromController_(ctx, u, controllerName, ct)
 }
 func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error {
 	if j.RevokeCloudCredential_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RevokeCloudCredential_(ctx, user, tag)
 }
 func (j *JujuManager) UpdateApplicationOffer(ctx context.Context, controller *dbmodel.Controller, offerUUID string, removed bool) error {
 	if j.UpdateApplicationOffer_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.UpdateApplicationOffer_(ctx, controller, offerUUID, removed)
 }
 func (j *JujuManager) UpdateCloud(ctx context.Context, u *openfga.User, ct names.CloudTag, cloud jujucloud.Cloud) error {
 	if j.UpdateCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.UpdateCloud_(ctx, u, ct, cloud)
 }
 func (j *JujuManager) UpdateCloudCredential(ctx context.Context, u *openfga.User, args juju.UpdateCloudCredentialArgs) ([]jujuparams.UpdateCredentialModelResult, error) {
 	if j.UpdateCloudCredential_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.UpdateCloudCredential_(ctx, u, args)
 }
 func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]base.UserModel, error) {
 	if j.ListModels_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ListModels_(ctx, user)
 }
@@ -255,28 +255,28 @@ func (j *JujuManager) UpdateMetrics(ctx context.Context) {
 }
 func (j *JujuManager) PollModels(ctx context.Context) error {
 	if j.PollModels_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.PollModels_(ctx)
 }
 
 func (j *JujuManager) GrantOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {
 	if j.GrantOfferAccessOnController_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.GrantOfferAccessOnController_(ctx, user, ut, offerURL, access)
 }
 
 func (j *JujuManager) RevokeOfferAccessOnController(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error {
 	if j.RevokeOfferAccessOnController_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RevokeOfferAccessOnController_(ctx, user, ut, offerURL, access)
 }
 
 func (j *JujuManager) PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error) {
 	if j.PrepareModelMigration_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.New("not implemented")
 	}
 	return j.PrepareModelMigration_(ctx, user, modelUUID, targetControllerName, userMapping)
 }
@@ -290,7 +290,7 @@ func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
 
 func (j *JujuManager) ModelControllerInfo(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*params.ModelControllerInfo, error) {
 	if j.ModelControllerInfo_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ModelControllerInfo_(ctx, user, qualifier)
 }

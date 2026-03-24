@@ -26,13 +26,13 @@ func (j *AuditLogManager) AddAuditLogEntry(ale *dbmodel.AuditLogEntry) {
 }
 func (j *AuditLogManager) FindAuditEvents(ctx context.Context, user *openfga.User, filter db.AuditLogFilter) ([]dbmodel.AuditLogEntry, error) {
 	if j.FindAuditEvents_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.FindAuditEvents_(ctx, user, filter)
 }
 func (j *AuditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	if j.PurgeLogs_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return j.PurgeLogs_(ctx, user, before)
 }

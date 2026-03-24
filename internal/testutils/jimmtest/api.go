@@ -176,7 +176,7 @@ type API struct {
 
 func (a *API) Activate(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error {
 	if a.Activate_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.Activate_(modelUUID, sourceInfo, relatedModels)
 }
@@ -184,35 +184,35 @@ func (a *API) Activate(modelUUID string, sourceInfo coremigration.SourceControll
 // Abort aborts the current operation on the controller.
 func (a *API) Abort(modelUUID string) error {
 	if a.Abort_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.Abort_(modelUUID)
 }
 
 func (a *API) AddCloud(tag names.CloudTag, cld jujucloud.Cloud, force bool) error {
 	if a.AddCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.AddCloud_(tag, cld, force)
 }
 
 func (a *API) AdoptResources(modelUUID string, controllerVersion version.Number) error {
 	if a.AdoptResources_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.AdoptResources_(modelUUID, controllerVersion)
 }
 
 func (a *API) CheckCredentialModels(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 	if a.CheckCredentialModels_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.CheckCredentialModels_(ctx, cred)
 }
 
 func (a *API) CheckMachines(modelUUID string) ([]error, error) {
 	if a.CheckMachines_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.CheckMachines_(modelUUID)
 }
@@ -226,91 +226,91 @@ func (a *API) Close() error {
 
 func (a *API) Cloud(tag names.CloudTag) (jujucloud.Cloud, error) {
 	if a.Cloud_ == nil {
-		return jujucloud.Cloud{}, errors.E(errors.CodeNotImplemented)
+		return jujucloud.Cloud{}, errors.New("not implemented")
 	}
 	return a.Cloud_(tag)
 }
 
 func (a *API) Clouds() (map[names.CloudTag]jujucloud.Cloud, error) {
 	if a.Clouds_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.Clouds_()
 }
 
 func (a *API) CloudSpec(ctx context.Context) (cloudspec.CloudSpec, error) {
 	if a.CloudSpec_ == nil {
-		return cloudspec.CloudSpec{}, errors.E(errors.CodeNotImplemented)
+		return cloudspec.CloudSpec{}, errors.New("not implemented")
 	}
 	return a.CloudSpec_(ctx)
 }
 
 func (a *API) ControllerConfig(ctx context.Context) (jujucontroller.Config, error) {
 	if a.ControllerConfig_ == nil {
-		return jujucontroller.Config{}, errors.E(errors.CodeNotImplemented)
+		return jujucontroller.Config{}, errors.New("not implemented")
 	}
 	return a.ControllerConfig_(ctx)
 }
 
 func (a *API) CreateModel(ctx context.Context, args *jujuclient.CreateModelArgs) (base.ModelInfo, error) {
 	if a.CreateModel_ == nil {
-		return base.ModelInfo{}, errors.E(errors.CodeNotImplemented)
+		return base.ModelInfo{}, errors.New("not implemented")
 	}
 	return a.CreateModel_(ctx, args)
 }
 
 func (a *API) DestroyApplicationOffer(ctx context.Context, offerURL string, force bool) error {
 	if a.DestroyApplicationOffer_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.DestroyApplicationOffer_(ctx, offerURL, force)
 }
 
 func (a *API) DestroyModel(ctx context.Context, tag names.ModelTag, destroyStorage *bool, force *bool, maxWait, timeout *time.Duration) error {
 	if a.DestroyModel_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.DestroyModel_(ctx, tag, destroyStorage, force, maxWait, timeout)
 }
 
 func (a *API) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
 	if a.DumpModel_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.DumpModel_(ctx, tag, simplified)
 }
 
 func (a *API) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
 	if a.DumpModelDB_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.DumpModelDB_(ctx, tag)
 }
 
 func (a *API) FindApplicationOffers(ctx context.Context, f []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	if a.FindApplicationOffers_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.FindApplicationOffers_(ctx, f)
 }
 
 func (a *API) GetApplicationOffer(ctx context.Context, urlStr string) (*crossmodel.ApplicationOfferDetails, error) {
 	if a.GetApplicationOffer_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.GetApplicationOffer_(ctx, urlStr)
 }
 
 func (a *API) GetApplicationOfferConsumeDetails(ctx context.Context, url string) (jujuparams.ConsumeOfferDetails, error) {
 	if a.GetApplicationOfferConsumeDetails_ == nil {
-		return jujuparams.ConsumeOfferDetails{}, errors.E(errors.CodeNotImplemented)
+		return jujuparams.ConsumeOfferDetails{}, errors.New("not implemented")
 	}
 	return a.GetApplicationOfferConsumeDetails_(ctx, url)
 }
 
 func (a *API) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag) error {
 	if a.GrantJIMMModelAdmin_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.GrantJIMMModelAdmin_(ctx, tag)
 }
@@ -321,42 +321,42 @@ func (a *API) IsBroken() bool {
 
 func (a *API) ListApplicationOffers(ctx context.Context, f []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 	if a.ListApplicationOffers_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.ListApplicationOffers_(ctx, f)
 }
 
 func (a *API) ModelInfo(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 	if a.ModelInfo_ == nil {
-		return jujuclient.ModelInfo{}, errors.E(errors.CodeNotImplemented)
+		return jujuclient.ModelInfo{}, errors.New("not implemented")
 	}
 	return a.ModelInfo_(ctx, model)
 }
 
 func (a *API) ModelStatus(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
 	if a.ModelStatus_ == nil {
-		return base.ModelStatus{}, errors.E(errors.CodeNotImplemented)
+		return base.ModelStatus{}, errors.New("not implemented")
 	}
 	return a.ModelStatus_(ctx, modelTag)
 }
 
 func (a *API) LatestLogTime(modelUUID string) (time.Time, error) {
 	if a.LatestLogTime_ == nil {
-		return time.Time{}, errors.E(errors.CodeNotImplemented)
+		return time.Time{}, errors.New("not implemented")
 	}
 	return a.LatestLogTime_(modelUUID)
 }
 
 func (a *API) ListModelSummaries(ctx context.Context, ms jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error) {
 	if a.ListModelSummaries_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.ListModelSummaries_(ctx, ms)
 }
 
 func (a *API) Offer(ctx context.Context, offer jujuclient.OfferParams) error {
 	if a.Offer_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.Offer_(ctx, offer)
 }
@@ -370,21 +370,21 @@ func (a *API) Ping(ctx context.Context) error {
 
 func (a *API) Prechecks(model jujuparams.MigrationModelInfo) error {
 	if a.Prechecks_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.Prechecks_(model)
 }
 
 func (a *API) RemoveCloud(tag names.CloudTag) error {
 	if a.RemoveCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.RemoveCloud_(tag)
 }
 
 func (a *API) RevokeCredential(ctx context.Context, tag names.CloudCredentialTag) error {
 	if a.RevokeCredential_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.RevokeCredential_(ctx, tag)
 }
@@ -395,91 +395,91 @@ func (a *API) SupportsModelSummaryWatcher() bool {
 
 func (a *API) Status(ctx context.Context, patterns []string) (*jujuparams.FullStatus, error) {
 	if a.Status_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.Status_(ctx, patterns)
 }
 
 func (a *API) UpdateCloud(tag names.CloudTag, cloud jujucloud.Cloud) error {
 	if a.UpdateCloud_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.UpdateCloud_(tag, cloud)
 }
 
 func (a *API) UpdateCloudsCredentialForce(ctx context.Context, cred jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
 	if a.UpdateCloudsCredentialForce_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.UpdateCloudsCredentialForce_(ctx, cred)
 }
 
 func (a *API) ValidateModelUpgrade(ctx context.Context, model names.ModelTag, force bool) error {
 	if a.ValidateModelUpgrade_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.ValidateModelUpgrade_(ctx, model, force)
 }
 
 func (a *API) WatchAllModelSummaries(ctx context.Context) (jujuclient.SummaryWatcher, error) {
 	if a.WatchAllModelSummaries_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.WatchAllModelSummaries_(ctx)
 }
 
 func (a *API) ChangeModelCredential(ctx context.Context, model names.ModelTag, credential names.CloudCredentialTag) error {
 	if a.ChangeModelCredential_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.ChangeModelCredential_(ctx, model, credential)
 }
 
 func (a *API) ListFilesystems(ctx context.Context, machines []string) ([]jujuparams.FilesystemDetailsListResult, error) {
 	if a.ListFilesystems_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.ListFilesystems_(ctx, machines)
 }
 
 func (a *API) ListVolumes(ctx context.Context, machines []string) ([]jujuparams.VolumeDetailsListResult, error) {
 	if a.ListVolumes_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.ListVolumes_(ctx, machines)
 }
 
 func (a *API) ListStorageDetails(ctx context.Context) ([]jujuparams.StorageDetails, error) {
 	if a.ListStorageDetails_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.ListStorageDetails_(ctx)
 }
 
 func (a *API) ListModels(ctx context.Context) ([]base.UserModel, error) {
 	if a.ListModels_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.ListModels_(ctx)
 }
 
 func (a *API) Import(bytes []byte) error {
 	if a.Import_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return a.Import_(bytes)
 }
 
 func (a *API) CredentialContents(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {
 	if a.CredentialContents_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return a.CredentialContents(cloud, credential, withSecrets)
 }
 
 func (a *API) UpgradeModel(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error) {
 	if a.UpgradeModel_ == nil {
-		return version.Number{}, errors.E(errors.CodeNotImplemented)
+		return version.Number{}, errors.New("not implemented")
 	}
 	return a.UpgradeModel_(modelUUID, targetVersion, stream, ignoreAgentVersions, dryRun)
 }

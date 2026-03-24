@@ -19,19 +19,19 @@ type IdentityManager struct {
 
 func (i *IdentityManager) FetchIdentity(ctx context.Context, id string) (*openfga.User, error) {
 	if i.FetchIdentity_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return i.FetchIdentity_(ctx, id)
 }
 func (i *IdentityManager) ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
 	if i.ListIdentities_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return i.ListIdentities_(ctx, user, pagination, match)
 }
 func (i *IdentityManager) CountIdentities(ctx context.Context, user *openfga.User) (int, error) {
 	if i.CountIdentities_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return i.CountIdentities_(ctx, user)
 }

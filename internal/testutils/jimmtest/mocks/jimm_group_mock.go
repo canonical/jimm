@@ -29,49 +29,49 @@ type GroupManager struct {
 
 func (j *GroupManager) AddGroup(ctx context.Context, u *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	if j.AddGroup_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.AddGroup_(ctx, u, name)
 }
 
 func (j *GroupManager) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
 	if j.CountGroups_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return j.CountGroups_(ctx, user)
 }
 
 func (j *GroupManager) GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
 	if j.GetGroupByUUID_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.GetGroupByUUID_(ctx, user, uuid)
 }
 
 func (j *GroupManager) GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 	if j.GetGroupByName_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.GetGroupByName_(ctx, user, name)
 }
 
 func (j *GroupManager) ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
 	if j.ListGroups_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ListGroups_(ctx, user, pagination, match)
 }
 
 func (j *GroupManager) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {
 	if j.RemoveGroup_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RemoveGroup_(ctx, user, name)
 }
 
 func (j *GroupManager) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
 	if j.RenameGroup_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RenameGroup_(ctx, user, oldName, newName)
 }

@@ -48,147 +48,147 @@ type PermissionManager struct {
 
 func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	if j.AddRelation_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.AddRelation_(ctx, user, tuples)
 }
 
 func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	if j.RemoveRelation_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RemoveRelation_(ctx, user, tuples)
 }
 
 func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
 	if j.CheckRelation_ == nil {
-		return false, errors.E(errors.CodeNotImplemented)
+		return false, errors.New("not implemented")
 	}
 	return j.CheckRelation_(ctx, user, tuple, trace)
 }
 
 func (j *PermissionManager) CheckRelations(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) ([]openfga.CheckResult, error) {
 	if j.CheckRelations_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.CheckRelations_(ctx, user, tuples)
 }
 
 func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 	if j.ListRelationshipTuples_ == nil {
-		return []openfga.Tuple{}, "", errors.E(errors.CodeNotImplemented)
+		return []openfga.Tuple{}, "", errors.New("not implemented")
 	}
 	return j.ListRelationshipTuples_(ctx, user, tuple, pageSize, continuationToken)
 }
 
 func (j *PermissionManager) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
 	if j.ListObjectRelations_ == nil {
-		return []openfga.Tuple{}, pagination.EntitlementToken{}, errors.E(errors.CodeNotImplemented)
+		return []openfga.Tuple{}, pagination.EntitlementToken{}, errors.New("not implemented")
 	}
 	return j.ListObjectRelations_(ctx, user, object, pageSize, entitlementToken)
 }
 
 func (j *PermissionManager) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error) {
 	if j.ListResources_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ListResources_(ctx, user, filter, namePrefixFilter, typeFilter)
 }
 
 func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *openfga.User, tag names.UserTag) (string, error) {
 	if j.GetJimmControllerAccess_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.New("not implemented")
 	}
 	return j.GetJimmControllerAccess_(ctx, user, tag)
 }
 
 func (j *PermissionManager) GetUserCloudAccess(ctx context.Context, user *openfga.User, cloud names.CloudTag) (string, error) {
 	if j.GetUserCloudAccess_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.New("not implemented")
 	}
 	return j.GetUserCloudAccess_(ctx, user, cloud)
 }
 
 func (j *PermissionManager) GetUserControllerAccess(ctx context.Context, user *openfga.User, controller names.ControllerTag) (string, error) {
 	if j.GetUserControllerAccess_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.New("not implemented")
 	}
 	return j.GetUserControllerAccess_(ctx, user, controller)
 }
 
 func (j *PermissionManager) GetUserModelAccess(ctx context.Context, user *openfga.User, model names.ModelTag) (string, error) {
 	if j.GetUserModelAccess_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.New("not implemented")
 	}
 	return j.GetUserModelAccess_(ctx, user, model)
 }
 
 func (j *PermissionManager) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 	if j.GrantAuditLogAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.GrantAuditLogAccess_(ctx, user, targetUserTag)
 }
 
 func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	if j.GrantCloudAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.GrantCloudAccess_(ctx, user, ct, ut, access)
 }
 
 func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	if j.GrantModelAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.GrantModelAccess_(ctx, user, mt, ut, access)
 }
 
 func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) error {
 	if j.GrantOfferAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.GrantOfferAccess_(ctx, user, offerURL, ut, access)
 }
 
 func (j *PermissionManager) RevokeAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 	if j.RevokeAuditLogAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RevokeAuditLogAccess_(ctx, user, targetUserTag)
 }
 
 func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga.User, ct names.CloudTag, ut names.UserTag, access string) error {
 	if j.RevokeCloudAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RevokeCloudAccess_(ctx, user, ct, ut, access)
 }
 
 func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	if j.RevokeModelAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RevokeModelAccess_(ctx, user, mt, ut, access)
 }
 
 func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga.User, offerURL string, ut names.UserTag, access jujuparams.OfferAccessPermission) (err error) {
 	if j.RevokeOfferAccess_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RevokeOfferAccess_(ctx, user, offerURL, ut, access)
 }
 
 func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, resolveUUIDs bool) (string, error) {
 	if j.ToJAASTag_ == nil {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.New("not implemented")
 	}
 	return j.ToJAASTag_(ctx, tag, resolveUUIDs)
 }
 
 func (j *PermissionManager) OpenFGACleanup(ctx context.Context) error {
 	if j.OpenFGACleanup_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.OpenFGACleanup_(ctx)
 }

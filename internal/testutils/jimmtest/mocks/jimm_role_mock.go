@@ -24,49 +24,49 @@ type RoleManager struct {
 
 func (j RoleManager) AddRole(ctx context.Context, u *openfga.User, name string) (*dbmodel.RoleEntry, error) {
 	if j.AddRole_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.AddRole_(ctx, u, name)
 }
 
 func (j RoleManager) CountRoles(ctx context.Context, user *openfga.User) (int, error) {
 	if j.CountRoles_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return j.CountRoles_(ctx, user)
 }
 
 func (j RoleManager) GetRoleByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.RoleEntry, error) {
 	if j.GetRoleByUUID_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.GetRoleByUUID_(ctx, user, uuid)
 }
 
 func (j RoleManager) GetRoleByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.RoleEntry, error) {
 	if j.GetRoleByName_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.GetRoleByName_(ctx, user, name)
 }
 
 func (j RoleManager) ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error) {
 	if j.ListRoles_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.ListRoles_(ctx, user, pagination, match)
 }
 
 func (j RoleManager) RemoveRole(ctx context.Context, user *openfga.User, name string) error {
 	if j.RemoveRole_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RemoveRole_(ctx, user, name)
 }
 
 func (j RoleManager) RenameRole(ctx context.Context, user *openfga.User, oldName, newName string) error {
 	if j.RenameRole_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return j.RenameRole_(ctx, user, oldName, newName)
 }

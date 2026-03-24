@@ -17,14 +17,14 @@ type JobManager struct {
 
 func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error) {
 	if j.GetJobInfo_ == nil {
-		return jobs.JobInfo{}, errors.E(errors.CodeNotImplemented)
+		return jobs.JobInfo{}, errors.New("not implemented")
 	}
 	return j.GetJobInfo_(ctx, jobID)
 }
 
 func (j *JobManager) ListJobs(ctx context.Context, req params.ListJobsRequest) (params.ListJobsResponse, error) {
 	if j.ListJobs_ == nil {
-		return params.ListJobsResponse{}, errors.E(errors.CodeNotImplemented)
+		return params.ListJobsResponse{}, errors.New("not implemented")
 	}
 	return j.ListJobs_(ctx, req)
 }

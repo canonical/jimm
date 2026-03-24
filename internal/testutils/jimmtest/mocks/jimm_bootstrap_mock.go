@@ -23,49 +23,49 @@ type BootstapManager struct {
 
 func (b *BootstapManager) GetJobInfo(ctx context.Context, user *openfga.User, jobId int64, offset int) (params.GetBootstrapInfoResponse, error) {
 	if b.GetJobInfo_ == nil {
-		return params.GetBootstrapInfoResponse{}, errors.E(errors.CodeNotImplemented)
+		return params.GetBootstrapInfoResponse{}, errors.New("not implemented")
 	}
 	return b.GetJobInfo_(ctx, user, jobId, offset)
 }
 
 func (b *BootstapManager) StopJob(ctx context.Context, user *openfga.User, jobId int64) error {
 	if b.StopJob_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return b.StopJob_(ctx, user, jobId)
 }
 
 func (b *BootstapManager) StartBootstrapJob(ctx context.Context, user *openfga.User, params bootstrap.BootstrapParams) (int64, error) {
 	if b.StartBootstrapJob_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return b.StartBootstrapJob_(ctx, user, params)
 }
 
 func (b *BootstapManager) StartDestroyControllerJob(ctx context.Context, user *openfga.User, params bootstrap.DestroyControllerParams) (int64, error) {
 	if b.StartDestroyControllerJob_ == nil {
-		return 0, errors.E(errors.CodeNotImplemented)
+		return 0, errors.New("not implemented")
 	}
 	return b.StartDestroyControllerJob_(ctx, user, params)
 }
 
 func (b *BootstapManager) WaitForJobCompletion(ctx context.Context, jobId int64, config bootstrap.WaitConfig) error {
 	if b.WaitForJobCompletion_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return b.WaitForJobCompletion_(ctx, jobId, config)
 }
 
 func (b *BootstapManager) BootstrapController(ctx context.Context, p bootstrap.RunBootstrapArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error {
 	if b.BootstrapController_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return b.BootstrapController_(ctx, p, cmdFactory, user)
 }
 
 func (b *BootstapManager) DestroyController(ctx context.Context, p bootstrap.RunDestroyControllerArgs, cmdFactory bootstrap.CommandFactory, user *openfga.User) error {
 	if b.DestroyController_ == nil {
-		return errors.E(errors.CodeNotImplemented)
+		return errors.New("not implemented")
 	}
 	return b.DestroyController_(ctx, p, cmdFactory, user)
 }

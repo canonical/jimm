@@ -14,7 +14,7 @@ type JWTService struct {
 
 func (j JWTService) NewJWT(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
 	if j.NewJWT_ == nil {
-		return nil, errors.E(errors.CodeNotImplemented)
+		return nil, errors.New("not implemented")
 	}
 	return j.NewJWT_(ctx, params)
 }
