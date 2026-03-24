@@ -127,7 +127,7 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return ControllerConnectionDetails{}, errors.E(errors.CodeNotFound, fmt.Sprintf("migrating model %q not found", modelUUID))
+			return ControllerConnectionDetails{}, errors.MsgWithCode(fmt.Sprintf("migrating model %q not found", modelUUID), errors.CodeNotFound)
 		}
 		return ControllerConnectionDetails{}, fmt.Errorf("failed to get controller for model %q: %w", modelUUID, err)
 	}
@@ -138,7 +138,7 @@ func (j *JujuManager) ControllerDetailsForIncomingModel(ctx context.Context, mod
 	}
 
 	if username == "" || password == "" {
-		return ControllerConnectionDetails{}, errors.E(errors.CodeNotFound, fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name))
+		return ControllerConnectionDetails{}, errors.ErrWithCode(fmt.Errorf("missing credentials for controller %q", incomingModel.TargetController.Name), errors.CodeNotFound)
 	}
 
 	return toControllerConnectionDetails(incomingModel.TargetController, username, password), nil

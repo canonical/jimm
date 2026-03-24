@@ -5,11 +5,8 @@ package errors
 
 import (
 	stderr "errors"
-	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/zaputil/zapctx"
-	"go.uber.org/zap"
 
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -65,58 +62,20 @@ func New(text string) error {
 	return stderr.New(text)
 }
 
-// E constructs errors for use throughout the JIMM application. An error
-// is constructed by processing the given arguments. The meaning of the
-// arguments is as follows:
-//
-//	errors.Code - string code classifying the error.
-//	error       - underlying error that caused the new error.
-//	string      - A human readable message describing the error.
-//
-// E will panic if no arguments are provided.
-func E(args ...interface{}) error {
-	if len(args) == 0 {
-		panic("call to errors.E with no arguments")
+// ErrWithCode constructs an error with an explicit code.
+func ErrWithCode(err error, code Code) error {
+	return &Error{
+		Code: code,
+		Err:  err,
 	}
-	var setCode bool
-	var setInfo bool
-	var e Error
-	for _, arg := range args {
-		switch v := arg.(type) {
-		case Code:
-			setCode = true
-			e.Code = v
-		case error:
-			e.Err = v
-		case string:
-			e.Message = v
-		case map[string]any:
-			setInfo = true
-			e.Info = v
-		default:
-			zapctx.Default.DPanic("unknown type passed to errors.E", zap.String("type", fmt.Sprintf("%T", arg)), zap.Any("value", arg))
-			return fmt.Errorf("unknown type (%T) passed to errors.E", arg)
-		}
-	}
-	if setCode {
-		return &e
-	}
+}
 
-	// If the caller didn't explicitly set the code/info for this error, attempt
-	// to copy the code/info from the wrapped error. The interface used to
-	// extract the details is compatible with both the Error type and juju
-	// API Error types.
-	if !setCode {
-		if code := ErrorCode(e.Err); code != "" {
-			e.Code = code
-		}
+// MsgWithCode constructs an error with a message and an explicit code.
+func MsgWithCode(msg string, code Code) error {
+	return &Error{
+		Code:    code,
+		Message: msg,
 	}
-	if !setInfo {
-		if info := ErrorInfo(e.Err); info != nil {
-			e.Info = info
-		}
-	}
-	return &e
 }
 
 // A Code is a code which describes the class of error. Where possible

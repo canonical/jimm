@@ -29,7 +29,7 @@ func (j *JujuManager) everyoneUser() *openfga.User {
 // checkJimmAdmin checks if the user is a JIMM admin.
 func (j *JujuManager) checkJimmAdmin(user *openfga.User) error {
 	if !user.JimmAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 	return nil
 }
@@ -41,7 +41,7 @@ func (j *JujuManager) checkControllerAdminAccess(ctx context.Context, user *open
 		return err
 	}
 	if !isAdministrator {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 	return nil
 }
@@ -55,7 +55,7 @@ func (j *JujuManager) getControllerByName(ctx context.Context, controllerName st
 	controller := dbmodel.Controller{Name: controllerName}
 	err := j.Database.GetController(ctx, &controller)
 	if err != nil {
-		return nil, errors.E(errors.CodeNotFound, "controller not found")
+		return nil, errors.MsgWithCode("controller not found", errors.CodeNotFound)
 	}
 	return &controller, nil
 }

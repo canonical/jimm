@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
@@ -31,7 +30,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId int64, logLine string) (
 	return d.Transaction(func(d *Database) error {
 		// Blocks all other operations, including reads, writes, and other locks.
 		if err := d.DB.Exec(jobLoglockQuery).Error; err != nil {
-			return errors.E("failed to lock job_logs table", err)
+			return fmt.Errorf("failed to lock job_logs table: %w", err)
 		}
 
 		// Get the current line number for this job.
@@ -42,7 +41,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId int64, logLine string) (
 			Select("COALESCE(MAX(line_number), 0)").
 			Scan(&currentLineNumber).Error
 		if err != nil {
-			return errors.E("failed to get current line number", err)
+			return fmt.Errorf("failed to get current line number: %w", err)
 		}
 
 		nextLineNumber := currentLineNumber + 1
@@ -103,7 +102,7 @@ func (d *Database) QueryJobLog(ctx context.Context, jobId int64, offset int) (lo
 			Select("COALESCE(MAX(line_number), 0)").
 			Scan(&currentLineNumber).Error
 		if err != nil {
-			return errors.E("failed to get current line number", err)
+			return fmt.Errorf("failed to get current line number: %w", err)
 		}
 
 		nextOffsetValue = currentLineNumber

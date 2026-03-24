@@ -196,7 +196,7 @@ func TestPrepareModelMigration_InvalidModelTag(t *testing.T) {
 		ModelTag: "blah",
 	})
 
-	c.Assert(err, qt.ErrorMatches, "invalid model tag")
+	c.Assert(err, qt.ErrorMatches, "invalid model tag.*")
 }
 
 func TestPrepareModelMigration_InvalidControllerName(t *testing.T) {
@@ -291,7 +291,7 @@ func TestBootstrapStatus(t *testing.T) {
 			return &mocks.BootstapManager{
 				GetJobInfo_: func(ctx context.Context, user *openfga.User, jobId int64, offset int) (apiparams.GetBootstrapInfoResponse, error) {
 					if jobId != expectedJobID {
-						return apiparams.GetBootstrapInfoResponse{}, errors.E(errors.CodeNotFound, "job not found")
+						return apiparams.GetBootstrapInfoResponse{}, errors.MsgWithCode("job not found", errors.CodeNotFound)
 					}
 					return apiparams.GetBootstrapInfoResponse{
 						Status: "running",
@@ -406,7 +406,7 @@ func TestBootstrapStop(t *testing.T) {
 			return &mocks.BootstapManager{
 				StopJob_: func(ctx context.Context, user *openfga.User, jobId int64) error {
 					if jobId != expectedJobID {
-						return errors.E(errors.CodeNotFound, "job not found")
+						return errors.MsgWithCode("job not found", errors.CodeNotFound)
 					}
 					return nil
 				},
@@ -743,7 +743,7 @@ func TestJobInfo(t *testing.T) {
 			return &mocks.JobManager{
 				GetJobInfo_: func(ctx context.Context, jobID int64) (jobs.JobInfo, error) {
 					if jobID != int64(1) {
-						return jobs.JobInfo{}, errors.E(errors.CodeNotFound, "job not found")
+						return jobs.JobInfo{}, errors.MsgWithCode("job not found", errors.CodeNotFound)
 					}
 					c.Check(jobID, qt.Equals, int64(1))
 					return jobs.JobInfo{
@@ -848,7 +848,7 @@ func TestListJobs(t *testing.T) {
 		JobManager_: func() jujuapi.JobManager {
 			return &mocks.JobManager{
 				ListJobs_: func(ctx context.Context, params apiparams.ListJobsRequest) (apiparams.ListJobsResponse, error) {
-					return apiparams.ListJobsResponse{}, errors.E(errors.CodeNotFound, "no jobs found")
+					return apiparams.ListJobsResponse{}, errors.MsgWithCode("no jobs found", errors.CodeNotFound)
 				},
 			}
 		},

@@ -31,7 +31,7 @@ func NewSSHKeyManager(store *db.Database) (*SSHKeyManager, error) {
 func (sm *SSHKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey PublicKey) error {
 
 	if ok, reason := publicKey.valid(); !ok {
-		return errors.E(errors.CodeBadRequest, reason)
+		return errors.MsgWithCode(reason, errors.CodeBadRequest)
 	}
 
 	k := dbmodel.SSHKey{

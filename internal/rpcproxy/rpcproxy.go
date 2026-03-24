@@ -335,7 +335,7 @@ func (p *modelProxy) auditLogMessage(msg *message, isResponse bool) error {
 		allErrors.Results = append(allErrors.Results, singleError)
 		jsonErr, err := json.Marshal(allErrors)
 		if err != nil {
-			return errors.E(err, "failed to marshal all errors")
+			return fmt.Errorf("failed to marshal all errors: %w", err)
 		}
 		ale.Errors = jsonErr
 	} else {
@@ -613,11 +613,11 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 
 	if p.anonymousLogin {
-		return errors.E(errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
+		return errors.MsgWithCode("Anonymous login does not support re-authentication", errors.CodeUnauthorized)
 	}
 	loginMsg := p.msgs.getLoginMessage()
 	if loginMsg == nil {
-		return errors.E(errors.CodeUnauthorized, "Haven't received login yet")
+		return errors.MsgWithCode("Haven't received login yet", errors.CodeUnauthorized)
 	}
 	err := addJWT(ctx, loginMsg, permissions, p.tokenGen)
 	if err != nil {
@@ -813,7 +813,7 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 			// return the client's login message verbatim to the controller.
 			return msg, nil
 		}
-		return nil, errors.E("JIMM does not support login from old clients", errors.CodeNotSupported)
+		return nil, errors.MsgWithCode("JIMM does not support login from old clients", errors.CodeNotSupported)
 	case names.ModelTag, names.MachineTag, names.UnitTag:
 		zapctx.Debug(ctx, "Legacy login request from agent", zap.String("tag", tag.String()))
 
@@ -828,11 +828,11 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 			Servers: redirectInfo.Addresses,
 			CACert:  redirectInfo.CACert,
 		}.AsMap()
-		errRedirect := errors.E(
-			errors.CodeRedirect,
-			"redirection to alternative server required",
-			info,
-		)
+		errRedirect := &errors.Error{
+			Code:    errors.CodeRedirect,
+			Message: "redirection to alternative server required",
+			Info:    info,
+		}
 
 		zapctx.Debug(ctx, "Redirecting agent to controller", zap.Any("servers", redirectInfo.Addresses))
 		return nil, errRedirect

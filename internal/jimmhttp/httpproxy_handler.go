@@ -69,13 +69,13 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 	modelUUID := chi.URLParam(req, "uuid")
 	if modelUUID == "" {
 		msg := "cannot parse model UUID from path"
-		writeError(ctx, w, http.StatusBadRequest, errors.E(msg), msg)
+		writeError(ctx, w, http.StatusBadRequest, errors.New(msg), msg)
 		return
 	}
 
 	if !names.IsValidModel(modelUUID) {
 		msg := "invalid model UUID format"
-		writeError(ctx, w, http.StatusBadRequest, errors.E(msg), msg)
+		writeError(ctx, w, http.StatusBadRequest, errors.New(msg), msg)
 		return
 	}
 

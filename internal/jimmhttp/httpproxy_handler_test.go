@@ -80,7 +80,7 @@ func TestHTTPProxyHandler(t *testing.T) {
 	ctrlService := mocks.ControllerService{
 		ControllerDetailsForModel_: func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error) {
 			if modelUUID != model.UUID.String {
-				return juju.ControllerConnectionDetails{}, errors.E(errors.CodeNotFound, "model not found")
+				return juju.ControllerConnectionDetails{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
 			}
 			return juju.ControllerConnectionDetails{
 				PublicAddress: fakeController.URL,

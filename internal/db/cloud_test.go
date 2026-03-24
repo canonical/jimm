@@ -87,7 +87,7 @@ func (s *dbSuite) TestGetCloud(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	err = s.Database.GetCloud(ctx, &cl)
-	c.Check(err, qt.ErrorMatches, `cloud "test-cloud" not found`)
+	c.Check(err, qt.ErrorMatches, `cloud "test-cloud" not found.*`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	cl2 := dbmodel.Cloud{
@@ -355,7 +355,7 @@ func (s *dbSuite) TestDeleteCloud(c *qt.C) {
 		Name: cl.Name,
 	}
 	err = s.Database.GetCloud(ctx, &cl2)
-	c.Check(err, qt.ErrorMatches, `cloud "test-cloud" not found`)
+	c.Check(err, qt.ErrorMatches, `cloud "test-cloud" not found.*`)
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 

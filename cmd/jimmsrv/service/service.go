@@ -416,7 +416,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 
 	if _, err := url.Parse(p.DashboardFinalRedirectURL); err != nil {
-		return nil, errors.E(err, "failed to parse final redirect url for the dashboard")
+		return nil, fmt.Errorf("failed to parse final redirect url for the dashboard: %w", err)
 	}
 
 	publicDNS, err := parseURLWithOptionalScheme(p.PublicDNSName)
@@ -445,7 +445,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 
 	if err := ensureControllerAdministrators(ctx, openFGAclient, controllerUUID, p.ControllerAdmins); err != nil {
-		return nil, errors.E(err, "failed to ensure controller admins")
+		return nil, fmt.Errorf("failed to ensure controller admins: %w", err)
 	}
 
 	credentialStore, err := setupCredentialStore(ctx, p, db)
@@ -779,7 +779,7 @@ func openDB(ctx context.Context, dsn string, logSQL bool) (*gorm.DB, error) {
 	case strings.HasPrefix(dsn, "postgres:") || strings.HasPrefix(dsn, "postgresql:"):
 		dialect = postgres.Open(dsn)
 	default:
-		return nil, errors.E(errors.CodeServerConfiguration, "unsupported DSN")
+		return nil, errors.MsgWithCode("unsupported DSN", errors.CodeServerConfiguration)
 	}
 	return gorm.Open(dialect, &gorm.Config{
 		Logger: &logger.GormLogger{LogSQL: logSQL},

@@ -119,7 +119,7 @@ func TestModelCreateArgs(t *testing.T) {
 				c.Assert(err, qt.IsNil)
 				c.Assert(a, qt.CmpEquals(opts...), test.expectedArgs)
 			} else {
-				c.Assert(err, qt.ErrorMatches, test.expectedError)
+				c.Assert(err, qt.ErrorMatches, test.expectedError+".*")
 			}
 		})
 	}
@@ -325,7 +325,7 @@ func TestToFullModelInfo(t *testing.T) {
 			NumSecrets: 7,
 			Status:     "available",
 			Message:    "ready",
-			Error:      errors.E("backend warning", errors.CodeBadRequest),
+			Error:      errors.MsgWithCode("backend warning", errors.CodeBadRequest),
 		}},
 	}
 
@@ -417,7 +417,7 @@ func TestToFullModelInfoNonNilSecretBackendError(t *testing.T) {
 				Name:        "vault",
 				BackendType: "vault",
 			},
-			Error: errors.E("an error", errors.CodeNotFound, map[string]any{"detail": "not found"}),
+			Error: &errors.Error{Code: errors.CodeNotFound, Message: "an error", Info: map[string]any{"detail": "not found"}},
 		}},
 	}
 

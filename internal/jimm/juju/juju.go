@@ -81,7 +81,7 @@ func NewJujuManager(
 // code of CodeConnectionFailed will be returned.
 func (j *JujuManager) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (API, error) {
 	if j == nil || j.Dialer == nil {
-		return nil, errors.E(errors.CodeConnectionFailed, "no dialer configured")
+		return nil, errors.MsgWithCode("no dialer configured", errors.CodeConnectionFailed)
 	}
 
 	return j.Dialer.Dial(ctx, ctl, modelTag, user)

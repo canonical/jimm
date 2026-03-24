@@ -73,7 +73,7 @@ func (j *JobManager) ListJobs(ctx context.Context, req apiparams.ListJobsRequest
 		count = defaultListJobsCount
 	}
 	if count > maxListJobsCount {
-		return apiparams.ListJobsResponse{}, errors.E(errors.CodeBadRequest, fmt.Sprintf("count must be between 1 and %d.", maxListJobsCount))
+		return apiparams.ListJobsResponse{}, errors.MsgWithCode(fmt.Sprintf("count must be between 1 and %d.", maxListJobsCount), errors.CodeBadRequest)
 	}
 
 	p := river.NewJobListParams().First(count)
@@ -90,7 +90,7 @@ func (j *JobManager) ListJobs(ctx context.Context, req apiparams.ListJobsRequest
 	if req.Cursor != "" {
 		cursor := &river.JobListCursor{}
 		if err := cursor.UnmarshalText([]byte(req.Cursor)); err != nil {
-			return apiparams.ListJobsResponse{}, errors.E("invalid cursor: %w", err)
+			return apiparams.ListJobsResponse{}, fmt.Errorf("invalid cursor: %w", err)
 		}
 		p = p.After(cursor)
 	}
@@ -116,7 +116,7 @@ func (j *JobManager) ListJobs(ctx context.Context, req apiparams.ListJobsRequest
 	if jobListResult.LastCursor != nil {
 		cursorBytes, err := jobListResult.LastCursor.MarshalText()
 		if err != nil {
-			return apiparams.ListJobsResponse{}, errors.E("failed to marshal cursor: %w", err)
+			return apiparams.ListJobsResponse{}, fmt.Errorf("failed to marshal cursor: %w", err)
 		}
 		nextCursor = string(cursorBytes)
 	}
@@ -150,7 +150,7 @@ func convertJobStates(statuses []apiparams.JobStatus) ([]rivertype.JobState, err
 		case apiparams.StatusPending:
 			riverStates = append(riverStates, rivertype.JobStateAvailable, rivertype.JobStateScheduled)
 		default:
-			return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("invalid job status: %s", status))
+			return nil, errors.MsgWithCode(fmt.Sprintf("invalid job status: %s", status), errors.CodeBadRequest)
 		}
 	}
 

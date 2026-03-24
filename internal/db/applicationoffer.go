@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -58,7 +59,7 @@ func (d *Database) GetApplicationOffer(ctx context.Context, offer *dbmodel.Appli
 	if err := db.First(&offer).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(err, "application offer not found")
+			return fmt.Errorf("application offer not found: %w", err)
 		}
 		return err
 	}
@@ -91,7 +92,7 @@ func (d *Database) FindApplicationOffersByModel(ctx context.Context, modelName, 
 	const op = "db.FindApplicationOfferByModel"
 
 	if modelName == "" || modelOwner == "" {
-		return nil, errors.E(errors.CodeBadRequest, "model name or owner not specified")
+		return nil, errors.MsgWithCode("model name or owner not specified", errors.CodeBadRequest)
 	}
 	if err := d.ready(); err != nil {
 		return nil, err

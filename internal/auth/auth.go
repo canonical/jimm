@@ -174,7 +174,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, errors.E(errors.CodeServerConfiguration, fmt.Errorf("failed to create oidc provider: %v", err))
+		return nil, errors.ErrWithCode(fmt.Errorf("failed to create oidc provider: %v", err), errors.CodeServerConfiguration)
 	}
 
 	authSvc := &AuthenticationService{
@@ -223,7 +223,7 @@ func (as *AuthenticationService) AuthCodeURL() (string, string, error) {
 	b := make([]byte, 8)
 	_, err := rand.Read(b)
 	if err != nil {
-		return "", "", errors.E(fmt.Sprintf("failed to generate state secret: %s", err.Error()))
+		return "", "", errors.New(fmt.Sprintf("failed to generate state secret: %s", err.Error()))
 	}
 	state := base64.RawURLEncoding.EncodeToString(b)
 	return as.oauthConfig.AuthCodeURL(state), state, nil
@@ -397,24 +397,24 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 	}()
 
 	if len(token) == 0 {
-		return nil, errors.E(errors.CodeSessionTokenInvalid, "no token presented")
+		return nil, errors.MsgWithCode("no token presented", errors.CodeSessionTokenInvalid)
 	}
 
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
 	if err != nil {
-		return nil, errors.E(err, "failed to decode token")
+		return nil, fmt.Errorf("failed to decode token: %w", err)
 	}
 
 	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
 		if stderrors.Is(err, jwt.ErrTokenExpired()) {
-			return nil, errors.E(errors.CodeSessionTokenInvalid, "JIMM session token expired")
+			return nil, errors.MsgWithCode("JIMM session token expired", errors.CodeSessionTokenInvalid)
 		}
 		return nil, err
 	}
 
 	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
-		return nil, errors.E(errors.CodeSessionTokenInvalid, "failed to parse email")
+		return nil, errors.MsgWithCode("failed to parse email", errors.CodeSessionTokenInvalid)
 	}
 
 	return parsedToken, nil
@@ -472,7 +472,7 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 
 	_, err = cfg.Token(ctx)
 	if err != nil {
-		return errors.E(errors.CodeUnauthorized, fmt.Errorf("invalid client credentials: %v", err))
+		return errors.ErrWithCode(fmt.Errorf("invalid client credentials: %v", err), errors.CodeUnauthorized)
 	}
 	return nil
 }
@@ -534,7 +534,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return ctx, errors.E(errors.CodeForbidden, "session is missing identity key")
+		return ctx, errors.MsgWithCode("session is missing identity key", errors.CodeForbidden)
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)
@@ -572,7 +572,7 @@ func (as *AuthenticationService) Logout(ctx context.Context, w http.ResponseWrit
 
 	identityIdStr, ok := identityId.(string)
 	if !ok {
-		return errors.E(fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
+		return errors.New(fmt.Sprintf("session identity key could not be parsed: expected %T, got %T", identityIdStr, identityId))
 	}
 
 	if err := as.deleteSession(session, w, req); err != nil {
@@ -624,7 +624,7 @@ func (as *AuthenticationService) validateAndUpdateAccessToken(ctx context.Contex
 
 	emailStr, ok := email.(string)
 	if !ok {
-		return errors.E(fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
+		return errors.New(fmt.Sprintf("failed to cast email: got %T, expected %T", email, emailStr))
 	}
 
 	db := as.db
@@ -670,11 +670,11 @@ func (as *AuthenticationService) refreshIdentitiesToken(ctx context.Context, ema
 	// Get a new access and refresh token (token source only has Token())
 	newToken, err := tSrc.Token()
 	if err != nil {
-		return errors.E(err, fmt.Errorf("failed to refresh token: %w", err))
+		return fmt.Errorf("failed to refresh token: %w", err)
 	}
 
 	if err := as.UpdateIdentity(ctx, email, newToken); err != nil {
-		return errors.E(err, fmt.Errorf("failed to update identity: %w", err))
+		return fmt.Errorf("failed to update identity: %w", err)
 	}
 
 	return nil

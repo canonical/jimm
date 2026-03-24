@@ -31,5 +31,5 @@ func dbError(err error) error {
 		}
 	}
 
-	return errors.E(code, err)
+	return errors.ErrWithCode(err, code)
 }

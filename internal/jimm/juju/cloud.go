@@ -43,7 +43,7 @@ func (j *JujuManager) GetCloud(ctx context.Context, user *openfga.User, tag name
 
 	switch accessLevel {
 	case "":
-		return dbmodel.Cloud{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return dbmodel.Cloud{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	case "admin":
 		return cl, nil
 	default:
@@ -75,7 +75,7 @@ func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, 
 
 	clouds, err := j.Database.GetClouds(ctx)
 	if err != nil {
-		return errors.E(err, "cannot load clouds")
+		return fmt.Errorf("cannot load clouds: %w", err)
 	}
 	for _, cloud := range clouds {
 		userAccess := permissions.ToCloudAccessString(user.GetCloudAccess(ctx, cloud.ResourceTag()))
@@ -100,12 +100,12 @@ func (j *JujuManager) ForEachUserCloud(ctx context.Context, user *openfga.User, 
 func (j *JujuManager) ForEachCloud(ctx context.Context, user *openfga.User, f func(*dbmodel.Cloud) error) error {
 
 	if !user.JimmAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	clds, err := j.Database.GetClouds(ctx)
 	if err != nil {
-		return errors.E("cannot load clouds", err)
+		return fmt.Errorf("cannot load clouds: %w", err)
 	}
 
 	for i := range clds {
@@ -188,20 +188,20 @@ func (j *JujuManager) determineHostCloudRegion(ctx context.Context, hostCloudReg
 			Name: hostCloudRegion,
 		}
 		if err := j.Database.GetCloud(ctx, &cl); err != nil {
-			return nil, errors.E(errors.CodeNotFound, "unable to find host cloud %q", hostCloudRegion)
+			return nil, errors.MsgWithCode(fmt.Sprintf("unable to find host cloud %q", hostCloudRegion), errors.CodeNotFound)
 		}
 		if len(cl.Regions) > 1 {
-			return nil, errors.E(errors.CodeBadRequest, "unable to determine a unique region for host cloud %q - consider specifying the host cloud region", hostCloudRegion)
+			return nil, errors.MsgWithCode(fmt.Sprintf("unable to determine a unique region for host cloud %q - consider specifying the host cloud region", hostCloudRegion), errors.CodeBadRequest)
 		}
 		if len(cl.Regions) == 0 {
-			return nil, errors.E(errors.CodeBadRequest, "the host cloud %q does not have a valid region", hostCloudRegion)
+			return nil, errors.MsgWithCode(fmt.Sprintf("the host cloud %q does not have a valid region", hostCloudRegion), errors.CodeBadRequest)
 		}
 		return &cl.Regions[0], nil
 	}
 
 	parts := strings.Split(hostCloudRegion, "/")
 	if len(parts) != 2 || parts[0] == "" {
-		return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("invalid cloud/region format %q", hostCloudRegion))
+		return nil, errors.MsgWithCode(fmt.Sprintf("invalid cloud/region format %q", hostCloudRegion), errors.CodeBadRequest)
 	}
 
 	findRegionFunctions := []func(context.Context, string, string) (*dbmodel.CloudRegion, error){
@@ -219,7 +219,7 @@ func (j *JujuManager) determineHostCloudRegion(ctx context.Context, hostCloudReg
 	}
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil, errors.E(err, errors.CodeNotFound, fmt.Sprintf("unable to find cloud/region %q", hostCloudRegion))
+			return nil, errors.ErrWithCode(fmt.Errorf("%s: %w", fmt.Sprintf("unable to find cloud/region %q", hostCloudRegion), err), errors.CodeNotFound)
 		}
 		return nil, err
 	}
@@ -257,16 +257,16 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 	}
 	for _, n := range reservedNames {
 		if tag.Id() == n {
-			return errors.E(errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
+			return errors.MsgWithCode(fmt.Sprintf("cloud %q already exists", tag.Id()), errors.CodeAlreadyExists)
 		}
 	}
 
 	// Validate that the requested cloud is valid.
 	if cloud.Type != "kubernetes" {
-		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("unsupported cloud type %q", cloud.Type))
+		return errors.MsgWithCode(fmt.Sprintf("unsupported cloud type %q", cloud.Type), errors.CodeIncompatibleClouds)
 	}
 	if cloud.HostCloudRegion == "" {
-		return errors.E(errors.CodeCloudRegionRequired, "cloud host region not specified")
+		return errors.MsgWithCode("cloud host region not specified", errors.CodeCloudRegionRequired)
 	}
 
 	region, err := j.determineHostCloudRegion(ctx, cloud.HostCloudRegion)
@@ -277,7 +277,7 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 	if region.Cloud.HostCloudRegion != "" {
 		// Do not support creating a new cloud on an already hosted
 		// cloud.
-		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
+		return errors.MsgWithCode(fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion), errors.CodeIncompatibleClouds)
 	}
 
 	// Create the cloud locally, to reserve the name.
@@ -391,7 +391,7 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 	// Ensure we always have at least 1 region for the cloud with at least 1 controller
 	// managing that region.
@@ -400,7 +400,7 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 		if len(c.Regions) > 0 {
 			zapctx.Error(ctx, "number of controllers available for cloud/region", zap.Int("controllers", len(c.Regions[0].Controllers)))
 		}
-		return errors.E(fmt.Sprintf("cloud administration not available for %s", ct.Id()))
+		return errors.New(fmt.Sprintf("cloud administration not available for %s", ct.Id()))
 	}
 	api, err := j.dial(ctx, &c.Regions[0].Controllers[0].Controller, names.ModelTag{}, user)
 	if err != nil {
@@ -430,7 +430,7 @@ func (j *JujuManager) RemoveCloud(ctx context.Context, user *openfga.User, ct na
 		}
 
 		if err := j.Database.DeleteCloud(ctx, c); err != nil {
-			return errors.E(err, "cannot update database after updating controller")
+			return fmt.Errorf("cannot update database after updating controller: %w", err)
 		}
 
 		if err := j.OpenFGAClient.RemoveCloud(ctx, ct); err != nil {
@@ -464,7 +464,7 @@ func (j *JujuManager) UpdateCloud(ctx context.Context, user *openfga.User, ct na
 	if cloudAccess != "admin" {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	var controllers []dbmodel.Controller
@@ -532,12 +532,12 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 
 	isAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
 	if err != nil {
-		return errors.E(err, errors.CodeUnauthorized, "unauthorized")
+		return errors.ErrWithCode(fmt.Errorf("unauthorized: %w", err), errors.CodeUnauthorized)
 	}
 	if !isAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	controllers := make(map[string]dbmodel.Controller)
@@ -549,7 +549,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 
 	controller, ok := controllers[controllerName]
 	if !ok {
-		return errors.E("cloud not hosted by controller", errors.CodeNotFound)
+		return errors.MsgWithCode("cloud not hosted by controller", errors.CodeNotFound)
 	}
 
 	api, err := j.dial(ctx, &controller, names.ModelTag{}, user)
@@ -571,7 +571,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	// if this was the only cloud controller, we delete the cloud
 	if len(controllers) == 0 {
 		if err := j.Database.DeleteCloud(ctx, &cloud); err != nil {
-			return errors.E(err, "failed to delete cloud after updating controller")
+			return fmt.Errorf("failed to delete cloud after updating controller: %w", err)
 		}
 		return nil
 	}
@@ -582,7 +582,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 		for _, crp := range cr.Controllers {
 			crp := crp
 			if err := j.Database.DeleteCloudRegionControllerPriority(ctx, &crp); err != nil {
-				return errors.E(err, "cannot update database after updating controller")
+				return fmt.Errorf("cannot update database after updating controller: %w", err)
 			}
 		}
 	}
@@ -622,13 +622,13 @@ func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.Use
 
 	parts := strings.SplitN(cloud.HostCloudRegion, "/", 2)
 	if len(parts) != 2 || parts[0] == "" {
-		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion))
+		return errors.MsgWithCode(fmt.Sprintf("cloud host region %q has invalid cloud/region format", cloud.HostCloudRegion), errors.CodeIncompatibleClouds)
 	}
 
 	region, err := db.FindRegionByCloudType(ctx, parts[0], parts[1])
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion))
+			return errors.MsgWithCode(fmt.Sprintf("unable to find cloud/region %q", cloud.HostCloudRegion), errors.CodeIncompatibleClouds)
 		}
 		return err
 	}
@@ -638,11 +638,11 @@ func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.Use
 		return err
 	}
 	if !allowedAddModel {
-		return errors.E(errors.CodeUnauthorized, fmt.Sprintf("missing access to %q", cloud.HostCloudRegion))
+		return errors.MsgWithCode(fmt.Sprintf("missing access to %q", cloud.HostCloudRegion), errors.CodeUnauthorized)
 	}
 
 	if region.Cloud.HostCloudRegion != "" {
-		return errors.E(errors.CodeIncompatibleClouds, fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion))
+		return errors.MsgWithCode(fmt.Sprintf("cloud already hosted %q", cloud.HostCloudRegion), errors.CodeIncompatibleClouds)
 	}
 
 	for _, rc := range region.Controllers {
@@ -650,7 +650,7 @@ func validateCloudRegion(ctx context.Context, db *db.Database, user *openfga.Use
 			return nil
 		}
 	}
-	return errors.E(errors.CodeNotFound, "controller not found")
+	return errors.MsgWithCode("controller not found", errors.CodeNotFound)
 }
 
 // checkReservedCloudNames checks if the tag intended to be added to JIMM
@@ -662,7 +662,7 @@ func checkReservedCloudNames(tag names.CloudTag, reservedCloudNames []string) er
 	}
 	for _, n := range reservedNames {
 		if tag.Id() == n {
-			return errors.E(errors.CodeAlreadyExists, fmt.Sprintf("cloud %q already exists", tag.Id()))
+			return errors.MsgWithCode(fmt.Sprintf("cloud %q already exists", tag.Id()), errors.CodeAlreadyExists)
 		}
 	}
 	return nil

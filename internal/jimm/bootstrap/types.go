@@ -74,7 +74,7 @@ func (p BootstrapParams) validate() error {
 
 	// If there are validation errors, return them as a single error.
 	if msgs != nil {
-		return errors.E(fmt.Sprintf("invalid bootstrap parameters:\n%s", strings.Join(msgs, "\n")))
+		return errors.New(fmt.Sprintf("invalid bootstrap parameters:\n%s", strings.Join(msgs, "\n")))
 	}
 	return nil
 }

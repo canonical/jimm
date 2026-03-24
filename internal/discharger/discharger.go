@@ -4,6 +4,7 @@ package discharger
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -43,10 +44,10 @@ func NewMacaroonDischarger(cfg MacaroonDischargerConfig, db *db.Database, offerA
 		return nil, errors.New("missing bakery private/public key")
 	} else {
 		if err := kp.Private.UnmarshalText([]byte(cfg.PrivateKey)); err != nil {
-			return nil, errors.E(err, "cannot unmarshal private key")
+			return nil, fmt.Errorf("cannot unmarshal private key: %w", err)
 		}
 		if err := kp.Public.UnmarshalText([]byte(cfg.PublicKey)); err != nil {
-			return nil, errors.E(err, "cannot unmarshal public key")
+			return nil, fmt.Errorf("cannot unmarshal public key: %w", err)
 		}
 	}
 	if offerAuthorizer == nil {

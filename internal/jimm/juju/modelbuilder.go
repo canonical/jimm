@@ -162,16 +162,16 @@ func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
 	}
 	err := b.jujuManager.Database.GetController(b.ctx, &targetController)
 	if err != nil {
-		b.err = errors.E(err, fmt.Sprintf("controller %q not found", controllerName))
+		b.err = fmt.Errorf("%s: %w", fmt.Sprintf("controller %q not found", controllerName), err)
 		return b
 	}
 	ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, targetController.ResourceTag())
 	if err != nil {
-		b.err = errors.E(err, "failed to verify permissions for adding model to controller")
+		b.err = fmt.Errorf("failed to verify permissions for adding model to controller: %w", err)
 		return b
 	}
 	if !ok {
-		b.err = errors.E(errors.CodeUnauthorized, fmt.Sprintf("not authorized to add model to controller %q", controllerName))
+		b.err = errors.MsgWithCode(fmt.Sprintf("not authorized to add model to controller %q", controllerName), errors.CodeUnauthorized)
 		return b
 	}
 	b.candidates = append(b.candidates, candidateController{
@@ -249,11 +249,11 @@ func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *mode
 	}
 	ok, err := b.ofgaUser.IsAllowedAddModelToCloud(b.ctx, c.ResourceTag())
 	if err != nil {
-		b.err = errors.E(err, "failed to verify permissions for adding model to cloud")
+		b.err = fmt.Errorf("failed to verify permissions for adding model to cloud: %w", err)
 		return b
 	}
 	if !ok {
-		b.err = errors.E(errors.CodeUnauthorized, fmt.Sprintf("not authorized to add model to cloud %q", cloud.Id()))
+		b.err = errors.MsgWithCode(fmt.Sprintf("not authorized to add model to cloud %q", cloud.Id()), errors.CodeUnauthorized)
 		return b
 	}
 	b.cloud = &c
@@ -337,7 +337,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 	// If there is no such region we will get a zero valued object below.
 	cloudRegion := b.cloud.Region(region)
 	if cloudRegion.Name == "" {
-		b.err = errors.E(errors.CodeNotFound, fmt.Sprintf("cloud region %q not found in cloud %q", region, b.cloud.Name))
+		b.err = errors.MsgWithCode(fmt.Sprintf("cloud region %q not found in cloud %q", region, b.cloud.Name), errors.CodeNotFound)
 		return b
 	}
 	b.cloudRegion = region
@@ -368,7 +368,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 
 	// Verify ownership of cloud credential
 	if b.owner == nil || b.owner.Name != credentialTag.Owner().Id() {
-		b.err = errors.E("model owner doesn't match cloud-credential owner", errors.CodeUnauthorized)
+		b.err = errors.MsgWithCode("model owner doesn't match cloud-credential owner", errors.CodeUnauthorized)
 		return b
 	}
 
@@ -379,7 +379,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 	}
 	err := b.jujuManager.Database.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
-		b.err = errors.E(err, fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()))
+		b.err = fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()), err)
 	}
 	b.credential = &credential
 
@@ -434,7 +434,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	err := b.jujuManager.Database.AddModel(b.ctx, b.model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			b.err = errors.E(err, fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name))
+			b.err = fmt.Errorf("%s: %w", fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name), err)
 			return b
 		} else {
 			b.err = fmt.Errorf("failed to store model information: %w", err)
@@ -469,7 +469,7 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 	}
 	err := b.model.FromJujuModelInfo(b.modelInfo)
 	if err != nil {
-		b.err = errors.E(err, "failed to convert model info")
+		b.err = fmt.Errorf("failed to convert model info: %w", err)
 		return b
 	}
 	b.model.ControllerID = b.controller.ID
@@ -483,7 +483,7 @@ func (b *modelBuilder) UpdateDatabaseModel() *modelBuilder {
 
 	err = b.jujuManager.Database.UpdateModel(b.ctx, b.model)
 	if err != nil {
-		b.err = errors.E(err, "failed to store model information")
+		b.err = fmt.Errorf("failed to store model information: %w", err)
 		return b
 	}
 	return b
@@ -516,7 +516,7 @@ func (b *modelBuilder) selectCloudCredentials() error {
 	}
 	credentials, err := b.jujuManager.Database.GetIdentityCloudCredentials(b.ctx, b.owner, b.cloud.Name)
 	if err != nil {
-		return errors.E(err, "failed to fetch user cloud credentials")
+		return fmt.Errorf("failed to fetch user cloud credentials: %w", err)
 	}
 	for _, credential := range credentials {
 		// skip any credentials known to be invalid.
@@ -550,7 +550,7 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 
 	if b.credential != nil {
 		if err := b.updateCredential(b.ctx, api, b.credential); err != nil {
-			b.err = errors.E(fmt.Sprintf("failed to update cloud credential: %s", err), err)
+			b.err = fmt.Errorf("%s: %w", fmt.Sprintf("failed to update cloud credential: %s", err), err)
 			return b
 		}
 	}
@@ -574,14 +574,14 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			b.err = errors.E(err, errors.CodeAlreadyExists, "model name in use")
+			b.err = errors.ErrWithCode(fmt.Errorf("model name in use: %w", err), errors.CodeAlreadyExists)
 		case jujuparams.CodeUpgradeInProgress:
-			b.err = errors.E(err, "upgrade in progress")
+			b.err = fmt.Errorf("upgrade in progress: %w", err)
 		default:
 			// The model couldn't be created because of an
 			// error in the request, don't try another
 			// controller.
-			b.err = errors.E(err, errors.CodeBadRequest)
+			b.err = errors.ErrWithCode(err, errors.CodeBadRequest)
 		}
 		return b
 	}

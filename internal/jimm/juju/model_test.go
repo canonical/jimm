@@ -1595,11 +1595,11 @@ func assertConfig(config map[string]interface{}, fnc func(context.Context, *juju
 			return base.ModelInfo{}, errors.New("cloud not specified")
 		}
 		if len(config) != len(args.Config) {
-			return base.ModelInfo{}, errors.E(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
+			return base.ModelInfo{}, errors.New(fmt.Sprintf("expected %d config settings, got %d", len(config), len(args.Config)))
 		}
 		for k, v := range args.Config {
 			if config[k] != v {
-				return base.ModelInfo{}, errors.E(fmt.Sprintf("config value mismatch for key %s: %s -> %s", k, config[k], v))
+				return base.ModelInfo{}, errors.New(fmt.Sprintf("config value mismatch for key %s: %s -> %s", k, config[k], v))
 			}
 		}
 		return fnc(ctx, args)
@@ -1921,7 +1921,7 @@ func TestModelInfoNotFound(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
-					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
+					return jujuclient.ModelInfo{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
 				},
 			},
 		},
@@ -1964,7 +1964,7 @@ func TestModelInfoRedirect(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
-					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
+					return jujuclient.ModelInfo{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
 				},
 			},
 		},
@@ -2025,7 +2025,7 @@ func TestModelStatusNotFound(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ModelStatus_: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
-					return base.ModelStatus{}, errors.E(errors.CodeNotFound, "model not found")
+					return base.ModelStatus{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
 				},
 			},
 		},

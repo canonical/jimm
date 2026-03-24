@@ -144,7 +144,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 
 	controllerConfig, err := s.jujuManager.ControllerConfig(ctx, user, model.Controller.Name)
 	if err != nil {
-		return DialInfo{}, errors.E(err, "cannot get controller config")
+		return DialInfo{}, fmt.Errorf("cannot get controller config: %w", err)
 	}
 
 	addrs, _ := rpc.GetAddressesAndTLSConfig(ctx, &model.Controller)

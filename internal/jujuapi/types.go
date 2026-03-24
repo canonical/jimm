@@ -3,6 +3,8 @@
 package jujuapi
 
 import (
+	"fmt"
+
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
@@ -66,7 +68,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 	if args.CloudTag != "" {
 		ct, err := names.ParseCloudTag(args.CloudTag)
 		if err != nil {
-			return nil, errors.E(err, errors.CodeBadRequest)
+			return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
 		}
 		a.Cloud = ct
 	}
@@ -74,7 +76,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 	if args.OwnerTag != "" {
 		ot, err := names.ParseUserTag(args.OwnerTag)
 		if err != nil {
-			return nil, errors.E(err, errors.CodeBadRequest)
+			return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
 		}
 		a.Owner = ot
 	} else {
@@ -84,7 +86,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 	if args.CloudCredentialTag != "" {
 		ct, err := names.ParseCloudCredentialTag(args.CloudCredentialTag)
 		if err != nil {
-			return nil, errors.E(err, "invalid cloud credential tag")
+			return nil, fmt.Errorf("invalid cloud credential tag: %w", err)
 		}
 		if a.Cloud.Id() != "" && ct.Cloud().Id() != a.Cloud.Id() {
 			return nil, errors.New("cloud credential cloud mismatch")

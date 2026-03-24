@@ -167,9 +167,7 @@ func (s *dbSuite) TestGetModel(c *qt.C) {
 	}
 	err = s.Database.GetModel(context.Background(), &dbModel)
 	c.Assert(err, qt.Not(qt.IsNil))
-	eError, ok := err.(*errors.Error)
-	c.Assert(ok, qt.IsTrue)
-	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	dbModel = dbmodel.Model{
 		Name:              model.Name,

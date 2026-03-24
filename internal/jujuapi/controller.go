@@ -75,14 +75,14 @@ type ControllerService interface {
 // settings. Only some settings can be changed after bootstrap.
 // JIMM does not support changing settings via ConfigSet.
 func (r *controllerRoot) ConfigSet(ctx context.Context, args jujuparams.ControllerConfigSet) error {
-	return errors.E(errors.CodeNotSupported)
+	return errors.ErrWithCode(nil, errors.CodeNotSupported)
 }
 
 // MongoVersion allows the introspection of the mongo version per
 // controller. This returns a not-supported error as JIMM does not use
 // mongodb for a database.
 func (r *controllerRoot) MongoVersion(ctx context.Context) (jujuparams.StringResult, error) {
-	return jujuparams.StringResult{}, errors.E(errors.CodeNotSupported)
+	return jujuparams.StringResult{}, errors.ErrWithCode(nil, errors.CodeNotSupported)
 }
 
 // IdentityProviderURL returns the URL of the configured external identity
@@ -145,7 +145,7 @@ func (r *controllerRoot) WatchModelSummaries(ctx context.Context) (jujuparams.Su
 func (r *controllerRoot) WatchAllModelSummaries(ctx context.Context) (jujuparams.SummaryWatcherID, error) {
 
 	if !r.user.JimmAdmin {
-		return jujuparams.SummaryWatcherID{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return jujuparams.SummaryWatcherID{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	err := r.setupUUIDGenerator()
@@ -211,7 +211,7 @@ func (r *controllerRoot) ModelStatus(ctx context.Context, args jujuparams.Entiti
 	for i, arg := range args.Entities {
 		mt, err := names.ParseModelTag(arg.Tag)
 		if err != nil {
-			results[i].Error = r.mapError(ctx, errors.E(err, errors.CodeBadRequest))
+			results[i].Error = r.mapError(ctx, errors.ErrWithCode(err, errors.CodeBadRequest))
 			continue
 		}
 		status, err := r.jimm.JujuManager().ModelStatus(ctx, r.user, mt)
@@ -252,7 +252,7 @@ func (r *controllerRoot) GetControllerAccess(ctx context.Context, args jujuparam
 	for i, arg := range args.Entities {
 		tag, err := names.ParseUserTag(arg.Tag)
 		if err != nil {
-			results[i].Error = r.mapError(ctx, errors.E(err, errors.CodeBadRequest))
+			results[i].Error = r.mapError(ctx, errors.ErrWithCode(err, errors.CodeBadRequest))
 			continue
 		}
 		access, err := r.jimm.PermissionManager().GetJimmControllerAccess(ctx, r.user, tag)

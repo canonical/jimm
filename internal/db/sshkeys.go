@@ -27,7 +27,7 @@ func (d *Database) AddSSHKey(ctx context.Context, sshKey *dbmodel.SSHKey) (err e
 			// we don't return an error if a user tries to add the same key twice.
 			return nil
 		}
-		return errors.E(dbErr)
+		return dbErr
 	}
 	return nil
 }
@@ -54,7 +54,7 @@ func (d *Database) RemoveSSHKeyByFingerprint(ctx context.Context, identityName s
 	}
 
 	if query.RowsAffected == 0 {
-		return errors.E(errors.CodeNotFound, "key not found")
+		return errors.MsgWithCode("key not found", errors.CodeNotFound)
 	}
 
 	return nil
@@ -80,7 +80,7 @@ func (d *Database) RemoveSSHKeyByComment(ctx context.Context, identityName strin
 	}
 
 	if query.RowsAffected == 0 {
-		return errors.E(errors.CodeNotFound, "key not found")
+		return errors.MsgWithCode("key not found", errors.CodeNotFound)
 	}
 
 	return nil

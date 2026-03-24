@@ -33,7 +33,7 @@ func TestGetIdentity(t *testing.T) {
 			if username == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, jimmm_errors.E(jimmm_errors.CodeNotFound)
+			return nil, jimmm_errors.ErrWithCode(nil, jimmm_errors.CodeNotFound)
 		},
 	}
 	jimm := jimmtest.JIMM{

@@ -77,7 +77,7 @@ func (d *Database) Transaction(f func(*Database) error) error {
 // with a code of errors.CodeServerConfiguration will be returned.
 func (d *Database) Migrate(ctx context.Context) error {
 	if d == nil || d.DB == nil {
-		return errors.E(errors.CodeServerConfiguration, "database not configured")
+		return errors.MsgWithCode("database not configured", errors.CodeServerConfiguration)
 	}
 
 	err := d.migrateFromSource(ctx, dbmodel.SQL, path.Join("sql", d.DB.Name()))
@@ -149,10 +149,10 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 // returned if the database is not yet initialised.
 func (d *Database) ready() error {
 	if d == nil || d.DB == nil {
-		return errors.E(errors.CodeServerConfiguration, "database not configured")
+		return errors.MsgWithCode("database not configured", errors.CodeServerConfiguration)
 	}
 	if atomic.LoadUint32(&d.migrated) == 0 {
-		return errors.E(errors.CodeUpgradeInProgress)
+		return errors.ErrWithCode(nil, errors.CodeUpgradeInProgress)
 	}
 	return nil
 }
@@ -161,10 +161,10 @@ func (d *Database) ready() error {
 func (d *Database) Close() error {
 	sqlDB, err := d.DB.DB()
 	if err != nil {
-		return errors.E(err, "failed to get the internal DB object")
+		return fmt.Errorf("failed to get the internal DB object: %w", err)
 	}
 	if err := sqlDB.Close(); err != nil {
-		return errors.E(err, "failed to close database connection")
+		return fmt.Errorf("failed to close database connection: %w", err)
 	}
 	return nil
 }

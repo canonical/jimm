@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
@@ -120,7 +119,7 @@ func (d *Database) ForEachAuditLogEntry(ctx context.Context, filter AuditLogFilt
 		}
 	}
 	if rows.Err() != nil {
-		return errors.E(rows.Err())
+		return rows.Err()
 	}
 	return nil
 }
@@ -144,7 +143,7 @@ func (d *Database) DeleteAuditLogsBefore(ctx context.Context, before time.Time) 
 		Where("time < ?", before).
 		Delete(&dbmodel.AuditLogEntry{})
 	if tx.Error != nil {
-		return 0, errors.E(dbError(tx.Error))
+		return 0, dbError(tx.Error)
 	}
 	return tx.RowsAffected, nil
 }

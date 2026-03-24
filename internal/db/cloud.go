@@ -30,7 +30,7 @@ func (d *Database) AddCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	if err := db.Create(c).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return errors.E(fmt.Sprintf("cloud %q already exists", c.Name), err)
+			return fmt.Errorf("%s: %w", fmt.Sprintf("cloud %q already exists", c.Name), err)
 		}
 		return err
 	}
@@ -56,7 +56,7 @@ func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	if err := db.First(&c).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(fmt.Sprintf("cloud %q not found", c.Name), err)
+			return fmt.Errorf("%s: %w", fmt.Sprintf("cloud %q not found", c.Name), err)
 		}
 		return err
 	}
@@ -145,7 +145,7 @@ func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) 
 	if err := db.Create(cr).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return errors.E(fmt.Sprintf("cloud-region %s/%s already exists", cr.CloudName, cr.Name), err)
+			return fmt.Errorf("%s: %w", fmt.Sprintf("cloud-region %s/%s already exists", cr.CloudName, cr.Name), err)
 		}
 		return err
 	}

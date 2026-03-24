@@ -30,7 +30,7 @@ func (r *controllerRoot) AddGroup(ctx context.Context, req apiparams.AddGroupReq
 	resp := apiparams.AddGroupResponse{}
 
 	if !jimmnames.IsValidGroupName(req.Name) {
-		return resp, errors.E(errors.CodeBadRequest, "invalid group name")
+		return resp, errors.MsgWithCode("invalid group name", errors.CodeBadRequest)
 	}
 
 	groupEntry, err := r.jimm.GroupManager().AddGroup(ctx, r.user, req.Name)
@@ -54,13 +54,13 @@ func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupReq
 	var err error
 	switch {
 	case req.UUID != "" && req.Name != "":
-		return apiparams.Group{}, errors.E(errors.CodeBadRequest, "only one of UUID or Name should be provided")
+		return apiparams.Group{}, errors.MsgWithCode("only one of UUID or Name should be provided", errors.CodeBadRequest)
 	case req.UUID != "":
 		groupEntry, err = r.jimm.GroupManager().GetGroupByUUID(ctx, r.user, req.UUID)
 	case req.Name != "":
 		groupEntry, err = r.jimm.GroupManager().GetGroupByName(ctx, r.user, req.Name)
 	default:
-		return apiparams.Group{}, errors.E(errors.CodeBadRequest, "no UUID or Name provided")
+		return apiparams.Group{}, errors.MsgWithCode("no UUID or Name provided", errors.CodeBadRequest)
 	}
 	if err != nil {
 		return apiparams.Group{}, fmt.Errorf("failed to get group: %w", err)
@@ -78,7 +78,7 @@ func (r *controllerRoot) GetGroup(ctx context.Context, req apiparams.GetGroupReq
 func (r *controllerRoot) RenameGroup(ctx context.Context, req apiparams.RenameGroupRequest) error {
 
 	if !jimmnames.IsValidGroupName(req.NewName) {
-		return errors.E(errors.CodeBadRequest, "invalid group name")
+		return errors.MsgWithCode("invalid group name", errors.CodeBadRequest)
 	}
 
 	if err := r.jimm.GroupManager().RenameGroup(ctx, r.user, req.Name, req.NewName); err != nil {

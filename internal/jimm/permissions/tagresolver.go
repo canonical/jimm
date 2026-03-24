@@ -78,7 +78,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetController(ctx, &controller)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to fetch controller information: %s", controller.UUID))
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch controller information: %s", controller.UUID), err)
 		}
 		return tagToString(names.ControllerTagKind, controller.Name), nil
 	case names.ModelTagKind:
@@ -90,7 +90,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetModel(ctx, &model)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to fetch model information: %s", model.UUID.String))
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch model information: %s", model.UUID.String), err)
 		}
 		modelUserID := model.OwnerIdentityName + "/" + model.Name
 		return tagToString(names.ModelTagKind, modelUserID), nil
@@ -100,7 +100,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetApplicationOffer(ctx, &ao)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID))
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID), err)
 		}
 		return tagToString(names.ApplicationOfferTagKind, ao.URL), nil
 	case jimmnames.GroupTagKind:
@@ -109,7 +109,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetGroup(ctx, &group)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to fetch group information: %s", group.UUID))
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch group information: %s", group.UUID), err)
 		}
 		return tagToString(jimmnames.GroupTagKind, group.Name), nil
 	case jimmnames.RoleTagKind:
@@ -118,7 +118,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetRole(ctx, &role)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to fetch role information: %s", role.UUID))
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch role information: %s", role.UUID), err)
 		}
 		return tagToString(jimmnames.RoleTagKind, role.Name), nil
 	case names.CloudTagKind:
@@ -127,11 +127,11 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetCloud(ctx, &cloud)
 		if err != nil {
-			return "", errors.E(err, fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name))
+			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name), err)
 		}
 		return tagToString(names.CloudTagKind, cloud.Name), nil
 	default:
-		return "", errors.E(fmt.Sprintf("unexpected tag kind: %v", tag.Kind))
+		return "", errors.New(fmt.Sprintf("unexpected tag kind: %v", tag.Kind))
 	}
 }
 
@@ -144,7 +144,7 @@ type tagResolver struct {
 func newTagResolver(tag string) (*tagResolver, string, error) {
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
 	if len(matches) != 4 {
-		return nil, "", errors.E("tag is not properly formatted", errors.CodeBadRequest)
+		return nil, "", errors.MsgWithCode("tag is not properly formatted", errors.CodeBadRequest)
 	}
 	tagKind := matches[1]
 	resourceUUID := ""
@@ -160,7 +160,7 @@ func newTagResolver(tag string) (*tagResolver, string, error) {
 
 	relation, err := ofganames.ParseRelation(matches[3])
 	if err != nil {
-		return nil, "", errors.E("failed to parse relation", errors.CodeBadRequest)
+		return nil, "", errors.MsgWithCode("failed to parse relation", errors.CodeBadRequest)
 	}
 	return &tagResolver{
 		resourceUUID: resourceUUID,
@@ -197,7 +197,7 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 
 	err := db.GetGroup(ctx, &entry)
 	if err != nil {
-		return nil, errors.E(fmt.Sprintf("group %s not found", t.trailer))
+		return nil, errors.New(fmt.Sprintf("group %s not found", t.trailer))
 	}
 
 	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
@@ -237,7 +237,7 @@ func (t *tagResolver) roleTag(ctx context.Context, db *db.Database) (*ofga.Entit
 
 	err := db.GetRole(ctx, &entry)
 	if err != nil {
-		return nil, errors.E(fmt.Sprintf("role %s not found", t.trailer))
+		return nil, errors.New(fmt.Sprintf("role %s not found", t.trailer))
 	}
 
 	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
@@ -337,7 +337,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	case names.CloudTagKind:
 		return resolver.cloudTag(ctx, db)
 	}
-	return nil, errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to map tag, unknown kind: %s", tagKind))
+	return nil, errors.MsgWithCode(fmt.Sprintf("failed to map tag, unknown kind: %s", tagKind), errors.CodeBadRequest)
 }
 
 // parseAndValidateTag attempts to parse the provided key into a tag whilst additionally
@@ -349,7 +349,7 @@ func (j *PermissionManager) parseAndValidateTag(ctx context.Context, key string)
 	if len(tupleKeySplit) == 1 {
 		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])
 		if err != nil {
-			return nil, errors.E(errors.CodeFailedToParseTupleKey, err)
+			return nil, errors.ErrWithCode(err, errors.CodeFailedToParseTupleKey)
 		}
 		return tag, nil
 	}
@@ -357,7 +357,7 @@ func (j *PermissionManager) parseAndValidateTag(ctx context.Context, key string)
 	tag, err := resolveTag(j.jimmUUID, j.store, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
-		return nil, errors.E(errors.CodeFailedToResolveTupleResource, err)
+		return nil, errors.ErrWithCode(err, errors.CodeFailedToResolveTupleResource)
 	}
 	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tag.String()))
 

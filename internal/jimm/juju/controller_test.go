@@ -766,7 +766,7 @@ func TestImportModel(t *testing.T) {
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
 		jimmAdmin:      true,
 		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
-			return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound, "model not found")
+			return jujuclient.ModelInfo{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
 		},
 		expectedError: "model not found",
 	}, {
@@ -990,7 +990,7 @@ func TestImportModel(t *testing.T) {
 							}, nil
 						}
 					}
-					return jujuparams.ConsumeOfferDetails{}, errors.E(errors.CodeNotFound)
+					return jujuparams.ConsumeOfferDetails{}, errors.ErrWithCode(nil, errors.CodeNotFound)
 				},
 			}
 
@@ -1433,7 +1433,7 @@ func TestInitiateMigration(t *testing.T) {
 			},
 		},
 		initiateMigrationResults: []result{{}},
-		expectedError:            "failed to unmarshal macaroons",
+		expectedError:            "failed to unmarshal macaroons.*",
 	}}
 
 	for _, test := range tests {
@@ -1521,7 +1521,7 @@ func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec, 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.initiateMigrationResults) == 0 {
-		return "", errors.E(errors.CodeNotImplemented)
+		return "", errors.ErrWithCode(nil, errors.CodeNotImplemented)
 	}
 	var result result
 	result, c.initiateMigrationResults = c.initiateMigrationResults[0], c.initiateMigrationResults[1:]

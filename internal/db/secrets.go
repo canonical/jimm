@@ -61,7 +61,7 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err e
 	const op = "db.GetSecret"
 
 	if secret.Tag == "" || secret.Type == "" {
-		return errors.E("missing secret tag and type", errors.CodeBadRequest)
+		return errors.MsgWithCode("missing secret tag and type", errors.CodeBadRequest)
 	}
 
 	if err := d.ready(); err != nil {
@@ -79,7 +79,7 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err e
 	if err := db.First(&secret).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(err, "secret not found")
+			return fmt.Errorf("secret not found: %w", err)
 		}
 		return dbError(err)
 	}
@@ -91,7 +91,7 @@ func (d *Database) DeleteSecret(ctx context.Context, secret *dbmodel.Secret) (er
 	const op = "db.DeleteSecret"
 
 	if secret.Tag == "" || secret.Type == "" {
-		return errors.E("missing secret tag and type", errors.CodeBadRequest)
+		return errors.MsgWithCode("missing secret tag and type", errors.CodeBadRequest)
 	}
 
 	if err := d.ready(); err != nil {

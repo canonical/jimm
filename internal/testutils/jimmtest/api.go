@@ -105,7 +105,7 @@ func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt na
 	if d, ok := m[mt.Id()]; ok {
 		return d.Dial(ctx, ctl, mt, u)
 	}
-	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
+	return nil, errors.New(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }
 
 // A DialerMap implements a juju.Dialer that uses a different Dialer for
@@ -117,7 +117,7 @@ func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.M
 	if d, ok := m[ctl.Name]; ok {
 		return d.Dial(ctx, ctl, mt, u)
 	}
-	return nil, errors.E(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
+	return nil, errors.New(fmt.Sprintf("dialer not configured for controller %s", ctl.Name))
 }
 
 // API is a default implementation of the juju.API interface. Every method

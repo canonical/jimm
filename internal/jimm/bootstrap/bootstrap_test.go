@@ -349,7 +349,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob(c *qt.C) {
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -500,7 +500,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_BinaryStoreGetFails(c *qt.C) {
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test err"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -538,7 +538,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ExecutorFails(c *qt.C) {
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -600,7 +600,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -628,7 +628,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ReturnsEarlyIfLineErrors(c *qt.
 	).Return(
 		func() chan jujucommands.OutputLine {
 			outputCh := make(chan jujucommands.OutputLine, 1)
-			outputCh <- jujucommands.OutputLine{Err: errors.E(testOutputLineError)}
+			outputCh <- jujucommands.OutputLine{Err: errors.New(testOutputLineError)}
 			close(outputCh)
 			return outputCh
 		}(),
@@ -667,7 +667,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetController
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -770,7 +770,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_ClientStoreFailsToGetAccountDet
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -873,7 +873,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_JujuManagerFailsToAddController
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -1001,7 +1001,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CleanupControllerFailure(c *qt.
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -1102,7 +1102,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 		gomock.Any(),
 		&dbmodel.Controller{Name: p.ControllerName},
 	).Return(
-		errors.E(errors.CodeNotFound, "test error"),
+		errors.MsgWithCode("test err", errors.CodeNotFound),
 	)
 	mocks.binaryStore.EXPECT().Get(
 		gomock.Any(),
@@ -1136,7 +1136,7 @@ func (s *bootstrapManagerSuite) TestBootstrapJob_CancelledJob(c *qt.C) {
 		}
 
 		outputCh := make(chan jujucommands.OutputLine, 1)
-		outputCh <- jujucommands.OutputLine{Line: "ignored", Err: errors.E(failedBootstrapErr)}
+		outputCh <- jujucommands.OutputLine{Line: "ignored", Err: errors.New(failedBootstrapErr)}
 		close(outputCh)
 		return outputCh, mocks.clientStore, func() { cleanupCalled = true }, nil
 	})

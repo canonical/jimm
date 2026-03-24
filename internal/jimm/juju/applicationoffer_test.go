@@ -892,7 +892,7 @@ func TestOffer(t *testing.T) {
 			return nil, nil
 		},
 		offer: func(context.Context, jujuclient.OfferParams) error {
-			return errors.E(errors.CodeNotFound, "application test-app")
+			return errors.MsgWithCode("application test-app", errors.CodeNotFound)
 		},
 		createEnv: func(c *qt.C, db *db.Database, client *openfga.OFGAClient) (dbmodel.Identity, juju.AddApplicationOfferParams, dbmodel.ApplicationOffer, func(*qt.C, error)) {
 			ctx := context.Background()
@@ -1502,7 +1502,7 @@ func TestDestroyOffer(t *testing.T) {
 
 			if test.destroyError != "" {
 				select {
-				case destroyErrorsChannel <- errors.E(test.destroyError):
+				case destroyErrorsChannel <- errors.New(test.destroyError):
 				default:
 				}
 			}
@@ -2045,7 +2045,7 @@ func TestFindApplicationOffers_MultipleControllers(t *testing.T) {
 			API: &jimmtest.API{
 				FindApplicationOffers_: func(ctx context.Context, filters []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 					controller1Dialed = true
-					return nil, errors.E(errors.CodeNotFound, "offer not found")
+					return nil, errors.MsgWithCode("offer not found", errors.CodeNotFound)
 				},
 			},
 		},

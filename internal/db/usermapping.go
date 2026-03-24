@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -45,19 +46,19 @@ func (d *Database) GetUserMapping(ctx context.Context, userMapping *dbmodel.User
 	case userMapping.ModelUUID.Valid && userMapping.LocalUser != "":
 		db = db.Where("model_uuid = ? AND local_user = ?", userMapping.ModelUUID.String, userMapping.LocalUser)
 	case !userMapping.ModelUUID.Valid:
-		return errors.E("missing model UUID", errors.CodeBadRequest)
+		return errors.MsgWithCode("missing model UUID", errors.CodeBadRequest)
 	case userMapping.LocalUser == "":
-		return errors.E("missing local user", errors.CodeBadRequest)
+		return errors.MsgWithCode("missing local user", errors.CodeBadRequest)
 	default:
-		return errors.E("invalid parameters", errors.CodeBadRequest)
+		return errors.MsgWithCode("invalid parameters", errors.CodeBadRequest)
 	}
 
 	if err := db.First(&userMapping).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(err, "user mapping not found")
+			return fmt.Errorf("user mapping not found: %w", err)
 		}
-		return dbError(err)
+		return err
 	}
 	return nil
 }

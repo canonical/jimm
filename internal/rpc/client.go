@@ -220,7 +220,7 @@ func (c *Client) Call(ctx context.Context, facade string, version int, id, metho
 		defer c.mu.Unlock()
 		return c.err
 	case <-ctx.Done():
-		return errors.E(ctx.Err())
+		return ctx.Err()
 	}
 }
 
@@ -242,7 +242,7 @@ func (c *Client) Close() error {
 	c.closing = true
 	cm := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
 	if err := c.conn.WriteControl(websocket.CloseMessage, cm, time.Time{}); err != nil {
-		c.err = errors.E("error closing connection", err)
+		c.err = fmt.Errorf("error closing connection: %w", err)
 		// If sending the close message failed then tear down the
 		// connection. Note that we don't need to clear up any
 		// outstanding messages here as the receiver will error and

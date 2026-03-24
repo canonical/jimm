@@ -87,7 +87,7 @@ func (c Connection) ModelInfo(ctx context.Context, model names.ModelTag) (ModelI
 		return ModelInfo{}, err
 	}
 	if res[0].Error != nil {
-		return ModelInfo{}, errors.E(res[0].Error)
+		return ModelInfo{}, res[0].Error
 	}
 	return convertParamsModelInfo(*res[0].Result)
 }

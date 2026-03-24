@@ -37,27 +37,27 @@ func init() {
 
 // AddUser implements the UserManager facade's AddUser method.
 func (r *controllerRoot) AddUser(args jujuparams.AddUsers) (jujuparams.AddUserResults, error) {
-	return jujuparams.AddUserResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	return jujuparams.AddUserResults{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 }
 
 // RemoveUser implements the UserManager facade's RemoveUser method.
 func (r *controllerRoot) RemoveUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	return jujuparams.ErrorResults{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 }
 
 // EnableUser implements the UserManager facade's EnableUser method.
 func (r *controllerRoot) EnableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	return jujuparams.ErrorResults{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 }
 
 // DisableUser implements the UserManager facade's DisableUser method.
 func (r *controllerRoot) DisableUser(jujuparams.Entities) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	return jujuparams.ErrorResults{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 }
 
 // ModelUserInfo returns information on all users in the model.
 func (r *controllerRoot) ModelUserInfo(args jujuparams.Entities) (jujuparams.ModelUserInfoResults, error) {
-	return jujuparams.ModelUserInfoResults{}, errors.E(errors.CodeNotImplemented, "not implements")
+	return jujuparams.ModelUserInfoResults{}, errors.MsgWithCode("not implements", errors.CodeNotImplemented)
 }
 
 // UserInfo implements the UserManager facade's UserInfo method.
@@ -80,10 +80,10 @@ func (r *controllerRoot) userInfo(entity string) (*jujuparams.UserInfo, error) {
 
 	user, err := parseUserTag(entity)
 	if err != nil {
-		return nil, errors.E(err, errors.CodeBadRequest)
+		return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
 	}
 	if r.user.Name != user.Id() {
-		return nil, errors.E(errors.CodeUnauthorized)
+		return nil, errors.ErrWithCode(nil, errors.CodeUnauthorized)
 	}
 	ui := r.user.ToJujuUserInfo()
 	return &ui, nil
@@ -91,11 +91,11 @@ func (r *controllerRoot) userInfo(entity string) (*jujuparams.UserInfo, error) {
 
 // SetPassword implements the UserManager facade's SetPassword method.
 func (r *controllerRoot) SetPassword(jujuparams.EntityPasswords) (jujuparams.ErrorResults, error) {
-	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	return jujuparams.ErrorResults{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 }
 
 // ResetPassword implements the UserManager facade's ResetPassword method.
 func (r *controllerRoot) ResetPassword(jujuparams.Entities) (jujuparams.ErrorResults, error) {
 	// JIMM does not support resetting user's password.
-	return jujuparams.ErrorResults{}, errors.E(errors.CodeUnauthorized, "unauthorized")
+	return jujuparams.ErrorResults{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 }

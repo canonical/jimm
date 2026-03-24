@@ -149,7 +149,7 @@ func (d *Database) CloudDefaults(ctx context.Context, defaults *dbmodel.CloudDef
 	if result.Error != nil {
 		err := dbError(result.Error)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(errors.CodeNotFound, "cloudregiondefaults not found", err)
+			return errors.MsgWithCode("cloudregiondefaults not found", errors.CodeNotFound)
 		}
 		return err
 	}

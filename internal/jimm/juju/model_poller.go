@@ -75,7 +75,7 @@ func (j *JujuManager) checkModelMigratedInternal(ctx context.Context, errFromAPI
 	// This is the error that Juju controllers return when a model has been migrated.
 	isRedirectErr := errors.ErrorCode(errFromAPI) == params.CodeRedirect
 	if !isRedirectErr {
-		return errors.E(errFromAPI)
+		return errFromAPI
 	}
 
 	// Parse the redirect error to get the new controller details.

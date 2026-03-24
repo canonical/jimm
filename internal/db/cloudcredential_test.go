@@ -250,7 +250,7 @@ var forEachCloudCredentialTests = []struct {
 	name:     "IterationError",
 	username: "alice@canonical.com",
 	f: func(*dbmodel.CloudCredential) error {
-		return errors.E("test error", errors.Code("test code"))
+		return errors.MsgWithCode("test error", errors.Code("test code"))
 	},
 	expectError:     "test error",
 	expectErrorCode: "test code",
@@ -339,6 +339,6 @@ func (s *dbSuite) TestDeleteCloudCredential(c *qt.C) {
 		Name:              cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
-	c.Assert(err, qt.ErrorMatches, `cloudcredential \S+ not found`)
+	c.Assert(err, qt.ErrorMatches, `cloudcredential \S+ not found.*`)
 
 }

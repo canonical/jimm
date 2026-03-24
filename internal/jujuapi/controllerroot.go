@@ -79,14 +79,14 @@ func newControllerRoot(j JIMM, p Params, identityId string) *controllerRoot {
 func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openfga.User, error) {
 	ut, err := parseUserTag(userTag)
 	if err != nil {
-		return nil, errors.E(errors.CodeBadRequest, err)
+		return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
 	}
 	if r.user.Tag() == ut {
 		// allow anyone to masquarade as themselves.
 		return r.user, nil
 	}
 	if !r.user.JimmAdmin {
-		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 	user, err := r.jimm.LoginManager().UserLogin(ctx, ut.Id())
 	if err != nil {
@@ -100,10 +100,10 @@ func (r *controllerRoot) masquerade(ctx context.Context, userTag string) (*openf
 func parseUserTag(tag string) (names.UserTag, error) {
 	ut, err := names.ParseUserTag(tag)
 	if err != nil {
-		return names.UserTag{}, errors.E(errors.CodeBadRequest, err)
+		return names.UserTag{}, errors.ErrWithCode(err, errors.CodeBadRequest)
 	}
 	if ut.IsLocal() {
-		return names.UserTag{}, errors.E(errors.CodeBadRequest, fmt.Sprintf("unsupported local user; if this is a service account add @%s domain", jimmnames.ServiceAccountDomain))
+		return names.UserTag{}, errors.MsgWithCode(fmt.Sprintf("unsupported local user; if this is a service account add @%s domain", jimmnames.ServiceAccountDomain), errors.CodeBadRequest)
 	}
 	return ut, nil
 }

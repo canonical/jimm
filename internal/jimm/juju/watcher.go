@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/juju/names/v5"
@@ -135,7 +136,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	defer api.Close()
 
 	if !api.SupportsModelSummaryWatcher() {
-		return errors.E(errors.CodeNotSupported)
+		return errors.ErrWithCode(nil, errors.CodeNotSupported)
 	}
 
 	// start the model summary watcher
@@ -152,7 +153,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	for {
 		select {
 		case <-ctx.Done():
-			return errors.E(ctx.Err(), "context cancelled")
+			return fmt.Errorf("context cancelled: %w", ctx.Err())
 		default:
 		}
 		// wait for updates from the all model summary watcher.

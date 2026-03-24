@@ -123,7 +123,7 @@ func NewBootstrapManager(
 	if jimmWellknownJWKSEndpoint != "" {
 		// Scheme is not optional, so we aren't using ParseURLWithOptionalScheme here.
 		if _, err := url.Parse(jimmWellknownJWKSEndpoint); err != nil {
-			return nil, errors.E(err, "failed to parse bootstrap login token refresh URL")
+			return nil, fmt.Errorf("failed to parse bootstrap login token refresh URL: %w", err)
 		}
 	}
 	if credentialStore == nil {
@@ -199,7 +199,7 @@ func (b *BootstrapManager) StopJob(ctx context.Context, user *openfga.User, jobI
 
 	_, err := b.jobQueue.CancelJob(ctx, jobID)
 	if err != nil {
-		return errors.E("failed to stop job", err)
+		return fmt.Errorf("failed to stop job: %w", err)
 	}
 
 	return nil
@@ -268,7 +268,7 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 		return 0, fmt.Errorf("failed to enqueue bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
-		return 0, errors.E("a bootstrap job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
+		return 0, errors.MsgWithCode("a bootstrap job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
 	}
 
 	return job.Job.ID, nil
@@ -339,7 +339,7 @@ func (b *BootstrapManager) BootstrapController(
 	// succeed when trying to add the controller to JIMM.
 	err := b.store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
 	if err == nil {
-		return errors.E(errors.CodeAlreadyExists, fmt.Errorf("controller %q already exists", p.ControllerName))
+		return errors.ErrWithCode(fmt.Errorf("controller %q already exists", p.ControllerName), errors.CodeAlreadyExists)
 	}
 	if errors.ErrorCode(err) != errors.CodeNotFound {
 		return fmt.Errorf("failed to check if controller exists: %w", err)
@@ -552,7 +552,7 @@ func (b *BootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 		return 0, fmt.Errorf("failed to start bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
-		return 0, errors.E("a destroy job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
+		return 0, errors.MsgWithCode("a destroy job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
 	}
 
 	return job.Job.ID, nil

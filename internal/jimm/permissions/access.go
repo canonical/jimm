@@ -148,7 +148,7 @@ func (j *PermissionManager) GrantAuditLogAccess(ctx context.Context, user *openf
 
 	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -170,7 +170,7 @@ func (j *PermissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 
 	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -197,22 +197,22 @@ func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.U
 		if _, ok := cachedPerms[key]; !ok {
 			stringVal, ok := val.(string)
 			if !ok {
-				return nil, errors.E(fmt.Sprintf("failed to get permission assertion: expected %T, got %T", stringVal, val))
+				return nil, errors.New(fmt.Sprintf("failed to get permission assertion: expected %T, got %T", stringVal, val))
 			}
 			tag, err := names.ParseTag(key)
 			if err != nil {
-				return cachedPerms, errors.E(fmt.Sprintf("failed to parse tag %s", key))
+				return cachedPerms, errors.New(fmt.Sprintf("failed to parse tag %s", key))
 			}
 			relation, err := ofganames.ConvertJujuRelation(stringVal)
 			if err != nil {
-				return cachedPerms, errors.E(fmt.Sprintf("failed to parse relation %s", stringVal), err)
+				return cachedPerms, fmt.Errorf("%s: %w", fmt.Sprintf("failed to parse relation %s", stringVal), err)
 			}
 			check, err := openfga.CheckRelation(ctx, user, tag, relation)
 			if err != nil {
 				return cachedPerms, err
 			}
 			if !check {
-				return cachedPerms, errors.E(fmt.Sprintf("Missing permission for %s:%s", key, val))
+				return cachedPerms, errors.New(fmt.Sprintf("Missing permission for %s:%s", key, val))
 			}
 			cachedPerms[key] = stringVal
 		}
@@ -238,7 +238,7 @@ func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 	// Only JIMM administrators are allowed to see the access
 	// level of somebody else.
 	if !user.JimmAdmin {
-		return "", errors.E(errors.CodeUnauthorized, "unauthorized")
+		return "", errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	var targetUser dbmodel.Identity
@@ -272,7 +272,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
+		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
@@ -282,7 +282,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -340,7 +340,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
+		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
@@ -350,7 +350,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -418,7 +418,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
+		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
 	}
 
 	modelAdmin, err := user.HasModelRelation(ctx, mt, ofganames.AdministratorRelation)
@@ -426,7 +426,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 		return err
 	}
 	if !modelAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -490,7 +490,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.E(errors.CodeBadRequest, fmt.Sprintf("failed to recognize given access: %q", access), err)
+		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
 	}
 
 	requiredAccess := ofganames.AdministratorRelation
@@ -504,7 +504,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		return err
 	}
 	if !modelAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -586,7 +586,7 @@ func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.
 		return err
 	}
 	if !isOfferAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := openfga.NewUser(identity, j.authSvc)
@@ -656,7 +656,7 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 		return err
 	}
 	if !isOfferAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	targetUser := openfga.NewUser(identity, j.authSvc)
@@ -666,7 +666,7 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 	}
 	err = targetUser.UnsetApplicationOfferAccess(ctx, offer.ResourceTag(), targetRelation)
 	if err != nil {
-		return errors.E(err, "failed to unset given access")
+		return fmt.Errorf("failed to unset given access: %w", err)
 	}
 
 	// Checking if the target user still has the given access to the

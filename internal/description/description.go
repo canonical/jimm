@@ -119,7 +119,7 @@ func migrationDescriptionVersion(controllerVersion version.Number) (int, error) 
 func TryDetermineModelUUID(raw []byte) (string, error) {
 	model, err := descriptionv10.Deserialize(raw)
 	if err != nil {
-		return "", errors.E("failed to deserialize model description: %w", err)
+		return "", fmt.Errorf("failed to deserialize model description: %w", err)
 	}
 	modelUUIDStr, ok := model.Config()[config.UUIDKey].(string)
 	if !ok {

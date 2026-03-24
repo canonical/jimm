@@ -1383,7 +1383,7 @@ func TestGetCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found`
+			return u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found.*`
 		},
 	}}
 	for _, test := range tests {
@@ -1465,7 +1465,7 @@ var forEachUserCloudCredentialTests = []struct {
 	env:      forEachUserCloudCredentialEnv,
 	username: "alice@canonical.com",
 	f: func(*dbmodel.CloudCredential) error {
-		return errors.E("test error", errors.Code("test code"))
+		return errors.MsgWithCode("test error", errors.Code("test code"))
 	},
 	expectError:     "test error",
 	expectErrorCode: "test code",
@@ -1740,50 +1740,50 @@ func (s testCloudCredentialAttributeStore) Put(_ context.Context, tag names.Clou
 }
 
 func (s testCloudCredentialAttributeStore) GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error) {
-	return "", "", errors.E(errors.CodeNotImplemented)
+	return "", "", errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
+	return nil, errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
+	return nil, errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
-	return time.Now(), errors.E(errors.CodeNotImplemented)
+	return time.Now(), errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 func (s testCloudCredentialAttributeStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) CleanupOAuthSecrets(ctx context.Context) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) GetOAuthSecret(ctx context.Context) ([]byte, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
+	return nil, errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func (s testCloudCredentialAttributeStore) PutOAuthSecret(ctx context.Context, raw []byte) error {
-	return errors.E(errors.CodeNotImplemented)
+	return errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 func TestCopyCredential(t *testing.T) {

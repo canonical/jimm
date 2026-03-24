@@ -135,7 +135,7 @@ func (d *Database) UpdateGroupName(ctx context.Context, uuid, name string) (err 
 	model := d.DB.WithContext(ctx).Model(&dbmodel.GroupEntry{})
 	model.Where("uuid = ?", uuid)
 	if model.Update("name", name).RowsAffected == 0 {
-		return errors.E(errors.CodeNotFound, "group not found")
+		return errors.MsgWithCode("group not found", errors.CodeNotFound)
 	}
 	return nil
 }
@@ -145,7 +145,7 @@ func (d *Database) RemoveGroup(ctx context.Context, group *dbmodel.GroupEntry) (
 	const op = "db.RemoveGroup"
 
 	if group.ID == 0 && group.UUID == "" {
-		return errors.E("neither UUID or ID specified", errors.CodeNotFound)
+		return errors.MsgWithCode("neither UUID or ID specified", errors.CodeNotFound)
 	}
 
 	if err := d.ready(); err != nil {

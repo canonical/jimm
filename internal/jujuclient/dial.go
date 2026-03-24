@@ -90,7 +90,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		return nil, err
 	}
 	if conn == nil {
-		return nil, errors.E(errors.CodeConnectionFailed, err)
+		return nil, errors.ErrWithCode(err, errors.CodeConnectionFailed)
 	}
 	client := rpc.NewClient(conn)
 
@@ -107,7 +107,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	var res jujuparams.LoginResult
 	if err := client.Call(ctx, "Admin", 3, "", "Login", loginRequest, &res); err != nil {
 		client.Close()
-		return nil, errors.E(errors.CodeConnectionFailed, err)
+		return nil, errors.ErrWithCode(err, errors.CodeConnectionFailed)
 	}
 
 	ct, err := names.ParseControllerTag(res.ControllerTag)
@@ -254,7 +254,7 @@ func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string
 			return c.Call(ctx, facade, version, id, method, args, resp)
 		}
 	}
-	return errors.E(fmt.Sprintf("facade %v version %v not supported", facade, versions))
+	return errors.New(fmt.Sprintf("facade %v version %v not supported", facade, versions))
 }
 
 // BestFacadeVersion returns the newest version of 'objType' that this
@@ -273,7 +273,7 @@ func (c *Connection) ModelTag() (names.ModelTag, bool) {
 // to make HTTP requests to the API. URLs passed to the client
 // will be made relative to the API host and the current model.
 func (c *Connection) HTTPClient() (*httprequest.Client, error) {
-	return nil, errors.E(errors.CodeNotImplemented)
+	return nil, errors.ErrWithCode(nil, errors.CodeNotImplemented)
 }
 
 // BakeryClientWrapper wraps an httpbakery.Client to implement

@@ -48,7 +48,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 	}
 	if err := j.Database.GetModel(ctx, &model); err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(err, "model not found")
+			return fmt.Errorf("model not found: %w", err)
 		}
 		return err
 	}
@@ -58,7 +58,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 		return fmt.Errorf("failed administrator check: %w", err)
 	}
 	if !isAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	offerURL := crossmodel.OfferURL{
@@ -74,7 +74,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 	offerCheck.URL = offerURL.String()
 	err = j.Database.GetApplicationOffer(ctx, &offerCheck)
 	if err == nil {
-		return errors.E(fmt.Sprintf("offer %s already exists, please use a different name", offerURL.String()), errors.CodeAlreadyExists)
+		return errors.MsgWithCode(fmt.Sprintf("offer %s already exists, please use a different name", offerURL.String()), errors.CodeAlreadyExists)
 	} else if errors.ErrorCode(err) != errors.CodeNotFound {
 		// Anything besides Not Found is a problem.
 		return err
@@ -105,7 +105,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 		})
 	if err != nil {
 		if strings.Contains(err.Error(), "application offer already exists") {
-			return errors.E(err, errors.CodeAlreadyExists)
+			return errors.ErrWithCode(err, errors.CodeAlreadyExists)
 		}
 		return err
 	}
@@ -186,7 +186,7 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 	}
 	if err := j.Database.GetApplicationOffer(ctx, &offer); err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.E(err, "application offer not found")
+			return fmt.Errorf("application offer not found: %w", err)
 		}
 		return err
 	}
@@ -200,11 +200,11 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 	case string(jujuparams.OfferAdminAccess):
 	case string(jujuparams.OfferConsumeAccess):
 	case string(jujuparams.OfferReadAccess):
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	default:
 		// TODO (ashipika)
 		//   - think about the returned error code
-		return errors.E(errors.CodeNotFound)
+		return errors.ErrWithCode(nil, errors.CodeNotFound)
 	}
 
 	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{}, user)
@@ -345,7 +345,7 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 	err := j.Database.GetApplicationOffer(ctx, &offer)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil, errors.E(err, "application offer not found")
+			return nil, fmt.Errorf("application offer not found: %w", err)
 		}
 		return nil, err
 	}
@@ -358,7 +358,7 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 	// if this user does not have access to this application offer
 	// we return a not found error.
 	if !reader {
-		return nil, errors.E(errors.CodeNotFound, "application offer not found")
+		return nil, errors.MsgWithCode("application offer not found", errors.CodeNotFound)
 	}
 
 	// Always collect application-offer admin details from the
@@ -456,7 +456,7 @@ func (o *offers) addOffer(offer *crossmodel.ApplicationOfferDetails) {
 func (j *JujuManager) FindApplicationOffers(ctx context.Context, user *openfga.User, filters ...crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 
 	if len(filters) == 0 {
-		return nil, errors.E(errors.CodeBadRequest, "at least one filter must be specified")
+		return nil, errors.MsgWithCode("at least one filter must be specified", errors.CodeBadRequest)
 	}
 
 	controllers := make(map[uint]*dbmodel.Controller)
@@ -481,7 +481,7 @@ func (j *JujuManager) FindApplicationOffers(ctx context.Context, user *openfga.U
 func (j *JujuManager) ListApplicationOffers(ctx context.Context, user *openfga.User, filters ...crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error) {
 
 	if len(filters) == 0 {
-		return nil, errors.E(errors.CodeBadRequest, "at least one filter must be specified")
+		return nil, errors.MsgWithCode("at least one filter must be specified", errors.CodeBadRequest)
 	}
 
 	controllers := make(map[uint]*dbmodel.Controller)
@@ -576,7 +576,7 @@ func (j *JujuManager) doApplicationOfferAdmin(ctx context.Context, user *openfga
 		return err
 	}
 	if !isOfferAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 	// add offer admin claim
 	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{}, user)

@@ -180,7 +180,7 @@ func TestModelSummaryWatcher(t *testing.T) {
 							case "00000002-0000-0000-0000-000000000002":
 							case "00000002-0000-0000-0000-000000000003":
 							}
-							return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
+							return jujuclient.ModelInfo{}, errors.ErrWithCode(nil, errors.CodeNotFound)
 						},
 					},
 				},
@@ -292,7 +292,7 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 					case "00000002-0000-0000-0000-000000000002":
 					case "00000002-0000-0000-0000-000000000003":
 					}
-					return jujuclient.ModelInfo{}, errors.E(errors.CodeNotFound)
+					return jujuclient.ModelInfo{}, errors.ErrWithCode(nil, errors.CodeNotFound)
 				},
 				WatchAllModelSummaries_: func(ctx context.Context) (jujuclient.SummaryWatcher, error) {
 					return mockWatcher, nil

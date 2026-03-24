@@ -36,7 +36,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 
 	query, err := gojq.Parse(jqQuery)
 	if err != nil {
-		return results, errors.E("failed to parse jq query", err)
+		return results, fmt.Errorf("failed to parse jq query: %w", err)
 	}
 
 	// Set up a formatterParamsRetriever to handle the heavy lifting
@@ -96,7 +96,7 @@ func (j *JujuManager) QueryModelsJq(ctx context.Context, modelUUIDs []string, jq
 			// both erreoneous and valid query results.
 			if err, ok := v.(error); ok {
 				if stderrors.Is(err, context.DeadlineExceeded) {
-					return results, errors.E(fmt.Sprintf("jq query timed out after %.2f seconds", j.crossModelQueryTimeout.Seconds()), err)
+					return results, fmt.Errorf("jq query timed out after %.2f seconds: %w", j.crossModelQueryTimeout.Seconds(), err)
 				}
 				results.Errors[modelUUID] = append(results.Errors[modelUUID], "jq error: "+err.Error())
 				continue

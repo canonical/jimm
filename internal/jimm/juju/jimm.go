@@ -94,7 +94,7 @@ func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) (
 func (j *JujuManager) SetControllerDeprecated(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error {
 
 	if !user.JimmAdmin {
-		return errors.E(errors.CodeUnauthorized, "unauthorized")
+		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	// Update the local database with the updated cloud definition. We
@@ -135,7 +135,7 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 			return err
 		}
 		if len(models) > 0 && !force {
-			return errors.E(errors.CodeStillAlive, "controller still has models")
+			return errors.MsgWithCode("controller still has models", errors.CodeStillAlive)
 		}
 
 		// Remove all models associated with the controller. If force is false,
@@ -160,7 +160,7 @@ func (j *JujuManager) RemoveController(ctx context.Context, user *openfga.User, 
 // FullModelStatus returns the full status of the juju model.
 func (j *JujuManager) FullModelStatus(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error) {
 	if !user.JimmAdmin {
-		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	model := dbmodel.Model{
@@ -199,7 +199,7 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			return jujuparams.MigrationTargetInfo{}, 0, err
 		}
-		return jujuparams.MigrationTargetInfo{}, 0, errors.E(err, fmt.Errorf("failed to get controller with name %q", controllerName))
+		return jujuparams.MigrationTargetInfo{}, 0, fmt.Errorf("failed to get controller with name %q: %w", controllerName, err)
 	}
 	adminUser, adminPass, err := credStore.GetControllerCredentials(ctx, controllerName)
 	if err != nil {
@@ -382,14 +382,14 @@ func WithOwnerAndModelName(ownerName, modelName string) ModelControllerInfoQuali
 // - WithOwnerAndModelName(owner, name) to specify by owner and model name
 func (j *JujuManager) ModelControllerInfo(ctx context.Context, user *openfga.User, qualifier ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
 	if !user.JimmAdmin {
-		return nil, errors.E(errors.CodeUnauthorized, "unauthorized")
+		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
 	}
 
 	var model dbmodel.Model
 	qualifier(&model)
 
 	if !model.UUID.Valid && (model.OwnerIdentityName == "" || model.Name == "") {
-		return nil, errors.E("either model uuid or both model name and owner must be provided", errors.CodeBadRequest)
+		return nil, errors.MsgWithCode("either model uuid or both model name and owner must be provided", errors.CodeBadRequest)
 	}
 
 	err := j.Database.GetModel(ctx, &model)

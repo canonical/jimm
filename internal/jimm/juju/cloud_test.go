@@ -624,7 +624,7 @@ var addHostedCloudTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unable to find cloud/region "ec2/default"`,
+	expectError:     `unable to find cloud/region "ec2/default".*`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:      "InvalidHostCloudRegion",
@@ -838,7 +838,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `controller not found`,
+	expectError:     `controller not found.*`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "CloudWithReservedName",
@@ -868,7 +868,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unable to find cloud/region "ec2/default"`,
+	expectError:     `unable to find cloud/region "ec2/default".*`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "InvalidHostCloudRegion",
@@ -898,7 +898,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `unable to find cloud/region "test-provider3/test-region-3"`,
+	expectError:     `unable to find cloud/region "test-provider3/test-region-3".*`,
 	expectErrorCode: errors.CodeIncompatibleClouds,
 }, {
 	name:           "HostCloudIsHosted",
@@ -1043,7 +1043,7 @@ var removeCloudTests = []struct {
 	name:            "CloudNotFound",
 	username:        "alice@canonical.com",
 	cloud:           "test2",
-	expectError:     `cloud "test2" not found`,
+	expectError:     `cloud "test2" not found.*`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "Success",
@@ -1171,7 +1171,7 @@ var updateCloudTests = []struct {
 	name:            "CloudNotFound",
 	username:        "alice@canonical.com",
 	cloud:           "test2",
-	expectError:     `cloud "test2" not found`,
+	expectError:     `cloud "test2" not found.*`,
 	expectErrorCode: errors.CodeNotFound,
 }, /* NOTE (alesstimec) Need to figure out what makes test-cloud
 	                        a public cloud giving alice@canonical.com the right
@@ -1426,7 +1426,7 @@ var removeCloudFromControllerTests = []struct {
 	username:        "alice@canonical.com",
 	cloud:           "test2",
 	controllerName:  "controller-2",
-	expectError:     `cloud "test2" not found`,
+	expectError:     `cloud "test2" not found.*`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "Success - with other controllers for the cloud",

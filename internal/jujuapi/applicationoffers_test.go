@@ -303,7 +303,7 @@ func TestApplicationOffers(t *testing.T) {
 	jujuManager := mocks.JujuManager{
 		GetApplicationOffer_: func(ctx context.Context, user *openfga.User, offerURL string) (*crossmodel.ApplicationOfferDetails, error) {
 			if offerURL == "owner@canonical.com/test-model.missing" {
-				return nil, errors.E(errors.CodeNotFound, "application offer not found")
+				return nil, errors.MsgWithCode("application offer not found", errors.CodeNotFound)
 			}
 			return &crossmodel.ApplicationOfferDetails{
 				OfferName:              "test-offer",

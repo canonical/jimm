@@ -99,9 +99,7 @@ func (s *dbSuite) TestGetModelMigration(c *qt.C) {
 	lookup = dbmodel.IncomingModelMigration{ModelUUID: sql.NullString{String: "no-such-uuid", Valid: true}}
 	err = s.Database.GetIncomingModelMigration(context.Background(), &lookup)
 	c.Assert(err, qt.Not(qt.IsNil))
-	eError, ok := err.(*errors.Error)
-	c.Assert(ok, qt.IsTrue)
-	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func (s *dbSuite) TestGetModelMigrationWithLock_NoWait(c *qt.C) {
