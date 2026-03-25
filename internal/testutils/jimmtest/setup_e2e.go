@@ -159,7 +159,7 @@ type LoginDetails struct {
 // - bob@canonical.com has add-model permission on the controllers and cloud-credentials.
 // - charlie@canonical.com has add-model permission on the controllers and cloud-credentials.
 func SetupJimmWithControllers(c *qt.C, opts ...SetupOption) JimmWithControllers {
-	jimmEnv := SetupJimmEnv(c, append([]SetupOption{WithHardcodedJWKS()}, opts...)...)
+	jimmEnv := SetupJimmEnv(c, opts...)
 	s := JimmWithControllers{
 		JIMMEnv: jimmEnv,
 	}

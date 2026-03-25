@@ -8,16 +8,9 @@ import (
 )
 
 var (
-	JwksKind                   = jwksKind
-	JwksPublicKeyTag           = jwksPublicKeyTag
-	JwksPrivateKeyTag          = jwksPrivateKeyTag
-	JwksExpiryTag              = jwksExpiryTag
-	OAuthKind                  = oauthKind
-	OAuthKeyTag                = oauthKeyTag
-	OAuthSessionStoreSecretTag = oauthSessionStoreSecretTag
-	NewUUID                    = &newUUID
-	MigrationTableName         = migrationTableName
-	JobLogLockQuery            = &jobLoglockQuery
+	NewUUID            = &newUUID
+	MigrationTableName = migrationTableName
+	JobLogLockQuery    = &jobLoglockQuery
 )
 
 func (d *Database) MigrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {

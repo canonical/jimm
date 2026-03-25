@@ -11,8 +11,7 @@ type SetupOption func(*SetupOptions)
 //
 // Fields are unexported; callers should use the With* helpers.
 type SetupOptions struct {
-	useRealAuthN     bool
-	useHardcodedJWKS bool
+	useRealAuthN bool
 }
 
 func applySetupOptions(opts []SetupOption) SetupOptions {
@@ -31,13 +30,5 @@ func applySetupOptions(opts []SetupOption) SetupOptions {
 func WithRealAuthN() SetupOption {
 	return func(o *SetupOptions) {
 		o.useRealAuthN = true
-	}
-}
-
-// WithHardcodedJWKS controls whether the test env seeds a hard-coded JWKS into
-// the credential store (true) or starts the JWKS rotator (false).
-func WithHardcodedJWKS() SetupOption {
-	return func(o *SetupOptions) {
-		o.useHardcodedJWKS = true
 	}
 }

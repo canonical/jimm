@@ -3,88 +3,86 @@
 package jimmjwx_test
 
 import (
-	"context"
-	"testing"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
-	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
-	"github.com/canonical/jimm/v3/internal/vault"
 )
 
-func newStore(t testing.TB) *vault.VaultStore {
-	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t)
-	if !ok {
-		t.Skip("vault not available")
-	}
-	return &vault.VaultStore{
-		Client:       client,
-		RoleID:       roleID,
-		RoleSecretID: roleSecretID,
-		KVPath:       path,
-	}
+// generateJWK generates a fresh RSA keypair and corresponding JWKS for tests.
+//
+// It will return a jwk.Set containing the public key
+// and a PEM encoded private key for JWT signing.
+func generateJWK(c *qt.C) (jwk.Set, []byte) {
+	c.Helper()
+
+	keySet, err := rsa.GenerateKey(rand.Reader, 2048)
+	c.Assert(err, qt.IsNil)
+
+	privateKeyPEM := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(keySet),
+		},
+	)
+
+	kid, err := uuid.NewRandom()
+	c.Assert(err, qt.IsNil)
+
+	jwks, err := jwk.FromRaw(keySet.PublicKey)
+	c.Assert(err, qt.IsNil)
+	err = jwks.Set(jwk.KeyIDKey, kid.String())
+	c.Assert(err, qt.IsNil)
+
+	err = jwks.Set(jwk.KeyUsageKey, "sig")
+	c.Assert(err, qt.IsNil)
+
+	err = jwks.Set(jwk.AlgorithmKey, jwa.RS256)
+	c.Assert(err, qt.IsNil)
+
+	ks := jwk.NewSet()
+	err = ks.AddKey(jwks)
+	c.Assert(err, qt.IsNil)
+
+	return ks, privateKeyPEM
 }
 
-func getJWKS(c *qt.C) jwk.Set {
-	set, err := jwk.ParseString(`
-	{
-		"keys": [
-		  {
-			"alg": "RS256",
-			"kty": "RSA",
-			"use": "sig",
-			"n": "yeNlzlub94YgerT030codqEztjfU_S6X4DbDA_iVKkjAWtYfPHDzz_sPCT1Axz6isZdf3lHpq_gYX4Sz-cbe4rjmigxUxr-FgKHQy3HeCdK6hNq9ASQvMK9LBOpXDNn7mei6RZWom4wo3CMvvsY1w8tjtfLb-yQwJPltHxShZq5-ihC9irpLI9xEBTgG12q5lGIFPhTl_7inA1PFK97LuSLnTJzW0bj096v_TMDg7pOWm_zHtF53qbVsI0e3v5nmdKXdFf9BjIARRfVrbxVxiZHjU6zL6jY5QJdh1QCmENoejj_ytspMmGW7yMRxzUqgxcAqOBpVm0b-_mW3HoBdjQ",
-			"e": "AQAB",
-			"kid": "32d2b213-d3fe-436c-9d4c-67a673890620"
-		  }
-		]
-	}
-	`)
+func newJWKSServiceParams(c *qt.C) (jimmjwx.JWKSServiceParams, jwk.Set, []byte) {
+	c.Helper()
+	set, privateKey := generateJWK(c)
+	rawJWKS, err := json.Marshal(set)
 	c.Assert(err, qt.IsNil)
-	return set
+	return jimmjwx.JWKSServiceParams{
+		JWKS:          string(rawJWKS),
+		PrivateKeyPEM: string(privateKey),
+		CacheMaxAge:   "600",
+	}, set, privateKey
 }
 
-// startTestRotator starts a rotator, returning the ks that has been found
-// it does not guarantee the keyset has any keys!
-func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.CredentialStore, svc *jimmjwx.JWKSService) jwk.Set {
-	err := store.CleanupJWKS(ctx)
+func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jwk.Set) {
+	c.Helper()
+	params, set, _ := newJWKSServiceParams(c)
+	service, err := jimmjwx.NewJWKSService(params)
 	c.Assert(err, qt.IsNil)
-
-	tick := make(chan time.Time, 1)
-	tick <- time.Now()
-	err = svc.StartJWKSRotator(ctx, tick, time.Now().AddDate(0, 3, 0))
-	c.Assert(err, qt.IsNil)
-
-	var ks jwk.Set
-	// We retry 500ms * 60 (30s)
-	for i := 0; i < 60; i++ {
-		if ks == nil {
-			ks, err = store.GetJWKS(ctx)
-			if err != nil {
-				c.Logf("failed to get JWKS: %s", err)
-			}
-			time.Sleep(500 * time.Millisecond)
-			continue
-		}
-		break
-
-	}
-	c.Assert(err, qt.IsNil)
-	key, ok := ks.Key(0)
-	c.Assert(ok, qt.IsTrue)
-	_, err = uuid.Parse(key.KeyID())
-	c.Assert(err, qt.IsNil)
-	return ks
+	return service, set
 }
 
-// setupCredentialStore sets up an in-memory credential store for testing.
-func setupCredentialStore(_ context.Context, _ *qt.C) credentials.CredentialStore {
-	store := jimmtest.NewInMemoryCredentialStore()
-
-	return store
+func newJWTService(c *qt.C, expiry time.Duration) (*jimmjwx.JWTService, jwk.Set) {
+	c.Helper()
+	service, set := newJWKSService(c)
+	return jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:       "host",
+		Expiry:     expiry,
+		JWKS:       service,
+		SigningKey: service.SigningKey(),
+	}), set
 }

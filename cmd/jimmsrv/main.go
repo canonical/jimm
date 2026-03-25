@@ -216,6 +216,9 @@ func start(ctx context.Context, s *service.Service) error {
 		AuditLogRetentionPeriodInDays: os.Getenv("JIMM_AUDIT_LOG_RETENTION_PERIOD_IN_DAYS"),
 		MacaroonExpiryDuration:        macaroonExpiryDuration,
 		JWTExpiryDuration:             jwtExpiryDuration,
+		JWKS:                          os.Getenv("JIMM_JWKS"),
+		JWKSPrivateKey:                os.Getenv("JIMM_JWKS_PRIVATE_KEY"),
+		JWKSCacheMaxAge:               os.Getenv("JIMM_JWKS_CACHE_MAX_AGE"),
 		InsecureSecretStorage:         insecureSecretStorage,
 		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
 			IssuerURL:            issuerURL,

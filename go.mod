@@ -40,13 +40,12 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/gosuri/uitable v0.0.4
-	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/vault/api v1.13.0
 	github.com/hashicorp/vault/api/auth/approle v0.6.0
 	github.com/itchyny/gojq v0.12.12
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgx/v4 v4.18.3
-	github.com/lestrrat-go/iter v1.0.2
+	github.com/lestrrat-go/iter v1.0.2 // indirect
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/mattn/go-colorable v0.1.14
 	github.com/oklog/ulid/v2 v2.1.1

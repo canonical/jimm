@@ -4,9 +4,7 @@ package vault
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	goerr "errors"
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -16,23 +14,13 @@ import (
 	"github.com/hashicorp/vault/api"
 	auth "github.com/hashicorp/vault/api/auth/approle"
 	"github.com/juju/names/v5"
-	"github.com/juju/zaputil/zapctx"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
 )
 
 const (
 	usernameKey = "username"
 	passwordKey = "password"
-)
-
-const (
-	jwksKey        = "jwks"
-	jwksExpiryKey  = "jwks-expiry"
-	jwksPrivateKey = "jwks-private"
-	oAuthSecretKey = "oauth-secret"
 )
 
 // A VaultStore stores cloud credential attributes and
@@ -73,7 +61,7 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (_ m
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.path(tag))
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && errors.Unwrap(err) != api.ErrSecretNotFound {
 		return nil, err
 	}
 	if secret == nil || secret.Data == nil {
@@ -158,7 +146,7 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.controllerCredentialsPath(controllerName))
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && errors.Unwrap(err) != api.ErrSecretNotFound {
 		return "", "", err
 	}
 	if secret == nil || secret.Data == nil {
@@ -202,235 +190,6 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 		return err
 	}
 	return nil
-}
-
-// CleanupJWKS removes all secrets associated with the JWKS process.
-func (s *VaultStore) CleanupJWKS(ctx context.Context) (err error) {
-	const op = "vault.CleanupJWKS"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return err
-	}
-
-	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSExpiryPath()); err != nil {
-		return err
-	}
-
-	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPath()); err != nil {
-		return err
-	}
-
-	if err = client.KVv2(s.KVPath).Delete(ctx, s.getJWKSPrivateKeyPath()); err != nil {
-		return err
-	}
-	return nil
-}
-
-// GetJWKS returns the current key set stored within the credential store.
-func (s *VaultStore) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
-	const op = "vault.GetJWKS"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, err
-	}
-
-	// This is how the current version of vaults API Read works,
-	// if the secret is not present on the path, it will instead return
-	// nil for the secret and a nil error. So we must check for this.
-	if secret == nil || secret.Data == nil {
-		msg := "no JWKS exists yet."
-		zapctx.Debug(ctx, msg)
-		return nil, errors.Codef(errors.CodeNotFound, "%s", msg)
-	}
-
-	jsonString, ok := secret.Data[jwksKey].(string)
-	if !ok {
-		return nil, errors.New("invalid type for jwks")
-	}
-
-	ks, err := jwk.ParseString(jsonString)
-	if err != nil {
-		return nil, err
-	}
-
-	return ks, nil
-}
-
-// GetJWKSPrivateKey returns the current private key for the active JWKS
-func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error) {
-	const op = "vault.GetJWKSPrivateKey"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPrivateKeyPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return nil, err
-	}
-
-	if secret == nil || secret.Data == nil {
-		msg := "no JWKS private key exists yet."
-		zapctx.Debug(ctx, msg)
-		return nil, errors.Codef(errors.CodeNotFound, "%s", msg)
-	}
-
-	keyPemB64 := secret.Data[jwksPrivateKey].(string)
-
-	keyPem, err := base64.StdEncoding.DecodeString(keyPemB64)
-	if err != nil {
-		return nil, err
-	}
-
-	return keyPem, nil
-}
-
-// GetJWKSExpiry returns the expiry of the active JWKS.
-func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error) {
-	const op = "vault.getJWKSExpiry"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	now := time.Now()
-	client, err := s.client(ctx)
-	if err != nil {
-		return now, err
-	}
-
-	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSExpiryPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
-		return now, err
-	}
-
-	if secret == nil || secret.Data == nil {
-		msg := "no JWKS expiry exists yet."
-		zapctx.Debug(ctx, msg)
-		return now, errors.Codef(errors.CodeNotFound, "%s", msg)
-	}
-
-	expiry, ok := secret.Data[jwksExpiryKey].(string)
-	if !ok {
-		return now, errors.New("failed to retrieve expiry")
-	}
-
-	t, err := time.Parse(time.RFC3339, expiry)
-	if err != nil {
-		return now, err
-	}
-
-	return t, nil
-}
-
-// PutJWKS puts a JWKS into the credential store.
-//
-// The pathing is similar to the controllers credentials
-// in that we understand RS256 keys as credentials, rather than crytographic keys.
-func (s *VaultStore) PutJWKS(ctx context.Context, jwks jwk.Set) (err error) {
-	const op = "vault.PutJWKS"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return err
-	}
-
-	jwksJson, err := json.Marshal(jwks)
-	if err != nil {
-		return err
-	}
-
-	jwksData := map[string]any{jwksKey: string(jwksJson)}
-	if _, err = client.KVv2(s.KVPath).Put(ctx, s.getJWKSPath(), jwksData); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// PutJWKSPrivateKey persists the private key associated with the current JWKS within the store.
-func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err error) {
-	const op = "vault.PutJWKSPrivateKey"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return err
-	}
-
-	privateKeyData := map[string]interface{}{jwksPrivateKey: pem}
-	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSPrivateKeyPath(), privateKeyData); err != nil {
-		return err
-	}
-	return nil
-}
-
-// PutJWKSExpiry sets the expiry time for the current JWKS within the store.
-func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err error) {
-	const op = "vault.PutJWKSExpiry"
-
-	durationObserver := servermon.DurationObserver(servermon.VaultCallDurationHistogram, op)
-	defer durationObserver()
-	defer servermon.ErrorCounter(servermon.VaultCallErrorCount, &err, op)
-
-	client, err := s.client(ctx)
-	if err != nil {
-		return err
-	}
-	expiryData := map[string]interface{}{jwksExpiryKey: expiry}
-	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSExpiryPath(), expiryData); err != nil {
-		return err
-	}
-	return nil
-}
-
-// getWellKnownPath returns a hard coded path to the .well-known credentials.
-func (s *VaultStore) getWellKnownPath() string {
-	return path.Join("creds", ".well-known")
-}
-
-// getJWKSPath returns a hardcoded suffixed vault path (dependent on
-// the initial KVPath) to the .well-known JWKS location.
-func (s *VaultStore) getJWKSPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks.json")
-}
-
-// getJWKSPath returns a hardcoded suffixed vault path (dependent on
-// the initial KVPath) to the .well-known JWKS location.
-func (s *VaultStore) getJWKSPrivateKeyPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks-key.pem")
-}
-
-// getJWKSPath returns the path to the jwks expiry secret.
-func (s *VaultStore) getJWKSExpiryPath() string {
-	return path.Join(s.getWellKnownPath(), "jwks-expiry")
 }
 
 // deleteControllerCredentials removes the credentials associated with the controller in

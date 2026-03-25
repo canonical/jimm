@@ -4,56 +4,62 @@ package jimmhttp_test
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	stderrors "errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
-	"github.com/canonical/jimm/v3/internal/vault"
 )
 
-func newStore(t testing.TB) *vault.VaultStore {
-	client, path, roleID, roleSecretID, ok := jimmtest.VaultClient(t)
-	if !ok {
-		t.Skip("vault not available")
-	}
-	return &vault.VaultStore{
-		Client:       client,
-		RoleID:       roleID,
-		RoleSecretID: roleSecretID,
-		KVPath:       path,
-	}
+type failingJWKSProvider struct{}
+
+func (failingJWKSProvider) Get(context.Context) (jwk.Set, error) {
+	return nil, stderrors.New("boom")
 }
 
-func getJWKS(c *qt.C) jwk.Set {
-	set, err := jwk.ParseString(`
-	{
-		"keys": [
-		  {
-			"alg": "RS256",
-			"kty": "RSA",
-			"use": "sig",
-			"n": "yeNlzlub94YgerT030codqEztjfU_S6X4DbDA_iVKkjAWtYfPHDzz_sPCT1Axz6isZdf3lHpq_gYX4Sz-cbe4rjmigxUxr-FgKHQy3HeCdK6hNq9ASQvMK9LBOpXDNn7mei6RZWom4wo3CMvvsY1w8tjtfLb-yQwJPltHxShZq5-ihC9irpLI9xEBTgG12q5lGIFPhTl_7inA1PFK97LuSLnTJzW0bj096v_TMDg7pOWm_zHtF53qbVsI0e3v5nmdKXdFf9BjIARRfVrbxVxiZHjU6zL6jY5QJdh1QCmENoejj_ytspMmGW7yMRxzUqgxcAqOBpVm0b-_mW3HoBdjQ",
-			"e": "AQAB",
-			"kid": "32d2b213-d3fe-436c-9d4c-67a673890620"
-		  }
-		]
-	}
-	`)
+func (failingJWKSProvider) CacheMaxAge() int64 {
+	return 600
+}
+
+func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jimmjwx.JWKSServiceParams) {
+	params, err := jimmtest.StaticJWKSServiceParams()
 	c.Assert(err, qt.IsNil)
-	return set
+	service, err := jimmjwx.NewJWKSService(params)
+	c.Assert(err, qt.IsNil)
+	return service, params
 }
 
-func setupWellknownHandlerAndRecorder(c *qt.C, path string, store *vault.VaultStore) *httptest.ResponseRecorder {
-	handler := jimmhttp.NewWellKnownHandler(store).Routes()
+func newMultiKeyJWKSService(c *qt.C) (*jimmjwx.JWKSService, string) {
+	_, params := newJWKSService(c)
+	var document map[string][]map[string]any
+	err := json.Unmarshal([]byte(params.JWKS), &document)
+	c.Assert(err, qt.IsNil)
+
+	duplicateKey := make(map[string]any, len(document["keys"][0]))
+	maps.Copy(duplicateKey, document["keys"][0])
+	duplicateKey["kid"] = "old-test-kid"
+	document["keys"] = append(document["keys"], duplicateKey)
+
+	rawJWKS, err := json.Marshal(document)
+	c.Assert(err, qt.IsNil)
+	params.JWKS = string(rawJWKS)
+	service, err := jimmjwx.NewJWKSService(params)
+	c.Assert(err, qt.IsNil)
+	return service, string(rawJWKS)
+}
+
+func setupWellknownHandlerAndRecorder(c *qt.C, path string, provider jimmhttp.JWKSProvider) *httptest.ResponseRecorder {
+	handler := jimmhttp.NewWellKnownHandler(provider).Routes()
 	rr := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", path, nil)
 	c.Assert(err, qt.IsNil)
@@ -61,115 +67,66 @@ func setupWellknownHandlerAndRecorder(c *qt.C, path string, store *vault.VaultSt
 	return rr
 }
 
-// 404: In the event the JWKS cannot be found explicitly from
-// the credential store.
-func TestWellknownAPIJWKSJSONHandles404(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	err := store.CleanupJWKS(ctx)
+func assertJSONBodyEquals(c *qt.C, body []byte, expected string) {
+	c.Helper()
+	var got any
+	var want any
+	err := json.Unmarshal(body, &got)
 	c.Assert(err, qt.IsNil)
-
-	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
-
-	resp := rr.Result()
-	defer resp.Body.Close()
-	code := rr.Code
-	b, err := io.ReadAll(resp.Body)
+	err = json.Unmarshal([]byte(expected), &want)
 	c.Assert(err, qt.IsNil)
-	c.Assert(code, qt.Equals, http.StatusNotFound)
-	c.Assert(b, qt.JSONEquals, map[string]any{
-		"Code":    errors.CodeNotFound,
-		"Err":     nil,
-		"Info":    nil,
-		"Message": "JWKS does not exist yet",
-	})
+	c.Assert(got, qt.DeepEquals, want)
 }
 
-// 500: In the event an expiry cannot be found, but a JWKS can.
 func TestWellknownAPIJWKSJSONHandles500(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	err := store.CleanupJWKS(ctx)
-	c.Assert(err, qt.IsNil)
-
-	jwks := getJWKS(c)
-
-	err = store.PutJWKS(ctx, jwks)
-	c.Assert(err, qt.IsNil)
-
-	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
+	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", failingJWKSProvider{})
 
 	resp := rr.Result()
 	defer resp.Body.Close()
 	code := rr.Code
 	b, err := io.ReadAll(resp.Body)
-
 	c.Assert(err, qt.IsNil)
 	c.Assert(code, qt.Equals, http.StatusInternalServerError)
 	c.Assert(b, qt.JSONEquals, map[string]any{
 		"Code":    errors.CodeJWKSRetrievalFailed,
-		"Info":    nil,
 		"Err":     nil,
-		"Message": "something went wrong...",
+		"Info":    nil,
+		"Message": "failed to retrieve JWKS",
 	})
 }
 
 func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
-	store := newStore(c)
-	err := store.CleanupJWKS(ctx)
-	c.Assert(err, qt.IsNil)
+	service, params := newJWKSService(c)
+	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", service)
 
-	jwks := getJWKS(c)
-
-	err = store.PutJWKS(ctx, jwks)
-	c.Assert(err, qt.IsNil)
-
-	// Test with expiry > 10min (should use 10min)
-	now := time.Now().UTC()
-	expiry := now.Add(30 * time.Minute)
-	err = store.PutJWKSExpiry(ctx, expiry)
-	c.Assert(err, qt.IsNil)
-	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
 	resp := rr.Result()
 	defer resp.Body.Close()
 	code := rr.Code
 	b, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(b, qt.JSONEquals, jwks)
 	c.Assert(code, qt.Equals, http.StatusOK)
+	assertJSONBodyEquals(c, b, params.JWKS)
 	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=600")
+}
 
-	// Test with expiry < 5min (should use actual expiry)
-	expiryShort := now.Add(3 * time.Minute)
-	err = store.PutJWKSExpiry(ctx, expiryShort)
-	c.Assert(err, qt.IsNil)
-	rr = setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
-	resp = rr.Result()
-	defer resp.Body.Close()
-	code = rr.Code
-	b, err = io.ReadAll(resp.Body)
-	c.Assert(err, qt.IsNil)
-	c.Assert(b, qt.JSONEquals, jwks)
-	c.Assert(code, qt.Equals, http.StatusOK)
-	remaining := int(expiryShort.Sub(now).Seconds())
-	regexMaxAge := fmt.Sprintf(("(%d|%d)"), remaining, remaining-1)
-	c.Assert(resp.Header.Get("Cache-Control"), qt.Matches, fmt.Sprintf("must-revalidate, max-age=%s", regexMaxAge))
+func TestWellknownAPIJWKSJSONServesMultipleKeys(t *testing.T) {
+	c := qt.New(t)
+	service, rawJWKS := newMultiKeyJWKSService(c)
+	rr := setupWellknownHandlerAndRecorder(c, "/jwks.json", service)
 
-	// Test with expiry in the past (should use max-age=10)
-	expiryPast := now.Add(-5 * time.Minute)
-	err = store.PutJWKSExpiry(ctx, expiryPast)
-	c.Assert(err, qt.IsNil)
-	rr = setupWellknownHandlerAndRecorder(c, "/jwks.json", store)
-	resp = rr.Result()
+	resp := rr.Result()
 	defer resp.Body.Close()
-	code = rr.Code
-	b, err = io.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(b, qt.JSONEquals, jwks)
-	c.Assert(code, qt.Equals, http.StatusOK)
-	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=10")
+	c.Assert(rr.Code, qt.Equals, http.StatusOK)
+	assertJSONBodyEquals(c, b, rawJWKS)
+
+	var body struct {
+		Keys []map[string]any `json:"keys"`
+	}
+	err = json.Unmarshal(b, &body)
+	c.Assert(err, qt.IsNil)
+	c.Assert(body.Keys, qt.HasLen, 2)
 }

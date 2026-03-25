@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/juju/api/base"
@@ -17,7 +16,6 @@ import (
 	"github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -1744,33 +1742,6 @@ func (s testCloudCredentialAttributeStore) GetControllerCredentials(ctx context.
 }
 
 func (s testCloudCredentialAttributeStore) PutControllerCredentials(ctx context.Context, controllerName string, username string, password string) error {
-	return errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-
-func (s testCloudCredentialAttributeStore) GetJWKS(ctx context.Context) (jwk.Set, error) {
-	return nil, errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-
-func (s testCloudCredentialAttributeStore) GetJWKSPrivateKey(ctx context.Context) ([]byte, error) {
-	return nil, errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-
-func (s testCloudCredentialAttributeStore) GetJWKSExpiry(ctx context.Context) (time.Time, error) {
-	return time.Now(), errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-
-func (s testCloudCredentialAttributeStore) PutJWKS(ctx context.Context, jwks jwk.Set) error {
-	return errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-func (s testCloudCredentialAttributeStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) error {
-	return errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-
-func (s testCloudCredentialAttributeStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) error {
-	return errors.Codef(errors.CodeNotImplemented, "not implemented")
-}
-
-func (s testCloudCredentialAttributeStore) CleanupJWKS(ctx context.Context) error {
 	return errors.Codef(errors.CodeNotImplemented, "not implemented")
 }
 
