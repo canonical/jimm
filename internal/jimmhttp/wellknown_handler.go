@@ -20,6 +20,7 @@ const (
 	JwksEndpoint = "/jwks.json"
 )
 
+// JWKSProvider defines the interface for retrieving JWKS material and cache max age.
 type JWKSProvider interface {
 	Get(ctx context.Context) (jwk.Set, error)
 	CacheMaxAge() int64

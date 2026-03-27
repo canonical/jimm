@@ -90,6 +90,7 @@ func NewJWKSService(p JWKSServiceParams) (*JWKSService, error) {
 	}, nil
 }
 
+// Get returns the JWKS set to be served at /.well-known/jwks.json.
 func (jwks *JWKSService) Get(_ context.Context) (jwk.Set, error) {
 	if jwks == nil {
 		return nil, errors.New("missing jwks service")
@@ -97,6 +98,7 @@ func (jwks *JWKSService) Get(_ context.Context) (jwk.Set, error) {
 	return jwks.set, nil
 }
 
+// CacheMaxAge returns the Cache-Control max-age, in seconds, for /.well-known/jwks.json.
 func (jwks *JWKSService) CacheMaxAge() int64 {
 	if jwks == nil {
 		return 0
@@ -104,6 +106,8 @@ func (jwks *JWKSService) CacheMaxAge() int64 {
 	return jwks.cacheMaxAge
 }
 
+// SigningKey returns the jwk.Key to be used for signing JWTs.
+// This is the private key corresponding to one of the public keys in the JWKS.
 func (jwks *JWKSService) SigningKey() jwk.Key {
 	if jwks == nil {
 		return nil
