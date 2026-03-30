@@ -276,7 +276,7 @@ Should you cancel this process, you can track the progress via bootstrap-status 
 	return poller.watchBootstrapLogs()
 }
 
-// cloudToParams converts a jujucloud.Cloud to the embedded bootstrap request cloud shape.
+// cloudToParams converts a jujucloud.Cloud to the bootstrap request cloud shape.
 func cloudToParams(cloudName, regionName string, cloud *jujucloud.Cloud) apiparams.BootstrapCloud {
 	paramsCloud := apiparams.BootstrapCloud{
 		Name: cloudName,
@@ -307,9 +307,6 @@ func cloudToParams(cloudName, regionName string, cloud *jujucloud.Cloud) apipara
 			}
 			break
 		}
-	}
-	if paramsCloud.Region.Name == "" {
-		paramsCloud.Region.Name = regionName
 	}
 	return paramsCloud
 }
