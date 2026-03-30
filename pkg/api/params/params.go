@@ -261,7 +261,7 @@ type ControllerProfile struct {
 	// UpdatedAt is the time the profile was last updated.
 	UpdatedAt string `json:"updated-at,omitempty" yaml:"updated-at,omitempty"`
 	// Cloud stores the cloud definition for the profile.
-	Cloud ControllerProfileCloud `json:"cloud" yaml:"cloud"`
+	Cloud BootstrapCloud `json:"cloud" yaml:"cloud"`
 	// BootstrapOptions holds the reusable bootstrap settings saved in the profile.
 	BootstrapOptions BootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
 }
@@ -278,8 +278,8 @@ type ControllerProfileSummary struct {
 	UpdatedAt string `json:"updated-at,omitempty" yaml:"updated-at,omitempty"`
 }
 
-// ControllerProfileCloud stores the cloud definition persisted in a controller profile.
-type ControllerProfileCloud struct {
+// BootstrapCloud stores the cloud definition used for controller bootstrap.
+type BootstrapCloud struct {
 	// Name is the cloud's name, e.g. "aws", "azure", "gcp", "localhost", etc.
 	Name string `json:"name" yaml:"name"`
 	// Type is the cloud's type, e.g. "ec2", "azure", "openstack", etc.
@@ -294,12 +294,12 @@ type ControllerProfileCloud struct {
 	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	// HostCloudRegion contains the host cloud region for the cloud, if any.
 	HostCloudRegion string `json:"host-cloud-region,omitempty" yaml:"host-cloud-region,omitempty"`
-	// Region contains the cloud region definition for the profile's bootstrap region.
-	Region ControllerProfileCloudRegion `json:"region" yaml:"region"`
+	// Region contains the cloud region definition for the controller.
+	Region BootstrapCloudRegion `json:"region" yaml:"region"`
 }
 
-// ControllerProfileCloudRegion stores the single bootstrap region definition for a profile.
-type ControllerProfileCloudRegion struct {
+// BootstrapCloudRegion stores the single bootstrap region definition for controller bootstrap.
+type BootstrapCloudRegion struct {
 	// Name is the region's name, e.g. "us-east-1".
 	Name string `json:"name" yaml:"name"`
 	// Endpoint contains the region-specific cloud API endpoint, if needed.
@@ -776,23 +776,20 @@ type StartBootstrapResponse struct {
 // BootstrapParams holds parameters for starting
 // a controller bootstrap job.
 type BootstrapParams struct {
-	// CloudName specifies the target cloud for the controller.
-	CloudName string `json:"cloud-name"`
-	// RegionName specifies the target region for the controller.
-	RegionName string `json:"region-name"`
 	// Cloud holds the cloud definition that will be used to bootstrap the controller.
-	Cloud jujuparams.Cloud `json:"cloud,omitempty"`
+	// The cloud name and bootstrap region are carried inside this object.
+	Cloud BootstrapCloud `json:"cloud" yaml:"cloud"`
 	// Credential contains the cloud credential and its tag, this credential will be used against the
 	// the cloud provided to bootstrap the controller.
-	Credential jujuparams.CloudCredential `json:"credential"`
+	Credential jujuparams.CloudCredential `json:"credential" yaml:"credential"`
 
 	// ControllerName specifies the name of the controller as recorded in JIMM.
-	ControllerName string `json:"controller-name"`
+	ControllerName string `json:"controller-name" yaml:"controller-name"`
 	// BootstrapOptions holds the supported bootstrap settings for the job.
-	BootstrapOptions BootstrapOptions `json:"bootstrap-options"`
+	BootstrapOptions BootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
 
 	// ControllerVersion is the version of the controller to be bootstrapped.
-	ControllerVersion string `json:"controller-version"`
+	ControllerVersion string `json:"controller-version" yaml:"controller-version"`
 }
 
 // DestroyControllerRequest holds the name of

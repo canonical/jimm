@@ -667,15 +667,15 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 	// Validate request is not for a built in cloud.
 	// Using a fixed slice over `juju/cmd/juju/common.BuiltInClouds()` as that
 	// function requires providers to be registered in the environs global.
-	if slices.Contains(builtInClouds, req.CloudName) {
+	if slices.Contains(builtInClouds, req.Cloud.Name) {
 		return apiparams.StartBootstrapResponse{},
-			errors.E(errors.CodeIncompatibleClouds, fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", req.CloudName))
+			errors.E(errors.CodeIncompatibleClouds, fmt.Errorf("bootstrap via JIMM does not support built-in clouds like %q", req.Cloud.Name))
 	}
 
-	cloudNameAndRegion := req.CloudName
+	cloudNameAndRegion := req.Cloud.Name
 
-	if req.RegionName != "" {
-		cloudNameAndRegion = fmt.Sprintf("%s/%s", req.CloudName, req.RegionName)
+	if req.Cloud.Region.Name != "" {
+		cloudNameAndRegion = fmt.Sprintf("%s/%s", req.Cloud.Name, req.Cloud.Region.Name)
 	}
 
 	params := bootstrap.BootstrapParams{
@@ -684,7 +684,7 @@ func (r *controllerRoot) StartBootstrap(ctx context.Context, req apiparams.Boots
 		CloudNameAndRegion: cloudNameAndRegion,
 		ControllerName:     req.ControllerName,
 
-		Cloud: cloudFromParams(req.CloudName, req.Cloud),
+		Cloud: bootstrapCloudFromParams(req.Cloud),
 		CloudCred: cloud.NewNamedCredential(
 			"bootstrap-credential",
 			cloud.AuthType(req.Credential.AuthType),

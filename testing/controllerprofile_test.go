@@ -18,14 +18,14 @@ func testControllerProfileRequest(name string) apiparams.SaveControllerProfileRe
 			Name:        name,
 			Description: "Reusable bootstrap settings",
 			JujuVersion: "3.6",
-			Cloud: apiparams.ControllerProfileCloud{
+			Cloud: apiparams.BootstrapCloud{
 				Name:           "aws",
 				Type:           "ec2",
 				AuthTypes:      []string{"access-key"},
 				CACertificates: []string{"ca-cert"},
 				Config:         map[string]interface{}{"default-base": "ubuntu@24.04"},
 				Endpoint:       "https://aws.example.com",
-				Region: apiparams.ControllerProfileCloudRegion{
+				Region: apiparams.BootstrapCloudRegion{
 					Name:             "eu-west-1",
 					Endpoint:         "https://region.example.com",
 					IdentityEndpoint: "https://identity.example.com",

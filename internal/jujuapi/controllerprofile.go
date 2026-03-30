@@ -167,7 +167,7 @@ func controllerProfileToParams(profile dbmodel.ControllerProfile) apiparams.Cont
 		Version:     profile.Version,
 		CreatedAt:   profile.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   profile.UpdatedAt.Format(time.RFC3339),
-		Cloud: apiparams.ControllerProfileCloud{
+		Cloud: apiparams.BootstrapCloud{
 			Name:            profile.Cloud.Name,
 			Type:            profile.Cloud.Type,
 			AuthTypes:       []string(profile.Cloud.AuthTypes),
@@ -175,7 +175,7 @@ func controllerProfileToParams(profile dbmodel.ControllerProfile) apiparams.Cont
 			Config:          map[string]interface{}(profile.Cloud.Config),
 			Endpoint:        profile.Cloud.Endpoint,
 			HostCloudRegion: profile.Cloud.HostCloudRegion,
-			Region: apiparams.ControllerProfileCloudRegion{
+			Region: apiparams.BootstrapCloudRegion{
 				Name:             profile.Cloud.Region.Name,
 				Endpoint:         profile.Cloud.Region.Endpoint,
 				IdentityEndpoint: profile.Cloud.Region.IdentityEndpoint,

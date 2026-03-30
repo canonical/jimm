@@ -341,7 +341,9 @@ func TestBootstrapStart_RejectsBuiltinClouds(t *testing.T) {
 	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
 
 	params := apiparams.BootstrapParams{
-		CloudName: "localhost",
+		Cloud: apiparams.BootstrapCloud{
+			Name: "localhost",
+		},
 	}
 
 	_, err := root.StartBootstrap(ctx, params)
@@ -372,8 +374,12 @@ func TestBootstrapStart(t *testing.T) {
 
 	params := apiparams.BootstrapParams{
 		ControllerName: "controller",
-		CloudName:      "cloud",
-		RegionName:     "region",
+		Cloud: apiparams.BootstrapCloud{
+			Name: "cloud",
+			Region: apiparams.BootstrapCloudRegion{
+				Name: "region",
+			},
+		},
 		BootstrapOptions: apiparams.BootstrapOptions{
 			BootstrapBase:        "ubuntu@24.04",
 			BootstrapConstraints: map[string]string{"mem": "8G"},
@@ -388,7 +394,6 @@ func TestBootstrapStart(t *testing.T) {
 			ControllerConfig:      map[string]string{"audit-log-enabled": "true"},
 			ControllerModelConfig: map[string]string{"image-stream": "released"},
 		},
-		Cloud:             jujuparams.Cloud{},
 		Credential:        jujuparams.CloudCredential{},
 		ControllerVersion: "3.6.9",
 	}

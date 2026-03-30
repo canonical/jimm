@@ -92,8 +92,14 @@ func TestBootstrapWithPublicCloud(t *testing.T) {
 	}, nil)
 
 	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
-		// If the cloud is public, the Cloud field should be empty.
-		c.Check(bsp.Cloud, qt.DeepEquals, jujuparams.Cloud{})
+		// Public clouds still omit provider metadata, but the request must carry
+		// the selected cloud name and region inside the embedded cloud object.
+		c.Check(bsp.Cloud, qt.DeepEquals, params.BootstrapCloud{
+			Name: cloudName,
+			Region: params.BootstrapCloudRegion{
+				Name: "region",
+			},
+		})
 		return &params.StartBootstrapResponse{JobID: "test-job-id"}, nil
 	})
 	s.client.EXPECT().Close().Return(nil)
@@ -149,13 +155,14 @@ func TestBootstrapApiParams(t *testing.T) {
 	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
 		expected := &params.BootstrapParams{
 			ControllerName: "controller-name",
-			CloudName:      cloudName,
-			RegionName:     "region",
-			Cloud: jujuparams.Cloud{
+			Cloud: params.BootstrapCloud{
+				Name:      cloudName,
 				Type:      "openstack",
 				AuthTypes: []string{string(jujucloud.UserPassAuthType)},
 				Endpoint:  "some-endpoint",
-				Regions:   []jujuparams.CloudRegion{},
+				Region: params.BootstrapCloudRegion{
+					Name: "region",
+				},
 			},
 			Credential: jujuparams.CloudCredential{
 				AuthType:   string(jujucloud.UserPassAuthType),
@@ -170,8 +177,6 @@ func TestBootstrapApiParams(t *testing.T) {
 			ControllerVersion: "controller-version",
 		}
 		c.Check(bsp.ControllerName, qt.Equals, expected.ControllerName)
-		c.Check(bsp.CloudName, qt.Equals, expected.CloudName)
-		c.Check(bsp.RegionName, qt.Equals, expected.RegionName)
 		c.Check(bsp.Cloud, qt.DeepEquals, expected.Cloud)
 		c.Check(bsp.Credential, qt.DeepEquals, expected.Credential)
 		c.Check(bsp.BootstrapOptions, qt.DeepEquals, expected.BootstrapOptions)

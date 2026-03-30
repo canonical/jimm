@@ -214,11 +214,9 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 	}
 
 	req := apiparams.BootstrapParams{
-		CloudName:         c.cloud,
-		RegionName:        c.region,
 		ControllerName:    c.controllerName,
 		ControllerVersion: c.controllerVersion,
-		Cloud:             cloudToParams(bootstrapCloud),
+		Cloud:             cloudToParams(c.cloud, c.region, bootstrapCloud),
 		Credential: jujuparams.CloudCredential{
 			Attributes: bootstrapCred.Attributes(),
 			AuthType:   string(bootstrapCred.AuthType()),
@@ -278,44 +276,40 @@ Should you cancel this process, you can track the progress via bootstrap-status 
 	return poller.watchBootstrapLogs()
 }
 
-// CloudToParams converts a jujucloud.Cloud to a jujuparams.Cloud.
-// Copied from api/client/cloud/cloud.go.
-func cloudToParams(cloud *jujucloud.Cloud) jujuparams.Cloud {
+// cloudToParams converts a jujucloud.Cloud to the embedded bootstrap request cloud shape.
+func cloudToParams(cloudName, regionName string, cloud *jujucloud.Cloud) apiparams.BootstrapCloud {
+	paramsCloud := apiparams.BootstrapCloud{
+		Name: cloudName,
+		Region: apiparams.BootstrapCloudRegion{
+			Name: regionName,
+		},
+	}
 	if cloud == nil {
-		return jujuparams.Cloud{}
+		return paramsCloud
 	}
 	authTypes := make([]string, len(cloud.AuthTypes))
 	for i, authType := range cloud.AuthTypes {
 		authTypes[i] = string(authType)
 	}
-	regions := make([]jujuparams.CloudRegion, len(cloud.Regions))
-	for i, region := range cloud.Regions {
-		regions[i] = jujuparams.CloudRegion{
-			Name:             region.Name,
-			Endpoint:         region.Endpoint,
-			IdentityEndpoint: region.IdentityEndpoint,
-			StorageEndpoint:  region.StorageEndpoint,
+	paramsCloud.Type = cloud.Type
+	paramsCloud.AuthTypes = authTypes
+	paramsCloud.Endpoint = cloud.Endpoint
+	paramsCloud.CACertificates = cloud.CACertificates
+	paramsCloud.HostCloudRegion = cloud.HostCloudRegion
+	paramsCloud.Config = cloud.Config
+	for _, region := range cloud.Regions {
+		if region.Name == regionName {
+			paramsCloud.Region = apiparams.BootstrapCloudRegion{
+				Name:             region.Name,
+				Endpoint:         region.Endpoint,
+				IdentityEndpoint: region.IdentityEndpoint,
+				StorageEndpoint:  region.StorageEndpoint,
+			}
+			break
 		}
 	}
-	var regionConfig map[string]map[string]interface{}
-	for r, attr := range cloud.RegionConfig {
-		if regionConfig == nil {
-			regionConfig = make(map[string]map[string]interface{})
-		}
-		regionConfig[r] = attr
+	if paramsCloud.Region.Name == "" {
+		paramsCloud.Region.Name = regionName
 	}
-	return jujuparams.Cloud{
-		Type:              cloud.Type,
-		HostCloudRegion:   cloud.HostCloudRegion,
-		AuthTypes:         authTypes,
-		Endpoint:          cloud.Endpoint,
-		IdentityEndpoint:  cloud.IdentityEndpoint,
-		StorageEndpoint:   cloud.StorageEndpoint,
-		Regions:           regions,
-		CACertificates:    cloud.CACertificates,
-		SkipTLSVerify:     cloud.SkipTLSVerify,
-		Config:            cloud.Config,
-		RegionConfig:      regionConfig,
-		IsControllerCloud: cloud.IsControllerCloud,
-	}
+	return paramsCloud
 }
