@@ -442,7 +442,7 @@ func TestControllerConfig(t *testing.T) {
 	c.Assert(config.SSHServerPort(), qt.Equals, 17022)
 
 	_, err = j.ControllerConfig(ctx, alice, "not-found")
-	c.Assert(err, qt.ErrorMatches, "controller not found.*")
+	c.Assert(err, qt.ErrorMatches, "controller not found")
 }
 
 const testImportModelEnv = `
@@ -768,7 +768,7 @@ func TestImportModel(t *testing.T) {
 		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
 			return jujuclient.ModelInfo{}, errors.Codef(errors.CodeNotFound, "model not found")
 		},
-		expectedError: "model not found.*",
+		expectedError: "model not found",
 	}, {
 		about:          "fail import from local user without newOwner flag",
 		user:           "alice@canonical.com",
@@ -1124,14 +1124,14 @@ func TestUpdateMigratedModel(t *testing.T) {
 		about:         "model not found",
 		user:          "alice@canonical.com",
 		model:         names.NewModelTag("unknown-model"),
-		expectedError: "model not found.*",
+		expectedError: "model not found",
 		jimmAdmin:     true,
 	}, {
 		about:            "controller not found",
 		user:             "alice@canonical.com",
 		model:            names.NewModelTag("00000002-0000-0000-0000-000000000002"),
 		targetController: "no-such-controller",
-		expectedError:    "controller not found.*",
+		expectedError:    "controller not found",
 		jimmAdmin:        true,
 	}, {
 		about:            "api returns an error",

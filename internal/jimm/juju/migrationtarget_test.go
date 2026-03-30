@@ -110,7 +110,7 @@ func TestAbortMigration_Success(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 
 	// Check the model has been deleted from the database.
 	model := &dbmodel.Model{
@@ -120,7 +120,7 @@ func TestAbortMigration_Success(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(ctx, model)
-	c.Assert(err, qt.ErrorMatches, `.*model not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 
 	// Check that permissions for the user have been removed.
 	ok, err := user.IsModelAdmin(ctx, names.NewModelTag(migratingModelUUID))
@@ -144,7 +144,7 @@ func TestAbortMigration_MissingIncomingModel(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	err := j.AbortMigration(ctx, user, "foo")
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
 func TestCheckMachines_Success(t *testing.T) {
@@ -192,7 +192,7 @@ func TestCheckMachines_MissingIncomingModel(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	_, err := j.CheckMachines(ctx, user, "foo")
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
 func TestControllerDetailsForIncomingModel(t *testing.T) {
@@ -552,7 +552,7 @@ func TestPrechecks_MissingCloudCredential(t *testing.T) {
 	})
 
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `^cloudcredential "test/alice@canonical.com/test-cred-not-found" not found.*$`)
+	c.Assert(err, qt.ErrorMatches, `^cloudcredential "test/alice@canonical.com/test-cred-not-found" not found$`)
 }
 
 func TestPrechecks_ControllerUnreachable(t *testing.T) {
@@ -659,7 +659,7 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
 func TestAdoptResources_Success(t *testing.T) {
@@ -706,7 +706,7 @@ func TestAdoptResources_NoModel(t *testing.T) {
 	j := newTestJujuManager(c, nil)
 
 	err := j.AdoptResources(ctx, nil, "foo", version.MustParse("3.6.9"))
-	c.Assert(err, qt.ErrorMatches, `.*model not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 }
 
 const testEnvWithIncomingMigrationAndModel = `clouds:
@@ -806,7 +806,7 @@ func TestActivate_Success(t *testing.T) {
 	}
 	// Check the model migration has been removed from the database.
 	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 
 	var count int64
 	err = j.Database.DB.Model(&dbmodel.UserMapping{}).Count(&count).Error
@@ -886,7 +886,7 @@ func TestActivate_NoIncomingModelMigration(t *testing.T) {
 	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	err := j.Activate(ctx, user, names.NewModelTag("foo"), migration.SourceControllerInfo{}, nil)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }
 
 type modelDescriptionArgs struct {
@@ -1244,7 +1244,7 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, `.*failed to import model from description: cloudcredential \S+ not found.*$`)
+	c.Assert(err, qt.ErrorMatches, `.*failed to import model from description: cloudcredential \S+ not found$`)
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{
@@ -1407,7 +1407,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 
 	userMapping := dbmodel.UserMapping{
 		ModelUUID:        modelMigration.ModelUUID,
@@ -1415,7 +1415,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		ExternalUserName: "alice@canonical.com",
 	}
 	err = j.Database.GetUserMapping(t.Context(), &userMapping)
-	c.Assert(err, qt.ErrorMatches, `.*user mapping not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*user mapping not found`)
 
 	// Check the model has been deleted.
 	model := &dbmodel.Model{
@@ -1425,7 +1425,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(t.Context(), model)
-	c.Assert(err, qt.ErrorMatches, `.*model not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 
 	// Check the third incoming migration has been deleted, with its model.
 	modelMigration = dbmodel.IncomingModelMigration{
@@ -1435,7 +1435,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 
 	model = &dbmodel.Model{
 		UUID: sql.NullString{
@@ -1444,7 +1444,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(t.Context(), model)
-	c.Assert(err, qt.ErrorMatches, `.*model not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model not found`)
 
 	// Check the fourth incoming migration has been deleted.
 	modelMigration = dbmodel.IncomingModelMigration{
@@ -1454,5 +1454,5 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found.*`)
+	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
 }

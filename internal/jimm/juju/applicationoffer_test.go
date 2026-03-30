@@ -420,7 +420,7 @@ func TestGetApplicationOfferConsumeDetails(t *testing.T) {
 				OfferURL: "no-such-offer",
 			},
 		},
-		expectedError: "application offer not found.*",
+		expectedError: "application offer not found",
 	}}
 
 	for _, test := range tests {
@@ -629,12 +629,12 @@ func TestGetApplicationOffer(t *testing.T) {
 		about:         "user without access cannot get the application offer",
 		user:          u2,
 		offerURL:      "test-offer-url",
-		expectedError: "application offer not found.*",
+		expectedError: "application offer not found",
 	}, {
 		about:         "not found",
 		user:          u1,
 		offerURL:      "offer-not-found",
-		expectedError: "application offer not found.*",
+		expectedError: "application offer not found",
 	}}
 
 	for _, test := range tests {
@@ -883,7 +883,7 @@ func TestOffer(t *testing.T) {
 			offer := dbmodel.ApplicationOffer{}
 
 			return *u, offerParams, offer, func(c *qt.C, err error) {
-				c.Assert(err, qt.ErrorMatches, "model not found.*")
+				c.Assert(err, qt.ErrorMatches, "model not found")
 			}
 		},
 	}, {
@@ -1470,7 +1470,7 @@ func TestDestroyOffer(t *testing.T) {
 		parameterFunc: func(env *environment) (dbmodel.Identity, string) {
 			return env.users[0], "no-such-offer"
 		},
-		expectedError: "application offer not found.*",
+		expectedError: "application offer not found",
 	}, {
 		about:        "controller returns an error",
 		destroyError: "a silly error",

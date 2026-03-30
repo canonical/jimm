@@ -692,7 +692,7 @@ users:
 		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
-	expectError: "model alice@canonical.com/test-model already exists.*",
+	expectError: "model alice@canonical.com/test-model already exists",
 }, {
 	name: "UpdateCredentialError",
 	env: `
@@ -760,7 +760,7 @@ users:
 		Cloud:       names.NewCloudTag("test-cloud"),
 		CloudRegion: "test-region-1",
 	},
-	expectError: "failed to update cloud credential: a silly error.*",
+	expectError: "failed to update cloud credential: a silly error",
 }, {
 	name: "UserWithoutAddModelPermission",
 	env: `
@@ -1671,7 +1671,7 @@ func TestGetModel(t *testing.T) {
 
 	// Get model that doesn't exist
 	_, err = j.GetModel(ctx, "fake-uuid")
-	c.Assert(err, qt.ErrorMatches, "failed to get model: model not found.*")
+	c.Assert(err, qt.ErrorMatches, "failed to get model: model not found")
 }
 
 // Note that this env does not give the everyone user access to the model.
@@ -1819,7 +1819,7 @@ var modelInfoTests = []struct {
 	env:         modelInfoTestEnv,
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000002",
-	expectError: "model not found.*",
+	expectError: "model not found",
 }, {
 	name:             "Access through everyone user",
 	env:              modelInfoTestEnvWithEveryoneAccess,
@@ -2107,7 +2107,7 @@ var modelStatusTests = []struct {
 	name:        "ModelNotFound",
 	username:    "alice@canonical.com",
 	uuid:        "00000001-0000-0000-0000-000000000001",
-	expectError: `model not found.*`,
+	expectError: `model not found`,
 }, {
 	name:        "UnauthorizedUser",
 	env:         modelStatusTestEnv,
@@ -2653,7 +2653,7 @@ var destroyModelTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `model not found.*`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
@@ -2784,7 +2784,7 @@ var dumpModelTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `model not found.*`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
@@ -2887,7 +2887,7 @@ var dumpModelDBTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `model not found.*`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
@@ -2989,7 +2989,7 @@ var validateModelUpgradeTests = []struct {
 	env:             destroyModelTestEnv,
 	username:        "alice@canonical.com",
 	uuid:            "00000002-0000-0000-0000-000000000002",
-	expectError:     `model not found.*`,
+	expectError:     `model not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:            "Unauthorized",
@@ -3224,7 +3224,7 @@ var updateModelCredentialTests = []struct {
 	username:        "alice@canonical.com",
 	credential:      "test-cloud/alice@canonical.com/cred-3",
 	uuid:            "00000002-0000-0000-0000-000000000001",
-	expectError:     `cloudcredential "test-cloud/alice@canonical.com/cred-3" not found.*`,
+	expectError:     `cloudcredential "test-cloud/alice@canonical.com/cred-3" not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name: "update credential returns an error",
