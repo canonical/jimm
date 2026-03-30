@@ -1383,7 +1383,7 @@ func TestGetCloudCredential(t *testing.T) {
 
 			tag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
 
-			return u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found.*`
+			return u, tag, dbmodel.CloudCredential{}, `cloudcredential "test-cloud/alice@canonical.com/test-credential-1" not found`
 		},
 	}}
 	for _, test := range tests {

@@ -143,5 +143,5 @@ func (s *dbSuite) TestJobLogs_lockJobLogs(c *qt.C) {
 	<-lockAcquired
 
 	err = s.Database.AddJobLog(ctx, jobID, "Creating Juju controller \"diglett\" on the-most-amazing-cloud")
-	c.Assert(err, qt.ErrorMatches, "failed to lock job_logs table.*")
+	c.Assert(err, qt.ErrorMatches, "failed to lock job_logs table")
 }

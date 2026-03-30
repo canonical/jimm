@@ -30,7 +30,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId int64, logLine string) (
 	return d.Transaction(func(d *Database) error {
 		// Blocks all other operations, including reads, writes, and other locks.
 		if err := d.DB.Exec(jobLoglockQuery).Error; err != nil {
-			return fmt.Errorf("failed to lock job_logs table: %w", err)
+			return fmt.Errorf("failed to lock job_logs table")
 		}
 
 		// Get the current line number for this job.

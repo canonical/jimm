@@ -81,7 +81,7 @@ func TestControllerInfo(t *testing.T) {
 	c.Assert(ctl.Name, qt.Equals, "test1")
 
 	_, err = j.ControllerInfo(ctx, "does-not-exist")
-	c.Assert(err, qt.ErrorMatches, "controller not found.*")
+	c.Assert(err, qt.ErrorMatches, "controller not found")
 }
 
 func TestListControllers(t *testing.T) {
@@ -337,7 +337,7 @@ func TestRemoveController(t *testing.T) {
 					Name: "test1",
 				}
 				err = j.Database.GetController(ctx, &controller)
-				c.Assert(err, qt.ErrorMatches, "controller not found.*")
+				c.Assert(err, qt.ErrorMatches, "controller not found")
 			}
 		})
 	}
@@ -676,17 +676,17 @@ func TestInitiateInternalMigration(t *testing.T) {
 		about:         "empty controller name",
 		user:          "alice@canonical.com",
 		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "alice@canonical.com/model-1", TargetController: ""},
-		expectedError: `failed to get controller with name "".*`,
+		expectedError: `failed to get controller with name "": controller UUID or name must be provided`,
 	}, {
 		about:         "model doesn't exist",
 		user:          "alice@canonical.com",
 		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "00000002-0000-0000-0000-000000000002", TargetController: "myController"},
-		expectedError: "model not found.*",
+		expectedError: "model not found",
 	}, {
 		about:         "model doesn't exist",
 		user:          "alice@canonical.com",
 		migrateInfo:   params.MigrateModelInfo{TargetModelNameOrUUID: "00000002-0000-0000-0000-000000000002", TargetController: "myController"},
-		expectedError: "model not found.*",
+		expectedError: "model not found",
 	}, {
 		about:         "a missing model target",
 		user:          "alice@canonical.com",
@@ -788,7 +788,7 @@ func TestPrepareModelMigration_ControllerDoesNotExist(t *testing.T) {
 		targetControllerName,
 		userMapping,
 	)
-	c.Assert(err, qt.ErrorMatches, "failed to add incoming model migration details: controller not found.*")
+	c.Assert(err, qt.ErrorMatches, "failed to add incoming model migration details: controller not found")
 }
 
 func TestPrepareModelMigration_Success(t *testing.T) {

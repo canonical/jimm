@@ -196,7 +196,7 @@ func TestPrepareModelMigration_InvalidModelTag(t *testing.T) {
 		ModelTag: "blah",
 	})
 
-	c.Assert(err, qt.ErrorMatches, "invalid model tag.*")
+	c.Assert(err, qt.ErrorMatches, `invalid model tag: "blah" is not a valid tag`)
 }
 
 func TestPrepareModelMigration_InvalidControllerName(t *testing.T) {

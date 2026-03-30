@@ -78,7 +78,7 @@ func TestModelCreateArgs(t *testing.T) {
 			CloudTag:           names.NewCloudTag("test-cloud").String(),
 			CloudCredentialTag: "test-credential-1",
 		},
-		expectedError: "invalid cloud credential tag",
+		expectedError: `invalid cloud credential tag: "test-credential-1" is not a valid tag`,
 	}, {
 		about: "cloud does not match cloud credential cloud",
 		args: jujuparams.ModelCreateArgs{
@@ -119,7 +119,7 @@ func TestModelCreateArgs(t *testing.T) {
 				c.Assert(err, qt.IsNil)
 				c.Assert(a, qt.CmpEquals(opts...), test.expectedArgs)
 			} else {
-				c.Assert(err, qt.ErrorMatches, test.expectedError+".*")
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
 			}
 		})
 	}

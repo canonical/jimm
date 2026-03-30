@@ -339,6 +339,6 @@ func (s *dbSuite) TestDeleteCloudCredential(c *qt.C) {
 		Name:              cred.Name,
 	}
 	err = s.Database.GetCloudCredential(context.Background(), &dbCred)
-	c.Assert(err, qt.ErrorMatches, `cloudcredential \S+ not found.*`)
+	c.Assert(err, qt.ErrorMatches, `cloudcredential \S+ not found`)
 
 }

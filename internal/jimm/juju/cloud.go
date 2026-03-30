@@ -219,7 +219,7 @@ func (j *JujuManager) determineHostCloudRegion(ctx context.Context, hostCloudReg
 	}
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil, errors.Codef(errors.CodeNotFound, "unable to find cloud/region %q: %w", hostCloudRegion, err)
+			return nil, errors.Codef(errors.CodeNotFound, "unable to find cloud/region %q", hostCloudRegion)
 		}
 		return nil, err
 	}

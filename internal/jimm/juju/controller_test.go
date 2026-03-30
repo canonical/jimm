@@ -1432,7 +1432,7 @@ func TestInitiateMigration(t *testing.T) {
 			},
 		},
 		initiateMigrationResults: []result{{}},
-		expectedError:            "failed to unmarshal macaroons.*",
+		expectedError:            "failed to unmarshal macaroons",
 	}}
 
 	for _, test := range tests {

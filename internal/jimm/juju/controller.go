@@ -661,7 +661,8 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 	if spec.TargetInfo.Macaroons != "" {
 		err = json.Unmarshal([]byte(spec.TargetInfo.Macaroons), &targetMacaroons)
 		if err != nil {
-			return result, errors.Codef(errors.CodeBadRequest, "failed to unmarshal macaroons: %w", err)
+			zapctx.Error(ctx, "failed to unmarshal macaroons", zap.Error(err))
+			return result, errors.Codef(errors.CodeBadRequest, "failed to unmarshal macaroons")
 		}
 	}
 
