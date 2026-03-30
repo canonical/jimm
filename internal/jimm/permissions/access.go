@@ -205,7 +205,7 @@ func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.U
 			}
 			relation, err := ofganames.ConvertJujuRelation(stringVal)
 			if err != nil {
-				return cachedPerms, fmt.Errorf("%s: %w", fmt.Sprintf("failed to parse relation %s", stringVal), err)
+				return cachedPerms, fmt.Errorf("failed to parse relation %s: %w", stringVal, err)
 			}
 			check, err := openfga.CheckRelation(ctx, user, tag, relation)
 			if err != nil {

@@ -162,7 +162,7 @@ func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
 	}
 	err := b.jujuManager.Database.GetController(b.ctx, &targetController)
 	if err != nil {
-		b.err = fmt.Errorf("%s: %w", fmt.Sprintf("controller %q not found", controllerName), err)
+		b.err = fmt.Errorf("controller %q not found: %w", controllerName, err)
 		return b
 	}
 	ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, targetController.ResourceTag())
@@ -379,7 +379,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 	}
 	err := b.jujuManager.Database.GetCloudCredential(b.ctx, &credential)
 	if err != nil {
-		b.err = fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch cloud credentials %s", credential.Path()), err)
+		b.err = fmt.Errorf("failed to fetch cloud credentials %s: %w", credential.Path(), err)
 	}
 	b.credential = &credential
 

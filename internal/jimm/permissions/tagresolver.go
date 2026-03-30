@@ -78,7 +78,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetController(ctx, &controller)
 		if err != nil {
-			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch controller information: %s", controller.UUID), err)
+			return "", fmt.Errorf("failed to fetch controller information: %s: %w", controller.UUID, err)
 		}
 		return tagToString(names.ControllerTagKind, controller.Name), nil
 	case names.ModelTagKind:
@@ -90,7 +90,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetModel(ctx, &model)
 		if err != nil {
-			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch model information: %s", model.UUID.String), err)
+			return "", fmt.Errorf("failed to fetch model information: %s: %w", model.UUID.String, err)
 		}
 		modelUserID := model.OwnerIdentityName + "/" + model.Name
 		return tagToString(names.ModelTagKind, modelUserID), nil
@@ -100,7 +100,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetApplicationOffer(ctx, &ao)
 		if err != nil {
-			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch application offer information: %s", ao.UUID), err)
+			return "", fmt.Errorf("failed to fetch application offer information: %s: %w", ao.UUID, err)
 		}
 		return tagToString(names.ApplicationOfferTagKind, ao.URL), nil
 	case jimmnames.GroupTagKind:
@@ -109,7 +109,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetGroup(ctx, &group)
 		if err != nil {
-			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch group information: %s", group.UUID), err)
+			return "", fmt.Errorf("failed to fetch group information: %s: %w", group.UUID, err)
 		}
 		return tagToString(jimmnames.GroupTagKind, group.Name), nil
 	case jimmnames.RoleTagKind:
@@ -118,7 +118,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetRole(ctx, &role)
 		if err != nil {
-			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch role information: %s", role.UUID), err)
+			return "", fmt.Errorf("failed to fetch role information: %s: %w", role.UUID, err)
 		}
 		return tagToString(jimmnames.RoleTagKind, role.Name), nil
 	case names.CloudTagKind:
@@ -127,7 +127,7 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 		}
 		err := j.store.GetCloud(ctx, &cloud)
 		if err != nil {
-			return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to fetch cloud information: %s", cloud.Name), err)
+			return "", fmt.Errorf("failed to fetch cloud information: %s: %w", cloud.Name, err)
 		}
 		return tagToString(names.CloudTagKind, cloud.Name), nil
 	default:

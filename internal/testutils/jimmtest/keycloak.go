@@ -100,7 +100,7 @@ func getAdminCLIAccessToken() (string, error) {
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response for admin CLI login (status-code: %d)", resp.StatusCode), err)
+		return "", fmt.Errorf("failed to read keycloak response for admin CLI login (status-code: %d): %w", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to login with keycloak admin CLI user (status-code: %d): %q", resp.StatusCode, string(body))
@@ -108,14 +108,14 @@ func getAdminCLIAccessToken() (string, error) {
 
 	m := map[string]any{}
 	if err := json.Unmarshal(body, &m); err != nil {
-		return "", fmt.Errorf("%s: %w", fmt.Sprintf("failed to parse keycloak response for admin CLI login: %q", string(body)), err)
+		return "", fmt.Errorf("failed to parse keycloak response for admin CLI login: %q: %w", string(body), err)
 	}
 
 	if _, ok := m["access_token"]; !ok {
-		return "", fmt.Errorf("%s: %w", fmt.Sprintf("cannot find access token in keycloak response: %q", string(body)), err)
+		return "", fmt.Errorf("cannot find access token in keycloak response: %q: %w", string(body), err)
 	}
 	if token, ok := m["access_token"].(string); !ok {
-		return "", fmt.Errorf("%s: %w", fmt.Sprintf("received token is not string: %v", m["access_token"]), err)
+		return "", fmt.Errorf("received token is not string: %v: %w", m["access_token"], err)
 	} else {
 		return token, nil
 	}
@@ -144,7 +144,7 @@ func getKeycloakUsersMap(adminCLIToken string) (map[string]string, error) {
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response for list of users (status-code: %d)", resp.StatusCode), err)
+		return nil, fmt.Errorf("failed to read keycloak response for list of users (status-code: %d): %w", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get users from keycloak (status-code: %d): %q", resp.StatusCode, string(body))
@@ -155,7 +155,7 @@ func getKeycloakUsersMap(adminCLIToken string) (map[string]string, error) {
 		Username string `json:"username"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("failed to parse keycloak response for list of users: %q", string(body)), err)
+		return nil, fmt.Errorf("failed to parse keycloak response for list of users: %q: %w", string(body), err)
 	}
 
 	result := map[string]string{}
@@ -216,7 +216,7 @@ func addKeycloakUser(adminCLIToken, email, username string) error {
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response to add user (status-code: %d)", resp.StatusCode), err)
+		return fmt.Errorf("failed to read keycloak response to add user (status-code: %d): %w", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to add user to keycloak (status-code: %d): %q", resp.StatusCode, string(body))
@@ -259,7 +259,7 @@ func setKeycloakUserPassword(adminCLIToken, id, password string) error {
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("%s: %w", fmt.Sprintf("failed to read keycloak response to set user password (status-code: %d)", resp.StatusCode), err)
+		return fmt.Errorf("failed to read keycloak response to set user password (status-code: %d): %w", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to set keycloak user password (status-code: %d): %q", resp.StatusCode, string(body))

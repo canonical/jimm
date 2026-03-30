@@ -184,12 +184,12 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 
 	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%s"`, databaseName)
 	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
-		return "", "", fmt.Errorf("%s: %w", fmt.Sprintf("error dropping existing database (maybe there's an active connection like psql client): %s", databaseName), err)
+		return "", "", fmt.Errorf("error dropping existing database (maybe there's an active connection like psql client): %s: %w", databaseName, err)
 	}
 
 	createDatabaseCommand := fmt.Sprintf(`CREATE DATABASE "%s" TEMPLATE "%s"`, databaseName, templateName)
 	if err := gdb.Exec(createDatabaseCommand).Error; err != nil {
-		return "", "", fmt.Errorf("%s: %w", fmt.Sprintf("error creating database: (%s)", databaseName), err)
+		return "", "", fmt.Errorf("error creating database %q: %w)", databaseName, err)
 	}
 
 	sqlDB, err := gdb.DB()
@@ -257,12 +257,12 @@ func createEmptyDatabase(suggestedName string) (string, string, error) {
 
 	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%s"`, databaseName)
 	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
-		return "", "", fmt.Errorf("%s: %w", fmt.Sprintf("error dropping existing database (maybe there's an active connection like psql client): %s", databaseName), err)
+		return "", "", fmt.Errorf("error dropping existing database %q (maybe there's an active connection like psql client): %w", databaseName, err)
 	}
 
 	createDatabaseCommand := fmt.Sprintf(`CREATE DATABASE "%s"`, databaseName)
 	if err := gdb.Exec(createDatabaseCommand).Error; err != nil {
-		return "", "", fmt.Errorf("%s: %w", fmt.Sprintf("error creating database: (%s)", databaseName), err)
+		return "", "", fmt.Errorf("error creating database %q: %w)", databaseName, err)
 	}
 
 	sqlDB, err := gdb.DB()
