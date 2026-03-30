@@ -297,7 +297,7 @@ func (j *JujuManager) ModelControllerInfo(ctx context.Context, user *openfga.Use
 
 func (j *JujuManager) SupportedVersions(ctx context.Context, minVersion *string) (params.SupportedJujuVersionsResponse, error) {
 	if j.SupportedVersions_ == nil {
-		return params.SupportedJujuVersionsResponse{}, errors.E(errors.CodeNotImplemented)
+		return params.SupportedJujuVersionsResponse{}, errors.New("not implemented")
 	}
 	return j.SupportedVersions_(ctx, minVersion)
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/google/go-github/v69/github"
 	"github.com/juju/version/v2"
 
-	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/pkg/api/params"
 )
 
@@ -52,7 +51,7 @@ func (j *JujuManager) SupportedVersions(ctx context.Context, minVersion *string)
 
 	releases, err := fetchReleasesFromGitHub(ctx, client, parsedMinVersion)
 	if err != nil {
-		return params.SupportedJujuVersionsResponse{}, errors.E(err)
+		return params.SupportedJujuVersionsResponse{}, err
 	}
 	return params.SupportedJujuVersionsResponse{Versions: releases}, nil
 }
