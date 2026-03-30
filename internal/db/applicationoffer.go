@@ -92,7 +92,7 @@ func (d *Database) FindApplicationOffersByModel(ctx context.Context, modelName, 
 	const op = "db.FindApplicationOfferByModel"
 
 	if modelName == "" || modelOwner == "" {
-		return nil, errors.MsgWithCode("model name or owner not specified", errors.CodeBadRequest)
+		return nil, errors.Codef(errors.CodeBadRequest, "model name or owner not specified")
 	}
 	if err := d.ready(); err != nil {
 		return nil, err

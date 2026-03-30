@@ -294,7 +294,7 @@ func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation
 // CheckPermission returns an Unauthorized error if user is not allowed specified permission to the resource.
 func (u *User) CheckPermission(ctx context.Context, resourceTag string, permission string) error {
 	if u.client == nil {
-		return errors.MsgWithCode("cannot check permission", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "cannot check permission")
 	}
 	resource, err := names.ParseTag(resourceTag)
 	if err != nil {
@@ -329,7 +329,7 @@ func (u *User) CheckPermission(ctx context.Context, resourceTag string, permissi
 	}
 
 	if !allowed {
-		return errors.MsgWithCode(fmt.Sprintf("user %q not allowed %q to %q", u.Name, permission, resourceTag), errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "user %q not allowed %q to %q", u.Name, permission, resourceTag)
 	}
 	return nil
 }

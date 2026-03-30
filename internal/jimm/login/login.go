@@ -111,7 +111,7 @@ func (j *LoginManager) LoginDevice(ctx context.Context) (*oauth2.DeviceAuthRespo
 
 	if err != nil {
 		zapctx.Error(ctx, "oauth device login failed", zap.Error(err))
-		return nil, errors.MsgWithCode("oauth device login failed, check JIMM's log.", errors.CodeFatalLoginError)
+		return nil, errors.Codef(errors.CodeFatalLoginError, "oauth device login failed, check JIMM's log.")
 	}
 	return resp, nil
 }
@@ -159,18 +159,18 @@ func (j *LoginManager) LoginClientCredentials(ctx context.Context, clientID stri
 	// TODO(Kian): Consider inlining the function below and removing the dependency on jimmnames.
 	clientIdWithDomain, err := jimmnames.EnsureValidServiceAccountId(clientID)
 	if err != nil {
-		return nil, errors.ErrWithCode(err, errors.CodeFatalLoginError)
+		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 
 	err = j.oAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
 	if err != nil {
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
-		return nil, errors.ErrWithCode(err, errors.CodeFatalLoginError)
+		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 	user, err := j.UserLogin(ctx, clientIdWithDomain)
 	if err != nil {
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
-		return nil, errors.ErrWithCode(err, errors.CodeFatalLoginError)
+		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 	logger.LogSuccessfulLogin(ctx, clientIdWithDomain)
 	return user, nil
@@ -185,14 +185,14 @@ func (j *LoginManager) LoginWithSessionToken(ctx context.Context, sessionToken s
 			return nil, err
 		}
 		logger.LogFailedLogin(ctx, "unknown session token")
-		return nil, errors.ErrWithCode(err, errors.CodeFatalLoginError)
+		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 
 	email := jwtToken.Subject()
 	user, err := j.UserLogin(ctx, email)
 	if err != nil {
 		logger.LogFailedLogin(ctx, email)
-		return nil, errors.ErrWithCode(err, errors.CodeFatalLoginError)
+		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 	logger.LogSuccessfulLogin(ctx, email)
 	return user, nil
@@ -226,7 +226,7 @@ func (j *LoginManager) UserLogin(ctx context.Context, identifier string) (*openf
 
 	ofgaUser, err := j.GetOrCreateIdentity(ctx, identifier)
 	if err != nil {
-		return nil, errors.ErrWithCode(err, errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "%w", err)
 	}
 	err = j.updateLastLogin(ctx, ofgaUser.Identity)
 	if err != nil {

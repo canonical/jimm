@@ -148,7 +148,7 @@ func (j *PermissionManager) GrantAuditLogAccess(ctx context.Context, user *openf
 
 	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -170,7 +170,7 @@ func (j *PermissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 
 	access := user.GetControllerAccess(ctx, j.jimmTag)
 	if access != ofganames.AdministratorRelation {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -238,7 +238,7 @@ func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 	// Only JIMM administrators are allowed to see the access
 	// level of somebody else.
 	if !user.JimmAdmin {
-		return "", errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return "", errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var targetUser dbmodel.Identity
@@ -272,7 +272,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
@@ -282,7 +282,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -340,7 +340,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
@@ -350,7 +350,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 	if !isCloudAdministrator {
 		// If the user doesn't have admin access on the cloud return
 		// an unauthorized error.
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -418,7 +418,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
 	}
 
 	modelAdmin, err := user.HasModelRelation(ctx, mt, ofganames.AdministratorRelation)
@@ -426,7 +426,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 		return err
 	}
 	if !modelAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -490,7 +490,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.ErrWithCode(fmt.Errorf("failed to recognize given access: %q: %w", access, err), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
 	}
 
 	requiredAccess := ofganames.AdministratorRelation
@@ -504,7 +504,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		return err
 	}
 	if !modelAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := &dbmodel.Identity{}
@@ -586,7 +586,7 @@ func (j *PermissionManager) GrantOfferAccess(ctx context.Context, user *openfga.
 		return err
 	}
 	if !isOfferAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := openfga.NewUser(identity, j.authSvc)
@@ -656,7 +656,7 @@ func (j *PermissionManager) RevokeOfferAccess(ctx context.Context, user *openfga
 		return err
 	}
 	if !isOfferAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	targetUser := openfga.NewUser(identity, j.authSvc)

@@ -35,7 +35,7 @@ func NewGroupManager(store *db.Database, authSvc *openfga.OFGAClient) (*GroupMan
 func (j *GroupManager) AddGroup(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error) {
 
 	if !user.JimmAdmin {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	ge, err := j.store.AddGroup(ctx, name)
@@ -49,7 +49,7 @@ func (j *GroupManager) AddGroup(ctx context.Context, user *openfga.User, name st
 func (j *GroupManager) CountGroups(ctx context.Context, user *openfga.User) (int, error) {
 
 	if !user.JimmAdmin {
-		return 0, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return 0, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	count, err := j.store.CountGroups(ctx)
 	if err != nil {
@@ -62,7 +62,7 @@ func (j *GroupManager) CountGroups(ctx context.Context, user *openfga.User) (int
 func (j *GroupManager) getGroup(ctx context.Context, user *openfga.User, group *dbmodel.GroupEntry) (*dbmodel.GroupEntry, error) {
 
 	if !user.JimmAdmin {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	if err := j.store.GetGroup(ctx, group); err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (j *GroupManager) GetGroupByName(ctx context.Context, user *openfga.User, n
 func (j *GroupManager) RenameGroup(ctx context.Context, user *openfga.User, oldName, newName string) error {
 
 	if !user.JimmAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	group := &dbmodel.GroupEntry{
@@ -113,7 +113,7 @@ func (j *GroupManager) RenameGroup(ctx context.Context, user *openfga.User, oldN
 func (j *GroupManager) RemoveGroup(ctx context.Context, user *openfga.User, name string) error {
 
 	if !user.JimmAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	group := &dbmodel.GroupEntry{
@@ -145,7 +145,7 @@ func (j *GroupManager) RemoveGroup(ctx context.Context, user *openfga.User, name
 func (j *GroupManager) ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error) {
 
 	if !user.JimmAdmin {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	groups, err := j.store.ListGroups(ctx, pagination.Limit(), pagination.Offset(), match)

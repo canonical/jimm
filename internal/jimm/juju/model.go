@@ -68,7 +68,7 @@ func (j *JujuManager) AddModel(ctx context.Context, user *openfga.User, args *Mo
 
 	// Only JIMM admins are able to add models on behalf of other users.
 	if owner.Name != user.Name && !user.JimmAdmin {
-		return base.ModelInfo{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return base.ModelInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	builder := newModelBuilder(ctx, j)
@@ -211,7 +211,7 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 	}
 
 	if ok, err := user.IsModelReader(ctx, mt); !ok || err != nil {
-		return jujuclient.ModelInfo{}, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return jujuclient.ModelInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, user)
@@ -529,7 +529,7 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 // immediately. The given function should not update the database.
 func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error {
 	if !user.JimmAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	errStop := errors.New("stop")
@@ -667,7 +667,7 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 	if !hasAccess {
 		// If the user doesn't have correct access on the model return
 		// an unauthorized error.
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, user)
@@ -685,7 +685,7 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 // the controller and the local database.
 func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error {
 	if !user.JimmAdmin && user.Tag() != cloudCredentialTag.Owner() {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	credential := dbmodel.CloudCredential{}

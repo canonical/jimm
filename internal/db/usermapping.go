@@ -46,11 +46,11 @@ func (d *Database) GetUserMapping(ctx context.Context, userMapping *dbmodel.User
 	case userMapping.ModelUUID.Valid && userMapping.LocalUser != "":
 		db = db.Where("model_uuid = ? AND local_user = ?", userMapping.ModelUUID.String, userMapping.LocalUser)
 	case !userMapping.ModelUUID.Valid:
-		return errors.MsgWithCode("missing model UUID", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "missing model UUID")
 	case userMapping.LocalUser == "":
-		return errors.MsgWithCode("missing local user", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "missing local user")
 	default:
-		return errors.MsgWithCode("invalid parameters", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "invalid parameters")
 	}
 
 	if err := db.First(&userMapping).Error; err != nil {

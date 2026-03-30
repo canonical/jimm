@@ -613,11 +613,11 @@ func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any
 func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
 
 	if p.anonymousLogin {
-		return errors.MsgWithCode("Anonymous login does not support re-authentication", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
 	}
 	loginMsg := p.msgs.getLoginMessage()
 	if loginMsg == nil {
-		return errors.MsgWithCode("Haven't received login yet", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "Haven't received login yet")
 	}
 	err := addJWT(ctx, loginMsg, permissions, p.tokenGen)
 	if err != nil {
@@ -813,7 +813,7 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 			// return the client's login message verbatim to the controller.
 			return msg, nil
 		}
-		return nil, errors.MsgWithCode("JIMM does not support login from old clients", errors.CodeNotSupported)
+		return nil, errors.Codef(errors.CodeNotSupported, "JIMM does not support login from old clients")
 	case names.ModelTag, names.MachineTag, names.UnitTag:
 		zapctx.Debug(ctx, "Legacy login request from agent", zap.String("tag", tag.String()))
 

@@ -19,7 +19,7 @@ import (
 // unsupportedLogin returns an appropriate error for login attempts using
 // old version of the Admin facade.
 func unsupportedLogin() error {
-	return errors.MsgWithCode("JIMM does not support login from old clients", errors.CodeNotSupported)
+	return errors.Codef(errors.CodeNotSupported, "JIMM does not support login from old clients")
 }
 
 // unsupportedLoginWithInfo is a version of unsupportedLogin that logs the
@@ -70,7 +70,7 @@ func (r *controllerRoot) GetDeviceSessionToken(ctx context.Context) (params.GetD
 
 	token, err := r.jimm.LoginManager().GetDeviceSessionToken(ctx, r.deviceOAuthResponse)
 	if err != nil {
-		return response, errors.ErrWithCode(err, errors.CodeUnauthorized)
+		return response, errors.Codef(errors.CodeUnauthorized, "%w", err)
 	}
 
 	response.SessionToken = token
@@ -87,7 +87,7 @@ func (r *controllerRoot) LoginWithSessionCookie(ctx context.Context) (jujuparams
 
 	user, err := r.jimm.LoginManager().LoginWithSessionCookie(ctx, r.identityId)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.ErrWithCode(err, errors.CodeUnauthorized)
+		return jujuparams.LoginResult{}, errors.Codef(errors.CodeUnauthorized, "%w", err)
 	}
 
 	r.mu.Lock()
@@ -149,7 +149,7 @@ func (r *controllerRoot) LoginWithClientCredentials(ctx context.Context, req par
 
 	user, err := r.jimm.LoginManager().LoginClientCredentials(ctx, req.ClientID, req.ClientSecret)
 	if err != nil {
-		return jujuparams.LoginResult{}, errors.ErrWithCode(err, errors.CodeUnauthorized)
+		return jujuparams.LoginResult{}, errors.Codef(errors.CodeUnauthorized, "%w", err)
 	}
 
 	r.mu.Lock()

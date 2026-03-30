@@ -119,7 +119,7 @@ func TestModelCleanup(t *testing.T) {
 			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
 				switch model.Id() {
 				case s.env.Models[0].UUID:
-					return jujuclient.ModelInfo{}, errors.ErrWithCode(nil, errors.CodeNotFound)
+					return jujuclient.ModelInfo{}, errors.Codef(errors.CodeNotFound, "not found")
 				case s.env.Models[1].UUID:
 					return jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: model.Id()}}, nil
 				case s.env.Models[2].UUID:

@@ -4,7 +4,6 @@ package middleware_test
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,7 +15,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	jimm_errors "github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -140,7 +139,7 @@ func TestAuthenticateViaBasicAuth(t *testing.T) {
 	loginManager := mocks.LoginManager{
 		LoginWithSessionToken_: func(ctx context.Context, sessionToken string) (*openfga.User, error) {
 			if sessionToken != "good" {
-				return nil, jimm_errors.ErrWithCode(nil, jimm_errors.CodeSessionTokenInvalid)
+				return nil, errors.Codef(errors.CodeSessionTokenInvalid, "session token invalid")
 			}
 			user := dbmodel.Identity{Name: testUser}
 			return &openfga.User{Identity: &user, JimmAdmin: true}, nil
@@ -213,7 +212,7 @@ func TestAuthenticateViaBasicAuthServiceAccount(t *testing.T) {
 				}
 				return &openfga.User{Identity: &user}, nil
 			}
-			return nil, jimm_errors.ErrWithCode(nil, jimm_errors.CodeUnauthorized)
+			return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 		},
 	}
 	tests := []struct {

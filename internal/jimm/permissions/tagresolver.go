@@ -144,7 +144,7 @@ type tagResolver struct {
 func newTagResolver(tag string) (*tagResolver, string, error) {
 	matches := jujuURIMatcher.FindStringSubmatch(tag)
 	if len(matches) != 4 {
-		return nil, "", errors.MsgWithCode("tag is not properly formatted", errors.CodeBadRequest)
+		return nil, "", errors.Codef(errors.CodeBadRequest, "tag is not properly formatted")
 	}
 	tagKind := matches[1]
 	resourceUUID := ""
@@ -160,7 +160,7 @@ func newTagResolver(tag string) (*tagResolver, string, error) {
 
 	relation, err := ofganames.ParseRelation(matches[3])
 	if err != nil {
-		return nil, "", errors.MsgWithCode("failed to parse relation", errors.CodeBadRequest)
+		return nil, "", errors.Codef(errors.CodeBadRequest, "failed to parse relation")
 	}
 	return &tagResolver{
 		resourceUUID: resourceUUID,
@@ -337,7 +337,7 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	case names.CloudTagKind:
 		return resolver.cloudTag(ctx, db)
 	}
-	return nil, errors.MsgWithCode(fmt.Sprintf("failed to map tag, unknown kind: %s", tagKind), errors.CodeBadRequest)
+	return nil, errors.Codef(errors.CodeBadRequest, "failed to map tag, unknown kind: %s", tagKind)
 }
 
 // parseAndValidateTag attempts to parse the provided key into a tag whilst additionally
@@ -349,7 +349,7 @@ func (j *PermissionManager) parseAndValidateTag(ctx context.Context, key string)
 	if len(tupleKeySplit) == 1 {
 		tag, err := ofganames.BlankKindTag(tupleKeySplit[0])
 		if err != nil {
-			return nil, errors.ErrWithCode(err, errors.CodeFailedToParseTupleKey)
+			return nil, errors.Codef(errors.CodeFailedToParseTupleKey, "%w", err)
 		}
 		return tag, nil
 	}
@@ -357,7 +357,7 @@ func (j *PermissionManager) parseAndValidateTag(ctx context.Context, key string)
 	tag, err := resolveTag(j.jimmUUID, j.store, tagString)
 	if err != nil {
 		zapctx.Debug(ctx, "failed to resolve tuple object", zap.Error(err))
-		return nil, errors.ErrWithCode(err, errors.CodeFailedToResolveTupleResource)
+		return nil, errors.Codef(errors.CodeFailedToResolveTupleResource, "%w", err)
 	}
 	zapctx.Debug(ctx, "resolved JIMM tag", zap.String("tag", tag.String()))
 

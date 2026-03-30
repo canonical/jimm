@@ -325,7 +325,7 @@ func TestToFullModelInfo(t *testing.T) {
 			NumSecrets: 7,
 			Status:     "available",
 			Message:    "ready",
-			Error:      errors.MsgWithCode("backend warning", errors.CodeBadRequest),
+			Error:      errors.Codef(errors.CodeBadRequest, "backend warning"),
 		}},
 	}
 

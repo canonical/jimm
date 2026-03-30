@@ -32,7 +32,7 @@ func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identi
 
 	for k := range configs {
 		if k == agentVersionKey {
-			return errors.MsgWithCode(`agent-version cannot have a default value`, errors.CodeBadRequest)
+			return errors.Codef(errors.CodeBadRequest, `agent-version cannot have a default value`)
 		}
 	}
 
@@ -51,7 +51,7 @@ func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identi
 			}
 		}
 		if !found {
-			return errors.MsgWithCode("region not found", errors.CodeNotFound)
+			return errors.Codef(errors.CodeNotFound, "region not found")
 		}
 	}
 	err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{

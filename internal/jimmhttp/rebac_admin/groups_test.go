@@ -315,7 +315,7 @@ func TestGetGroupRoles(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".*group doesn't exist")
 	getGroupErr = nil
 
-	getRoleErr = jimmerr.MsgWithCode("role doesn't exist", jimmerr.CodeNotFound)
+	getRoleErr = jimmerr.Codef(jimmerr.CodeNotFound, "role doesn't exist")
 	_, err = groupSvc.GetGroupRoles(ctx, newUUID.String(), &resources.GetGroupsItemRolesParams{})
 	c.Assert(err, qt.IsNil)
 	getRoleErr = nil

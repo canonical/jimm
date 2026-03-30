@@ -268,7 +268,7 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 		return 0, fmt.Errorf("failed to enqueue bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
-		return 0, errors.MsgWithCode("a bootstrap job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
+		return 0, errors.Codef(errors.CodeInProgress, "a bootstrap job is already in progress - please wait for it to complete before starting a new one")
 	}
 
 	return job.Job.ID, nil
@@ -339,7 +339,7 @@ func (b *BootstrapManager) BootstrapController(
 	// succeed when trying to add the controller to JIMM.
 	err := b.store.GetController(ctx, &dbmodel.Controller{Name: p.ControllerName})
 	if err == nil {
-		return errors.ErrWithCode(fmt.Errorf("controller %q already exists", p.ControllerName), errors.CodeAlreadyExists)
+		return errors.Codef(errors.CodeAlreadyExists, "controller %q already exists", p.ControllerName)
 	}
 	if errors.ErrorCode(err) != errors.CodeNotFound {
 		return fmt.Errorf("failed to check if controller exists: %w", err)
@@ -552,7 +552,7 @@ func (b *BootstrapManager) StartDestroyControllerJob(ctx context.Context, user *
 		return 0, fmt.Errorf("failed to start bootstrap job: %w", err)
 	}
 	if job.UniqueSkippedAsDuplicate {
-		return 0, errors.MsgWithCode("a destroy job is already in progress - please wait for it to complete before starting a new one", errors.CodeInProgress)
+		return 0, errors.Codef(errors.CodeInProgress, "a destroy job is already in progress - please wait for it to complete before starting a new one")
 	}
 
 	return job.Job.ID, nil

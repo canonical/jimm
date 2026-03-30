@@ -82,7 +82,7 @@ func (d *Database) UpdateRoleName(ctx context.Context, oldName, name string) (er
 	model := d.DB.WithContext(ctx).Model(&dbmodel.RoleEntry{})
 	model.Where("name = ?", oldName)
 	if model.Update("name", name).RowsAffected == 0 {
-		return errors.MsgWithCode("role not found", errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, "role not found")
 	}
 
 	return nil
@@ -93,7 +93,7 @@ func (d *Database) RemoveRole(ctx context.Context, role *dbmodel.RoleEntry) (err
 	const op = "db.RemoveRole"
 
 	if role.ID == 0 && role.UUID == "" {
-		return errors.MsgWithCode("neither role UUID or ID specified", errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, "neither role UUID or ID specified")
 	}
 
 	if err := d.ready(); err != nil {

@@ -171,7 +171,7 @@ func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
 		return b
 	}
 	if !ok {
-		b.err = errors.MsgWithCode(fmt.Sprintf("not authorized to add model to controller %q", controllerName), errors.CodeUnauthorized)
+		b.err = errors.Codef(errors.CodeUnauthorized, "not authorized to add model to controller %q", controllerName)
 		return b
 	}
 	b.candidates = append(b.candidates, candidateController{
@@ -253,7 +253,7 @@ func (b *modelBuilder) WithCloud(user *openfga.User, cloud names.CloudTag) *mode
 		return b
 	}
 	if !ok {
-		b.err = errors.MsgWithCode(fmt.Sprintf("not authorized to add model to cloud %q", cloud.Id()), errors.CodeUnauthorized)
+		b.err = errors.Codef(errors.CodeUnauthorized, "not authorized to add model to cloud %q", cloud.Id())
 		return b
 	}
 	b.cloud = &c
@@ -337,7 +337,7 @@ func (b *modelBuilder) WithCloudRegion(region string) *modelBuilder {
 	// If there is no such region we will get a zero valued object below.
 	cloudRegion := b.cloud.Region(region)
 	if cloudRegion.Name == "" {
-		b.err = errors.MsgWithCode(fmt.Sprintf("cloud region %q not found in cloud %q", region, b.cloud.Name), errors.CodeNotFound)
+		b.err = errors.Codef(errors.CodeNotFound, "cloud region %q not found in cloud %q", region, b.cloud.Name)
 		return b
 	}
 	b.cloudRegion = region
@@ -368,7 +368,7 @@ func (b *modelBuilder) WithCloudCredential(credentialTag names.CloudCredentialTa
 
 	// Verify ownership of cloud credential
 	if b.owner == nil || b.owner.Name != credentialTag.Owner().Id() {
-		b.err = errors.MsgWithCode("model owner doesn't match cloud-credential owner", errors.CodeUnauthorized)
+		b.err = errors.Codef(errors.CodeUnauthorized, "model owner doesn't match cloud-credential owner")
 		return b
 	}
 
@@ -574,14 +574,14 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 			// the operation to delete a model isn't synchronous even
 			// for empty models. We could also have a worker that deletes
 			// empty models that don't appear in the database.
-			b.err = errors.ErrWithCode(fmt.Errorf("model name in use: %w", err), errors.CodeAlreadyExists)
+			b.err = errors.Codef(errors.CodeAlreadyExists, "model name in use: %w", err)
 		case jujuparams.CodeUpgradeInProgress:
 			b.err = fmt.Errorf("upgrade in progress: %w", err)
 		default:
 			// The model couldn't be created because of an
 			// error in the request, don't try another
 			// controller.
-			b.err = errors.ErrWithCode(err, errors.CodeBadRequest)
+			b.err = errors.Codef(errors.CodeBadRequest, "%w", err)
 		}
 		return b
 	}

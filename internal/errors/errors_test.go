@@ -3,6 +3,7 @@
 package errors_test
 
 import (
+	stderr "errors"
 	"fmt"
 	"testing"
 
@@ -12,35 +13,40 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
-func TestErrWithCode(t *testing.T) {
+func TestCodefWrapsError(t *testing.T) {
 	c := qt.New(t)
 
 	code := errors.Code("test code")
 	wrapped := errors.New("an error happened")
-	err := errors.ErrWithCode(wrapped, code)
+	err := errors.Codef(code, "%w", wrapped)
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 	errValue, ok := err.(*errors.Error)
 	c.Assert(ok, qt.IsTrue)
 	c.Check(errValue.Code, qt.Equals, code)
-	c.Check(errValue.Err, qt.Equals, wrapped)
+	c.Assert(errValue.Err, qt.IsNotNil)
+	c.Check(errValue.Err.Error(), qt.Equals, wrapped.Error())
+	c.Check(stderr.Is(errValue.Err, wrapped), qt.IsTrue)
+	c.Check(stderr.Is(err, wrapped), qt.IsTrue)
 }
 
-func TestMsgWithCode(t *testing.T) {
+func TestCodefFormatsString(t *testing.T) {
 	c := qt.New(t)
 
 	code := errors.Code("test code")
-	err := errors.MsgWithCode("an error happened", code)
+	err := errors.Codef(code, "an error happened")
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 	errValue, ok := err.(*errors.Error)
 	c.Assert(ok, qt.IsTrue)
 	c.Check(errValue.Code, qt.Equals, code)
-	c.Check(errValue.Message, qt.Equals, "an error happened")
+	c.Assert(errValue.Err, qt.IsNotNil)
+	c.Check(errValue.Err.Error(), qt.Equals, "an error happened")
+	c.Check(errValue.Message, qt.Equals, "")
 
-	err = errors.New("plain-error")
-	c.Check(err, qt.ErrorMatches, `plain-error`)
-	c.Check(errors.ErrorInfo(err), qt.DeepEquals, map[string]any(nil))
+	err = errors.Codef(code, "formatted %s", "message")
+	c.Check(err, qt.ErrorMatches, `formatted message`)
+	c.Check(errors.ErrorCode(err), qt.Equals, code)
 }
 
 func TestErrorCodeWithJujuRPC(t *testing.T) {

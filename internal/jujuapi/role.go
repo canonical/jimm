@@ -20,7 +20,7 @@ func (r *controllerRoot) AddRole(ctx context.Context, req apiparams.AddRoleReque
 	resp := apiparams.AddRoleResponse{}
 
 	if !jimmnames.IsValidRoleName(req.Name) {
-		return resp, errors.MsgWithCode("invalid role name", errors.CodeBadRequest)
+		return resp, errors.Codef(errors.CodeBadRequest, "invalid role name")
 	}
 
 	roleEntry, err := r.jimm.RoleManager().AddRole(ctx, r.user, req.Name)
@@ -44,15 +44,15 @@ func (r *controllerRoot) GetRole(ctx context.Context, req apiparams.GetRoleReque
 	var err error
 	switch {
 	case req.UUID != "" && req.Name != "":
-		return apiparams.Role{}, errors.MsgWithCode("only one of UUID or Name should be provided", errors.CodeBadRequest)
+		return apiparams.Role{}, errors.Codef(errors.CodeBadRequest, "only one of UUID or Name should be provided")
 	case req.Name != "" && !jimmnames.IsValidRoleName(req.Name):
-		return apiparams.Role{}, errors.MsgWithCode("invalid role name", errors.CodeBadRequest)
+		return apiparams.Role{}, errors.Codef(errors.CodeBadRequest, "invalid role name")
 	case req.UUID != "":
 		roleEntry, err = r.jimm.RoleManager().GetRoleByUUID(ctx, r.user, req.UUID)
 	case req.Name != "":
 		roleEntry, err = r.jimm.RoleManager().GetRoleByName(ctx, r.user, req.Name)
 	default:
-		return apiparams.Role{}, errors.MsgWithCode("no UUID or Name provided", errors.CodeBadRequest)
+		return apiparams.Role{}, errors.Codef(errors.CodeBadRequest, "no UUID or Name provided")
 	}
 	if err != nil {
 		return apiparams.Role{}, fmt.Errorf("failed to get role: %w", err)
@@ -70,7 +70,7 @@ func (r *controllerRoot) GetRole(ctx context.Context, req apiparams.GetRoleReque
 func (r *controllerRoot) RenameRole(ctx context.Context, req apiparams.RenameRoleRequest) error {
 
 	if !jimmnames.IsValidRoleName(req.NewName) {
-		return errors.MsgWithCode("invalid role name", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "invalid role name")
 	}
 
 	if err := r.jimm.RoleManager().RenameRole(ctx, r.user, req.Name, req.NewName); err != nil {
@@ -83,7 +83,7 @@ func (r *controllerRoot) RenameRole(ctx context.Context, req apiparams.RenameRol
 func (r *controllerRoot) RemoveRole(ctx context.Context, req apiparams.RemoveRoleRequest) error {
 
 	if !jimmnames.IsValidRoleName(req.Name) {
-		return errors.MsgWithCode("invalid role name", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "invalid role name")
 	}
 
 	if err := r.jimm.RoleManager().RemoveRole(ctx, r.user, req.Name); err != nil {

@@ -73,7 +73,7 @@ func (j *JobManager) ListJobs(ctx context.Context, req apiparams.ListJobsRequest
 		count = defaultListJobsCount
 	}
 	if count > maxListJobsCount {
-		return apiparams.ListJobsResponse{}, errors.MsgWithCode(fmt.Sprintf("count must be between 1 and %d.", maxListJobsCount), errors.CodeBadRequest)
+		return apiparams.ListJobsResponse{}, errors.Codef(errors.CodeBadRequest, "count must be between 1 and %d.", maxListJobsCount)
 	}
 
 	p := river.NewJobListParams().First(count)
@@ -150,7 +150,7 @@ func convertJobStates(statuses []apiparams.JobStatus) ([]rivertype.JobState, err
 		case apiparams.StatusPending:
 			riverStates = append(riverStates, rivertype.JobStateAvailable, rivertype.JobStateScheduled)
 		default:
-			return nil, errors.MsgWithCode(fmt.Sprintf("invalid job status: %s", status), errors.CodeBadRequest)
+			return nil, errors.Codef(errors.CodeBadRequest, "invalid job status: %s", status)
 		}
 	}
 

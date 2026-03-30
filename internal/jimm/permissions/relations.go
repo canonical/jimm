@@ -30,7 +30,7 @@ const BATCH_SIZE_OPENFGA = 100
 func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 
 	if !user.JimmAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	parsedTuples, err := j.parseTuples(ctx, tuples)
 	if err != nil {
@@ -45,7 +45,7 @@ func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User,
 
 		err = j.authSvc.AddRelation(ctx, batch...)
 		if err != nil {
-			return errors.ErrWithCode(err, errors.CodeOpenFGARequestFailed)
+			return errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
 		}
 		j.logUserUpdates(ctx, user, batch, true)
 	}
@@ -57,7 +57,7 @@ func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User,
 func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 
 	if !user.JimmAdmin {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	parsedTuples, err := j.parseTuples(ctx, tuples)
 	if err != nil {
@@ -72,7 +72,7 @@ func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 
 		err = j.authSvc.RemoveRelation(ctx, batch...)
 		if err != nil {
-			return errors.ErrWithCode(err, errors.CodeOpenFGARequestFailed)
+			return errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
 		}
 		j.logUserUpdates(ctx, user, batch, true)
 	}
@@ -91,12 +91,12 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == user.Name
 	// Admins can check any relation, non-admins can only check their own.
 	if !user.JimmAdmin && !userCheckingSelf {
-		return allowed, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return allowed, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	allowed, err = j.authSvc.CheckRelation(ctx, *parsedTuple, trace)
 	if err != nil {
-		return allowed, errors.ErrWithCode(err, errors.CodeOpenFGARequestFailed)
+		return allowed, errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
 	}
 	return allowed, nil
 }
@@ -125,7 +125,7 @@ func (j *PermissionManager) CheckRelations(ctx context.Context, user *openfga.Us
 func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 
 	if !user.JimmAdmin {
-		return nil, "", errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, "", errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	// if targetObject is not specified returns all tuples.
 	parsedTuple := &openfga.Tuple{}
@@ -136,7 +136,7 @@ func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *op
 			return nil, "", err
 		}
 	} else if tuple.Object != "" {
-		return nil, "", errors.MsgWithCode("it is invalid to pass an object without a target object.", errors.CodeBadRequest)
+		return nil, "", errors.Codef(errors.CodeBadRequest, "it is invalid to pass an object without a target object.")
 	}
 
 	responseTuples, ct, err := j.authSvc.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)
@@ -154,7 +154,7 @@ func (j *PermissionManager) ListObjectRelations(ctx context.Context, user *openf
 
 	var e pagination.EntitlementToken
 	if !user.JimmAdmin {
-		return nil, e, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, e, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	responseTuples, nextToken, err := j.getObjectRelationsPage(ctx, object, pageSize, entitlementToken)
 	if err != nil {
@@ -177,7 +177,7 @@ func (j *PermissionManager) ListObjectRelations(ctx context.Context, user *openf
 func (j *PermissionManager) ListResources(ctx context.Context, user *openfga.User, filter pagination.LimitOffsetPagination, namePrefixFilter, typeFilter string) ([]db.Resource, error) {
 
 	if !user.JimmAdmin {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	return j.store.ListResources(ctx, filter.Limit(), filter.Offset(), namePrefixFilter, typeFilter)
@@ -243,7 +243,7 @@ func (j *PermissionManager) parseTuple(ctx context.Context, tuple apiparams.Rela
 
 	relation, err := ofganames.ParseRelation(tuple.Relation)
 	if err != nil {
-		return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
+		return nil, errors.Codef(errors.CodeBadRequest, "%w", err)
 	}
 	t := openfga.Tuple{
 		Relation: relation,
@@ -254,11 +254,11 @@ func (j *PermissionManager) parseTuple(ctx context.Context, tuple apiparams.Rela
 	// to be specific to the erroneous offender.
 	parseTagError := func(msg string, key string, err error) error {
 		zapctx.Debug(ctx, msg, zap.String("key", key), zap.Error(err))
-		return errors.MsgWithCode(fmt.Sprintf("%s %s: %s", msg, key, err.Error()), errors.CodeFailedToParseTupleKey)
+		return errors.Codef(errors.CodeFailedToParseTupleKey, "%s %s: %s", msg, key, err.Error())
 	}
 
 	if tuple.TargetObject == "" {
-		return nil, errors.MsgWithCode("target object not specified", errors.CodeBadRequest)
+		return nil, errors.Codef(errors.CodeBadRequest, "target object not specified")
 	}
 	t.Target, err = j.parseAndValidateTag(ctx, tuple.TargetObject)
 	if err != nil {

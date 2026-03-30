@@ -174,7 +174,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
-		return nil, errors.ErrWithCode(fmt.Errorf("failed to create oidc provider: %v", err), errors.CodeServerConfiguration)
+		return nil, errors.Codef(errors.CodeServerConfiguration, "failed to create oidc provider: %v", err)
 	}
 
 	authSvc := &AuthenticationService{
@@ -397,7 +397,7 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 	}()
 
 	if len(token) == 0 {
-		return nil, errors.MsgWithCode("no token presented", errors.CodeSessionTokenInvalid)
+		return nil, errors.Codef(errors.CodeSessionTokenInvalid, "no token presented")
 	}
 
 	decodedToken, err := base64.StdEncoding.DecodeString(token)
@@ -408,13 +408,13 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 	parsedToken, err := jwt.Parse(decodedToken, jwt.WithKey(as.signingAlg, []byte(as.jwtSessionKey)))
 	if err != nil {
 		if stderrors.Is(err, jwt.ErrTokenExpired()) {
-			return nil, errors.MsgWithCode("JIMM session token expired", errors.CodeSessionTokenInvalid)
+			return nil, errors.Codef(errors.CodeSessionTokenInvalid, "JIMM session token expired")
 		}
 		return nil, err
 	}
 
 	if _, err = mail.ParseAddress(parsedToken.Subject()); err != nil {
-		return nil, errors.MsgWithCode("failed to parse email", errors.CodeSessionTokenInvalid)
+		return nil, errors.Codef(errors.CodeSessionTokenInvalid, "failed to parse email")
 	}
 
 	return parsedToken, nil
@@ -472,7 +472,7 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 
 	_, err = cfg.Token(ctx)
 	if err != nil {
-		return errors.ErrWithCode(fmt.Errorf("invalid client credentials: %v", err), errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "invalid client credentials: %v", err)
 	}
 	return nil
 }
@@ -534,7 +534,7 @@ func (as *AuthenticationService) AuthenticateBrowserSession(ctx context.Context,
 
 	identityId, ok := session.Values[SessionIdentityKey]
 	if !ok {
-		return ctx, errors.MsgWithCode("session is missing identity key", errors.CodeForbidden)
+		return ctx, errors.Codef(errors.CodeForbidden, "session is missing identity key")
 	}
 
 	err = as.validateAndUpdateAccessToken(ctx, identityId)

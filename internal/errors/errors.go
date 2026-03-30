@@ -5,6 +5,7 @@ package errors
 
 import (
 	stderr "errors"
+	"fmt"
 
 	jujuparams "github.com/juju/juju/rpc/params"
 
@@ -62,19 +63,22 @@ func New(text string) error {
 	return stderr.New(text)
 }
 
-// ErrWithCode constructs an error with an explicit code.
-func ErrWithCode(err error, code Code) error {
+// Codef constructs an error with a formatted message and an explicit code.
+//
+// The message is formatted using fmt.Errorf with the provided format and args.
+// The code is attached to the error and can be retrieved using the ErrorCode function.
+//
+// If the format string includes a %w verb and the corresponding argument is an error,
+// that error will be wrapped and can be retrieved using errors.Unwrap.
+//
+// To attach a code to an error without adding context use %w or %v as necessary:
+// `errors.Codef(code, "%w", err)`
+// or
+// `errors.Codef(code, "%v", err)`
+func Codef(code Code, format string, args ...any) error {
 	return &Error{
 		Code: code,
-		Err:  err,
-	}
-}
-
-// MsgWithCode constructs an error with a message and an explicit code.
-func MsgWithCode(msg string, code Code) error {
-	return &Error{
-		Code:    code,
-		Message: msg,
+		Err:  fmt.Errorf(format, args...),
 	}
 }
 

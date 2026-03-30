@@ -81,7 +81,7 @@ func (j *AuditLogManager) FindAuditEvents(ctx context.Context, user *openfga.Use
 
 	access := user.GetAuditLogViewerAccess(ctx, j.jimmTag)
 	if access != ofganames.AuditLogViewerRelation {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var entries []dbmodel.AuditLogEntry
@@ -101,7 +101,7 @@ func (j *AuditLogManager) FindAuditEvents(ctx context.Context, user *openfga.Use
 // returned.
 func (j *AuditLogManager) PurgeLogs(ctx context.Context, user *openfga.User, before time.Time) (int64, error) {
 	if !user.JimmAdmin {
-		return 0, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return 0, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	count, err := j.store.DeleteAuditLogsBefore(ctx, before)
 	if err != nil {

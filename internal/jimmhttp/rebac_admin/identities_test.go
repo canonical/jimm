@@ -4,7 +4,6 @@ package rebac_admin_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/canonical/ofga"
@@ -16,7 +15,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
-	jimmm_errors "github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -33,7 +32,7 @@ func TestGetIdentity(t *testing.T) {
 			if username == "bob@canonical.com" {
 				return openfga.NewUser(&dbmodel.Identity{Name: "bob@canonical.com"}, nil), nil
 			}
-			return nil, jimmm_errors.ErrWithCode(nil, jimmm_errors.CodeNotFound)
+			return nil, errors.Codef(errors.CodeNotFound, "not found")
 		},
 	}
 	jimm := jimmtest.JIMM{

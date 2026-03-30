@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"gorm.io/gorm/clause"
 
@@ -25,7 +24,7 @@ func (d *Database) SetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if cred.CloudName == "" || cred.OwnerIdentityName == "" || cred.Name == "" {
-		return errors.MsgWithCode(fmt.Sprintf("invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "invalid cloudcredential tag %q", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name)
 	}
 
 	db := d.DB.WithContext(ctx)
@@ -55,7 +54,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if cred.CloudName == "" || cred.OwnerIdentityName == "" || cred.Name == "" {
-		return errors.MsgWithCode(fmt.Sprintf("cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name), errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, "cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name)
 	}
 	db := d.DB.WithContext(ctx)
 	db = db.Preload("Cloud")
@@ -63,10 +62,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	if err := db.Where("cloud_name = ? AND owner_identity_name = ? AND name = ?", cred.CloudName, cred.OwnerIdentityName, cred.Name).First(&cred).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.ErrWithCode(
-				fmt.Errorf("cloudcredential %q not found: %w", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name, err),
-				errors.CodeNotFound,
-			)
+			return errors.Codef(errors.CodeNotFound, "cloudcredential %q not found: %w", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name, err)
 		}
 		return err
 	}

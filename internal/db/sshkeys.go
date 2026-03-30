@@ -54,7 +54,7 @@ func (d *Database) RemoveSSHKeyByFingerprint(ctx context.Context, identityName s
 	}
 
 	if query.RowsAffected == 0 {
-		return errors.MsgWithCode("key not found", errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, "key not found")
 	}
 
 	return nil
@@ -80,7 +80,7 @@ func (d *Database) RemoveSSHKeyByComment(ctx context.Context, identityName strin
 	}
 
 	if query.RowsAffected == 0 {
-		return errors.MsgWithCode("key not found", errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, "key not found")
 	}
 
 	return nil

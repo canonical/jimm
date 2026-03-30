@@ -48,7 +48,7 @@ func (s *InMemoryCredentialStore) Get(ctx context.Context, credTag names.CloudCr
 
 	attrs, ok := s.cloudCredentialAttributes[credTag.String()]
 	if !ok {
-		return nil, errors.ErrWithCode(nil, errors.CodeNotFound)
+		return nil, errors.Codef(errors.CodeNotFound, "not found")
 	}
 	attrsCopy := make(map[string]string, len(attrs))
 	for k, v := range attrs {
@@ -82,7 +82,7 @@ func (s *InMemoryCredentialStore) GetControllerCredentials(ctx context.Context, 
 
 	cc, ok := s.controllerCredentials[controllerName]
 	if !ok {
-		return "", "", errors.ErrWithCode(nil, errors.CodeNotFound)
+		return "", "", errors.Codef(errors.CodeNotFound, "not found")
 	}
 	return cc.username, cc.password, nil
 }
@@ -127,7 +127,7 @@ func (s *InMemoryCredentialStore) GetJWKS(ctx context.Context) (jwk.Set, error) 
 	defer s.mu.RUnlock()
 
 	if s.jwks == nil {
-		return nil, errors.ErrWithCode(nil, errors.CodeNotFound)
+		return nil, errors.Codef(errors.CodeNotFound, "not found")
 	}
 	jwks := s.jwks
 	return jwks, nil
@@ -139,7 +139,7 @@ func (s *InMemoryCredentialStore) GetJWKSPrivateKey(ctx context.Context) ([]byte
 	defer s.mu.RUnlock()
 
 	if len(s.privateKey) == 0 {
-		return nil, errors.ErrWithCode(nil, errors.CodeNotFound)
+		return nil, errors.Codef(errors.CodeNotFound, "not found")
 	}
 
 	pk := make([]byte, len(s.privateKey))
@@ -154,7 +154,7 @@ func (s *InMemoryCredentialStore) GetJWKSExpiry(ctx context.Context) (time.Time,
 	defer s.mu.RUnlock()
 
 	if s.expiry.IsZero() {
-		return time.Time{}, errors.ErrWithCode(nil, errors.CodeNotFound)
+		return time.Time{}, errors.Codef(errors.CodeNotFound, "not found")
 	}
 
 	return s.expiry, nil

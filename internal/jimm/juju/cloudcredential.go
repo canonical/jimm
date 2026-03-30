@@ -28,7 +28,7 @@ import (
 func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error) {
 
 	if !user.JimmAdmin && user.Name != tag.Owner().Id() {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var credential dbmodel.CloudCredential
@@ -47,7 +47,7 @@ func (j *JujuManager) GetCloudCredential(ctx context.Context, user *openfga.User
 func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.Identity, tag names.CloudCredentialTag) error {
 
 	if user.Name != tag.Owner().Id() {
-		return errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	var credential dbmodel.CloudCredential
@@ -75,7 +75,7 @@ func (j *JujuManager) RevokeCloudCredential(ctx context.Context, user *dbmodel.I
 	// Now we want to ensure that the credential is not used by any models before removing it to maintain
 	// referential integrity.
 	if len(models) > 0 {
-		return errors.MsgWithCode(fmt.Sprintf("cloud credential still used by %d model(s)", len(models)), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "cloud credential still used by %d model(s)", len(models))
 	}
 
 	cloud := dbmodel.Cloud{
@@ -133,7 +133,7 @@ func (j *JujuManager) UpdateCloudCredential(ctx context.Context, user *openfga.U
 	var result []jujuparams.UpdateCredentialModelResult
 	if user.Tag() != args.CredentialTag.Owner() {
 		if !user.JimmAdmin {
-			return result, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+			return result, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 		}
 		// ensure the user we are adding the credential for exists.
 		var u2 dbmodel.Identity
@@ -311,11 +311,11 @@ func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, user *op
 	if hidden {
 		// Controller superusers cannot read hidden credential attributes.
 		if user.Name != cred.OwnerIdentityName {
-			return nil, nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+			return nil, nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 		}
 	} else {
 		if !user.JimmAdmin && user.Name != cred.OwnerIdentityName {
-			return nil, nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+			return nil, nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 		}
 	}
 

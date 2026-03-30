@@ -90,7 +90,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 		return nil, err
 	}
 	if conn == nil {
-		return nil, errors.ErrWithCode(err, errors.CodeConnectionFailed)
+		return nil, errors.Codef(errors.CodeConnectionFailed, "%w", err)
 	}
 	client := rpc.NewClient(conn)
 
@@ -107,7 +107,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	var res jujuparams.LoginResult
 	if err := client.Call(ctx, "Admin", 3, "", "Login", loginRequest, &res); err != nil {
 		client.Close()
-		return nil, errors.ErrWithCode(err, errors.CodeConnectionFailed)
+		return nil, errors.Codef(errors.CodeConnectionFailed, "%w", err)
 	}
 
 	ct, err := names.ParseControllerTag(res.ControllerTag)
@@ -273,7 +273,7 @@ func (c *Connection) ModelTag() (names.ModelTag, bool) {
 // to make HTTP requests to the API. URLs passed to the client
 // will be made relative to the API host and the current model.
 func (c *Connection) HTTPClient() (*httprequest.Client, error) {
-	return nil, errors.ErrWithCode(nil, errors.CodeNotImplemented)
+	return nil, errors.Codef(errors.CodeNotImplemented, "not implemented")
 }
 
 // BakeryClientWrapper wraps an httpbakery.Client to implement

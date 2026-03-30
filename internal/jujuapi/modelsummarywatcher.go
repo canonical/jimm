@@ -93,7 +93,7 @@ func (r *watcherRegistry) get(id string) (*modelSummaryWatcher, error) {
 
 	w, ok := r.watchers[id]
 	if !ok {
-		return nil, errors.ErrWithCode(nil, errors.CodeNotFound)
+		return nil, errors.Codef(errors.CodeNotFound, "not found")
 	}
 	return w, nil
 }

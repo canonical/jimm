@@ -105,11 +105,11 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 	mockAuthenticator.EXPECT().VerifySessionToken(gomock.Any()).DoAndReturn(func(token string) (jwt.Token, error) {
 		decodedToken, err := base64.StdEncoding.DecodeString(token)
 		if err != nil {
-			return nil, errors.MsgWithCode("failed to decode token", errors.CodeSessionTokenInvalid)
+			return nil, errors.Codef(errors.CodeSessionTokenInvalid, "failed to decode token")
 		}
 		parsedToken, err := jwt.ParseInsecure(decodedToken)
 		if err != nil {
-			return nil, errors.MsgWithCode("failed to parse token", errors.CodeSessionTokenInvalid)
+			return nil, errors.Codef(errors.CodeSessionTokenInvalid, "failed to parse token")
 		}
 		return parsedToken, nil
 	}).AnyTimes()

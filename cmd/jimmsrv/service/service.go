@@ -779,7 +779,7 @@ func openDB(ctx context.Context, dsn string, logSQL bool) (*gorm.DB, error) {
 	case strings.HasPrefix(dsn, "postgres:") || strings.HasPrefix(dsn, "postgresql:"):
 		dialect = postgres.Open(dsn)
 	default:
-		return nil, errors.MsgWithCode("unsupported DSN", errors.CodeServerConfiguration)
+		return nil, errors.Codef(errors.CodeServerConfiguration, "unsupported DSN")
 	}
 	return gorm.Open(dialect, &gorm.Config{
 		Logger: &logger.GormLogger{LogSQL: logSQL},

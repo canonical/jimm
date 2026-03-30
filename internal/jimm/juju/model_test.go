@@ -1921,7 +1921,7 @@ func TestModelInfoNotFound(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
-					return jujuclient.ModelInfo{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
+					return jujuclient.ModelInfo{}, errors.Codef(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -1964,7 +1964,7 @@ func TestModelInfoRedirect(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
-					return jujuclient.ModelInfo{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
+					return jujuclient.ModelInfo{}, errors.Codef(errors.CodeNotFound, "model not found")
 				},
 			},
 		},
@@ -2025,7 +2025,7 @@ func TestModelStatusNotFound(t *testing.T) {
 		Dialer: &jimmtest.Dialer{
 			API: &jimmtest.API{
 				ModelStatus_: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
-					return base.ModelStatus{}, errors.MsgWithCode("model not found", errors.CodeNotFound)
+					return base.ModelStatus{}, errors.Codef(errors.CodeNotFound, "model not found")
 				},
 			},
 		},

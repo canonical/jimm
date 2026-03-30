@@ -77,7 +77,7 @@ func (d *Database) Transaction(f func(*Database) error) error {
 // with a code of errors.CodeServerConfiguration will be returned.
 func (d *Database) Migrate(ctx context.Context) error {
 	if d == nil || d.DB == nil {
-		return errors.MsgWithCode("database not configured", errors.CodeServerConfiguration)
+		return errors.Codef(errors.CodeServerConfiguration, "database not configured")
 	}
 
 	err := d.migrateFromSource(ctx, dbmodel.SQL, path.Join("sql", d.DB.Name()))
@@ -149,10 +149,10 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 // returned if the database is not yet initialised.
 func (d *Database) ready() error {
 	if d == nil || d.DB == nil {
-		return errors.MsgWithCode("database not configured", errors.CodeServerConfiguration)
+		return errors.Codef(errors.CodeServerConfiguration, "database not configured")
 	}
 	if atomic.LoadUint32(&d.migrated) == 0 {
-		return errors.ErrWithCode(nil, errors.CodeUpgradeInProgress)
+		return errors.Codef(errors.CodeUpgradeInProgress, "upgrade in progress")
 	}
 	return nil
 }

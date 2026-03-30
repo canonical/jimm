@@ -65,7 +65,7 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 		// TODO: fix ordering of where fields and handle error to represent what is *actually* required.
 		db = db.Where("controller_id = ?", model.ControllerID)
 	default:
-		return errors.MsgWithCode("missing id or uuid", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "missing id or uuid")
 	}
 
 	db = preloadModel("", db)
@@ -135,7 +135,7 @@ func (d *Database) DeleteModel(ctx context.Context, model *dbmodel.Model) (err e
 	case model.ID != 0:
 		db = db.Where("id = ?", model.ID)
 	default:
-		return errors.MsgWithCode("missing id or uuid", errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "missing id or uuid")
 	}
 
 	if err := db.Delete(model).Error; err != nil {

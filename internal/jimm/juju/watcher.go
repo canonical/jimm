@@ -136,7 +136,7 @@ func (w *Watcher) watchAllModelSummaries(ctx context.Context, ctl *dbmodel.Contr
 	defer api.Close()
 
 	if !api.SupportsModelSummaryWatcher() {
-		return errors.ErrWithCode(nil, errors.CodeNotSupported)
+		return errors.Codef(errors.CodeNotSupported, "not supported")
 	}
 
 	// start the model summary watcher

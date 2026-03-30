@@ -27,7 +27,7 @@ func (d *Database) GetIdentity(ctx context.Context, u *dbmodel.Identity) (err er
 	const op = "db.GetIdentity"
 
 	if u.Name == "" {
-		return errors.MsgWithCode(`invalid identity name ""`, errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	if err := d.ready(); err != nil {
@@ -67,7 +67,7 @@ func (d *Database) FetchIdentity(ctx context.Context, u *dbmodel.Identity) (err 
 	const op = "db.FetchIdentity"
 
 	if u.Name == "" {
-		return errors.MsgWithCode(`invalid identity name ""`, errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	if err := d.ready(); err != nil {
@@ -102,7 +102,7 @@ func (d *Database) UpdateIdentity(ctx context.Context, u *dbmodel.Identity) (err
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	if u.Name == "" {
-		return errors.MsgWithCode(`invalid identity name ""`, errors.CodeNotFound)
+		return errors.Codef(errors.CodeNotFound, `invalid identity name ""`)
 	}
 
 	db := d.DB.WithContext(ctx)
@@ -118,7 +118,7 @@ func (d *Database) GetIdentityCloudCredentials(ctx context.Context, u *dbmodel.I
 	const op = "db.GetIdentityCloudCredentials"
 
 	if u.Name == "" || cloud == "" {
-		return nil, errors.MsgWithCode(`cloudcredential not found`, errors.CodeNotFound)
+		return nil, errors.Codef(errors.CodeNotFound, `cloudcredential not found`)
 	}
 
 	if err := d.ready(); err != nil {

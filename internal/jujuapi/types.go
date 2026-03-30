@@ -68,7 +68,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 	if args.CloudTag != "" {
 		ct, err := names.ParseCloudTag(args.CloudTag)
 		if err != nil {
-			return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
+			return nil, errors.Codef(errors.CodeBadRequest, "%w", err)
 		}
 		a.Cloud = ct
 	}
@@ -76,7 +76,7 @@ func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.Use
 	if args.OwnerTag != "" {
 		ot, err := names.ParseUserTag(args.OwnerTag)
 		if err != nil {
-			return nil, errors.ErrWithCode(err, errors.CodeBadRequest)
+			return nil, errors.Codef(errors.CodeBadRequest, "%w", err)
 		}
 		a.Owner = ot
 	} else {

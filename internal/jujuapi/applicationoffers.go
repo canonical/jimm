@@ -4,7 +4,6 @@ package jujuapi
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
 	"github.com/juju/juju/core/crossmodel"
@@ -55,11 +54,11 @@ func (r *controllerRoot) offer(ctx context.Context, args jujuparams.AddApplicati
 
 	mt, err := names.ParseModelTag(args.ModelTag)
 	if err != nil {
-		return errors.ErrWithCode(err, errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "%w", err)
 	}
 	offerOwnerTag, err := names.ParseUserTag(args.OwnerTag)
 	if err != nil {
-		return errors.ErrWithCode(err, errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "%w", err)
 	}
 	err = r.jimm.JujuManager().Offer(ctx, r.user, juju.AddApplicationOfferParams{
 		ModelTag:               mt,
@@ -103,7 +102,7 @@ func (r *controllerRoot) getConsumeDetails(ctx context.Context, user *openfga.Us
 
 	ourl, err := crossmodel.ParseOfferURL(offerURL)
 	if err != nil {
-		return jujuparams.ConsumeOfferDetails{}, errors.ErrWithCode(fmt.Errorf("cannot parse offer URL: %w", err), errors.CodeBadRequest)
+		return jujuparams.ConsumeOfferDetails{}, errors.Codef(errors.CodeBadRequest, "cannot parse offer URL: %w", err)
 	}
 
 	// Ensure the path is normalised.
@@ -171,7 +170,7 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 
 	ut, err := parseUserTag(change.UserTag)
 	if err != nil {
-		return errors.ErrWithCode(err, errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "%w", err)
 	}
 	switch change.Action {
 	case jujuparams.GrantOfferAccess:
@@ -185,7 +184,7 @@ func (r *controllerRoot) modifyOfferAccess(ctx context.Context, change jujuparam
 		}
 		return nil
 	default:
-		return errors.MsgWithCode(fmt.Sprintf("unknown action %q", change.Action), errors.CodeBadRequest)
+		return errors.Codef(errors.CodeBadRequest, "unknown action %q", change.Action)
 	}
 }
 

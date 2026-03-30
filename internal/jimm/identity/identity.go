@@ -50,7 +50,7 @@ func (j *IdentityManager) FetchIdentity(ctx context.Context, id string) (*openfg
 func (j *IdentityManager) ListIdentities(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
 
 	if !user.JimmAdmin {
-		return nil, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	identities, err := j.store.ListIdentities(ctx, pagination.Limit(), pagination.Offset(), match)
 	var users []openfga.User
@@ -68,7 +68,7 @@ func (j *IdentityManager) ListIdentities(ctx context.Context, user *openfga.User
 func (j *IdentityManager) CountIdentities(ctx context.Context, user *openfga.User) (int, error) {
 
 	if !user.JimmAdmin {
-		return 0, errors.MsgWithCode("unauthorized", errors.CodeUnauthorized)
+		return 0, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	count, err := j.store.CountIdentities(ctx)
