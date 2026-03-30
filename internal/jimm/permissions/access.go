@@ -212,7 +212,7 @@ func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.U
 				return cachedPerms, err
 			}
 			if !check {
-				return cachedPerms, fmt.Errorf("Missing permission for %s:%s", key, val)
+				return cachedPerms, fmt.Errorf("missing permission for %s:%s", key, val)
 			}
 			cachedPerms[key] = stringVal
 		}
