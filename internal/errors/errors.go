@@ -71,7 +71,7 @@ func New(text string) error {
 // If the format string includes a %w verb and the corresponding argument is an error,
 // that error will be wrapped and can be retrieved using errors.Unwrap.
 //
-// To attach a code to an error without adding context use %w or %v as necessary:
+// To attach a code to an error without adding context use %w or %v as necessary, i.e.:
 // `errors.Codef(code, "%w", err)`
 // or
 // `errors.Codef(code, "%v", err)`

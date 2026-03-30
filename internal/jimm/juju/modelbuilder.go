@@ -434,7 +434,7 @@ func (b *modelBuilder) CreateDatabaseModel() *modelBuilder {
 	err := b.jujuManager.Database.AddModel(b.ctx, b.model)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			b.err = fmt.Errorf("%s: %w", fmt.Sprintf("model %s/%s already exists", b.owner.Name, b.name), err)
+			b.err = errors.Codef(errors.CodeAlreadyExists, "model %s/%s already exists", b.owner.Name, b.name)
 			return b
 		} else {
 			b.err = fmt.Errorf("failed to store model information: %w", err)

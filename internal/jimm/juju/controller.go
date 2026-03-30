@@ -250,7 +250,7 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 
 	if err := addControllerTx(ctx, j, dbClouds, ctl); err != nil {
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return fmt.Errorf("%s: %w", fmt.Sprintf("controller %q already exists", ctl.Name), err)
+			return errors.Codef(errors.CodeAlreadyExists, "controller %q already exists", ctl.Name)
 		}
 
 		return fmt.Errorf("failed to add controller: %w", err)
@@ -500,7 +500,7 @@ func (m *modelImporter) save(ctx context.Context) error {
 		err := m.jimm.Database.AddModel(ctx, &m.model)
 		if err != nil {
 			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-				return fmt.Errorf("model (%s) already exists", m.model.Name)
+				return errors.Codef(errors.CodeAlreadyExists, "model %q already exists", m.model.Name)
 			}
 			return err
 		}
@@ -513,7 +513,7 @@ func (m *modelImporter) save(ctx context.Context) error {
 			}
 			if err := m.jimm.Database.AddApplicationOffer(ctx, &dbOffer); err != nil {
 				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-					return fmt.Errorf("offer with URL %s already exists", offer.OfferURL)
+					return errors.Codef(errors.CodeAlreadyExists, "offer with URL %s already exists", offer.OfferURL)
 				}
 				return err
 			}

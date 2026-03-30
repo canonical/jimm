@@ -628,7 +628,7 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 			}
 			if err := tx.AddApplicationOffer(ctx, &dbOffer); err != nil {
 				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-					return nil, nil, fmt.Errorf("offer with URL %s already exists", dbOffer.URL)
+					return nil, nil, errors.Codef(errors.CodeAlreadyExists, "offer with URL %s already exists", dbOffer.URL)
 				}
 				return nil, nil, fmt.Errorf("failed to add application offer %q: %w", dbOffer.Name, err)
 			}

@@ -197,7 +197,7 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 	err := db.GetController(ctx, &dbController)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return jujuparams.MigrationTargetInfo{}, 0, err
+			return jujuparams.MigrationTargetInfo{}, 0, errors.Codef(errors.CodeNotFound, "controller %q not found", controllerName)
 		}
 		return jujuparams.MigrationTargetInfo{}, 0, fmt.Errorf("failed to get controller with name %q: %w", controllerName, err)
 	}
