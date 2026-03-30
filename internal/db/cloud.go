@@ -55,7 +55,7 @@ func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	if err := db.First(&c).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.Codef(errors.CodeNotFound, "cloud %q not found", err)
+			return errors.Codef(errors.CodeNotFound, "cloud %q not found", c.Name)
 		}
 		return err
 	}

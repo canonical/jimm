@@ -69,7 +69,7 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	if err != nil && errors.ErrorCode(err) == errors.CodeNotFound {
 		w.WriteHeader(http.StatusNotFound)
 		zapctx.Error(ctx, "HTTP error", zap.NamedError("/jwks.json", fmt.Errorf("JWKS does not exist yet: %w", err)))
-		render.JSON(w, r, errors.Codef(errors.CodeNotFound, "JWKS does not exist yet"))
+		render.JSON(w, r, errors.Error{Code: errors.CodeNotFound, Message: "JWKS does not exist yet"})
 		return
 	}
 
@@ -84,7 +84,7 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		zapctx.Error(ctx, "HTTP error", zap.NamedError("/jwks.json", fmt.Errorf("failed to retrieve JWKS expiry: %w", err)))
-		render.JSON(w, r, errors.Codef(errors.CodeJWKSRetrievalFailed, "something went wrong..."))
+		render.JSON(w, r, errors.Error{Code: errors.CodeJWKSRetrievalFailed, Message: "something went wrong..."})
 		return
 	}
 

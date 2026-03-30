@@ -792,5 +792,5 @@ func TestQueryModelsJqInfiniteRangeQueryTimesOut(t *testing.T) {
 	}
 
 	_, err := j.QueryModelsJq(ctx, modelUUIDs, "range(infinite)")
-	c.Assert(err, qt.ErrorMatches, "jq query timed out after 0.00 seconds")
+	c.Assert(err, qt.ErrorMatches, "jq query timed out after 0.00 seconds: context deadline exceeded")
 }

@@ -62,7 +62,7 @@ func (d *Database) GetCloudCredential(ctx context.Context, cred *dbmodel.CloudCr
 	if err := db.Where("cloud_name = ? AND owner_identity_name = ? AND name = ?", cred.CloudName, cred.OwnerIdentityName, cred.Name).First(&cred).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.Codef(errors.CodeNotFound, "cloudcredential %q not found: %w", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name, err)
+			return errors.Codef(errors.CodeNotFound, "cloudcredential %q not found", cred.CloudName+"/"+cred.OwnerIdentityName+"/"+cred.Name)
 		}
 		return err
 	}

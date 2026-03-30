@@ -1255,7 +1255,6 @@ func TestInitiateMigration(t *testing.T) {
 	c := qt.New(t)
 
 	mt1 := names.NewModelTag("00000002-0000-0000-0000-000000000003")
-	// mt2 := names.NewModelTag("00000002-0000-0000-0000-000000000004")
 
 	migrationId1 := uuid.New().String()
 
@@ -1316,7 +1315,7 @@ func TestInitiateMigration(t *testing.T) {
 			},
 		},
 		initiateMigrationResults: []result{{}},
-		expectedError:            "unauthorized access",
+		expectedError:            "unauthorized",
 	}, {
 		about: "InitiateMigration call fails",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1356,7 +1355,7 @@ func TestInitiateMigration(t *testing.T) {
 			},
 		},
 		initiateMigrationResults: []result{{}},
-		expectedError:            "unauthorized access",
+		expectedError:            "unauthorized",
 	}, {
 		about: "invalid model tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {

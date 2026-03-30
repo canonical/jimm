@@ -48,7 +48,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 	}
 	if err := j.Database.GetModel(ctx, &model); err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.Codef(errors.CodeNotFound, "model %q not found", offer.ModelTag.Id())
+			return errors.Codef(errors.CodeNotFound, "model not found")
 		}
 		return err
 	}
@@ -186,7 +186,7 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 	}
 	if err := j.Database.GetApplicationOffer(ctx, &offer); err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return errors.Codef(errors.CodeNotFound, "application offer %q not found", offer.URL)
+			return errors.Codef(errors.CodeNotFound, "application offer not found")
 		}
 		return err
 	}
@@ -345,7 +345,7 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 	err := j.Database.GetApplicationOffer(ctx, &offer)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil, errors.Codef(errors.CodeNotFound, "application offer %q not found", offerURL)
+			return nil, errors.Codef(errors.CodeNotFound, "application offer not found")
 		}
 		return nil, err
 	}

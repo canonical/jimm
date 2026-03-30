@@ -272,7 +272,7 @@ func (j *PermissionManager) GrantCloudAccess(ctx context.Context, user *openfga.
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q", access)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
@@ -340,7 +340,7 @@ func (j *PermissionManager) RevokeCloudAccess(ctx context.Context, user *openfga
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q", access)
 	}
 
 	isCloudAdministrator, err := openfga.IsAdministrator(ctx, user, ct)
@@ -418,7 +418,7 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q", access)
 	}
 
 	modelAdmin, err := user.HasModelRelation(ctx, mt, ofganames.AdministratorRelation)
@@ -490,7 +490,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 			zaputil.Error(err),
 			zap.String("access", string(access)),
 		)
-		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q: %w", access, err)
+		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q", access)
 	}
 
 	requiredAccess := ofganames.AdministratorRelation

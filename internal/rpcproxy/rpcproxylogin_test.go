@@ -137,7 +137,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
-			Error:     "unauthorized access",
+			Error:     "unauthorized",
 			ErrorCode: "unauthorized access",
 		},
 		oauthAuthenticatorError: errors.Codef(errors.CodeUnauthorized, "unauthorized"),
@@ -168,7 +168,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
-			Error:     "unauthorized access",
+			Error:     "unauthorized",
 			ErrorCode: "unauthorized access",
 		},
 		oauthAuthenticatorError: errors.Codef(errors.CodeUnauthorized, "unauthorized"),
@@ -307,7 +307,7 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		},
 		expectedClientResponse: &rpcproxy.Message{
 			RequestID: 1,
-			Error:     "unauthorized access",
+			Error:     "unauthorized",
 			ErrorCode: "unauthorized access",
 		},
 		oauthAuthenticatorError: errors.Codef(errors.CodeUnauthorized, "unauthorized"),
