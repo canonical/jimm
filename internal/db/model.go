@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"gorm.io/gorm"
 
@@ -73,7 +72,7 @@ func (d *Database) GetModel(ctx context.Context, model *dbmodel.Model) (err erro
 	if err := db.First(&model).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("model not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "model not found")
 		}
 		return err
 	}
@@ -196,7 +195,7 @@ func (d *Database) GetModelsByUUID(ctx context.Context, modelUUIDs []string) (_ 
 	if err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return nil, fmt.Errorf("model not found: %w", err)
+			return nil, errors.Codef(errors.CodeNotFound, "model not found")
 		}
 		return nil, dbError(err)
 	}

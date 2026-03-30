@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"gorm.io/gorm"
 
@@ -30,7 +29,7 @@ func (d *Database) AddCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	if err := db.Create(c).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return fmt.Errorf("%s: %w", fmt.Sprintf("cloud %q already exists", c.Name), err)
+			return errors.Codef(errors.CodeAlreadyExists, "cloud %q already exists", c.Name)
 		}
 		return err
 	}
@@ -56,7 +55,7 @@ func (d *Database) GetCloud(ctx context.Context, c *dbmodel.Cloud) (err error) {
 	if err := db.First(&c).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("%s: %w", fmt.Sprintf("cloud %q not found", c.Name), err)
+			return errors.Codef(errors.CodeNotFound, "cloud %q not found", err)
 		}
 		return err
 	}
@@ -145,7 +144,7 @@ func (d *Database) AddCloudRegion(ctx context.Context, cr *dbmodel.CloudRegion) 
 	if err := db.Create(cr).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return fmt.Errorf("%s: %w", fmt.Sprintf("cloud-region %s/%s already exists", cr.CloudName, cr.Name), err)
+			return errors.Codef(errors.CodeAlreadyExists, "cloud-region %s/%s already exists", cr.CloudName, cr.Name)
 		}
 		return err
 	}

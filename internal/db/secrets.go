@@ -79,7 +79,7 @@ func (d *Database) GetSecret(ctx context.Context, secret *dbmodel.Secret) (err e
 	if err := db.First(&secret).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("secret not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "secret not found")
 		}
 		return dbError(err)
 	}

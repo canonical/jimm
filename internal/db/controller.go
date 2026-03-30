@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"gorm.io/gorm/clause"
 
@@ -58,7 +57,7 @@ func (d *Database) GetController(ctx context.Context, controller *dbmodel.Contro
 	if err := db.First(&controller).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("controller not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "controller not found")
 		}
 		return err
 	}
@@ -109,7 +108,7 @@ func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Con
 	if err := db.Delete(controller).Error; err != nil {
 		err := dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("controller not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "controller not found")
 		}
 		return err
 	}

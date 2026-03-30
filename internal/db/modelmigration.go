@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"gorm.io/gorm/clause"
@@ -77,7 +76,7 @@ func (d *Database) GetIncomingModelMigrationWithLock(ctx context.Context, modelM
 	if err := db.Preload("TargetController").First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("model migration not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "model migration not found")
 		}
 		return err
 	}
@@ -106,7 +105,7 @@ func (d *Database) GetIncomingModelMigration(ctx context.Context, modelMigration
 	if err := db.Preload("TargetController").First(&modelMigration).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("model migration not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "model migration not found")
 		}
 		return err
 	}

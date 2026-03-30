@@ -4,7 +4,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -56,7 +55,7 @@ func (d *Database) GetUserMapping(ctx context.Context, userMapping *dbmodel.User
 	if err := db.First(&userMapping).Error; err != nil {
 		err = dbError(err)
 		if errors.ErrorCode(err) == errors.CodeNotFound {
-			return fmt.Errorf("user mapping not found: %w", err)
+			return errors.Codef(errors.CodeNotFound, "user mapping not found")
 		}
 		return err
 	}
