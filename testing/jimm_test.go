@@ -901,7 +901,7 @@ func TestCrossModelQuery(t *testing.T) {
 		Type:  "some-type-not-supported",
 		Query: ".",
 	})
-	c.Assert(err, qt.ErrorMatches, `unable to query models \(invalid query type\)`)
+	c.Assert(err, qt.ErrorMatches, `unable to query models: invalid query type`)
 
 	_, err = client.CrossModelQuery(&apiparams.CrossModelQueryRequest{
 		Type:  "jimmsql",
@@ -991,7 +991,7 @@ func TestJimmModelMigrationNonSuperuser(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(res.Results, qt.HasLen, 1)
 	item := res.Results[0]
-	c.Assert(item.Error.Message, qt.Matches, "unauthorized access")
+	c.Assert(item.Error.Message, qt.Matches, "unauthorized")
 }
 
 func TestVersion(t *testing.T) {

@@ -1016,7 +1016,7 @@ func TestListRelationshipTuplesWithMissingGroups(t *testing.T) {
 	tupleWithoutDBEntry.TargetObject = "group:" + group.UUID
 	// first tuples are created during setup test
 	c.Assert(response.Tuples[initialTupleCount], qt.Equals, tupleWithoutDBEntry)
-	c.Assert(response.Errors, qt.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID})
+	c.Assert(response.Errors, qt.DeepEquals, []string{"failed to parse target: failed to fetch group information: " + group.UUID + ": record not found"})
 }
 
 func TestCheckRelationAsNonAdmin(t *testing.T) {

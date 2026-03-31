@@ -104,7 +104,7 @@ func TestUserInfoSpecifiedUsers(t *testing.T) {
 
 	client := usermanager.NewClient(conn)
 	users, err := client.UserInfo([]string{"alice@canonical.com", "bob@canonical.com"}, usermanager.AllUsers)
-	c.Assert(err, qt.ErrorMatches, "bob@canonical.com: unauthorized access")
+	c.Assert(err, qt.ErrorMatches, "bob@canonical.com: unauthorized")
 	c.Assert(users, qt.HasLen, 0)
 }
 
