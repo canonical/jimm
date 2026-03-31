@@ -4,6 +4,8 @@ package jimmjwx_test
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"testing"
 	"time"
 
@@ -129,6 +131,39 @@ func TestNewJWTWithCustomExpiry(t *testing.T) {
 		jwt.WithClock(futureClock{expiry: shortExpiry}),
 	)
 	c.Assert(err, qt.ErrorMatches, `"exp" not satisfied`)
+}
+
+func TestNewJWTUsesRefreshedSigningKey(t *testing.T) {
+	c := qt.New(t)
+	params, _, _ := newJWKSServiceParams(c)
+	params.CacheMaxAge = "1"
+	service, err := jimmjwx.NewJWKSService(params)
+	c.Assert(err, qt.IsNil)
+	defer func() { c.Assert(service.Close(), qt.IsNil) }()
+	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+		Host:   "host",
+		Expiry: time.Minute,
+		JWKS:   service,
+	})
+
+	refreshedSet, refreshedPrivateKey := generateJWK(c)
+	rawJWKS, err := json.Marshal(refreshedSet)
+	c.Assert(err, qt.IsNil)
+	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
+	c.Assert(err, qt.IsNil)
+	err = os.WriteFile(params.PrivateKeyPath, refreshedPrivateKey, 0o600)
+	c.Assert(err, qt.IsNil)
+
+	time.Sleep(1100 * time.Millisecond)
+
+	tok, err := jwtService.NewJWT(context.Background(), jimmjwx.JWTParams{
+		Controller: "controller-my-diglett-controller",
+		User:       "diglett@canonical.com",
+	})
+	c.Assert(err, qt.IsNil)
+
+	_, err = jwt.Parse(tok, jwt.WithKeySet(refreshedSet))
+	c.Assert(err, qt.IsNil)
 }
 
 type futureClock struct {

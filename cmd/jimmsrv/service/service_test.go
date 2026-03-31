@@ -43,17 +43,17 @@ func TestMain(m *testing.M) {
 // for tests. A test can override any parameter that it needs.
 // Note that newTestServiceParameters will create an empty test database.
 func newTestServiceParameters(c *qt.C) jimmsvc.Params {
-	jwksParams, err := jimmtest.StaticJWKSServiceParams()
+	jwksParams, err := jimmtest.StaticJWKSServiceParams(c)
 	c.Assert(err, qt.IsNil)
 
 	return jimmsvc.Params{
-		DSN:             testdb.CreateEmptyDatabase(c),
-		ControllerUUID:  "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
-		PrivateKey:      "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
-		PublicKey:       "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
-		JWKS:            jwksParams.JWKS,
-		JWKSPrivateKey:  jwksParams.PrivateKeyPEM,
-		JWKSCacheMaxAge: jwksParams.CacheMaxAge,
+		DSN:                testdb.CreateEmptyDatabase(c),
+		ControllerUUID:     "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",
+		PrivateKey:         "ly/dzsI9Nt/4JxUILQeAX79qZ4mygDiuYGqc2ZEiDEc=",
+		PublicKey:          "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
+		JWKSPath:           jwksParams.JWKSPath,
+		JWKSPrivateKeyPath: jwksParams.PrivateKeyPath,
+		JWKSCacheMaxAge:    jwksParams.CacheMaxAge,
 		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
 			IssuerURL:           "http://localhost:8082/realms/jimm",
 			ClientID:            "jimm-device",

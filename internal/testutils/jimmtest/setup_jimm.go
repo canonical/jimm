@@ -92,7 +92,7 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 	c.Assert(err, qt.IsNil)
 
 	credentialStore := NewInMemoryCredentialStore()
-	jwksService, err := NewStaticJWKSService()
+	jwksService, err := NewStaticJWKSService(c)
 	c.Assert(err, qt.IsNil)
 
 	jwtExpiry := params.JWTExpiryDuration
@@ -101,10 +101,9 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 	}
 
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:       params.PublicDNSName,
-		Expiry:     jwtExpiry,
-		JWKS:       jwksService,
-		SigningKey: jwksService.SigningKey(),
+		Host:   params.PublicDNSName,
+		Expiry: jwtExpiry,
+		JWKS:   jwksService,
 	})
 
 	dialer := &jujuclient.Dialer{

@@ -21,15 +21,15 @@ const (
 )
 
 type JWTServiceParams struct {
-	Host       string
-	Expiry     time.Duration
-	JWKS       JwksGetter
-	SigningKey jwk.Key
+	Host   string
+	Expiry time.Duration
+	JWKS   JwksGetter
 }
 
 // JwksGetter provides a Get method to fetch the JWK set.
 type JwksGetter interface {
 	Get(ctx context.Context) (jwk.Set, error)
+	SigningKey(ctx context.Context) (jwk.Key, error)
 }
 
 // JWTService manages the creation of JWTs that are intended to be issued
@@ -79,7 +79,15 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 
 	zapctx.Debug(ctx, "issuing a new JWT", zap.Any("params", params))
 
-	if j.SigningKey == nil {
+	if j.JWKS == nil {
+		return nil, errors.New("missing signing key provider")
+	}
+
+	signingKey, err := j.JWKS.SigningKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if signingKey == nil {
 		return nil, errors.New("missing signing key")
 	}
 
@@ -112,7 +120,7 @@ func (j *JWTService) NewJWT(ctx context.Context, params JWTParams) ([]byte, erro
 		token,
 		jwt.WithKey(
 			jwa.RS256,
-			j.SigningKey,
+			signingKey,
 		),
 	)
 	if err != nil {

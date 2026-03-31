@@ -170,11 +170,11 @@ type Params struct {
 	// for controller to JIMM communication ONLY.
 	JWTExpiryDuration time.Duration
 
-	// JWKS is the JSON Web Key Set document served by JIMM.
-	JWKS string
+	// JWKSPath is the path to the JSON Web Key Set document served by JIMM.
+	JWKSPath string
 
-	// JWKSPrivateKey is the PEM encoded RSA private key used to sign controller JWTs.
-	JWKSPrivateKey string
+	// JWKSPrivateKeyPath is the path to the PEM encoded RSA private key used to sign controller JWTs.
+	JWKSPrivateKeyPath string
 
 	// JWKSCacheMaxAge is the Cache-Control max-age, in seconds, for /.well-known/jwks.json.
 	JWKSCacheMaxAge string
@@ -429,9 +429,9 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 
 	jwksService, err := jimmjwx.NewJWKSService(jimmjwx.JWKSServiceParams{
-		JWKS:          p.JWKS,
-		PrivateKeyPEM: p.JWKSPrivateKey,
-		CacheMaxAge:   p.JWKSCacheMaxAge,
+		JWKSPath:       p.JWKSPath,
+		PrivateKeyPath: p.JWKSPrivateKeyPath,
+		CacheMaxAge:    p.JWKSCacheMaxAge,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure jwks: %w", err)
@@ -472,10 +472,9 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:       p.PublicDNSName,
-		Expiry:     jwtExpiry,
-		JWKS:       jwksService,
-		SigningKey: jwksService.SigningKey(),
+		Host:   p.PublicDNSName,
+		Expiry: jwtExpiry,
+		JWKS:   jwksService,
 	})
 
 	dialer := &jujuclient.Dialer{
@@ -505,6 +504,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		JWTService:                    jwtService,
 		JWKSService:                   jwksService,
 	}
+	deps.cleanupFuncs = append(deps.cleanupFuncs, jwksService.Close)
 
 	sessionStore, cleanupFuncs, err := setupSessionStore(p.CookieSessionKey, db)
 	if err != nil {

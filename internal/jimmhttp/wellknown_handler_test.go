@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -32,17 +33,22 @@ func (failingJWKSProvider) CacheMaxAge() int64 {
 }
 
 func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jimmjwx.JWKSServiceParams) {
-	params, err := jimmtest.StaticJWKSServiceParams()
+	params, err := jimmtest.StaticJWKSServiceParams(c)
 	c.Assert(err, qt.IsNil)
 	service, err := jimmjwx.NewJWKSService(params)
 	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		c.Assert(service.Close(), qt.IsNil)
+	})
 	return service, params
 }
 
 func newMultiKeyJWKSService(c *qt.C) (*jimmjwx.JWKSService, string) {
 	_, params := newJWKSService(c)
 	var document map[string][]map[string]any
-	err := json.Unmarshal([]byte(params.JWKS), &document)
+	rawJWKS, err := os.ReadFile(params.JWKSPath)
+	c.Assert(err, qt.IsNil)
+	err = json.Unmarshal(rawJWKS, &document)
 	c.Assert(err, qt.IsNil)
 
 	duplicateKey := make(map[string]any, len(document["keys"][0]))
@@ -50,9 +56,10 @@ func newMultiKeyJWKSService(c *qt.C) (*jimmjwx.JWKSService, string) {
 	duplicateKey["kid"] = "old-test-kid"
 	document["keys"] = append(document["keys"], duplicateKey)
 
-	rawJWKS, err := json.Marshal(document)
+	rawJWKS, err = json.Marshal(document)
 	c.Assert(err, qt.IsNil)
-	params.JWKS = string(rawJWKS)
+	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
+	c.Assert(err, qt.IsNil)
 	service, err := jimmjwx.NewJWKSService(params)
 	c.Assert(err, qt.IsNil)
 	return service, string(rawJWKS)
@@ -107,7 +114,9 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	b, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 	c.Assert(code, qt.Equals, http.StatusOK)
-	assertJSONBodyEquals(c, b, params.JWKS)
+	rawJWKS, err := os.ReadFile(params.JWKSPath)
+	c.Assert(err, qt.IsNil)
+	assertJSONBodyEquals(c, b, string(rawJWKS))
 	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=600")
 }
 

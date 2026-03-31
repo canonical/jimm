@@ -3,39 +3,56 @@
 package jimmjwx
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"strconv"
+	"sync"
+	"time"
 
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 type JWKSServiceParams struct {
-	JWKS          string
-	PrivateKeyPEM string
-	CacheMaxAge   string
+	JWKSPath       string
+	PrivateKeyPath string
+	CacheMaxAge    string
+}
+
+type cachedJWKS struct {
+	set        jwk.Set
+	signingKey jwk.Key
 }
 
 // JWKSService serves operator-managed JWKS material for JIMM.
 type JWKSService struct {
-	set         jwk.Set
-	signingKey  jwk.Key
-	cacheMaxAge int64
+	mu        sync.RWMutex
+	closeOnce sync.Once
+
+	jwksPath       string
+	privateKeyPath string
+	cached         cachedJWKS
+	cacheMaxAge    int64
+	stopCh         chan struct{}
+	doneCh         chan struct{}
 }
 
 // NewJWKSService parses and validates the operator-managed JWKS configuration.
 func NewJWKSService(p JWKSServiceParams) (*JWKSService, error) {
-	if p.JWKS == "" {
-		return nil, errors.New("missing jwks")
+	if p.JWKSPath == "" {
+		return nil, errors.New("missing jwks path")
 	}
-	if p.PrivateKeyPEM == "" {
-		return nil, errors.New("missing jwks private key")
+	if p.PrivateKeyPath == "" {
+		return nil, errors.New("missing jwks private key path")
 	}
 	if p.CacheMaxAge == "" {
 		return nil, errors.New("missing jwks cache max age")
@@ -49,45 +66,21 @@ func NewJWKSService(p JWKSServiceParams) (*JWKSService, error) {
 		return nil, errors.New("jwks cache max age must be greater than 0")
 	}
 
-	set, err := jwk.ParseString(p.JWKS)
-	if err != nil {
-		return nil, fmt.Errorf("parse jwks: %w", err)
-	}
-	if set.Len() == 0 {
-		return nil, errors.New("jwks must contain at least one key")
-	}
-
-	privateKey, err := parseRSAPrivateKey([]byte(p.PrivateKeyPEM))
+	material, err := loadJWKS(p.JWKSPath, p.PrivateKeyPath)
 	if err != nil {
 		return nil, err
 	}
 
-	signingKey, err := jwk.FromRaw(privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("create jwks signing key: %w", err)
+	service := &JWKSService{
+		jwksPath:       p.JWKSPath,
+		privateKeyPath: p.PrivateKeyPath,
+		cached:         material,
+		cacheMaxAge:    cacheMaxAge,
+		stopCh:         make(chan struct{}),
+		doneCh:         make(chan struct{}),
 	}
-	if err := signingKey.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
-		return nil, err
-	}
-	if err := signingKey.Set(jwk.KeyUsageKey, "sig"); err != nil {
-		return nil, err
-	}
-
-	publicKey, err := matchingPublicKey(set, &privateKey.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-	if publicKey.KeyID() != "" {
-		if err := signingKey.Set(jwk.KeyIDKey, publicKey.KeyID()); err != nil {
-			return nil, err
-		}
-	}
-
-	return &JWKSService{
-		set:         set,
-		signingKey:  signingKey,
-		cacheMaxAge: cacheMaxAge,
-	}, nil
+	go service.refreshLoop()
+	return service, nil
 }
 
 // Get returns the JWKS set to be served at /.well-known/jwks.json.
@@ -95,7 +88,12 @@ func (jwks *JWKSService) Get(_ context.Context) (jwk.Set, error) {
 	if jwks == nil {
 		return nil, errors.New("missing jwks service")
 	}
-	return jwks.set, nil
+	jwks.mu.RLock()
+	defer jwks.mu.RUnlock()
+	if jwks.cached.set == nil {
+		return nil, errors.New("missing jwks")
+	}
+	return jwks.cached.set, nil
 }
 
 // CacheMaxAge returns the Cache-Control max-age, in seconds, for /.well-known/jwks.json.
@@ -108,11 +106,117 @@ func (jwks *JWKSService) CacheMaxAge() int64 {
 
 // SigningKey returns the jwk.Key to be used for signing JWTs.
 // This is the private key corresponding to one of the public keys in the JWKS.
-func (jwks *JWKSService) SigningKey() jwk.Key {
+func (jwks *JWKSService) SigningKey(_ context.Context) (jwk.Key, error) {
+	if jwks == nil {
+		return nil, errors.New("missing jwks service")
+	}
+	jwks.mu.RLock()
+	defer jwks.mu.RUnlock()
+	if jwks.cached.signingKey == nil {
+		return nil, errors.New("missing signing key")
+	}
+	return jwks.cached.signingKey, nil
+}
+
+// Close stops the background JWKS refresh loop.
+func (jwks *JWKSService) Close() error {
 	if jwks == nil {
 		return nil
 	}
-	return jwks.signingKey
+	jwks.closeOnce.Do(func() {
+		close(jwks.stopCh)
+		<-jwks.doneCh
+	})
+	return nil
+}
+
+func (jwks *JWKSService) refresh(ctx context.Context) {
+	material, err := loadJWKS(jwks.jwksPath, jwks.privateKeyPath)
+	if err != nil {
+		zapctx.Warn(ctx, "failed to refresh jwks, using cached value", zap.Error(err))
+		return
+	}
+
+	jwks.mu.Lock()
+	defer jwks.mu.Unlock()
+	jwks.cached = material
+}
+
+func (jwks *JWKSService) refreshLoop() {
+	ticker := time.NewTicker(time.Duration(jwks.cacheMaxAge) * time.Second)
+	defer ticker.Stop()
+	defer close(jwks.doneCh)
+
+	for {
+		select {
+		case <-ticker.C:
+			jwks.refresh(context.Background())
+		case <-jwks.stopCh:
+			return
+		}
+	}
+}
+
+func loadJWKS(jwksPath, privateKeyPath string) (cachedJWKS, error) {
+	rawJWKS, err := readRequiredFile(jwksPath, "jwks")
+	if err != nil {
+		return cachedJWKS{}, err
+	}
+
+	set, err := jwk.Parse(rawJWKS)
+	if err != nil {
+		return cachedJWKS{}, fmt.Errorf("parse jwks: %w", err)
+	}
+	if set.Len() == 0 {
+		return cachedJWKS{}, errors.New("jwks must contain at least one key")
+	}
+
+	privateKeyPEM, err := readRequiredFile(privateKeyPath, "jwks private key")
+	if err != nil {
+		return cachedJWKS{}, err
+	}
+
+	privateKey, err := parseRSAPrivateKey(privateKeyPEM)
+	if err != nil {
+		return cachedJWKS{}, err
+	}
+
+	signingKey, err := jwk.FromRaw(privateKey)
+	if err != nil {
+		return cachedJWKS{}, fmt.Errorf("create jwks signing key: %w", err)
+	}
+	if err := signingKey.Set(jwk.AlgorithmKey, jwa.RS256); err != nil {
+		return cachedJWKS{}, err
+	}
+	if err := signingKey.Set(jwk.KeyUsageKey, "sig"); err != nil {
+		return cachedJWKS{}, err
+	}
+
+	publicKey, err := matchingPublicKey(set, &privateKey.PublicKey)
+	if err != nil {
+		return cachedJWKS{}, err
+	}
+	if publicKey.KeyID() != "" {
+		if err := signingKey.Set(jwk.KeyIDKey, publicKey.KeyID()); err != nil {
+			return cachedJWKS{}, err
+		}
+	}
+
+	return cachedJWKS{
+		set:        set,
+		signingKey: signingKey,
+	}, nil
+}
+
+func readRequiredFile(path, name string) ([]byte, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", name, err)
+	}
+	if len(bytes.TrimSpace(content)) == 0 {
+		return nil, errors.New(name + " file is empty")
+	}
+	return content, nil
 }
 
 func parseRSAPrivateKey(privateKeyPEM []byte) (*rsa.PrivateKey, error) {

@@ -8,6 +8,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"os"
+	"path/filepath"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -61,10 +63,17 @@ func newJWKSServiceParams(c *qt.C) (jimmjwx.JWKSServiceParams, jwk.Set, []byte) 
 	set, privateKey := generateJWK(c)
 	rawJWKS, err := json.Marshal(set)
 	c.Assert(err, qt.IsNil)
+	dir := c.TempDir()
+	jwksPath := filepath.Join(dir, "jwks.json")
+	privateKeyPath := filepath.Join(dir, "jwks_private_key.pem")
+	err = os.WriteFile(jwksPath, rawJWKS, 0o600)
+	c.Assert(err, qt.IsNil)
+	err = os.WriteFile(privateKeyPath, privateKey, 0o600)
+	c.Assert(err, qt.IsNil)
 	return jimmjwx.JWKSServiceParams{
-		JWKS:          string(rawJWKS),
-		PrivateKeyPEM: string(privateKey),
-		CacheMaxAge:   "600",
+		JWKSPath:       jwksPath,
+		PrivateKeyPath: privateKeyPath,
+		CacheMaxAge:    "600",
 	}, set, privateKey
 }
 
@@ -73,6 +82,9 @@ func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jwk.Set) {
 	params, set, _ := newJWKSServiceParams(c)
 	service, err := jimmjwx.NewJWKSService(params)
 	c.Assert(err, qt.IsNil)
+	c.Cleanup(func() {
+		c.Assert(service.Close(), qt.IsNil)
+	})
 	return service, set
 }
 
@@ -80,9 +92,8 @@ func newJWTService(c *qt.C, expiry time.Duration) (*jimmjwx.JWTService, jwk.Set)
 	c.Helper()
 	service, set := newJWKSService(c)
 	return jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:       "host",
-		Expiry:     expiry,
-		JWKS:       service,
-		SigningKey: service.SigningKey(),
+		Host:   "host",
+		Expiry: expiry,
+		JWKS:   service,
 	}), set
 }
