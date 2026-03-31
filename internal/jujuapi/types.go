@@ -54,6 +54,7 @@ func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
 	}
 }
 
+// bootstrapCloudFromParams converts the bootstrap cloud params into a cloud.Cloud.
 func bootstrapCloudFromParams(p params.BootstrapCloud) cloud.Cloud {
 	authTypes := make([]cloud.AuthType, len(p.AuthTypes))
 	for i, authType := range p.AuthTypes {

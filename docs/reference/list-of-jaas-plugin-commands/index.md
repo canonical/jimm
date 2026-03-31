@@ -236,17 +236,24 @@ Bootstrap a Juju controller via JIMM
 | Flag | Default | Usage |
 | --- | --- | --- |
 | `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--bootstrap-base` |  | Specify the base of the bootstrap machine |
+| `--bootstrap-constraints` | [] | Specify bootstrap machine constraints |
 | `--config` |  | Specify a configuration file, or one or more configuration options.     (`--config config.yaml [--config key=value ...])` |
+| `--constraints` | [] | Set model constraints |
 | `--credential` |  | The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud. |
 | `--detach` | false | If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete. |
 | `--format` | json | Specify output format (json&#x7c;yaml) |
+| `--model-default` |  | Specify a configuration file, or one or more configuration options to be set for all models, unless otherwise specified.     (`--model-default config.yaml [--model-default key=value ...])` |
 | `-o`, `--output` |  | Specify an output file |
+| `--storage-pool` |  | Specify options for an initial storage pool. 'name' and 'type' are required, plus any additional attributes.     (`--storage-pool pool-config.yaml [--storage-pool key=value ...])` |
 
 ## Examples
 
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --config controller-service-type=loadbalancer
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --bootstrap-base ubuntu@24.04 --bootstrap-constraints mem=8G --constraints arch=amd64
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --storage-pool name=controller-pool --storage-pool type=ebs --config audit-log-enabled=true
 
 
 ## Details
@@ -276,10 +283,11 @@ file contents.
 These config options must match the config options supported by the Juju CLI
 for the version of Juju being bootstrapped. See the Juju documentation for
 the version specified for the full list of supported bootstrap config
-options.
+options. Additional bootstrap settings can be supplied with --bootstrap-base,
+--bootstrap-constraints, --constraints, --model-default, and --storage-pool,
+these align with the corresponding Juju CLI options.
 
-Note that some config options may not be specified as they will automatically
-be set.
+Note that some config options will be automatically set but can be overriden.
 These are:
 
 - login-token-refresh-url

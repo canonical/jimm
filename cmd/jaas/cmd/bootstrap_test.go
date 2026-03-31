@@ -57,6 +57,32 @@ func TestBootstrapArgParsing(t *testing.T) {
 				c.Check(command.detach, qt.Equals, true)
 			},
 		}, {
+			name: "bootstrap-option-flags",
+			args: []string{
+				"test-cloud/region",
+				"controller-name",
+				"controller-version",
+				"--bootstrap-base", "ubuntu@24.04",
+				"--bootstrap-constraints", "mem=8G",
+				"--constraints", "arch=amd64",
+				"--model-default", "logging-config=<root>=INFO",
+				"--storage-pool", "name=controller-pool",
+				"--storage-pool", "type=ebs",
+				"--config", "audit-log-enabled=true",
+				"--config", "image-stream=released",
+			},
+			checkFlags: func(c *qt.C, command *bootstrapCommand) {
+				c.Check(command.cloud, qt.Equals, "test-cloud")
+				c.Check(command.region, qt.Equals, "region")
+				c.Check(command.bootstrapBase, qt.Equals, "ubuntu@24.04")
+				c.Check([]string(command.bootstrapCons), qt.DeepEquals, []string{"mem=8G"})
+				c.Check([]string(command.constraints), qt.DeepEquals, []string{"arch=amd64"})
+			},
+		}, {
+			name:     "invalid-bootstrap-base",
+			args:     []string{"test-cloud/region", "controller-name", "controller-version", "--bootstrap-base", "not-a-base"},
+			errMatch: `invalid bootstrap base "not-a-base": .*`,
+		}, {
 			name:     "too-few-args",
 			args:     []string{"test-cloud/region"},
 			errMatch: "expected at least 3 arguments, got 1",
@@ -167,8 +193,28 @@ func TestBootstrapApiParams(t *testing.T) {
 				Attributes: map[string]string{},
 			},
 			BootstrapOptions: params.BootstrapOptions{
+				BootstrapBase: "ubuntu@24.04",
+				BootstrapConstraints: map[string]string{
+					"mem":   "8G",
+					"cores": "2",
+				},
+				ModelConstraints: map[string]string{
+					"arch": "amd64",
+				},
+				ModelDefault: map[string]string{
+					"logging-config": "<root>=INFO",
+				},
+				StoragePool: &params.BootstrapStoragePool{
+					Name: "controller-pool",
+					Type: "ebs",
+					Attributes: map[string]string{
+						"volume-type": "gp3",
+					},
+				},
 				BootstrapConfig: map[string]string{
+					"audit-log-enabled": "true",
 					"bootstrap-timeout": "60",
+					"image-stream":      "released",
 					"string-option":     "value",
 				},
 			},
@@ -195,7 +241,17 @@ func TestBootstrapApiParams(t *testing.T) {
 		"controller-name",
 		"controller-version",
 		"--detach",
+		"--bootstrap-base", "ubuntu@24.04",
+		"--bootstrap-constraints", "mem=8G",
+		"--bootstrap-constraints", "cores=2",
+		"--constraints", "arch=amd64",
+		"--model-default", "logging-config=<root>=INFO",
+		"--storage-pool", "name=controller-pool",
+		"--storage-pool", "type=ebs",
+		"--storage-pool", "volume-type=gp3",
+		"--config", "audit-log-enabled=true",
 		"--config", "bootstrap-timeout=60",
+		"--config", "image-stream=released",
 		"--config", "string-option=value",
 	)
 
@@ -411,4 +467,88 @@ func TestBootstrapSpecifiedCredentialWithDefault(t *testing.T) {
 	mcmd := modelcmd.WrapBase(command)
 	err := mcmd.Run(ctx)
 	c.Assert(err, qt.ErrorMatches, `no credential found with name "cred-3"`)
+}
+
+func TestSplitEscapedFields(t *testing.T) {
+	c := qt.New(t)
+	tests := []struct {
+		name     string
+		value    string
+		expected []string
+	}{
+		{
+			name:     "empty",
+			value:    "",
+			expected: nil,
+		},
+		{
+			name:     "plain fields",
+			value:    "mem=8G arch=amd64",
+			expected: []string{"mem=8G", "arch=amd64"},
+		},
+		{
+			name:     "escaped spaces",
+			value:    `tags=prod\ blue zones=us-east-1a`,
+			expected: []string{"tags=prod blue", "zones=us-east-1a"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c.Check(splitEscapedFields(test.value), qt.DeepEquals, test.expected)
+		})
+	}
+}
+
+func TestStringifyScalar(t *testing.T) {
+	c := qt.New(t)
+	tests := []struct {
+		name     string
+		value    any
+		expected string
+		errMatch string
+	}{
+		{
+			name:     "string",
+			value:    "value",
+			expected: "value",
+		},
+		{
+			name:     "bool",
+			value:    true,
+			expected: "true",
+		},
+		{
+			name:     "integer",
+			value:    42,
+			expected: "42",
+		},
+		{
+			name:     "float",
+			value:    3.5,
+			expected: "3.5",
+		},
+		{
+			name:     "nil",
+			value:    nil,
+			errMatch: "nil value",
+		},
+		{
+			name:     "non scalar",
+			value:    []string{"nope"},
+			errMatch: `unsupported type \[\]string`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			value, err := stringifyScalar(test.value)
+			if test.errMatch != "" {
+				c.Assert(err, qt.ErrorMatches, test.errMatch)
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(value, qt.Equals, test.expected)
+		})
+	}
 }
