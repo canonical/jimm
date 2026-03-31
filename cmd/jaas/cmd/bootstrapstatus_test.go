@@ -50,10 +50,7 @@ func TestBootstrapStatus_Failed(t *testing.T) {
 
 	ctx := newTestContext(c)
 	err := command.Run(ctx)
-	c.Assert(err, qt.IsNil)
-
-	stdout := cmdtesting.Stdout(ctx)
-	c.Assert(stdout, qt.Equals, "Job failed: Job failed\n")
+	c.Assert(err, qt.ErrorMatches, "job failed: Job failed")
 }
 
 func TestBootstrapStatus_Running(t *testing.T) {

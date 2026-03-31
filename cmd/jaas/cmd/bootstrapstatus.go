@@ -133,11 +133,7 @@ func (p bootstrapLogPoller) watchBootstrapLogs() error {
 			}
 			return nil
 		case params.StatusFailed:
-			_, err = p.out.Write([]byte("Job failed: " + response.Error + "\n"))
-			if err != nil {
-				return fmt.Errorf("failed to write error: %w", err)
-			}
-			return nil
+			return fmt.Errorf("job failed: %s", response.Error)
 		case params.StatusPending:
 			_, err := p.out.Write([]byte("Job is pending...\n"))
 			if err != nil {
