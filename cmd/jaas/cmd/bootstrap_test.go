@@ -195,8 +195,9 @@ func TestBootstrapApiParams(t *testing.T) {
 			BootstrapOptions: params.BootstrapOptions{
 				BootstrapBase: "ubuntu@24.04",
 				BootstrapConstraints: map[string]string{
-					"mem":   "8G",
-					"cores": "2",
+					"mem":       "8G",
+					"cores":     "2",
+					"root-disk": "10G",
 				},
 				ModelConstraints: map[string]string{
 					"arch": "amd64",
@@ -243,7 +244,7 @@ func TestBootstrapApiParams(t *testing.T) {
 		"--detach",
 		"--bootstrap-base", "ubuntu@24.04",
 		"--bootstrap-constraints", "mem=8G",
-		"--bootstrap-constraints", "cores=2",
+		"--bootstrap-constraints", "cores=2 root-disk=10G",
 		"--constraints", "arch=amd64",
 		"--model-default", "logging-config=<root>=INFO",
 		"--storage-pool", "name=controller-pool",

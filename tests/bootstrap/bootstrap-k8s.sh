@@ -17,7 +17,7 @@ echo "Bootstrapping controller on microk8s"
 $JAAS bootstrap testk8s test-controller 3.6.9 \
   --config controller-service-type=loadbalancer \
   --bootstrap-constraints cores=2 \
-  --model-default logging-config=<root>=INFO
+  --model-default 'logging-config=<root>=INFO'
 
 CERT=$(sudo microk8s config | yq '.users[0].user."client-certificate-data"')
 KEY=$(sudo microk8s config | yq '.users[0].user."client-key-data"' )

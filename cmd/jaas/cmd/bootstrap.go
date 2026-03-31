@@ -427,6 +427,7 @@ func parseConstraintFlag(ctxt *cmd.Context, values []string, flagName string) (m
 	if len(values) == 0 {
 		return nil, nil
 	}
+	// ParseWithAliases requires only spaces and name=value pairs.
 	joined := strings.Join(values, " ")
 	_, aliases, err := constraints.ParseWithAliases(joined)
 	common.WarnConstraintAliases(ctxt, aliases)
