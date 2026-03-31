@@ -428,7 +428,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		return nil, fmt.Errorf("failed to parse public DNS name: %v", err)
 	}
 
-	jwksService, err := jimmjwx.NewJWKSService(jimmjwx.JWKSServiceParams{
+	jwksService, err := jimmjwx.NewJWKSService(ctx, jimmjwx.JWKSServiceParams{
 		JWKSPath:       p.JWKSPath,
 		PrivateKeyPath: p.JWKSPrivateKeyPath,
 		CacheMaxAge:    p.JWKSCacheMaxAge,

@@ -137,7 +137,7 @@ func TestNewJWTUsesRefreshedSigningKey(t *testing.T) {
 	c := qt.New(t)
 	params, _, _ := newJWKSServiceParams(c)
 	params.CacheMaxAge = "1"
-	service, err := jimmjwx.NewJWKSService(params)
+	service, err := jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.IsNil)
 	defer func() { c.Assert(service.Close(), qt.IsNil) }()
 	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{

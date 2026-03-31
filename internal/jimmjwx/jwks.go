@@ -35,19 +35,19 @@ type cachedJWKS struct {
 
 // JWKSService serves operator-managed JWKS material for JIMM.
 type JWKSService struct {
-	mu        sync.RWMutex
-	closeOnce sync.Once
+	mu sync.RWMutex
 
 	jwksPath       string
 	privateKeyPath string
 	cached         cachedJWKS
 	cacheMaxAge    int64
-	stopCh         chan struct{}
-	doneCh         chan struct{}
 }
 
 // NewJWKSService parses and validates the operator-managed JWKS configuration.
-func NewJWKSService(p JWKSServiceParams) (*JWKSService, error) {
+func NewJWKSService(ctx context.Context, p JWKSServiceParams) (*JWKSService, error) {
+	if ctx == nil {
+		return nil, errors.New("missing context")
+	}
 	if p.JWKSPath == "" {
 		return nil, errors.New("missing jwks path")
 	}
@@ -76,10 +76,8 @@ func NewJWKSService(p JWKSServiceParams) (*JWKSService, error) {
 		privateKeyPath: p.PrivateKeyPath,
 		cached:         material,
 		cacheMaxAge:    cacheMaxAge,
-		stopCh:         make(chan struct{}),
-		doneCh:         make(chan struct{}),
 	}
-	go service.refreshLoop()
+	go service.refreshLoop(ctx)
 	return service, nil
 }
 
@@ -118,18 +116,6 @@ func (jwks *JWKSService) SigningKey(_ context.Context) (jwk.Key, error) {
 	return jwks.cached.signingKey, nil
 }
 
-// Close stops the background JWKS refresh loop.
-func (jwks *JWKSService) Close() error {
-	if jwks == nil {
-		return nil
-	}
-	jwks.closeOnce.Do(func() {
-		close(jwks.stopCh)
-		<-jwks.doneCh
-	})
-	return nil
-}
-
 func (jwks *JWKSService) refresh(ctx context.Context) {
 	material, err := loadJWKS(jwks.jwksPath, jwks.privateKeyPath)
 	if err != nil {
@@ -142,16 +128,14 @@ func (jwks *JWKSService) refresh(ctx context.Context) {
 	jwks.cached = material
 }
 
-func (jwks *JWKSService) refreshLoop() {
+func (jwks *JWKSService) refreshLoop(ctx context.Context) {
 	ticker := time.NewTicker(time.Duration(jwks.cacheMaxAge) * time.Second)
-	defer ticker.Stop()
-	defer close(jwks.doneCh)
 
 	for {
 		select {
 		case <-ticker.C:
-			jwks.refresh(context.Background())
-		case <-jwks.stopCh:
+			jwks.refresh(ctx)
+		case <-ctx.Done():
 			return
 		}
 	}

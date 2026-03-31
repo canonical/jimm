@@ -3,6 +3,7 @@
 package jimmjwx_test
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -80,7 +81,7 @@ func newJWKSServiceParams(c *qt.C) (jimmjwx.JWKSServiceParams, jwk.Set, []byte) 
 func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jwk.Set) {
 	c.Helper()
 	params, set, _ := newJWKSServiceParams(c)
-	service, err := jimmjwx.NewJWKSService(params)
+	service, err := jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.IsNil)
 	c.Cleanup(func() {
 		c.Assert(service.Close(), qt.IsNil)

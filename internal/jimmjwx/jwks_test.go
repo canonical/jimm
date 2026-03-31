@@ -57,7 +57,7 @@ func TestNewJWKSServiceRejectsUnmatchedPrivateKey(t *testing.T) {
 	_, wrongPrivateKey := generateJWK(c)
 	err := os.WriteFile(params.PrivateKeyPath, wrongPrivateKey, 0o600)
 	c.Assert(err, qt.IsNil)
-	_, err = jimmjwx.NewJWKSService(params)
+	_, err = jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.ErrorMatches, "jwks does not contain the public key for the provided private key")
 }
 
@@ -79,7 +79,7 @@ func TestNewJWKSServiceServesMultipleKeys(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
 	c.Assert(err, qt.IsNil)
-	service, err := jimmjwx.NewJWKSService(params)
+	service, err := jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.IsNil)
 	set, err := service.Get(context.Background())
 	c.Assert(err, qt.IsNil)
@@ -90,7 +90,7 @@ func TestNewJWKSServiceRejectsInvalidCacheMaxAge(t *testing.T) {
 	c := qt.New(t)
 	params, _, _ := newJWKSServiceParams(c)
 	params.CacheMaxAge = "nope"
-	_, err := jimmjwx.NewJWKSService(params)
+	_, err := jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.ErrorMatches, "parse jwks cache max age: .*")
 }
 
@@ -98,7 +98,7 @@ func TestJWKSServiceRefreshesFilesAfterCacheExpiry(t *testing.T) {
 	c := qt.New(t)
 	params, initialSet, _ := newJWKSServiceParams(c)
 	params.CacheMaxAge = "1"
-	service, err := jimmjwx.NewJWKSService(params)
+	service, err := jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.IsNil)
 	defer func() { c.Assert(service.Close(), qt.IsNil) }()
 
@@ -126,7 +126,7 @@ func TestJWKSServiceFallsBackToCachedValueOnRefreshFailure(t *testing.T) {
 	c := qt.New(t)
 	params, initialSet, _ := newJWKSServiceParams(c)
 	params.CacheMaxAge = "1"
-	service, err := jimmjwx.NewJWKSService(params)
+	service, err := jimmjwx.NewJWKSService(context.Background(), params)
 	c.Assert(err, qt.IsNil)
 	defer func() { c.Assert(service.Close(), qt.IsNil) }()
 

@@ -3,6 +3,7 @@
 package jimmtest
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ func NewStaticJWKSService(c *qt.C) (*jimmjwx.JWKSService, error) {
 	if err != nil {
 		return nil, err
 	}
-	service, err := jimmjwx.NewJWKSService(params)
+	service, err := jimmjwx.NewJWKSService(context.Background(), params)
 	if err != nil {
 		return nil, err
 	}
