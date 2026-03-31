@@ -33,3 +33,11 @@ echo "Adding credential and creating model on the new controller"
 # We no op this because despite adding the credential it is exit 0 due to it already existing locally.
 juju add-credential testk8s --controller "$JIMM_CONTROLLER_NAME" -f ./credentials.yaml || :
 juju add-model test-model testk8s
+
+echo
+echo "Destroying model"
+juju destroy-model test-model --no-prompt
+
+echo
+echo "Destroying controller"
+$JAAS destroy-controller test-controller --no-prompt
