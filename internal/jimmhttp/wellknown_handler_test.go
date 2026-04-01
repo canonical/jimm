@@ -35,11 +35,8 @@ func (failingJWKSProvider) CacheMaxAge() int64 {
 func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jimmjwx.JWKSServiceParams) {
 	params, err := jimmtest.StaticJWKSServiceParams(c)
 	c.Assert(err, qt.IsNil)
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
+	service, err := jimmjwx.NewJWKSService(c.Context(), params)
 	c.Assert(err, qt.IsNil)
-	c.Cleanup(func() {
-		c.Assert(service.Close(), qt.IsNil)
-	})
 	return service, params
 }
 
@@ -60,7 +57,7 @@ func newMultiKeyJWKSService(c *qt.C) (*jimmjwx.JWKSService, string) {
 	c.Assert(err, qt.IsNil)
 	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
 	c.Assert(err, qt.IsNil)
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
+	service, err := jimmjwx.NewJWKSService(c.Context(), params)
 	c.Assert(err, qt.IsNil)
 	return service, string(rawJWKS)
 }

@@ -176,9 +176,6 @@ type Params struct {
 	// JWKSPrivateKeyPath is the path to the PEM encoded RSA private key used to sign controller JWTs.
 	JWKSPrivateKeyPath string
 
-	// JWKSCacheMaxAge is the Cache-Control max-age, in seconds, for /.well-known/jwks.json.
-	JWKSCacheMaxAge string
-
 	// InsecureSecretStorage instructs JIMM to store secrets in its database
 	// instead of dedicated secure storage. SHOULD NOT BE USED IN PRODUCTION.
 	InsecureSecretStorage bool
@@ -431,7 +428,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	jwksService, err := jimmjwx.NewJWKSService(ctx, jimmjwx.JWKSServiceParams{
 		JWKSPath:       p.JWKSPath,
 		PrivateKeyPath: p.JWKSPrivateKeyPath,
-		CacheMaxAge:    p.JWKSCacheMaxAge,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure jwks: %w", err)
@@ -504,7 +500,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		JWTService:                    jwtService,
 		JWKSService:                   jwksService,
 	}
-	deps.cleanupFuncs = append(deps.cleanupFuncs, jwksService.Close)
 
 	sessionStore, cleanupFuncs, err := setupSessionStore(p.CookieSessionKey, db)
 	if err != nil {

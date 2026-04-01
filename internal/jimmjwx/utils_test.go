@@ -1,9 +1,8 @@
 // Copyright 2025 Canonical.
 
-package jimmjwx_test
+package jimmjwx
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -17,8 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-
-	"github.com/canonical/jimm/v3/internal/jimmjwx"
 )
 
 // generateJWK generates a fresh RSA keypair and corresponding JWKS for tests.
@@ -59,7 +56,7 @@ func generateJWK(c *qt.C) (jwk.Set, []byte) {
 	return ks, privateKeyPEM
 }
 
-func newJWKSServiceParams(c *qt.C) (jimmjwx.JWKSServiceParams, jwk.Set, []byte) {
+func newJWKSServiceParams(c *qt.C) (JWKSServiceParams, jwk.Set, []byte) {
 	c.Helper()
 	set, privateKey := generateJWK(c)
 	rawJWKS, err := json.Marshal(set)
@@ -71,28 +68,24 @@ func newJWKSServiceParams(c *qt.C) (jimmjwx.JWKSServiceParams, jwk.Set, []byte) 
 	c.Assert(err, qt.IsNil)
 	err = os.WriteFile(privateKeyPath, privateKey, 0o600)
 	c.Assert(err, qt.IsNil)
-	return jimmjwx.JWKSServiceParams{
+	return JWKSServiceParams{
 		JWKSPath:       jwksPath,
 		PrivateKeyPath: privateKeyPath,
-		CacheMaxAge:    "600",
 	}, set, privateKey
 }
 
-func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jwk.Set) {
+func newJWKSService(c *qt.C) (*JWKSService, jwk.Set) {
 	c.Helper()
 	params, set, _ := newJWKSServiceParams(c)
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
+	service, err := NewJWKSService(c.Context(), params)
 	c.Assert(err, qt.IsNil)
-	c.Cleanup(func() {
-		c.Assert(service.Close(), qt.IsNil)
-	})
 	return service, set
 }
 
-func newJWTService(c *qt.C, expiry time.Duration) (*jimmjwx.JWTService, jwk.Set) {
+func newJWTService(c *qt.C, expiry time.Duration) (*JWTService, jwk.Set) {
 	c.Helper()
 	service, set := newJWKSService(c)
-	return jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
+	return NewJWTService(JWTServiceParams{
 		Host:   "host",
 		Expiry: expiry,
 		JWKS:   service,

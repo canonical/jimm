@@ -1,5 +1,5 @@
 // Copyright 2024 Canonical.
-package jimmjwx_test
+package jimmjwx
 
 import (
 	"context"
@@ -7,37 +7,15 @@ import (
 	"maps"
 	"os"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
-	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwk"
-
-	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
-
-func TestGenerateJWKS(t *testing.T) {
-	c := qt.New(t)
-	ctx := context.Background()
-
-	jwks, privKeyPem := generateJWK(c)
-
-	jwksIter := jwks.Keys(ctx)
-	jwksIter.Next(ctx)
-	key := jwksIter.Pair().Value.(jwk.Key)
-
-	// kid
-	_, err := uuid.Parse(key.KeyID())
-	c.Assert(err, qt.IsNil)
-	// use
-	c.Assert(key.KeyUsage(), qt.Equals, "sig")
-	// alg
-	c.Assert(key.Algorithm(), qt.Equals, jwa.RS256)
-
-	// It's fine for us to just test the key exists.
-	c.Assert(string(privKeyPem), qt.Contains, "-----BEGIN RSA PRIVATE KEY-----")
-}
 
 func TestNewJWKSServiceParsesOperatorManagedConfig(t *testing.T) {
 	c := qt.New(t)
@@ -45,7 +23,6 @@ func TestNewJWKSServiceParsesOperatorManagedConfig(t *testing.T) {
 	set, err := service.Get(context.Background())
 	c.Assert(err, qt.IsNil)
 	c.Assert(set.Len(), qt.Equals, expectedSet.Len())
-	c.Assert(service.CacheMaxAge(), qt.Equals, int64(600))
 	signingKey, err := service.SigningKey(context.Background())
 	c.Assert(err, qt.IsNil)
 	c.Assert(signingKey, qt.IsNotNil)
@@ -57,7 +34,7 @@ func TestNewJWKSServiceRejectsUnmatchedPrivateKey(t *testing.T) {
 	_, wrongPrivateKey := generateJWK(c)
 	err := os.WriteFile(params.PrivateKeyPath, wrongPrivateKey, 0o600)
 	c.Assert(err, qt.IsNil)
-	_, err = jimmjwx.NewJWKSService(context.Background(), params)
+	_, err = NewJWKSService(c.Context(), params)
 	c.Assert(err, qt.ErrorMatches, "jwks does not contain the public key for the provided private key")
 }
 
@@ -79,69 +56,81 @@ func TestNewJWKSServiceServesMultipleKeys(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
 	c.Assert(err, qt.IsNil)
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
+	service, err := NewJWKSService(c.Context(), params)
 	c.Assert(err, qt.IsNil)
 	set, err := service.Get(context.Background())
 	c.Assert(err, qt.IsNil)
 	c.Assert(set.Len(), qt.Equals, 2)
 }
 
-func TestNewJWKSServiceRejectsInvalidCacheMaxAge(t *testing.T) {
-	c := qt.New(t)
-	params, _, _ := newJWKSServiceParams(c)
-	params.CacheMaxAge = "nope"
-	_, err := jimmjwx.NewJWKSService(context.Background(), params)
-	c.Assert(err, qt.ErrorMatches, "parse jwks cache max age: .*")
-}
-
 func TestJWKSServiceRefreshesFilesAfterCacheExpiry(t *testing.T) {
-	c := qt.New(t)
-	params, initialSet, _ := newJWKSServiceParams(c)
-	params.CacheMaxAge = "1"
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
-	c.Assert(err, qt.IsNil)
-	defer func() { c.Assert(service.Close(), qt.IsNil) }()
+	synctest.Test(t, func(t *testing.T) {
+		c := qt.New(t)
+		params, initialSet, _ := newJWKSServiceParams(c)
+		service, err := NewJWKSService(c.Context(), params)
+		c.Assert(err, qt.IsNil)
 
-	refreshedSet, refreshedPrivateKey := generateJWK(c)
-	rawJWKS, err := json.Marshal(refreshedSet)
-	c.Assert(err, qt.IsNil)
-	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
-	c.Assert(err, qt.IsNil)
-	err = os.WriteFile(params.PrivateKeyPath, refreshedPrivateKey, 0o600)
-	c.Assert(err, qt.IsNil)
+		refreshedSet, refreshedPrivateKey := generateJWK(c)
+		rawJWKS, err := json.Marshal(refreshedSet)
+		c.Assert(err, qt.IsNil)
+		err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
+		c.Assert(err, qt.IsNil)
+		err = os.WriteFile(params.PrivateKeyPath, refreshedPrivateKey, 0o600)
+		c.Assert(err, qt.IsNil)
 
-	time.Sleep(1100 * time.Millisecond)
+		time.Sleep(jwksRefreshInterval + time.Minute)
 
-	set, err := service.Get(context.Background())
-	c.Assert(err, qt.IsNil)
-	c.Assert(firstKeyID(c, set), qt.Equals, firstKeyID(c, refreshedSet))
-	c.Assert(firstKeyID(c, set), qt.Not(qt.Equals), firstKeyID(c, initialSet))
+		set, err := service.Get(context.Background())
+		c.Assert(err, qt.IsNil)
+		c.Assert(firstKeyID(c, set), qt.Equals, firstKeyID(c, refreshedSet))
+		c.Assert(firstKeyID(c, set), qt.Not(qt.Equals), firstKeyID(c, initialSet))
 
-	signingKey, err := service.SigningKey(context.Background())
-	c.Assert(err, qt.IsNil)
-	c.Assert(signingKey.KeyID(), qt.Equals, firstKeyID(c, refreshedSet))
+		signingKey, err := service.SigningKey(context.Background())
+		c.Assert(err, qt.IsNil)
+		c.Assert(signingKey.KeyID(), qt.Equals, firstKeyID(c, refreshedSet))
+	})
 }
 
 func TestJWKSServiceFallsBackToCachedValueOnRefreshFailure(t *testing.T) {
-	c := qt.New(t)
-	params, initialSet, _ := newJWKSServiceParams(c)
-	params.CacheMaxAge = "1"
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
-	c.Assert(err, qt.IsNil)
-	defer func() { c.Assert(service.Close(), qt.IsNil) }()
+	synctest.Test(t, func(t *testing.T) {
+		c := qt.New(t)
+		params, initialSet, _ := newJWKSServiceParams(c)
+		service, err := NewJWKSService(c.Context(), params)
+		c.Assert(err, qt.IsNil)
 
-	err = os.WriteFile(params.JWKSPath, []byte("not-json"), 0o600)
-	c.Assert(err, qt.IsNil)
+		err = os.WriteFile(params.JWKSPath, []byte("not-json"), 0o600)
+		c.Assert(err, qt.IsNil)
 
-	time.Sleep(1100 * time.Millisecond)
+		time.Sleep(jwksRefreshInterval + time.Minute)
 
-	set, err := service.Get(context.Background())
-	c.Assert(err, qt.IsNil)
-	c.Assert(firstKeyID(c, set), qt.Equals, firstKeyID(c, initialSet))
+		set, err := service.Get(context.Background())
+		c.Assert(err, qt.IsNil)
+		c.Assert(firstKeyID(c, set), qt.Equals, firstKeyID(c, initialSet))
 
-	signingKey, err := service.SigningKey(context.Background())
-	c.Assert(err, qt.IsNil)
-	c.Assert(signingKey.KeyID(), qt.Equals, firstKeyID(c, initialSet))
+		signingKey, err := service.SigningKey(context.Background())
+		c.Assert(err, qt.IsNil)
+		c.Assert(signingKey.KeyID(), qt.Equals, firstKeyID(c, initialSet))
+	})
+}
+
+func TestJWKSServiceLogsWhenRefreshLoopContextIsCancelled(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := qt.New(t)
+		params, _, _ := newJWKSServiceParams(c)
+
+		core, logs := observer.New(zap.InfoLevel)
+		ctx := zapctx.WithLogger(context.Background(), zap.New(core))
+		ctx, cancel := context.WithCancel(ctx)
+
+		_, err := NewJWKSService(ctx, params)
+		c.Assert(err, qt.IsNil)
+
+		cancel()
+		time.Sleep(time.Nanosecond)
+
+		c.Assert(logs.Len(), qt.Equals, 1)
+		c.Assert(logs.All()[0].Message, qt.Equals, "exiting jwks refresh polling")
+	})
 }
 
 func firstKeyID(c *qt.C, set jwk.Set) string {

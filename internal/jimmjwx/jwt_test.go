@@ -1,18 +1,17 @@
 // Copyright 2025 Canonical.
 
-package jimmjwx_test
+package jimmjwx
 
 import (
 	"context"
 	"encoding/json"
 	"os"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-
-	"github.com/canonical/jimm/v3/internal/jimmjwx"
 )
 
 func TestJWTServiceExposesConfiguredJWKS(t *testing.T) {
@@ -30,7 +29,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 	jwtService, set := newJWTService(c, time.Minute)
 
 	// Mint a new JWT
-	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+	tok, err := jwtService.NewJWT(ctx, JWTParams{
 		Controller: "controller-my-diglett-controller",
 		User:       "diglett@canonical.com",
 		Access: map[string]string{
@@ -70,7 +69,7 @@ func TestNewJWTWithReservedClaimErrors(t *testing.T) {
 	ctx := context.Background()
 	jwtService, _ := newJWTService(c, time.Minute)
 
-	_, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+	_, err := jwtService.NewJWT(ctx, JWTParams{
 		Controller: "controller-my-diglett-controller",
 		User:       "diglett@canonical.com",
 		Access: map[string]string{
@@ -91,7 +90,7 @@ func TestNewJWTExpires(t *testing.T) {
 	jwtService, set := newJWTService(c, expiry)
 
 	// Mint a new JWT
-	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+	tok, err := jwtService.NewJWT(ctx, JWTParams{
 		Controller: "controller-my-diglett-controller",
 		User:       "diglett@canonical.com",
 		Access: map[string]string{
@@ -118,7 +117,7 @@ func TestNewJWTWithCustomExpiry(t *testing.T) {
 	shortExpiry := time.Minute // Use a shorter expiry for this token
 
 	// Mint a new JWT with custom expiry
-	tok, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+	tok, err := jwtService.NewJWT(ctx, JWTParams{
 		Controller: "controller-my-diglett-controller",
 		User:       "foo",
 		Expiry:     shortExpiry,
@@ -134,36 +133,42 @@ func TestNewJWTWithCustomExpiry(t *testing.T) {
 }
 
 func TestNewJWTUsesRefreshedSigningKey(t *testing.T) {
-	c := qt.New(t)
-	params, _, _ := newJWKSServiceParams(c)
-	params.CacheMaxAge = "1"
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
-	c.Assert(err, qt.IsNil)
-	defer func() { c.Assert(service.Close(), qt.IsNil) }()
-	jwtService := jimmjwx.NewJWTService(jimmjwx.JWTServiceParams{
-		Host:   "host",
-		Expiry: time.Minute,
-		JWKS:   service,
+	synctest.Test(t, func(t *testing.T) {
+		c := qt.New(t)
+		params, _, _ := newJWKSServiceParams(c)
+		service, err := NewJWKSService(c.Context(), params)
+		c.Assert(err, qt.IsNil)
+		jwtService := NewJWTService(JWTServiceParams{
+			Host:   "host",
+			Expiry: time.Minute,
+			JWKS:   service,
+		})
+		oldSet := service.cached.set
+
+		refreshedSet, refreshedPrivateKey := generateJWK(c)
+		rawJWKS, err := json.Marshal(refreshedSet)
+		c.Assert(err, qt.IsNil)
+		err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
+		c.Assert(err, qt.IsNil)
+		err = os.WriteFile(params.PrivateKeyPath, refreshedPrivateKey, 0o600)
+		c.Assert(err, qt.IsNil)
+
+		time.Sleep(jwksRefreshInterval + time.Minute)
+
+		tok, err := jwtService.NewJWT(context.Background(), JWTParams{
+			Controller: "controller-my-diglett-controller",
+			User:       "diglett@canonical.com",
+		})
+		c.Assert(err, qt.IsNil)
+
+		// Check parsing fails with old set
+		_, err = jwt.Parse(tok, jwt.WithKeySet(oldSet))
+		c.Assert(err, qt.ErrorMatches, `.*failed to find key.*`)
+
+		// Check parsing succeeds with refreshed set
+		_, err = jwt.Parse(tok, jwt.WithKeySet(refreshedSet))
+		c.Assert(err, qt.IsNil)
 	})
-
-	refreshedSet, refreshedPrivateKey := generateJWK(c)
-	rawJWKS, err := json.Marshal(refreshedSet)
-	c.Assert(err, qt.IsNil)
-	err = os.WriteFile(params.JWKSPath, rawJWKS, 0o600)
-	c.Assert(err, qt.IsNil)
-	err = os.WriteFile(params.PrivateKeyPath, refreshedPrivateKey, 0o600)
-	c.Assert(err, qt.IsNil)
-
-	time.Sleep(1100 * time.Millisecond)
-
-	tok, err := jwtService.NewJWT(context.Background(), jimmjwx.JWTParams{
-		Controller: "controller-my-diglett-controller",
-		User:       "diglett@canonical.com",
-	})
-	c.Assert(err, qt.IsNil)
-
-	_, err = jwt.Parse(tok, jwt.WithKeySet(refreshedSet))
-	c.Assert(err, qt.IsNil)
 }
 
 type futureClock struct {

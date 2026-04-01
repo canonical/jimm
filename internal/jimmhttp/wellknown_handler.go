@@ -23,7 +23,6 @@ const (
 // JWKSProvider defines the interface for retrieving JWKS material and cache max age.
 type JWKSProvider interface {
 	Get(ctx context.Context) (jwk.Set, error)
-	CacheMaxAge() int64
 }
 
 // WellKnownHandler holds the grouped router to be mounted and
@@ -76,6 +75,7 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d", wkh.JWKSProvider.CacheMaxAge()))
+	// Cache-control of 5 minutes
+	w.Header().Set("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d", 5*60))
 	render.JSON(w, r, ks)
 }

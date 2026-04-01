@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -22,16 +21,21 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
+// JWKSService implements JWKSProvider to serve operator-managed JWKS material for JIMM.
 type JWKSServiceParams struct {
 	JWKSPath       string
 	PrivateKeyPath string
-	CacheMaxAge    string
 }
 
 type cachedJWKS struct {
 	set        jwk.Set
 	signingKey jwk.Key
 }
+
+// jwksRefreshInterval defines how often the JWKS material is refreshed from disk.
+// This value should be << expected frequency of updates to the data to ensure changes
+// are picked up in a timely manner, but not so low as to cause excessive disk reads.
+const jwksRefreshInterval = 5 * time.Minute
 
 // JWKSService serves operator-managed JWKS material for JIMM.
 type JWKSService struct {
@@ -40,10 +44,17 @@ type JWKSService struct {
 	jwksPath       string
 	privateKeyPath string
 	cached         cachedJWKS
-	cacheMaxAge    int64
 }
 
-// NewJWKSService parses and validates the operator-managed JWKS configuration.
+// NewJWKSService reads and periodically refreshes the JWKS material from the provided paths.
+//
+// The file paths are expected to be managed by the operator, e.g. a Juju charm or otherwise.
+// JIMM reads from the files with a relatively high frequency (every 5 minutes) compared to
+// the expected frequency of updates (hours/days) to allow for changes to be picked up in a
+// timely manner without requiring a restart of the service.
+//
+// The provided context is used to manage the lifecycle of the refresh loop; cancelling the
+// context will stop the loop and must be done on cleanup.
 func NewJWKSService(ctx context.Context, p JWKSServiceParams) (*JWKSService, error) {
 	if ctx == nil {
 		return nil, errors.New("missing context")
@@ -53,17 +64,6 @@ func NewJWKSService(ctx context.Context, p JWKSServiceParams) (*JWKSService, err
 	}
 	if p.PrivateKeyPath == "" {
 		return nil, errors.New("missing jwks private key path")
-	}
-	if p.CacheMaxAge == "" {
-		return nil, errors.New("missing jwks cache max age")
-	}
-
-	cacheMaxAge, err := strconv.ParseInt(p.CacheMaxAge, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("parse jwks cache max age: %w", err)
-	}
-	if cacheMaxAge <= 0 {
-		return nil, errors.New("jwks cache max age must be greater than 0")
 	}
 
 	material, err := loadJWKS(p.JWKSPath, p.PrivateKeyPath)
@@ -75,7 +75,6 @@ func NewJWKSService(ctx context.Context, p JWKSServiceParams) (*JWKSService, err
 		jwksPath:       p.JWKSPath,
 		privateKeyPath: p.PrivateKeyPath,
 		cached:         material,
-		cacheMaxAge:    cacheMaxAge,
 	}
 	go service.refreshLoop(ctx)
 	return service, nil
@@ -92,14 +91,6 @@ func (jwks *JWKSService) Get(_ context.Context) (jwk.Set, error) {
 		return nil, errors.New("missing jwks")
 	}
 	return jwks.cached.set, nil
-}
-
-// CacheMaxAge returns the Cache-Control max-age, in seconds, for /.well-known/jwks.json.
-func (jwks *JWKSService) CacheMaxAge() int64 {
-	if jwks == nil {
-		return 0
-	}
-	return jwks.cacheMaxAge
 }
 
 // SigningKey returns the jwk.Key to be used for signing JWTs.
@@ -119,7 +110,7 @@ func (jwks *JWKSService) SigningKey(_ context.Context) (jwk.Key, error) {
 func (jwks *JWKSService) refresh(ctx context.Context) {
 	material, err := loadJWKS(jwks.jwksPath, jwks.privateKeyPath)
 	if err != nil {
-		zapctx.Warn(ctx, "failed to refresh jwks, using cached value", zap.Error(err))
+		zapctx.Error(ctx, "failed to refresh jwks, using cached value", zap.Error(err))
 		return
 	}
 
@@ -129,13 +120,14 @@ func (jwks *JWKSService) refresh(ctx context.Context) {
 }
 
 func (jwks *JWKSService) refreshLoop(ctx context.Context) {
-	ticker := time.NewTicker(time.Duration(jwks.cacheMaxAge) * time.Second)
+	ticker := time.NewTicker(jwksRefreshInterval)
 
 	for {
 		select {
 		case <-ticker.C:
 			jwks.refresh(ctx)
 		case <-ctx.Done():
+			zapctx.Info(ctx, "exiting jwks refresh polling")
 			return
 		}
 	}

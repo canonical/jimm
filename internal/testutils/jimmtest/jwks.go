@@ -3,7 +3,6 @@
 package jimmtest
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -36,7 +35,6 @@ func StaticJWKSServiceParams(c *qt.C) (jimmjwx.JWKSServiceParams, error) {
 	return jimmjwx.JWKSServiceParams{
 		JWKSPath:       jwksPath,
 		PrivateKeyPath: privateKeyPath,
-		CacheMaxAge:    "600",
 	}, nil
 }
 
@@ -46,12 +44,9 @@ func NewStaticJWKSService(c *qt.C) (*jimmjwx.JWKSService, error) {
 	if err != nil {
 		return nil, err
 	}
-	service, err := jimmjwx.NewJWKSService(context.Background(), params)
+	service, err := jimmjwx.NewJWKSService(c.Context(), params)
 	if err != nil {
 		return nil, err
 	}
-	c.Cleanup(func() {
-		c.Assert(service.Close(), qt.IsNil)
-	})
 	return service, nil
 }

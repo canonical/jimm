@@ -226,7 +226,6 @@ func start(ctx context.Context, s *service.Service) error {
 		JWTExpiryDuration:             jwtExpiryDuration,
 		JWKSPath:                      jwksPath,
 		JWKSPrivateKeyPath:            jwksPrivateKeyPath,
-		JWKSCacheMaxAge:               os.Getenv("JIMM_JWKS_CACHE_MAX_AGE"),
 		InsecureSecretStorage:         insecureSecretStorage,
 		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
 			IssuerURL:            issuerURL,

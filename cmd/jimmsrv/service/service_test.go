@@ -53,7 +53,6 @@ func newTestServiceParameters(c *qt.C) jimmsvc.Params {
 		PublicKey:          "izcYsQy3TePp6bLjqOo3IRPFvkQd2IKtyODGqC6SdFk=",
 		JWKSPath:           jwksParams.JWKSPath,
 		JWKSPrivateKeyPath: jwksParams.PrivateKeyPath,
-		JWKSCacheMaxAge:    jwksParams.CacheMaxAge,
 		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
 			IssuerURL:           "http://localhost:8082/realms/jimm",
 			ClientID:            "jimm-device",
