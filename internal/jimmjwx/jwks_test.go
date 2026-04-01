@@ -126,7 +126,7 @@ func TestJWKSServiceLogsWhenRefreshLoopContextIsCancelled(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 
 		cancel()
-		time.Sleep(time.Nanosecond)
+		synctest.Wait()
 
 		c.Assert(logs.Len(), qt.Equals, 1)
 		c.Assert(logs.All()[0].Message, qt.Equals, "exiting jwks refresh polling")

@@ -28,10 +28,6 @@ func (failingJWKSProvider) Get(context.Context) (jwk.Set, error) {
 	return nil, stderrors.New("boom")
 }
 
-func (failingJWKSProvider) CacheMaxAge() int64 {
-	return 600
-}
-
 func newJWKSService(c *qt.C) (*jimmjwx.JWKSService, jimmjwx.JWKSServiceParams) {
 	params, err := jimmtest.StaticJWKSServiceParams(c)
 	c.Assert(err, qt.IsNil)

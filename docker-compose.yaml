@@ -30,8 +30,8 @@ services:
     ports:
       - 17070:80
     volumes:
-      - ./local/jimm/jwks.json:/etc/jimm/jwks.json:ro
-      - ./local/jimm/jwks_private_key.pem:/etc/jimm/jwks_private_key.pem:ro
+      - ./internal/testutils/jimmtest/testdata/jwks.json:/etc/jimm/jwks.json:ro
+      - ./internal/testutils/jimmtest/testdata/jwks_private_key.pem:/etc/jimm/jwks_private_key.pem:ro
     entrypoint:
       - bash
       - -c
@@ -62,8 +62,8 @@ services:
       - 2346:2346
     volumes:
       - ./:/jimm/
-      - ./local/jimm/jwks.json:/etc/jimm/jwks.json:ro
-      - ./local/jimm/jwks_private_key.pem:/etc/jimm/jwks_private_key.pem:ro
+      - ./internal/testutils/jimmtest/testdata/jwks.json:/etc/jimm/jwks.json:ro
+      - ./internal/testutils/jimmtest/testdata/jwks_private_key.pem:/etc/jimm/jwks_private_key.pem:ro
       - go-modules:/go/pkg/mod # cache modules to improve startup
       - go-cache:/root/.cache/go-build # cache build's artifacts to startup
 

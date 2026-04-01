@@ -3,7 +3,6 @@
 package jimmjwx
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -18,14 +17,14 @@ func TestJWTServiceExposesConfiguredJWKS(t *testing.T) {
 	c := qt.New(t)
 	jwtService, _ := newJWTService(c, time.Minute)
 
-	set, err := jwtService.JWKS.Get(context.Background())
+	set, err := jwtService.JWKS.Get(c.Context())
 	c.Assert(err, qt.IsNil)
 	c.Assert(set.Len(), qt.Equals, 1)
 }
 
 func TestNewJWTIsParsableByExponent(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
+	ctx := c.Context()
 	jwtService, set := newJWTService(c, time.Minute)
 
 	// Mint a new JWT
@@ -66,7 +65,7 @@ func TestNewJWTIsParsableByExponent(t *testing.T) {
 
 func TestNewJWTWithReservedClaimErrors(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
+	ctx := c.Context()
 	jwtService, _ := newJWTService(c, time.Minute)
 
 	_, err := jwtService.NewJWT(ctx, JWTParams{
@@ -86,7 +85,7 @@ func TestNewJWTWithReservedClaimErrors(t *testing.T) {
 func TestNewJWTExpires(t *testing.T) {
 	c := qt.New(t)
 	expiry := time.Second
-	ctx := context.Background()
+	ctx := c.Context()
 	jwtService, set := newJWTService(c, expiry)
 
 	// Mint a new JWT
@@ -111,7 +110,7 @@ func TestNewJWTExpires(t *testing.T) {
 
 func TestNewJWTWithCustomExpiry(t *testing.T) {
 	c := qt.New(t)
-	ctx := context.Background()
+	ctx := c.Context()
 	jwtService, set := newJWTService(c, time.Hour)
 
 	shortExpiry := time.Minute // Use a shorter expiry for this token
@@ -155,7 +154,7 @@ func TestNewJWTUsesRefreshedSigningKey(t *testing.T) {
 
 		time.Sleep(jwksRefreshInterval + time.Minute)
 
-		tok, err := jwtService.NewJWT(context.Background(), JWTParams{
+		tok, err := jwtService.NewJWT(c.Context(), JWTParams{
 			Controller: "controller-my-diglett-controller",
 			User:       "diglett@canonical.com",
 		})

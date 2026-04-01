@@ -63,7 +63,7 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	if wkh == nil || wkh.JWKSProvider == nil {
 		zapctx.Error(ctx, "nil reference in JWKS handler")
 		w.WriteHeader(http.StatusInternalServerError)
-		render.JSON(w, r, errors.Codef(errors.CodeJWKSRetrievalFailed, "JWKS does not exist"))
+		render.JSON(w, r, errors.Error{Code: errors.CodeJWKSRetrievalFailed, Message: "JWKS does not exist"})
 		return
 	}
 	ks, err := wkh.JWKSProvider.Get(ctx)
@@ -71,11 +71,11 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		zapctx.Error(ctx, "HTTP error", zap.NamedError("/jwks.json", fmt.Errorf("failed to retrieve JWKS: %w", err)))
-		render.JSON(w, r, errors.Codef(errors.CodeJWKSRetrievalFailed, "failed to retrieve JWKS"))
+		render.JSON(w, r, errors.Error{Code: errors.CodeJWKSRetrievalFailed, Message: "failed to retrieve JWKS"})
 		return
 	}
 
-	// Cache-control of 5 minutes
-	w.Header().Set("Cache-Control", fmt.Sprintf("must-revalidate, max-age=%d", 5*60))
+	// Cache-control of 10 minutes
+	w.Header().Set("Cache-Control", "must-revalidate, max-age=600")
 	render.JSON(w, r, ks)
 }
