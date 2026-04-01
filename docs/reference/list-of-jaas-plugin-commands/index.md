@@ -236,8 +236,8 @@ Bootstrap a Juju controller via JIMM
 | Flag | Default | Usage |
 | --- | --- | --- |
 | `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--bootstrap-base` |  | Specify the base of the bootstrap machine |
-| `--bootstrap-constraints` | [] | Specify bootstrap machine constraints |
+| `--bootstrap-base` |  | Specify the base of the bootstrap machine. |
+| `--bootstrap-constraints` | [] | Specify bootstrap machine constraints. |
 | `--config` |  | Specify a configuration file, or one or more configuration options.     (`--config config.yaml [--config key=value ...])` |
 | `--constraints` | [] | Set model constraints |
 | `--credential` |  | The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud. |

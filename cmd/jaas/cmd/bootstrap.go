@@ -143,8 +143,8 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 	f.StringVar(&c.credentialName, "credential", "", "The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud.")
-	f.StringVar(&c.bootstrapBase, "bootstrap-base", "", "Specify the base of the bootstrap machine")
-	f.Var(&c.bootstrapCons, "bootstrap-constraints", "Specify bootstrap machine constraints")
+	f.StringVar(&c.bootstrapBase, "bootstrap-base", "", "Specify the base of the bootstrap machine.")
+	f.Var(&c.bootstrapCons, "bootstrap-constraints", "Specify bootstrap machine constraints.")
 	f.Var(&c.constraints, "constraints", "Set model constraints")
 	f.Var(&c.config, "config",
 		"Specify a configuration file, or one or more configuration options.\n    (`--config config.yaml [--config key=value ...])`")
