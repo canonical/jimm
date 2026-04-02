@@ -11,9 +11,14 @@ concurrency:
 
 jobs:
   e2e-test:
-    name: E2E Tests with External Controller
+    name: E2E Tests with External Controller (Juju ${{ matrix.juju-channel }})
     timeout-minutes: 60
     runs-on: [self-hosted-linux-amd64-jammy-large]
+    strategy:
+      matrix:
+        juju-channel:
+          - "3.5/stable"
+          - "3.6/stable"
     steps:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
@@ -31,7 +36,7 @@ jobs:
 
       - name: Install Juju
         run: |
-          sudo snap install juju --channel=3.6/stable
+          sudo snap install juju --channel=${{ matrix.juju-channel }}
           mkdir -p ~/.local/share/juju
 
       - name: Initialise LXD
