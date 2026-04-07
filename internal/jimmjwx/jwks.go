@@ -56,9 +56,6 @@ type JWKSService struct {
 // The provided context is used to manage the lifecycle of the refresh loop; cancelling the
 // context will stop the loop and must be done on cleanup.
 func NewJWKSService(ctx context.Context, p JWKSServiceParams) (*JWKSService, error) {
-	if ctx == nil {
-		return nil, errors.New("missing context")
-	}
 	if p.JWKSPath == "" {
 		return nil, errors.New("missing jwks path")
 	}

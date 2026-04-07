@@ -21,6 +21,8 @@ The service is started using Docker Compose, the following services should be st
 
 Some notes on the setup:
 - Local images are created in the repo's `/local/<service>` folder where any init scripts are defined for each service using the service's upstream docker image.
+- The JIMM container expects two files containing a signing key and a set of public keys. We mount the files
+from `internal/testutils/jimmtest/testdata/` into the container for this purpose.
 - The docker compose has a base at `docker-compose.common.yaml` for common elements to reduce duplication.
 - The compose has 2 additional profiles (dev and test). 
   - Starting the compose with no profile will spin up the necessary components for testing.

@@ -110,7 +110,7 @@ func TestWellknownAPIJWKSJSONHandles200(t *testing.T) {
 	rawJWKS, err := os.ReadFile(params.JWKSPath)
 	c.Assert(err, qt.IsNil)
 	assertJSONBodyEquals(c, b, string(rawJWKS))
-	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "must-revalidate, max-age=600")
+	c.Assert(resp.Header.Get("Cache-Control"), qt.Equals, "max-age=600")
 }
 
 func TestWellknownAPIJWKSJSONServesMultipleKeys(t *testing.T) {

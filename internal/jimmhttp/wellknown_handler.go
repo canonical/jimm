@@ -76,6 +76,6 @@ func (wkh *WellKnownHandler) JWKS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Cache-control of 10 minutes
-	w.Header().Set("Cache-Control", "must-revalidate, max-age=600")
+	w.Header().Set("Cache-Control", "max-age=600")
 	render.JSON(w, r, ks)
 }
