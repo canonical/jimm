@@ -54,6 +54,9 @@ In order for a Juju controller to trust a JIMM controller, the `login-token-refr
 
 This can be specified manually when bootstrapping the Juju controller directly or is set automatically when bootstrapping through JIMM.
 
+The `jaas` tool broadly offers the same set of bootstrap-specific flags and configuration values available through the `juju` CLI.  
+Take a look at the `jaas` CLI bootstrap command {ref}`reference <command-jaas-bootstrap>` to see the full list of options.
+
 ### MicroK8s Controller
 
 The following section provides guidance on how to connect a controller bootstrapped on MicroK8s to your JIMM running in MicroK8s.
@@ -150,7 +153,7 @@ juju jaas register-controller "${CONTROLLER_NAME}" --local --tls-hostname juju-a
 Bootstrapping a controller to LXD via JIMM faces additional networking hurdles because JIMM needs
 to communicate with the LXD server to bootstrap a controller.
 
-We suggest consulting the `jaas` CLI bootstrap command {doc}`reference <../reference/jaas-plugin>` docs to better understand how to
+We suggest consulting the `jaas` CLI bootstrap command {ref}`reference <command-jaas-bootstrap>` docs to better understand how to 
 use the command in your desired use-case.
 
 ````
