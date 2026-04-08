@@ -79,9 +79,6 @@ func NewJWKSService(ctx context.Context, p JWKSServiceParams) (*JWKSService, err
 
 // Get returns the JWKS set to be served at /.well-known/jwks.json.
 func (jwks *JWKSService) Get(_ context.Context) (jwk.Set, error) {
-	if jwks == nil {
-		return nil, errors.New("missing jwks service")
-	}
 	jwks.mu.RLock()
 	defer jwks.mu.RUnlock()
 	if jwks.cached.set == nil {
@@ -93,9 +90,6 @@ func (jwks *JWKSService) Get(_ context.Context) (jwk.Set, error) {
 // SigningKey returns the jwk.Key to be used for signing JWTs.
 // This is the private key corresponding to one of the public keys in the JWKS.
 func (jwks *JWKSService) SigningKey(_ context.Context) (jwk.Key, error) {
-	if jwks == nil {
-		return nil, errors.New("missing jwks service")
-	}
 	jwks.mu.RLock()
 	defer jwks.mu.RUnlock()
 	if jwks.cached.signingKey == nil {
