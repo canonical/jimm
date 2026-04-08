@@ -216,17 +216,17 @@ func parseRSAPrivateKey(privateKeyPEM []byte) (*rsa.PrivateKey, error) {
 }
 
 func matchingPublicKey(set jwk.Set, signingPublicKey *rsa.PublicKey) (jwk.Key, error) {
+	signingKey, err := jwk.PublicKeyOf(signingPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("create jwk public key: %w", err)
+	}
+
 	for i := 0; i < set.Len(); i++ {
 		key, ok := set.Key(i)
 		if !ok {
 			continue
 		}
-
-		var publicKey rsa.PublicKey
-		if err := key.Raw(&publicKey); err != nil {
-			continue
-		}
-		if publicKey.E == signingPublicKey.E && publicKey.N.Cmp(signingPublicKey.N) == 0 {
+		if jwk.Equal(key, signingKey) {
 			return key, nil
 		}
 	}
