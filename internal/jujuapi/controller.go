@@ -233,7 +233,7 @@ func (r *controllerRoot) ControllerConfig(ctx context.Context) (jujuparams.Contr
 	if err != nil {
 		return jujuparams.ControllerConfigResult{}, err
 	}
-	cfg := make(map[string]interface{})
+	cfg := make(map[string]any)
 	cfg[jujucontroller.ControllerUUIDKey] = config.ControllerUUID
 	cfg[jujucontroller.SSHServerPort] = config.SSHPort
 	// TODO: update this to use the key coming from juju when we update the juju dependency.

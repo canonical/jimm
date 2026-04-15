@@ -23,20 +23,20 @@ type ModelManager struct {
 	AddModel_               func(ctx context.Context, u *openfga.User, args *juju.ModelCreateArgs) (base.ModelInfo, error)
 	ChangeModelCredential_  func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, cloudCredentialTag names.CloudCredentialTag) error
 	DestroyModel_           func(ctx context.Context, u *openfga.User, mt names.ModelTag, destroyStorage *bool, force *bool, maxWait *time.Duration, timeout *time.Duration) error
-	DumpModel_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error)
-	DumpModelDB_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error)
+	DumpModel_              func(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]any, error)
+	DumpModelDB_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]any, error)
 	ForEachModel_           func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, jujuparams.UserAccessPermission) error) error
 	ForEachUserModel_       func(ctx context.Context, u *openfga.User, f func(*dbmodel.Model, string) error) error
 	FullModelStatus_        func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, patterns []string) (*jujuparams.FullStatus, error)
 	ListModelSummaries_     func(ctx context.Context, user *openfga.User, maskingControllerUUID string) ([]base.UserModelSummary, error)
 	GetModel_               func(ctx context.Context, uuid string) (dbmodel.Model, error)
 	ImportModel_            func(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error
-	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error)
+	IdentityModelDefaults_  func(ctx context.Context, user *dbmodel.Identity) (map[string]any, error)
 	ModelDefaultsForCloud_  func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag) (jujuparams.ModelDefaultsResult, error)
 	ModelInfo_              func(ctx context.Context, u *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_            func(ctx context.Context, u *openfga.User, mt names.ModelTag) (base.ModelStatus, error)
 	QueryModelsJq_          func(ctx context.Context, models []string, jqQuery string) (params.CrossModelQueryResponse, error)
-	SetModelDefaults_       func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error
+	SetModelDefaults_       func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]any) error
 	UnsetModelDefaults_     func(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, keys []string) error
 	UpdateMigratedModel_    func(ctx context.Context, user *openfga.User, modelTag names.ModelTag, targetControllerName string) error
 	ValidateModelUpgrade_   func(ctx context.Context, u *openfga.User, mt names.ModelTag, force bool) error
@@ -64,13 +64,13 @@ func (j *ModelManager) DestroyModel(ctx context.Context, u *openfga.User, mt nam
 	return j.DestroyModel_(ctx, u, mt, destroyStorage, force, maxWait, timeout)
 }
 
-func (j *ModelManager) DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error) {
+func (j *ModelManager) DumpModel(ctx context.Context, u *openfga.User, mt names.ModelTag, simplified bool) (map[string]any, error) {
 	if j.DumpModel_ == nil {
 		return nil, errors.New("not implemented")
 	}
 	return j.DumpModel_(ctx, u, mt, simplified)
 }
-func (j *ModelManager) DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
+func (j *ModelManager) DumpModelDB(ctx context.Context, u *openfga.User, mt names.ModelTag) (map[string]any, error) {
 	if j.DumpModelDB_ == nil {
 		return nil, errors.New("not implemented")
 	}
@@ -146,7 +146,7 @@ func (j *ModelManager) QueryModelsJq(ctx context.Context, models []string, jqQue
 	return j.QueryModelsJq_(ctx, models, jqQuery)
 }
 
-func (j *ModelManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
+func (j *ModelManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]any) error {
 	if j.SetModelDefaults_ == nil {
 		return errors.New("not implemented")
 	}
@@ -166,7 +166,7 @@ func (j *ModelManager) UpdateMigratedModel(ctx context.Context, user *openfga.Us
 	}
 	return j.UpdateMigratedModel_(ctx, user, modelTag, targetControllerName)
 }
-func (j *ModelManager) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]interface{}, error) {
+func (j *ModelManager) IdentityModelDefaults(ctx context.Context, user *dbmodel.Identity) (map[string]any, error) {
 	if j.IdentityModelDefaults_ == nil {
 		return nil, errors.New("not implemented")
 	}

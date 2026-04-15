@@ -62,7 +62,7 @@ func startAndTestRotator(c *qt.C, ctx context.Context, store credentials.Credent
 
 	var ks jwk.Set
 	// We retry 500ms * 60 (30s)
-	for i := 0; i < 60; i++ {
+	for range 60 {
 		if ks == nil {
 			ks, err = store.GetJWKS(ctx)
 			if err != nil {

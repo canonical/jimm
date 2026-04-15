@@ -86,7 +86,7 @@ func (s *dbSuite) TestFindLatestKey(c *qt.C) {
 
 	// Add some keys
 	rks := make([]dbrootkeystore.RootKey, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		var name, key bytes.Buffer
 		fmt.Fprintf(&name, "test-%d", i)
 		fmt.Fprintf(&key, "secret %d", i)

@@ -37,10 +37,7 @@ func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User,
 		return err
 	}
 	for i := 0; i < len(parsedTuples); i += BATCH_SIZE_OPENFGA {
-		end := i + BATCH_SIZE_OPENFGA
-		if end > len(parsedTuples) {
-			end = len(parsedTuples)
-		}
+		end := min(i+BATCH_SIZE_OPENFGA, len(parsedTuples))
 		batch := parsedTuples[i:end]
 
 		err = j.authSvc.AddRelation(ctx, batch...)
@@ -64,10 +61,7 @@ func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 		return err
 	}
 	for i := 0; i < len(parsedTuples); i += BATCH_SIZE_OPENFGA {
-		end := i + BATCH_SIZE_OPENFGA
-		if end > len(parsedTuples) {
-			end = len(parsedTuples)
-		}
+		end := min(i+BATCH_SIZE_OPENFGA, len(parsedTuples))
 		batch := parsedTuples[i:end]
 
 		err = j.authSvc.RemoveRelation(ctx, batch...)

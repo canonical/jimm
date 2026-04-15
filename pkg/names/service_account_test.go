@@ -57,7 +57,6 @@ func TestIsValidServiceAccountId(t *testing.T) {
 		expectedValid: false,
 	}}
 	for i, test := range tests {
-		test := test
 		c.Run(fmt.Sprintf("test case %d", i), func(c *qt.C) {
 			c.Assert(names.IsValidServiceAccountId(test.id), qt.Equals, test.expectedValid)
 		})
@@ -101,7 +100,6 @@ func TestEnsureValidClientIdWithDomain(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		c.Run(test.name, func(c *qt.C) {
 			result, err := names.EnsureValidServiceAccountId(test.id)
 			if test.expectedError {

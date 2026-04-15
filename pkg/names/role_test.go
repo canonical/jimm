@@ -36,7 +36,6 @@ func TestParseRoleTag(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		test := test
 		c.Run(fmt.Sprintf("test case %d", i), func(c *qt.C) {
 			gt, err := names.ParseRoleTag(test.tag)
 			if test.expectedError == "" {

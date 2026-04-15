@@ -25,7 +25,7 @@ func (p *testTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.U
 	return nil, nil
 }
 
-func (p *testTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
+func (p *testTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]any) ([]byte, error) {
 	return nil, nil
 }
 

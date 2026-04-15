@@ -20,7 +20,7 @@ import (
 // Publisher defines the interface used by the Watcher
 // to publish model summaries.
 type Publisher interface {
-	Publish(model string, content interface{}) <-chan struct{}
+	Publish(model string, content any) <-chan struct{}
 }
 
 // A Watcher watches juju controllers for changes to all models.

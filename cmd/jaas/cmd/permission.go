@@ -392,7 +392,7 @@ func (c *checkPermissionCommand) Init(args []string) error {
 	return nil
 }
 
-func formatCheckRelationString(writer io.Writer, value interface{}) error {
+func formatCheckRelationString(writer io.Writer, value any) error {
 	accessResult, ok := value.(accessResult)
 	if !ok {
 		return fmt.Errorf("failed to parse access result")
@@ -554,7 +554,7 @@ func fetchRelations(client JIMMAPI, params apiparams.ListRelationshipTuplesReque
 	}
 }
 
-func formatRelationsTabular(writer io.Writer, value interface{}) error {
+func formatRelationsTabular(writer io.Writer, value any) error {
 	resp, ok := value.(*apiparams.ListRelationshipTuplesResponse)
 	if !ok {
 		return fmt.Errorf("expected value of type %T, got %T", resp, value)

@@ -51,8 +51,8 @@ const (
 // that both the GoChecker and QuickTest checker satisfy.
 // Useful for enabling test setup functions to fail without a panic.
 type SimpleTester interface {
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
+	Fatalf(format string, args ...any)
+	Logf(format string, args ...any)
 }
 
 // An Authenticator is an implementation of jimm.Authenticator that returns

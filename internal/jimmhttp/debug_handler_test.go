@@ -62,7 +62,7 @@ func TestDebugStatus(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	fmt.Println(string(buf))
-	var v map[string]map[string]interface{}
+	var v map[string]map[string]any
 	err = json.Unmarshal(buf, &v)
 	c.Assert(err, qt.IsNil)
 
@@ -74,7 +74,7 @@ func TestDebugStatus(t *testing.T) {
 func TestDebugStatusStatusError(t *testing.T) {
 	c := qt.New(t)
 
-	rr := setupDebugHandlerAndRecorder(c, jimmhttp.MakeStatusCheck("Test", func(context.Context) (interface{}, error) {
+	rr := setupDebugHandlerAndRecorder(c, jimmhttp.MakeStatusCheck("Test", func(context.Context) (any, error) {
 		return nil, errors.New("test error")
 	}), "/status")
 
@@ -84,7 +84,7 @@ func TestDebugStatusStatusError(t *testing.T) {
 	buf, err := io.ReadAll(resp.Body)
 	c.Assert(err, qt.IsNil)
 
-	var v map[string]map[string]interface{}
+	var v map[string]map[string]any
 	err = json.Unmarshal(buf, &v)
 	c.Assert(err, qt.IsNil)
 	c.Check(v["start_time"]["Name"], qt.Equals, "Test")

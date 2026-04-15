@@ -15,8 +15,8 @@ func TestSubscribeToModelMessages(t *testing.T) {
 	c := qt.New(t)
 	hub := &pubsub.Hub{}
 
-	messages := make(chan interface{}, 10)
-	handlerFunc := func(model string, content interface{}) {
+	messages := make(chan any, 10)
+	handlerFunc := func(model string, content any) {
 		select {
 		case messages <- content:
 		default:
@@ -44,8 +44,8 @@ func TestSubscribeToModelMessagesAfterMessagesHaveBeenSent(t *testing.T) {
 	c := qt.New(t)
 	hub := &pubsub.Hub{}
 
-	messages := make(chan interface{}, 10)
-	handlerFunc := func(model string, content interface{}) {
+	messages := make(chan any, 10)
+	handlerFunc := func(model string, content any) {
 		select {
 		case messages <- content:
 		default:
@@ -68,8 +68,8 @@ func TestSubscribeMatcher(t *testing.T) {
 	c := qt.New(t)
 	hub := &pubsub.Hub{}
 
-	messages := make(chan interface{}, 10)
-	handlerFunc := func(model string, content interface{}) {
+	messages := make(chan any, 10)
+	handlerFunc := func(model string, content any) {
 		select {
 		case messages <- content:
 		default:
@@ -115,10 +115,10 @@ func TestSubscribeMatcher(t *testing.T) {
 }
 
 type messageHub interface {
-	Publish(string, interface{}) <-chan struct{}
+	Publish(string, any) <-chan struct{}
 }
 
-func assertPublish(c *qt.C, hub messageHub, model string, message interface{}) {
+func assertPublish(c *qt.C, hub messageHub, model string, message any) {
 	done := hub.Publish(model, message)
 	select {
 	case <-done:
@@ -127,8 +127,8 @@ func assertPublish(c *qt.C, hub messageHub, model string, message interface{}) {
 	}
 }
 
-func assertMessage(c *qt.C, messages chan interface{}, expectedMessage string) {
-	var message interface{}
+func assertMessage(c *qt.C, messages chan any, expectedMessage string) {
+	var message any
 	select {
 	case message = <-messages:
 		if expectedMessage != "" {

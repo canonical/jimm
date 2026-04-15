@@ -16,7 +16,7 @@ type APICallCloser interface {
 	// APICall makes a call to the API server with the given object type,
 	// id, request and parameters. The response is filled in with the
 	// call's result if the call is successful.
-	APICall(objType string, version int, id, request string, params, response interface{}) error
+	APICall(objType string, version int, id, request string, params, response any) error
 	Close() error
 }
 

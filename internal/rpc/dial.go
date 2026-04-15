@@ -164,9 +164,7 @@ func dialAllHelper(ctx context.Context, dialer *Dialer, urls []string, headers h
 	for _, url := range urls {
 		zapctx.Info(ctx, "dialing", zap.String("url", url))
 		url := url
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			conn, dErr := dialer.DialWebsocket(ctx, url, headers)
 			if dErr != nil {
 				errOnce.Do(func() {
@@ -183,7 +181,7 @@ func dialAllHelper(ctx context.Context, dialer *Dialer, urls []string, headers h
 			if !keep {
 				conn.Close()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if res != nil {

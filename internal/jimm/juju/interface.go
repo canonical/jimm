@@ -96,10 +96,10 @@ type API interface {
 	ConnectStream(string, url.Values) (base.Stream, error)
 
 	// DumpModel collects a database-agnostic dump of a model.
-	DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error)
+	DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]any, error)
 
 	// DumpModelDB collects a database dump of a model.
-	DumpModelDB(context.Context, names.ModelTag) (map[string]interface{}, error)
+	DumpModelDB(context.Context, names.ModelTag) (map[string]any, error)
 
 	// FindApplicationOffers finds application offers that match the filter.
 	FindApplicationOffers(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)

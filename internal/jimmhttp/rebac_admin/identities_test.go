@@ -68,10 +68,7 @@ func TestListIdentities(t *testing.T) {
 	identityManager := mocks.IdentityManager{
 		ListIdentities_: func(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]openfga.User, error) {
 			start := pagination.Offset()
-			end := start + pagination.Limit()
-			if end > len(testUsers) {
-				end = len(testUsers)
-			}
+			end := min(start+pagination.Limit(), len(testUsers))
 			return testUsers[start:end], nil
 		},
 		CountIdentities_: func(ctx context.Context, user *openfga.User) (int, error) {

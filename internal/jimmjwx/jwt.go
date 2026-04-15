@@ -85,7 +85,7 @@ type JWTParams struct {
 	Access map[string]string
 	// ExtraClaims contain any extra claims that should be added to the JWT.
 	// "access" is a reserved claim and will cause an error if used.
-	ExtraClaims map[string]interface{}
+	ExtraClaims map[string]any
 	// Expiry is the duration after which the JWT will expire.
 	// If not set, it will default to the configured default expiry.
 	// If set, it will override the JWTServiceParams.Expiry.

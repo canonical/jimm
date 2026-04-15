@@ -24,7 +24,7 @@ func NewModelSummaryWatcher() *modelSummaryWatcher {
 	}
 }
 
-func PublishToWatcher(w *modelSummaryWatcher, model string, data interface{}) {
+func PublishToWatcher(w *modelSummaryWatcher, model string, data any) {
 	w.pubsubHandler(model, data)
 }
 
@@ -33,11 +33,9 @@ func ModelAccessWatcherMatch(w *modelAccessWatcher, model string) bool {
 }
 
 func RunModelAccessWatcher(w *modelAccessWatcher, wg *sync.WaitGroup) {
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		w.loop()
-	}()
+	})
 }
 
 type ControllerRoot = controllerRoot

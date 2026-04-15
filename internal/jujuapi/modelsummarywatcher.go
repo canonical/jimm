@@ -141,7 +141,7 @@ type modelSummaryWatcher struct {
 	summaries map[string]jujuparams.ModelAbstract
 }
 
-func (w *modelSummaryWatcher) pubsubHandler(model string, summaryI interface{}) {
+func (w *modelSummaryWatcher) pubsubHandler(model string, summaryI any) {
 	summary, ok := summaryI.(jujuparams.ModelAbstract)
 	if !ok {
 		zapctx.Error(

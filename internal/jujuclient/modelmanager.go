@@ -21,7 +21,7 @@ type CreateModelArgs struct {
 	Cloud              string
 	CloudRegion        string
 	CloudCredentialTag names.CloudCredentialTag
-	Config             map[string]interface{}
+	Config             map[string]any
 }
 
 // CreateModel creates a new model as specified by the given model
@@ -56,7 +56,7 @@ type SecretBackend struct {
 	Name                string
 	BackendType         string
 	TokenRotateInterval *time.Duration
-	Config              map[string]interface{}
+	Config              map[string]any
 }
 
 // SecretBackendResult represents jujuparams.SecretBackendResult.
@@ -106,13 +106,13 @@ func (c Connection) GrantJIMMModelAdmin(ctx context.Context, tag names.ModelTag)
 // DumpModel dumps debugging details for the given model. If the simplied
 // dump is requested then a simplified dump is returned. DumpModel uses the
 // DumpModels method on the ModelManager facade.
-func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]interface{}, error) {
+func (c Connection) DumpModel(ctx context.Context, tag names.ModelTag, simplified bool) (map[string]any, error) {
 	return modelmanager.NewClient(&c).DumpModel(tag, simplified)
 }
 
 // DumpModelDB dumps the controller database entry given model.
 // DumpModelDB uses the DumpModelsDB method on the ModelManager facade..
-func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]interface{}, error) {
+func (c Connection) DumpModelDB(ctx context.Context, tag names.ModelTag) (map[string]any, error) {
 	return modelmanager.NewClient(&c).DumpModelDB(tag)
 }
 

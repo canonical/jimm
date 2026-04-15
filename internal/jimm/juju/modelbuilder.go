@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 
@@ -56,7 +57,7 @@ type modelBuilder struct {
 
 	name               string
 	candidates         []candidateController
-	config             map[string]interface{}
+	config             map[string]any
 	owner              *dbmodel.Identity
 	credential         *dbmodel.CloudCredential
 	controller         *dbmodel.Controller
@@ -137,13 +138,11 @@ func (b *modelBuilder) WithName(name string) *modelBuilder {
 }
 
 // WithConfig returns a builder with the specified model config.
-func (b *modelBuilder) WithConfig(cfg map[string]interface{}) *modelBuilder {
+func (b *modelBuilder) WithConfig(cfg map[string]any) *modelBuilder {
 	if b.config == nil {
-		b.config = make(map[string]interface{})
+		b.config = make(map[string]any)
 	}
-	for key, value := range cfg {
-		b.config[key] = value
-	}
+	maps.Copy(b.config, cfg)
 	return b
 }
 

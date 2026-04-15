@@ -156,12 +156,12 @@ func (s *dbSuite) TestListRole(c *qt.C) {
 	ctx := context.Background()
 	firstRoles, err := s.Database.ListRoles(ctx, 5, 0, "")
 	c.Assert(err, qt.IsNil)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.Assert(firstRoles[i].Name, qt.Equals, fmt.Sprintf("test-role-%d", i))
 	}
 	secondRoles, err := s.Database.ListRoles(ctx, 5, 5, "")
 	c.Assert(err, qt.IsNil)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.Assert(secondRoles[i].Name, qt.Equals, fmt.Sprintf("test-role-%d", i+5))
 	}
 

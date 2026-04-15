@@ -84,7 +84,7 @@ func TestKill(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		go func() {
 			defer wg.Done()
 			err := cl.Call(t.Context(), req, nil, nil)

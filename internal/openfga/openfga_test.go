@@ -156,7 +156,7 @@ func TestRemoveTuplesSucceeds(t *testing.T) {
 	// limits.
 
 	// Test a large number of tuples
-	for i := 0; i < 150; i++ {
+	for i := range 150 {
 		tuple := openfga.Tuple{
 			Object:   ofganames.ConvertTag(names.NewUserTag("test" + strconv.Itoa(i))),
 			Relation: "member",

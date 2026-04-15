@@ -228,7 +228,7 @@ func (c *Connection) hasFacadeVersion(facade string, version int) bool {
 // Call makes an RPC call to the server. Call sends the request message to
 // the server and waits for the response to be returned or the context to
 // be canceled.
-func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) (err error) {
+func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp any) (err error) {
 	labels := []string{facade, method, ""}
 	if c.ctl != nil {
 		labels = []string{facade, method, c.ctl.UUID}
@@ -246,7 +246,7 @@ func (c *Connection) Call(ctx context.Context, facade string, version int, id, m
 
 // CallHighestFacadeVersion calls the specified method on the highest supported version of
 // the facade.
-func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
+func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp any) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(versions)))
 
 	for _, version := range versions {
@@ -295,7 +295,7 @@ func (c *Connection) BakeryClient() base.MacaroonDischarger {
 // APICall makes a call to the API server with the given object type,
 // id, request and parameters. The response is filled in with the
 // call's result if the call is successful.
-func (c *Connection) APICall(objType string, version int, id, request string, params, response interface{}) error {
+func (c *Connection) APICall(objType string, version int, id, request string, params, response any) error {
 	return c.Call(c.ctx, objType, version, id, request, params, response)
 }
 

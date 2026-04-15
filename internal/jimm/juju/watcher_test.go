@@ -112,7 +112,7 @@ var modelSummaryWatcherTests = []struct {
 		nil,
 	},
 	checkPublisher: func(c *qt.C, publisher *testPublisher) {
-		c.Assert(publisher.messages, qt.DeepEquals, []interface{}{
+		c.Assert(publisher.messages, qt.DeepEquals, []any{
 			jujuparams.ModelAbstract{
 				UUID:   "00000002-0000-0000-0000-000000000001",
 				Status: "test status",
@@ -192,12 +192,10 @@ func TestModelSummaryWatcher(t *testing.T) {
 			env.PopulateDB(c, w.Database)
 
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				err := w.WatchAllModelSummaries(ctx, time.Millisecond)
 				checkIfContextCanceled(c, ctx, err)
-			}()
+			})
 
 			for _, summary := range test.summaries {
 				select {
@@ -238,12 +236,10 @@ func TestWatcherSetsControllerUnavailable(t *testing.T) {
 	env.PopulateDB(c, w.Database)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := w.WatchAllModelSummaries(ctx, time.Millisecond)
 		checkIfContextCanceled(c, ctx, err)
-	}()
+	})
 
 	// it appears that the jimm code does not treat failing to
 	// set a controller as unavailable as an error - so
@@ -323,12 +319,10 @@ func TestWatcherClearsControllerUnavailable(t *testing.T) {
 
 	// start the watcher
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err := w.WatchAllModelSummaries(ctx, time.Millisecond)
 		checkIfContextCanceled(c, ctx, err)
-	}()
+	})
 	wg.Wait()
 
 	// check that the unavailable since time has been cleared
@@ -407,10 +401,10 @@ func checkIfContextCanceled(c *qt.C, ctx context.Context, err error) {
 
 type testPublisher struct {
 	mu       sync.Mutex
-	messages []interface{}
+	messages []any
 }
 
-func (p *testPublisher) Publish(model string, content interface{}) <-chan struct{} {
+func (p *testPublisher) Publish(model string, content any) <-chan struct{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.messages = append(p.messages, content)

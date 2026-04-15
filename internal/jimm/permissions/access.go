@@ -191,7 +191,7 @@ func (j *PermissionManager) RevokeAuditLogAccess(ctx context.Context, user *open
 // to cachedPerms if they exist. If the user does not have any of the desired permissions then an
 // error is returned.
 // Note that cachedPerms map is modified and returned.
-func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]interface{}) (map[string]string, error) {
+func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.User, cachedPerms map[string]string, desiredPerms map[string]any) (map[string]string, error) {
 
 	for key, val := range desiredPerms {
 		if _, ok := cachedPerms[key]; !ok {

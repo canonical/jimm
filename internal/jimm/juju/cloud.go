@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
@@ -255,10 +256,8 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 	if len(reservedNames) == 0 {
 		reservedNames = DefaultReservedCloudNames
 	}
-	for _, n := range reservedNames {
-		if tag.Id() == n {
-			return errors.Codef(errors.CodeAlreadyExists, "cloud %q already exists", tag.Id())
-		}
+	if slices.Contains(reservedNames, tag.Id()) {
+		return errors.Codef(errors.CodeAlreadyExists, "cloud %q already exists", tag.Id())
 	}
 
 	// Validate that the requested cloud is valid.
@@ -580,7 +579,6 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	// from cloud regions
 	for _, cr := range cloud.Regions {
 		for _, crp := range cr.Controllers {
-			crp := crp
 			if err := j.Database.DeleteCloudRegionControllerPriority(ctx, &crp); err != nil {
 				return fmt.Errorf("cannot update database after updating controller: %w", err)
 			}
@@ -660,10 +658,8 @@ func checkReservedCloudNames(tag names.CloudTag, reservedCloudNames []string) er
 	if len(reservedNames) == 0 {
 		reservedNames = DefaultReservedCloudNames
 	}
-	for _, n := range reservedNames {
-		if tag.Id() == n {
-			return errors.Codef(errors.CodeAlreadyExists, "cloud %q already exists", tag.Id())
-		}
+	if slices.Contains(reservedNames, tag.Id()) {
+		return errors.Codef(errors.CodeAlreadyExists, "cloud %q already exists", tag.Id())
 	}
 	return nil
 }

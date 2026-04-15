@@ -93,7 +93,7 @@ func TestCallClosedWithoutResponse(t *testing.T) {
 	c := qt.New(t)
 
 	srv := newServer(func(conn *websocket.Conn) error {
-		var req map[string]interface{}
+		var req map[string]any
 		if err := conn.ReadJSON(&req); err != nil {
 			return err
 		}
@@ -117,15 +117,15 @@ func TestCallErrorResponse(t *testing.T) {
 	c := qt.New(t)
 
 	srv := newServer(func(conn *websocket.Conn) error {
-		var req map[string]interface{}
+		var req map[string]any
 		if err := conn.ReadJSON(&req); err != nil {
 			return err
 		}
-		resp := map[string]interface{}{
+		resp := map[string]any{
 			"request-id": req["request-id"],
 			"error":      "test error",
 			"error-code": "test error code",
-			"error-info": map[string]interface{}{
+			"error-info": map[string]any{
 				"k1": "v1",
 				"k2": 2,
 			},
@@ -148,7 +148,7 @@ func TestCallErrorResponse(t *testing.T) {
 	c.Assert(ok, qt.IsTrue)
 
 	c.Check(e.ErrorCode(), qt.Equals, "test error code")
-	c.Check(e.Info, qt.DeepEquals, map[string]interface{}{
+	c.Check(e.Info, qt.DeepEquals, map[string]any{
 		"k1": "v1",
 		"k2": float64(2),
 	})
@@ -163,14 +163,14 @@ func TestClientReceiveRequest(t *testing.T) {
 	c := qt.New(t)
 
 	srv := newServer(func(conn *websocket.Conn) error {
-		var req map[string]interface{}
+		var req map[string]any
 		if err := conn.ReadJSON(&req); err != nil {
 			return err
 		}
 		if err := conn.WriteJSON(req); err != nil {
 			return err
 		}
-		var req2 map[string]interface{}
+		var req2 map[string]any
 		if err := conn.ReadJSON(&req2); err != nil {
 			return err
 		}
@@ -200,7 +200,7 @@ func TestClientReceiveInvalidMessage(t *testing.T) {
 	c := qt.New(t)
 
 	srv := newServer(func(conn *websocket.Conn) error {
-		var req map[string]interface{}
+		var req map[string]any
 		if err := conn.ReadJSON(&req); err != nil {
 			return err
 		}

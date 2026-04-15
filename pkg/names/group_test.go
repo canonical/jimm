@@ -36,7 +36,6 @@ func TestParseGroupTag(t *testing.T) {
 	}}
 
 	for i, test := range tests {
-		test := test
 		c.Run(fmt.Sprintf("test case %d", i), func(c *qt.C) {
 			gt, err := names.ParseGroupTag(test.tag)
 			if test.expectedError == "" {

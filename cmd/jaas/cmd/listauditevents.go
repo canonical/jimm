@@ -104,7 +104,7 @@ func (c *listAuditEventsCommand) Run(ctxt *cmd.Context) error {
 	return nil
 }
 
-func formatTabular(writer io.Writer, value interface{}) error {
+func formatTabular(writer io.Writer, value any) error {
 	e, ok := value.(apiparams.AuditEvents)
 	if !ok {
 		return fmt.Errorf("expected value of type %T, got %T", e, value)

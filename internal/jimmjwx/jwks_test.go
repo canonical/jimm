@@ -47,8 +47,7 @@ func TestGenerateJWKS(t *testing.T) {
 // As such, it will retry 60 times on a 500ms basis.
 func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 	c := qt.New(t)
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	defer cancelCtx()
+	ctx := t.Context()
 
 	store := newStore(c)
 	err := store.CleanupJWKS(ctx)
@@ -63,8 +62,7 @@ func TestStartJWKSRotatorWithNoJWKSInTheStore(t *testing.T) {
 // So I suppose this test is "best effort", but will only ever pass if the code is truly OK.
 func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	c := qt.New(t)
-	ctx, cancelCtx := context.WithCancel(context.Background())
-	defer cancelCtx()
+	ctx := t.Context()
 	store := newStore(c)
 	err := store.CleanupJWKS(ctx)
 	c.Assert(err, qt.IsNil)
@@ -85,7 +83,7 @@ func TestStartJWKSRotatorRotatesAJWKS(t *testing.T) {
 	err = svc.StartJWKSRotator(ctx, time.NewTicker(time.Second).C, time.Now())
 	c.Assert(err, qt.IsNil)
 	// We retry 500ms * 60 (30s) to test the diff
-	for i := 0; i < 60; i++ {
+	for range 60 {
 		time.Sleep(500 * time.Millisecond)
 		ks2, err := store.GetJWKS(ctx)
 		c.Assert(err, qt.IsNil)

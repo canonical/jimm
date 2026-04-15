@@ -39,7 +39,7 @@ type Model interface {
 	ClearUsers()
 	CloudCredential() CloudCredential
 	SetCloudCredential(args CloudCredentialArgs)
-	Config() map[string]interface{}
+	Config() map[string]any
 	Serialize() ([]byte, error)
 }
 

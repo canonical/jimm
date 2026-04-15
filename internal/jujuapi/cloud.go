@@ -524,10 +524,10 @@ func CloudToParams(cloud cloud.Cloud) jujuparams.Cloud {
 			StorageEndpoint:  region.StorageEndpoint,
 		}
 	}
-	var regionConfig map[string]map[string]interface{}
+	var regionConfig map[string]map[string]any
 	for r, attr := range cloud.RegionConfig {
 		if regionConfig == nil {
-			regionConfig = make(map[string]map[string]interface{})
+			regionConfig = make(map[string]map[string]any)
 		}
 		regionConfig[r] = attr
 	}

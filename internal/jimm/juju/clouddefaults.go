@@ -18,7 +18,7 @@ const (
 )
 
 // SetModelDefaults writes new default model setting values for the specified cloud/region.
-func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]interface{}) error {
+func (j *JujuManager) SetModelDefaults(ctx context.Context, user *dbmodel.Identity, cloudTag names.CloudTag, region string, configs map[string]any) error {
 
 	var keys strings.Builder
 	var needComma bool

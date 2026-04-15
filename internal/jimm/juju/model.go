@@ -45,7 +45,7 @@ func shuffleRegionControllers(controllers []dbmodel.CloudRegionControllerPriorit
 type ModelCreateArgs struct {
 	Name            string
 	Owner           names.UserTag
-	Config          map[string]interface{}
+	Config          map[string]any
 	Cloud           names.CloudTag
 	CloudRegion     string
 	CloudCredential names.CloudCredentialTag
@@ -590,8 +590,8 @@ func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt n
 // juju controller. If simplified is true a simpllified dump is requested.
 // If the given user is not a controller superuser or a model admin an
 // error with the code CodeUnauthorized is returned.
-func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt names.ModelTag, simplified bool) (map[string]interface{}, error) {
-	var dump map[string]interface{}
+func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt names.ModelTag, simplified bool) (map[string]any, error) {
+	var dump map[string]any
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
 		dump, err = api.DumpModel(ctx, mt, simplified)
@@ -606,8 +606,8 @@ func (j *JujuManager) DumpModel(ctx context.Context, user *openfga.User, mt name
 // DumpModelDB retrieves a database dump of the given model from its juju
 // controller. If the given user is not a controller superuser or a model
 // admin an error with the code CodeUnauthorized is returned.
-func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt names.ModelTag) (map[string]interface{}, error) {
-	var dump map[string]interface{}
+func (j *JujuManager) DumpModelDB(ctx context.Context, user *openfga.User, mt names.ModelTag) (map[string]any, error) {
+	var dump map[string]any
 	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
 		var err error
 		dump, err = api.DumpModelDB(ctx, mt)

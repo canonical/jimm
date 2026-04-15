@@ -60,7 +60,7 @@ type TokenGenerator interface {
 	// MakeToken assumes MakeLoginToken has already been called and checks the permissions
 	// specified in the permissionMap. If the logged in user has all those permissions
 	// a JWT will be returned with assertions confirming all those permissions.
-	MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error)
+	MakeToken(ctx context.Context, permissionMap map[string]any) ([]byte, error)
 	// SetTags sets the desired model and controller tags that this TokenGenerator is valid for.
 	SetTags(mt names.ModelTag, ct names.ControllerTag)
 	// GetUser returns the authenticated user.
@@ -69,8 +69,8 @@ type TokenGenerator interface {
 
 // WebsocketConnection represents the websocket connection interface used by the proxy.
 type WebsocketConnection interface {
-	ReadJSON(v interface{}) error
-	WriteJSON(v interface{}) error
+	ReadJSON(v any) error
+	WriteJSON(v any) error
 	Close() error
 }
 
@@ -142,11 +142,9 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 		errChan:              errChan,
 		createControllerConn: helpers.ConnectController,
 	}
-	clProxy.wg.Add(1)
-	go func() {
-		defer clProxy.wg.Done()
+	clProxy.wg.Go(func() {
 		errChan <- clProxy.start(ctx)
-	}()
+	})
 	var err error
 	select {
 	case err = <-errChan:
@@ -172,12 +170,12 @@ type writeLockConn struct {
 }
 
 // readJson allows for non-concurrent reads on the websocket.
-func (c *writeLockConn) readJson(v interface{}) error {
+func (c *writeLockConn) readJson(v any) error {
 	return c.conn.ReadJSON(v)
 }
 
 // writeJson allows for concurrent writes on the websocket.
-func (c *writeLockConn) writeJson(v interface{}) error {
+func (c *writeLockConn) writeJson(v any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.conn.WriteJSON(v)
@@ -460,11 +458,9 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 				modelMigrationMode: p.modelMigrationMode,
 			},
 		}
-		p.wg.Add(1)
-		go func() {
-			defer p.wg.Done()
+		p.wg.Go(func() {
 			p.errChan <- controllerToClient.start(ctx)
-		}()
+		})
 	})
 	return createConnErr
 }
@@ -631,7 +627,7 @@ func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]
 }
 
 // addJWT adds a JWT token to the the provided message.
-func addJWT(ctx context.Context, msg *message, permissions map[string]interface{}, tokenGen TokenGenerator) error {
+func addJWT(ctx context.Context, msg *message, permissions map[string]any, tokenGen TokenGenerator) error {
 
 	// First we unmarshal the existing LoginRequest.
 	if msg == nil {
@@ -670,7 +666,7 @@ func createErrResponse(err error, req *message) *message {
 }
 
 func modifyControllerResponse(msg *message) error {
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(msg.Response, &response)
 	if err != nil {
 		return err

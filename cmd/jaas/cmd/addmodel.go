@@ -5,6 +5,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -253,7 +254,7 @@ func (c *addModelCommand) Run(ctx *cmd.Context) error {
 	}
 
 	messageFormat := "Added '%s' model"
-	messageArgs := []interface{}{c.Name}
+	messageArgs := []any{c.Name}
 
 	details := jujuclient.ModelDetails{
 		ModelUUID: model.UUID,
@@ -471,10 +472,8 @@ func (c *addModelCommand) findUnspecifiedCredential(ctx *cmd.Context, p *findCre
 	}
 	// If the user has not specified a credential, and the cloud advertises
 	// itself as supporting the "empty" auth-type, then return immediately.
-	for _, authType := range p.cloud.AuthTypes {
-		if authType == jujucloud.EmptyAuthType {
-			return nil, names.CloudCredentialTag{}, p.cloudRegion, nil
-		}
+	if slices.Contains(p.cloud.AuthTypes, jujucloud.EmptyAuthType) {
+		return nil, names.CloudCredentialTag{}, p.cloudRegion, nil
 	}
 
 	if p.cloudTag.Id() == "" {
@@ -596,7 +595,7 @@ func (c *addModelCommand) findLocalCredential(ctx *cmd.Context, p *findCredentia
 	return fail(err)
 }
 
-func (c *addModelCommand) getConfigValues(ctx *cmd.Context) (map[string]interface{}, error) {
+func (c *addModelCommand) getConfigValues(ctx *cmd.Context) (map[string]any, error) {
 	configValues, err := c.Config.ReadAttrs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse config: %w", err)
@@ -605,7 +604,7 @@ func (c *addModelCommand) getConfigValues(ctx *cmd.Context) (map[string]interfac
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse config: %w", err)
 	}
-	attrs, ok := coercedValues.(map[string]interface{})
+	attrs, ok := coercedValues.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("params must contain a YAML map with string keys")
 	}

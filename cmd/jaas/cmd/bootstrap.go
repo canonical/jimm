@@ -392,7 +392,7 @@ func readStringMapFlag(ctxt *cmd.Context, flag *common.ConfigFlag, flagName stri
 	return stringifyMapValues(attrs, flagName)
 }
 
-func stringifyMapValues(attrs map[string]interface{}, flagName string) (map[string]string, error) {
+func stringifyMapValues(attrs map[string]any, flagName string) (map[string]string, error) {
 	if len(attrs) == 0 {
 		return nil, nil
 	}
@@ -407,7 +407,7 @@ func stringifyMapValues(attrs map[string]interface{}, flagName string) (map[stri
 	return values, nil
 }
 
-func stringifyScalar(value interface{}) (string, error) {
+func stringifyScalar(value any) (string, error) {
 	if value == nil {
 		return "", fmt.Errorf("nil value")
 	}

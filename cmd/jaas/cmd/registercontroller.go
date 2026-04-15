@@ -138,7 +138,7 @@ func (c *registerControllerCommand) Run(ctxt *cmd.Context) error {
 	return c.out.Write(ctxt, info)
 }
 
-func unmarshalControllerDetails(v interface{}, data []byte) error {
+func unmarshalControllerDetails(v any, data []byte) error {
 	err := yaml.Unmarshal(data, &v)
 	if err != nil {
 		return err

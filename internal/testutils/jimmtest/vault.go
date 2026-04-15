@@ -13,7 +13,7 @@ const (
 
 type fatalF interface {
 	Name() string
-	Fatalf(format string, args ...interface{})
+	Fatalf(format string, args ...any)
 }
 
 // VaultClient returns a new vault client for use in a test.

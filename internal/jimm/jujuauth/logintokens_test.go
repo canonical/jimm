@@ -4,6 +4,7 @@ package jujuauth_test
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -70,17 +71,13 @@ func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, user *open
 }
 
 // CheckPermission implements the CheckPermission methods of the JWTGeneratorAccessChecker interface.
-func (tac *testAccessChecker) CheckPermission(ctx context.Context, user *openfga.User, accessMap map[string]string, permissions map[string]interface{}) (map[string]string, error) {
+func (tac *testAccessChecker) CheckPermission(ctx context.Context, user *openfga.User, accessMap map[string]string, permissions map[string]any) (map[string]string, error) {
 	if tac.permissionCheckErr != nil {
 		return nil, tac.permissionCheckErr
 	}
 	access := make(map[string]string)
-	for k, v := range accessMap {
-		access[k] = v
-	}
-	for k, v := range tac.permissions {
-		access[k] = v
-	}
+	maps.Copy(access, accessMap)
+	maps.Copy(access, tac.permissions)
 	return access, nil
 }
 
@@ -268,7 +265,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		checkPermissionsError error
 		jwtService            *testJWTService
 		expectedError         string
-		permissions           map[string]interface{}
+		permissions           map[string]any
 		expectedJWTParams     jimmjwx.JWTParams
 	}{{
 		about:      "all is well",
@@ -285,7 +282,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	}, {
 		about:      "check permission fails",
 		jwtService: &testJWTService{},
-		permissions: map[string]interface{}{
+		permissions: map[string]any{
 			"entity1": "access_level1",
 		},
 		checkPermissionsError: errors.New("a test error"),
@@ -293,7 +290,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 	}, {
 		about:      "additional permissions need checking",
 		jwtService: &testJWTService{},
-		permissions: map[string]interface{}{
+		permissions: map[string]any{
 			"entity1": "access_level1",
 		},
 		checkPermissions: map[string]string{

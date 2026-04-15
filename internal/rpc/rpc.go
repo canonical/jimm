@@ -15,16 +15,16 @@ import (
 // connection. It contains the union of fields in a request or response
 // message.
 type message struct {
-	RequestID uint64                 `json:"request-id,omitempty"`
-	Type      string                 `json:"type,omitempty"`
-	Version   int                    `json:"version,omitempty"`
-	ID        string                 `json:"id,omitempty"`
-	Request   string                 `json:"request,omitempty"`
-	Params    json.RawMessage        `json:"params,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	ErrorCode string                 `json:"error-code,omitempty"`
-	ErrorInfo map[string]interface{} `json:"error-info,omitempty"`
-	Response  json.RawMessage        `json:"response,omitempty"`
+	RequestID uint64          `json:"request-id,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Version   int             `json:"version,omitempty"`
+	ID        string          `json:"id,omitempty"`
+	Request   string          `json:"request,omitempty"`
+	Params    json.RawMessage `json:"params,omitempty"`
+	Error     string          `json:"error,omitempty"`
+	ErrorCode string          `json:"error-code,omitempty"`
+	ErrorInfo map[string]any  `json:"error-info,omitempty"`
+	Response  json.RawMessage `json:"response,omitempty"`
 }
 
 // isRequest returns whether the message is a request

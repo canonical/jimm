@@ -317,7 +317,7 @@ func TestToFullModelInfo(t *testing.T) {
 				Name:                "vault",
 				BackendType:         "vault",
 				TokenRotateInterval: &rotateInterval,
-				Config: map[string]interface{}{
+				Config: map[string]any{
 					"endpoint": "https://vault.example.com",
 				},
 			},
@@ -348,7 +348,7 @@ func TestToFullModelInfo(t *testing.T) {
 			Name:                "vault",
 			BackendType:         "vault",
 			TokenRotateInterval: &rotateInterval,
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"endpoint": "https://vault.example.com",
 			},
 		},

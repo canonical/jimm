@@ -365,10 +365,7 @@ func auditParamsToFilter(req apiparams.FindAuditEventsRequest) (db.AuditLogFilte
 		limit = maxLimit
 	}
 	filter.Limit = limit
-	offset := req.Offset
-	if offset < 0 {
-		offset = 0
-	}
+	offset := max(req.Offset, 0)
 	filter.Offset = offset
 	return filter, nil
 }

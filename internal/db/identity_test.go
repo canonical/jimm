@@ -78,7 +78,7 @@ func (s *dbSuite) TestGetIdentityConcurrent(c *qt.C) {
 
 	N := 50
 	errorChannel := make(chan error, N)
-	for i := 0; i < N; i++ {
+	for range N {
 		go func() {
 			u, err := dbmodel.NewIdentity("bob@canonical.com")
 			c.Check(err, qt.IsNil)
@@ -87,7 +87,7 @@ func (s *dbSuite) TestGetIdentityConcurrent(c *qt.C) {
 		}()
 	}
 
-	for i := 0; i < N; i++ {
+	for range N {
 		err = <-errorChannel
 		c.Assert(err, qt.IsNil)
 	}
@@ -251,12 +251,12 @@ func (s *dbSuite) TestListIdentities(c *qt.C) {
 	ctx := context.Background()
 	firstIdentities, err := s.Database.ListIdentities(ctx, 5, 0, "")
 	c.Assert(err, qt.IsNil)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.Assert(firstIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i))
 	}
 	secondIdentities, err := s.Database.ListIdentities(ctx, 5, 5, "")
 	c.Assert(err, qt.IsNil)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.Assert(secondIdentities[i].Name, qt.Equals, fmt.Sprintf("bob%d@canonical.com", i+5))
 	}
 

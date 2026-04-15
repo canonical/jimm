@@ -109,7 +109,7 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 		return err
 	}
 
-	data := make(map[string]interface{}, len(attr))
+	data := make(map[string]any, len(attr))
 	for k, v := range attr {
 		data[k] = v
 	}
@@ -193,7 +193,7 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 		return err
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		usernameKey: username,
 		passwordKey: password,
 	}
@@ -385,7 +385,7 @@ func (s *VaultStore) PutJWKSPrivateKey(ctx context.Context, pem []byte) (err err
 		return err
 	}
 
-	privateKeyData := map[string]interface{}{jwksPrivateKey: pem}
+	privateKeyData := map[string]any{jwksPrivateKey: pem}
 	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSPrivateKeyPath(), privateKeyData); err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (s *VaultStore) PutJWKSExpiry(ctx context.Context, expiry time.Time) (err e
 	if err != nil {
 		return err
 	}
-	expiryData := map[string]interface{}{jwksExpiryKey: expiry}
+	expiryData := map[string]any{jwksExpiryKey: expiry}
 	if _, err := client.KVv2(s.KVPath).Put(ctx, s.getJWKSExpiryPath(), expiryData); err != nil {
 		return err
 	}

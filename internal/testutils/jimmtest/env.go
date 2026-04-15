@@ -324,10 +324,10 @@ func (cd *ApplicationOffer) DBObject(c *qt.C, db *db.Database) dbmodel.Applicati
 
 // CloudDefaults represents default cloud/region configuration for a new model.
 type CloudDefaults struct {
-	User     string                 `json:"user"`
-	Cloud    string                 `json:"cloud"`
-	Region   string                 `json:"region"`
-	Defaults map[string]interface{} `json:"defaults"`
+	User     string         `json:"user"`
+	Cloud    string         `json:"cloud"`
+	Region   string         `json:"region"`
+	Defaults map[string]any `json:"defaults"`
 
 	env *Environment
 	dbo dbmodel.CloudDefaults
@@ -639,7 +639,7 @@ func ParseMachineHardware(s string) *instance.HardwareCharacteristics {
 		return nil
 	}
 	var hw instance.HardwareCharacteristics
-	for _, f := range strings.Fields(s) {
+	for f := range strings.FieldsSeq(s) {
 		var err error
 
 		parts := strings.SplitN(f, "=", 2)

@@ -535,7 +535,7 @@ type CheckRelationsResponse struct {
 
 // ListRelationshipTuplesRequests holds the request information to list tuples.
 type ListRelationshipTuplesRequest struct {
-	Tuple             RelationshipTuple `json:"tuple,omitempty"`
+	Tuple             RelationshipTuple `json:"tuple"`
 	PageSize          int32             `json:"page_size,omitempty"`
 	ContinuationToken string            `json:"continuation_token,omitempty"`
 	ResolveUUIDs      bool              `json:"resolve_uuids,omitempty"`

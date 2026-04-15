@@ -23,7 +23,7 @@ func testControllerProfileRequest(name string) apiparams.SaveControllerProfileRe
 				Type:           "ec2",
 				AuthTypes:      []string{"access-key"},
 				CACertificates: []string{"ca-cert"},
-				Config:         map[string]interface{}{"default-base": "ubuntu@24.04"},
+				Config:         map[string]any{"default-base": "ubuntu@24.04"},
 				Endpoint:       "https://aws.example.com",
 				Region: apiparams.BootstrapCloudRegion{
 					Name:             "eu-west-1",

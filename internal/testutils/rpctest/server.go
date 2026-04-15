@@ -81,7 +81,7 @@ func HandleWS(f func(*websocket.Conn) error) http.Handler {
 
 func Echo(c *websocket.Conn) error {
 	for {
-		msg := make(map[string]interface{})
+		msg := make(map[string]any)
 		if err := c.ReadJSON(&msg); err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func Echo(c *websocket.Conn) error {
 
 func Unauthorized(c *websocket.Conn) error {
 	for {
-		msg := make(map[string]interface{})
+		msg := make(map[string]any)
 		if err := c.ReadJSON(&msg); err != nil {
 			return err
 		}

@@ -459,7 +459,7 @@ func TestFullModelStatus(t *testing.T) {
 			ModelStatus: jujuparams.DetailedStatus{
 				Status: "available",
 				Info:   "",
-				Data:   map[string]interface{}{},
+				Data:   map[string]any{},
 			},
 			SLA: "unsupported",
 		},

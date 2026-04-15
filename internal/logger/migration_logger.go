@@ -15,7 +15,7 @@ type MigrationLogger struct {
 }
 
 // Printf implements the Printf function of the migrate.Logger interface.
-func (l MigrationLogger) Printf(format string, v ...interface{}) {
+func (l MigrationLogger) Printf(format string, v ...any) {
 	line := fmt.Sprintf(format, v...)
 	// Remove unneeded new lines since the zap logger adds them.
 	if line[len(line)-1] == '\n' {

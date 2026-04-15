@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	contextType = reflect.TypeOf((*context.Context)(nil)).Elem()
-	errorType   = reflect.TypeOf((*error)(nil)).Elem()
-	stringType  = reflect.TypeOf("")
+	contextType = reflect.TypeFor[context.Context]()
+	errorType   = reflect.TypeFor[error]()
+	stringType  = reflect.TypeFor[string]()
 )
 
 // Method converts the given function to an RPC method that can be used
@@ -24,7 +24,7 @@ var (
 //
 // Note that all parameters and return values are optional. Method will
 // panic if the given value is not a function of the correct type.
-func Method(f interface{}) rpcreflect.MethodCaller {
+func Method(f any) rpcreflect.MethodCaller {
 	v := reflect.ValueOf(f)
 	if k := v.Kind(); k != reflect.Func {
 		panic(fmt.Sprintf("method must be a func not %s", k))

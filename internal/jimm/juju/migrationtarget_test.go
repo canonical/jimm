@@ -903,7 +903,7 @@ func newModelDescription(args modelDescriptionArgs) descriptionv9.Model {
 		Owner:        names.NewUserTag(args.Owner),
 		Type:         descriptionv9.IAAS,
 		Cloud:        args.CloudName,
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"uuid": migratingModelUUID,
 			"name": args.ModelName,
 		},

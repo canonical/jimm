@@ -136,9 +136,7 @@ func withBootstrapArch(constraints map[string]string) map[string]string {
 func mergedBootstrapConfig(defaultLoginTokenURL string, options BootstrapOptions) map[string]string {
 	merged := make(map[string]string)
 	for _, configMap := range []map[string]string{options.ControllerConfig, options.ControllerModelConfig, options.BootstrapConfig} {
-		for key, value := range configMap {
-			merged[key] = value
-		}
+		maps.Copy(merged, configMap)
 	}
 	if _, ok := merged[loginTokenRefreshURLKey]; !ok {
 		merged[loginTokenRefreshURLKey] = defaultLoginTokenURL

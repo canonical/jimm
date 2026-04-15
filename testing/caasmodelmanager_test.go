@@ -117,7 +117,7 @@ func TestListCAASModelSummaries(t *testing.T) {
 		Status: base.Status{
 			Status: "available",
 			Info:   "",
-			Data:   map[string]interface{}{},
+			Data:   map[string]any{},
 			Since:  nil,
 		},
 		ModelUserAccess:    "admin",

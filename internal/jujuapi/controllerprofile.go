@@ -172,7 +172,7 @@ func controllerProfileToParams(profile dbmodel.ControllerProfile) apiparams.Cont
 			Type:            profile.Cloud.Type,
 			AuthTypes:       []string(profile.Cloud.AuthTypes),
 			CACertificates:  []string(profile.Cloud.CACertificates),
-			Config:          map[string]interface{}(profile.Cloud.Config),
+			Config:          map[string]any(profile.Cloud.Config),
 			Endpoint:        profile.Cloud.Endpoint,
 			HostCloudRegion: profile.Cloud.HostCloudRegion,
 			Region: apiparams.BootstrapCloudRegion{
