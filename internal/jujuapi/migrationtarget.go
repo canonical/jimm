@@ -16,20 +16,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuapi/rpc"
 )
 
-/*
-Below are the remaining RPC methods to add to the MigrationTarget facade.
-There are additional HTTP endpoints not included here that also need to be implemented.
-
-func (api *API) Abort(args params.ModelArgs) error
-func (api *API) Activate(args params.ActivateModelArgs) error
-func (api *API) AdoptResources(args params.AdoptResourcesArgs) error
-func (api *API) CACert() (params.BytesResult, error)
-func (api *API) CheckMachines(args params.ModelArgs) (params.ErrorResults, error)
-func (api *API) Import(serialized params.SerializedModel) error
-func (api *API) LatestLogTime(args params.ModelArgs) (time.Time, error)
-func (api *API) Prechecks(model params.MigrationModelInfo) error
-*/
-
 func init() {
 	facadeInit["MigrationTarget"] = func(r *controllerRoot) []int {
 		preChecks := rpc.Method(r.Prechecks)
@@ -49,6 +35,10 @@ func init() {
 		r.AddMethod("MigrationTarget", 6, "CheckMachines", checkMachines)
 		r.AddMethod("MigrationTarget", 6, "Import", importMethod)
 		r.AddMethod("MigrationTarget", 6, "LatestLogTime", latestLogTime)
+		// Avoid implementing v7 of the MigrationTarget facade as this version
+		// only changes OwnerTag -> ModelQualifier for Juju 4. But Juju 4 -> Juju 4
+		// migrations will use a newer version or totally different facade and Juju 3 -> Juju 4
+		// migrations will continue using v6, the last version that Juju 3 supports.
 
 		return []int{6}
 	}
