@@ -102,6 +102,7 @@ func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath s
 	if err != nil {
 		return fmt.Errorf("failed to obtain DB conn: %w", err)
 	}
+	defer conn.Close()
 
 	driver, err := postgres.WithConnection(ctx, conn, &postgres.Config{MigrationsTable: migrationTableName})
 	if err != nil {
