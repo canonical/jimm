@@ -9,15 +9,6 @@ myst:
 
 These how-to guides cover key operations and processes in JAAS.
 
-<!--
-```{toctree}
-:titlesonly:
-:glob:
-
-*
-```
--->
-
 ## Your JAAS deployment, the bird's eye
 
 ```{toctree}
