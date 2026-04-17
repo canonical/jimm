@@ -83,7 +83,8 @@ func TestAgentLoginReturnsRedirect(t *testing.T) {
 	}
 	_, err = api.Open(&info, dialOpts)
 	c.Assert(err, qt.Not(qt.IsNil))
-	redirectErr, ok := errors.Cause(err).(*api.RedirectError)
+	redirectErr := &api.RedirectError{}
+	ok := errors.As(errors.Cause(err), &redirectErr)
 	c.Check(ok, qt.Equals, true)
 	c.Assert(redirectErr.Servers, qt.HasLen, 1)
 	servers := redirectErr.Servers[0].HostPorts().Strings()

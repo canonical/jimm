@@ -162,7 +162,7 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 	// Get the model info from the current controller.
 	modelInfo, err := c.ClientStore().ModelByName(currentController, c.modelName)
 	if err != nil {
-		return fmt.Errorf("could not find model %q on controller %q: %v", c.modelName, currentController, err)
+		return fmt.Errorf("could not find model %q on controller %q: %w", c.modelName, currentController, err)
 	}
 
 	userMapping, err := c.parseUserMappingFile()
@@ -172,7 +172,7 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 
 	jujuAPI, err := c.jujuApiFunc()
 	if err != nil {
-		return fmt.Errorf("could not create Juju API client: %v", err)
+		return fmt.Errorf("could not create Juju API client: %w", err)
 	}
 	defer jujuAPI.Close()
 
@@ -184,22 +184,22 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 
 	token, err := c.prepareMigration(userMapping, modelInfo.ModelUUID)
 	if err != nil {
-		return fmt.Errorf("failure preparing migration: %v", err)
+		return fmt.Errorf("failure preparing migration: %w", err)
 	}
 
 	spec, err := c.getMigrationSpec(token, modelInfo.ModelUUID)
 	if err != nil {
-		return fmt.Errorf("could not get migration spec: %v", err)
+		return fmt.Errorf("could not get migration spec: %w", err)
 	}
 
 	events, err := jujuAPI.InitiateMigration(spec)
 	if err != nil {
-		return fmt.Errorf("could not initiate migration from controller %q: %v", currentController, err)
+		return fmt.Errorf("could not initiate migration from controller %q: %w", currentController, err)
 	}
 
 	err = c.out.Write(ctxt, events)
 	if err != nil {
-		return fmt.Errorf("could not write migration events: %v", err)
+		return fmt.Errorf("could not write migration events: %w", err)
 	}
 	return nil
 }
@@ -209,7 +209,7 @@ func (c *migrateModelCommand) Run(ctxt *cmd.Context) error {
 func (c *migrateModelCommand) prepareMigration(userMapping map[string]string, modelUUID string) (string, error) {
 	jimmClient, err := c.jimmAPIFunc()
 	if err != nil {
-		return "", fmt.Errorf("could not create JIMM client: %v", err)
+		return "", fmt.Errorf("could not create JIMM client: %w", err)
 	}
 	defer jimmClient.Close()
 	response, err := jimmClient.PrepareModelMigration(&apiparams.PrepareModelMigrationRequest{
@@ -226,12 +226,12 @@ func (c *migrateModelCommand) prepareMigration(userMapping map[string]string, mo
 func (c *migrateModelCommand) parseUserMappingFile() (map[string]string, error) {
 	content, err := os.ReadFile(c.userMappingFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not read user mapping file: %v", err)
+		return nil, fmt.Errorf("could not read user mapping file: %w", err)
 	}
 	userMapping := make(map[string]string)
 	err = yaml.Unmarshal(content, &userMapping)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse user mapping file: %v", err)
+		return nil, fmt.Errorf("could not parse user mapping file: %w", err)
 	}
 	if len(userMapping) < 1 {
 		return nil, fmt.Errorf("user mapping file is empty or not properly formatted")
@@ -272,7 +272,7 @@ func (c *migrateModelCommand) getMigrationSpec(token string, modelUUID string) (
 func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string, modelUUID, modelName string, jujuAPI MigrateAPI) error {
 	modelInfo, err := jujuAPI.ModelInfo([]names.ModelTag{names.NewModelTag(modelUUID)})
 	if err != nil {
-		return fmt.Errorf("could not get model info: %v", err)
+		return fmt.Errorf("could not get model info: %w", err)
 	}
 	if len(modelInfo) == 0 {
 		return fmt.Errorf("model %q not found", modelName)
@@ -304,7 +304,7 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 	}
 	offers, err := jujuAPI.ListOffers(filter)
 	if err != nil {
-		return fmt.Errorf("could not list application offers: %v", err)
+		return fmt.Errorf("could not list application offers: %w", err)
 	}
 	for _, offer := range offers {
 		for _, user := range offer.Users {
@@ -326,7 +326,7 @@ func (c *migrateModelCommand) validateUserMapping(userMapping map[string]string,
 func (c *migrateModelCommand) newJujuClient() (MigrateAPI, error) {
 	currentController, err := c.ClientStore().CurrentController()
 	if err != nil {
-		return nil, fmt.Errorf("could not determine controller: %v", err)
+		return nil, fmt.Errorf("could not determine controller: %w", err)
 	}
 
 	apiCaller, err := c.NewAPIRootWithDialOpts(c.ClientStore(), currentController, "", nil)

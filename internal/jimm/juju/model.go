@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"fmt"
 	"math/rand/v2"
 	"sort"
@@ -510,10 +511,10 @@ func (j *JujuManager) ForEachUserModel(ctx context.Context, user *openfga.User, 
 		}
 		return nil
 	})
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil
-	case errStop:
+	case stderrors.Is(err, errStop):
 		return iterErr
 	default:
 		return err
@@ -541,10 +542,10 @@ func (j *JujuManager) ForEachModel(ctx context.Context, user *openfga.User, f fu
 		}
 		return nil
 	})
-	switch err {
-	case nil:
+	switch {
+	case err == nil:
 		return nil
-	case errStop:
+	case stderrors.Is(err, errStop):
 		return iterErr
 	default:
 		return err
@@ -730,13 +731,13 @@ func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]bas
 	// Get uuids of models the user has access to
 	uuids, err := user.ListModels(ctx, ofganames.ReaderRelation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list user models: %v", err)
+		return nil, fmt.Errorf("failed to list user models: %w", err)
 	}
 
 	// Get the models from the database
 	models, err := j.Database.GetModelsByUUID(ctx, uuids)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get models by uuid: %v", err)
+		return nil, fmt.Errorf("failed to get models by uuid: %w", err)
 	}
 
 	// Create map for lookup later
@@ -785,7 +786,7 @@ func (j *JujuManager) ListModels(ctx context.Context, user *openfga.User) ([]bas
 		return nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list models: %v", err)
+		return nil, fmt.Errorf("failed to list models: %w", err)
 	}
 
 	return userModels, nil

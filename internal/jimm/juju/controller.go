@@ -206,13 +206,13 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 
 	api, err := j.dialController(ctx, ctl, user)
 	if err != nil {
-		return fmt.Errorf("failed to dial the controller: %v", err)
+		return fmt.Errorf("failed to dial the controller: %w", err)
 	}
 	defer api.Close()
 
 	cloudSpec, err := api.CloudSpec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get model summary: %v", err)
+		return fmt.Errorf("failed to get model summary: %w", err)
 	}
 
 	ctl.CloudName = cloudSpec.Name
@@ -687,7 +687,7 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 		return tx.UpdateModel(ctx, &model)
 	})
 	if err != nil {
-		return result, fmt.Errorf("failed to update the model's migration mode: %v", err)
+		return result, fmt.Errorf("failed to update the model's migration mode: %w", err)
 	}
 
 	// Until we have better handling for partial failures we try to revert

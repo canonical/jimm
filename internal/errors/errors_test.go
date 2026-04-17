@@ -22,7 +22,8 @@ func TestCodefWrapsError(t *testing.T) {
 	c.Check(err, qt.ErrorMatches, `an error happened`)
 	c.Check(errors.ErrorCode(err), qt.Equals, code)
 
-	errValue, ok := err.(*errors.Error)
+	errValue := &errors.Error{}
+	ok := stderr.As(err, &errValue)
 	c.Assert(ok, qt.IsTrue)
 	c.Check(errValue.Code, qt.Equals, code)
 	c.Assert(errValue.Err, qt.IsNotNil)

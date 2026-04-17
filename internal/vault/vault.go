@@ -73,7 +73,7 @@ func (s *VaultStore) Get(ctx context.Context, tag names.CloudCredentialTag) (_ m
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.path(tag))
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && !goerr.Is(goerr.Unwrap(err), api.ErrSecretNotFound) {
 		return nil, err
 	}
 	if secret == nil || secret.Data == nil {
@@ -133,7 +133,8 @@ func (s *VaultStore) delete(ctx context.Context, tag names.CloudCredentialTag) (
 		return err
 	}
 	err = client.KVv2(s.KVPath).Delete(ctx, s.path(tag))
-	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
+	rerr := &api.ResponseError{}
+	if goerr.As(err, &rerr) && rerr.StatusCode == http.StatusNotFound {
 		// Ignore the error if attempting to delete something that isn't there.
 		err = nil
 	}
@@ -158,7 +159,7 @@ func (s *VaultStore) GetControllerCredentials(ctx context.Context, controllerNam
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.controllerCredentialsPath(controllerName))
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && !goerr.Is(goerr.Unwrap(err), api.ErrSecretNotFound) {
 		return "", "", err
 	}
 	if secret == nil || secret.Data == nil {
@@ -245,7 +246,7 @@ func (s *VaultStore) GetJWKS(ctx context.Context) (_ jwk.Set, err error) {
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && !goerr.Is(goerr.Unwrap(err), api.ErrSecretNotFound) {
 		return nil, err
 	}
 
@@ -285,7 +286,7 @@ func (s *VaultStore) GetJWKSPrivateKey(ctx context.Context) (_ []byte, err error
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSPrivateKeyPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && !goerr.Is(goerr.Unwrap(err), api.ErrSecretNotFound) {
 		return nil, err
 	}
 
@@ -320,7 +321,7 @@ func (s *VaultStore) GetJWKSExpiry(ctx context.Context) (_ time.Time, err error)
 	}
 
 	secret, err := client.KVv2(s.KVPath).Get(ctx, s.getJWKSExpiryPath())
-	if err != nil && goerr.Unwrap(err) != api.ErrSecretNotFound {
+	if err != nil && !goerr.Is(goerr.Unwrap(err), api.ErrSecretNotFound) {
 		return now, err
 	}
 
@@ -447,7 +448,8 @@ func (s *VaultStore) deleteControllerCredentials(ctx context.Context, controller
 		return err
 	}
 	err = client.KVv2(s.KVPath).Delete(ctx, s.controllerCredentialsPath(controllerName))
-	if rerr, ok := err.(*api.ResponseError); ok && rerr.StatusCode == http.StatusNotFound {
+	rerr := &api.ResponseError{}
+	if goerr.As(err, &rerr) && rerr.StatusCode == http.StatusNotFound {
 		// Ignore the error if attempting to delete something that isn't there.
 		err = nil
 	}

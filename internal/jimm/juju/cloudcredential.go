@@ -5,6 +5,7 @@ package juju
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -294,7 +295,7 @@ func (j *JujuManager) ForEachUserCloudCredential(ctx context.Context, u *dbmodel
 		}
 		return nil
 	})
-	if err == errStop {
+	if stderrors.Is(err, errStop) {
 		err = iterErr
 	}
 	return err

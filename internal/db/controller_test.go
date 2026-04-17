@@ -4,6 +4,7 @@ package db_test
 
 import (
 	"context"
+	stderrors "errors"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -51,7 +52,8 @@ func (s *dbSuite) TestAddController(c *qt.C) {
 
 	err = s.Database.AddController(context.Background(), &c1)
 	c.Assert(err, qt.Not(qt.IsNil))
-	eError, ok := err.(*errors.Error)
+	eError := &errors.Error{}
+	ok := stderrors.As(err, &eError)
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeAlreadyExists)
 }
@@ -225,7 +227,8 @@ func (s *dbSuite) TestUpdateController(c *qt.C) {
 
 	err = s.Database.UpdateController(context.Background(), &dbmodel.Controller{})
 	c.Assert(err, qt.Not(qt.IsNil))
-	eError, ok := err.(*errors.Error)
+	eError := &errors.Error{}
+	ok := stderrors.As(err, &eError)
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeNotFound)
 }

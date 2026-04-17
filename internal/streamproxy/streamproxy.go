@@ -5,6 +5,7 @@ package streamproxy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/api/base"
@@ -56,6 +57,7 @@ func unexpectedReadError(err error) bool {
 		websocket.CloseAbnormalClosure) {
 		return true
 	}
-	_, unmarshalError := err.(*json.InvalidUnmarshalError)
+	invalidUnmarshalError := &json.InvalidUnmarshalError{}
+	unmarshalError := errors.As(err, &invalidUnmarshalError)
 	return unmarshalError
 }

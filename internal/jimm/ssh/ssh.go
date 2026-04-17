@@ -121,12 +121,12 @@ type SSHManager struct {
 func (s *SSHManager) PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error) {
 	zapctx.Info(ctx, "PublicKeyHandler")
 	if ok, err := s.sshKeyManager.VerifyPublicKey(ctx, claimUser, key); !ok || err != nil {
-		return nil, fmt.Errorf("cannot verify key for user %s: %v", claimUser, err)
+		return nil, fmt.Errorf("cannot verify key for user %s: %w", claimUser, err)
 	}
 	user, err := s.identityManager.FetchIdentity(ctx, claimUser)
 	if err != nil {
 		zapctx.Info(ctx, fmt.Sprintf("cannot find user %s", claimUser))
-		return nil, fmt.Errorf("cannot find user %s: %v", claimUser, err)
+		return nil, fmt.Errorf("cannot find user %s: %w", claimUser, err)
 	}
 	return user, nil
 }
@@ -139,7 +139,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 	zapctx.Info(ctx, "SSHDialInfo")
 	model, err := s.jujuManager.GetModel(ctx, modelUUID)
 	if err != nil {
-		return DialInfo{}, fmt.Errorf("cannot find model: %v", err)
+		return DialInfo{}, fmt.Errorf("cannot find model: %w", err)
 	}
 
 	controllerConfig, err := s.jujuManager.ControllerConfig(ctx, user, model.Controller.Name)
@@ -149,7 +149,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 
 	addrs, _ := rpc.GetAddressesAndTLSConfig(ctx, &model.Controller)
 	if len(addrs) == 0 {
-		return DialInfo{}, fmt.Errorf("cannot find addresses for model's controller: %v", err)
+		return DialInfo{}, errors.New("cannot find addresses for model's controller")
 	}
 
 	addrsNoPort := make([]string, len(addrs))
@@ -178,7 +178,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 	jwtGenerator := s.jwtFactory.NewSSHGenerator()
 	token, err := jwtGenerator.NewSSHToken(ctx, tokenArgs)
 	if err != nil {
-		return DialInfo{}, fmt.Errorf("cannot generate jwt: %v", err)
+		return DialInfo{}, fmt.Errorf("cannot generate jwt: %w", err)
 	}
 
 	return DialInfo{
@@ -216,7 +216,7 @@ func (s *SSHManager) DialController(ctx context.Context, dialInfo DialInfo, user
 	}
 
 	if client == nil {
-		return nil, fmt.Errorf("failed to dial controller: %v", goerr.Join(errs...))
+		return nil, fmt.Errorf("failed to dial controller: %w", goerr.Join(errs...))
 	}
 	return client, nil
 }

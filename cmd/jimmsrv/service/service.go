@@ -421,7 +421,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 
 	publicDNS, err := parseURLWithOptionalScheme(p.PublicDNSName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse public DNS name: %v", err)
+		return nil, fmt.Errorf("failed to parse public DNS name: %w", err)
 	}
 
 	if p.DSN == "" {
@@ -619,7 +619,7 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 		ControllerUUID:         deps.ControllerUUID,
 	}, deps.Database, s.jimm.OfferAuthorizer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set up discharger: %v", err)
+		return nil, fmt.Errorf("failed to set up discharger: %w", err)
 	}
 	s.mux.Handle(localDischargePath+"/*", discharger.GetDischargerMux(macaroonDischarger, localDischargePath))
 
@@ -800,7 +800,7 @@ func setupCredentialStore(ctx context.Context, p Params, db *db.Database) (jimmc
 
 	vs, err := newVaultStore(ctx, p)
 	if err != nil {
-		return nil, fmt.Errorf("vault store error: %v", err)
+		return nil, fmt.Errorf("vault store error: %w", err)
 	}
 	if vs != nil {
 		return vs, nil

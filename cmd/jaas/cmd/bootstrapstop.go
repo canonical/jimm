@@ -65,18 +65,18 @@ func (c *bootstrapStopCommand) Init(args []string) error {
 func (c *bootstrapStopCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.getJIMMAPI()
 	if err != nil {
-		return fmt.Errorf("failed to create JIMM client: %v", err)
+		return fmt.Errorf("failed to create JIMM client: %w", err)
 	}
 
 	err = client.StopBootstrap(&params.StopBootstrapRequest{
 		JobID: c.jobId,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to stop bootstrap: %v", err)
+		return fmt.Errorf("failed to stop bootstrap: %w", err)
 	}
 	_, err = fmt.Fprintf(ctxt.Stdout, "Bootstrap job with ID %q has been stopped.\n", c.jobId)
 	if err != nil {
-		return fmt.Errorf("failed to write output: %v", err)
+		return fmt.Errorf("failed to write output: %w", err)
 	}
 	return nil
 }

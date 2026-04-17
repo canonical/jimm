@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	stderrors "errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -143,7 +144,8 @@ func TestCallErrorResponse(t *testing.T) {
 	var res string
 	err = conn.Call(context.Background(), "test", 0, "1234", "Test", "SUCCESS", &res)
 	c.Check(err, qt.ErrorMatches, `test error \(test error code\)`)
-	e, ok := err.(*rpc.Error)
+	e := &rpc.Error{}
+	ok := stderrors.As(err, &e)
 	c.Logf("expected %T, received %T", e, err)
 	c.Assert(ok, qt.IsTrue)
 
@@ -187,7 +189,11 @@ func TestClientReceiveRequest(t *testing.T) {
 	var res string
 	err = conn.Call(context.Background(), "test", 1, "", "Test", "SUCCESS", &res)
 	c.Check(err, qt.ErrorMatches, `test\(1\).Test not implemented \(not implemented\)`)
-	e := err.(*rpc.Error)
+	e := func() *rpc.Error {
+		target := &rpc.Error{}
+		_ = stderrors.As(err, &target)
+		return target
+	}()
 	c.Check(e.ErrorCode(), qt.Equals, "not implemented")
 	c.Check(res, qt.Equals, "")
 

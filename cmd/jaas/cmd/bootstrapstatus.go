@@ -83,7 +83,7 @@ func (c *bootstrapStatusCommand) Init(args []string) error {
 func (c *bootstrapStatusCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.getJIMMAPI()
 	if err != nil {
-		return fmt.Errorf("failed to create JIMM client: %v", err)
+		return fmt.Errorf("failed to create JIMM client: %w", err)
 	}
 	defer client.Close()
 

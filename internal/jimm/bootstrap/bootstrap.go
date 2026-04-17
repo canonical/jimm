@@ -246,7 +246,7 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	}
 
 	if err := params.validate(); err != nil {
-		return 0, fmt.Errorf("invalid bootstrap parameters: %v", err)
+		return 0, fmt.Errorf("invalid bootstrap parameters: %w", err)
 	}
 
 	bootstrapArgs := rivertypes.BootstrapArgs{

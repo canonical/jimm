@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -65,7 +66,8 @@ func HandleWS(f func(*websocket.Conn) error) http.Handler {
 		defer c.Close()
 		err = f(c)
 		var cm []byte
-		closeError, isCloseError := err.(*websocket.CloseError)
+		closeError := &websocket.CloseError{}
+		isCloseError := stderrors.As(err, &closeError)
 		switch {
 		case err == nil:
 			cm = websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")

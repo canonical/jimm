@@ -5,6 +5,7 @@ package db_test
 import (
 	"context"
 	"database/sql"
+	stderrors "errors"
 	"sort"
 	"testing"
 	"time"
@@ -86,7 +87,8 @@ func (s *dbSuite) TestAddModel(c *qt.C) {
 
 	err = s.Database.AddModel(context.Background(), &m1)
 	c.Assert(err, qt.Not(qt.IsNil))
-	eError, ok := err.(*errors.Error)
+	eError := &errors.Error{}
+	ok := stderrors.As(err, &eError)
 	c.Assert(ok, qt.IsTrue)
 	c.Assert(eError.Code, qt.Equals, errors.CodeAlreadyExists)
 }

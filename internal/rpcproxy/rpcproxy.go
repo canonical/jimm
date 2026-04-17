@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"sync"
 	"time"
@@ -192,7 +193,7 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 			if err := c.writeJson(errorMsg); err != nil {
 				zapctx.Error(context.Background(), "failed to send error message in proxy", zap.Error(err))
 			}
-
+			return
 		}
 		msg.Response = responseData
 	}
@@ -355,7 +356,8 @@ func unexpectedReadError(err error) bool {
 		websocket.CloseAbnormalClosure) {
 		return true
 	}
-	_, unmarshalError := err.(*json.InvalidUnmarshalError)
+	invalidUnmarshalError := &json.InvalidUnmarshalError{}
+	unmarshalError := stderrors.As(err, &invalidUnmarshalError)
 	return unmarshalError
 }
 
@@ -800,7 +802,7 @@ func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*mes
 	}
 	tag, err := names.ParseTag(request.AuthTag)
 	if err != nil {
-		return nil, fmt.Errorf("invalid user tag: %v", err)
+		return nil, fmt.Errorf("invalid user tag: %w", err)
 	}
 	switch tag := tag.(type) {
 	case names.UserTag:

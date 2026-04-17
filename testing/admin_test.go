@@ -363,7 +363,7 @@ func getDialWebsocketWithCustomCookieJar(jar *cookiejar.Jar) func(ctx context.Co
 
 		c, resp, err := dialer.Dial(urlStr, nil)
 		if err != nil {
-			if err == websocket.ErrBadHandshake {
+			if errors.Is(err, websocket.ErrBadHandshake) {
 				defer resp.Body.Close()
 				body, readErr := io.ReadAll(resp.Body)
 				if readErr == nil {

@@ -171,7 +171,7 @@ func createDatabaseFromTemplate(suggestedName string, templateName string) (stri
 
 	u, err := url.Parse(dsn)
 	if err != nil {
-		return "", "", fmt.Errorf("error parsing DSN as a URI: %s", err)
+		return "", "", fmt.Errorf("error parsing DSN as a URI: %w", err)
 	}
 
 	createDatabaseMutex.Lock()
@@ -215,17 +215,17 @@ func DeleteDatabase(databaseName string) (err error) {
 
 	gdb, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return fmt.Errorf("error opening database: %s", err)
+		return fmt.Errorf("error opening database: %w", err)
 	}
 	db, err := gdb.DB()
 	if err != nil {
-		return fmt.Errorf("error getting db: %s", err)
+		return fmt.Errorf("error getting db: %w", err)
 	}
 	defer func() { err = db.Close() }()
 
 	dropDatabaseCommand := fmt.Sprintf(`DROP DATABASE IF EXISTS "%s"`, databaseName)
 	if err := gdb.Exec(dropDatabaseCommand).Error; err != nil {
-		return fmt.Errorf("failed to delete database (%s): %s", databaseName, err)
+		return fmt.Errorf("failed to delete database (%s): %w", databaseName, err)
 	}
 	return nil
 }
@@ -244,7 +244,7 @@ func createEmptyDatabase(suggestedName string) (string, string, error) {
 
 	u, err := url.Parse(dsn)
 	if err != nil {
-		return "", "", fmt.Errorf("error parsing DSN as a URI: %s", err)
+		return "", "", fmt.Errorf("error parsing DSN as a URI: %w", err)
 	}
 
 	createDatabaseMutex.Lock()

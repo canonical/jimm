@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -34,7 +35,8 @@ func main() {
 	err := s.Wait()
 
 	zapctx.Error(context.Background(), "jimm shutdown complete", zap.Error(err))
-	if _, ok := err.(*service.SignalError); !ok {
+	signalError := &service.SignalError{}
+	if !stderrors.As(err, &signalError) {
 		os.Exit(1)
 	}
 }
@@ -122,7 +124,7 @@ func start(ctx context.Context, s *service.Service) error {
 	if key, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok && key != "" {
 		insecureSecretStorage, err = strconv.ParseBool(key)
 		if err != nil {
-			return fmt.Errorf("failed to parse INSECURE_SECRET_STORAGE env var: %v", err)
+			return fmt.Errorf("failed to parse INSECURE_SECRET_STORAGE env var: %w", err)
 		}
 	}
 	if insecureSecretStorage {

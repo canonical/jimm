@@ -48,7 +48,7 @@ func (d *Database) AddJobLog(ctx context.Context, jobId int64, logLine string) (
 
 		log, err := dbmodel.NewJobLog(jobId, nextLineNumber, logLine)
 		if err != nil {
-			return fmt.Errorf("failed to construct job log: %v", err)
+			return fmt.Errorf("failed to construct job log: %w", err)
 		}
 
 		if err := d.DB.WithContext(ctx).Create(log).Error; err != nil {

@@ -197,7 +197,7 @@ func (b *modelBuilder) WithAnyController() *modelBuilder {
 		}
 		ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, c.ResourceTag())
 		if err != nil {
-			return fmt.Errorf("failed to verify permissions for adding model to controller: %v", err)
+			return fmt.Errorf("failed to verify permissions for adding model to controller: %w", err)
 		}
 		if ok {
 			candidateControllers = append(candidateControllers, candidateController{

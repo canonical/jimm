@@ -3,6 +3,8 @@
 package db
 
 import (
+	stderrors "errors"
+
 	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -21,7 +23,7 @@ type pgError interface {
 func dbError(err error) error {
 	code := errors.Code(errors.ErrorCode(err))
 
-	if err == gorm.ErrRecordNotFound {
+	if stderrors.Is(err, gorm.ErrRecordNotFound) {
 		code = errors.CodeNotFound
 	}
 

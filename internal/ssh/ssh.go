@@ -209,7 +209,7 @@ func fetchAndAuthorizeUser(ctx ssh.Context, modelTag names.ModelTag) (*openfga.U
 	}
 	ok, err := user.IsModelAdmin(ctx, modelTag)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check for model access: %v", err)
+		return nil, fmt.Errorf("failed to check for model access: %w", err)
 	}
 	if !ok {
 		return nil, fmt.Errorf("user doesn't have permission")

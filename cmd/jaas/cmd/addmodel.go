@@ -586,10 +586,10 @@ func (c *addModelCommand) findLocalCredential(ctx *cmd.Context, p *findCredentia
 	if err == nil {
 		return credential, credentialName, cloudRegion, nil
 	}
-	switch errors.Cause(err) {
-	case modelcmd.ErrMultipleCredentials:
+	switch {
+	case errors.Is(errors.Cause(err), modelcmd.ErrMultipleCredentials):
 		return fail(errAmbiguousCredential)
-	case common.ErrMultipleDetectedCredentials:
+	case errors.Is(errors.Cause(err), common.ErrMultipleDetectedCredentials):
 		return fail(errAmbiguousDetectedCredential)
 	}
 	return fail(err)
@@ -609,7 +609,7 @@ func (c *addModelCommand) getConfigValues(ctx *cmd.Context) (map[string]any, err
 		return nil, fmt.Errorf("params must contain a YAML map with string keys")
 	}
 	if err := common.FinalizeAuthorizedKeys(ctx, attrs); err != nil {
-		if errors.Cause(err) != common.ErrNoAuthorizedKeys {
+		if !errors.Is(errors.Cause(err), common.ErrNoAuthorizedKeys) {
 			return nil, err
 		}
 	}

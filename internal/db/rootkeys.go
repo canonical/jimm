@@ -3,6 +3,7 @@
 package db
 
 import (
+	"errors"
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
@@ -29,7 +30,7 @@ func (d *Database) GetKey(id []byte) (_ dbrootkeystore.RootKey, err error) {
 		ID: id,
 	}
 	if err := d.DB.First(&rk).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return dbrootkeystore.RootKey{}, bakery.ErrNotFound
 		}
 		return dbrootkeystore.RootKey{}, err
@@ -59,7 +60,7 @@ func (d *Database) FindLatestKey(createdAfter, expiresAfter, expiresBefore time.
 	db = db.Order("created_at DESC")
 	var rk dbmodel.RootKey
 	if err := db.First(&rk).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return dbrootkeystore.RootKey{}, nil
 		}
 		return dbrootkeystore.RootKey{}, dbError(err)
