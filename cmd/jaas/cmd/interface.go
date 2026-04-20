@@ -27,9 +27,13 @@ type JIMMAPI interface {
 	// Controller operations
 	AddCloudToController(req *params.AddCloudToControllerRequest) error
 	AddController(req *params.AddControllerRequest) (params.ControllerInfo, error)
+	SaveControllerProfile(req *params.SaveControllerProfileRequest) (params.SaveControllerProfileResponse, error)
+	GetControllerProfile(req *params.GetControllerProfileRequest) (params.GetControllerProfileResponse, error)
+	ListControllerProfiles(req *params.ListControllerProfilesRequest) ([]params.ControllerProfileSummary, error)
 	ListControllers() ([]params.ControllerInfo, error)
 	RemoveCloudFromController(req *params.RemoveCloudFromControllerRequest) error
 	RemoveController(req *params.RemoveControllerRequest) (params.ControllerInfo, error)
+	RemoveControllerProfile(req *params.RemoveControllerProfileRequest) error
 	SetControllerDeprecated(req *params.SetControllerDeprecatedRequest) (params.ControllerInfo, error)
 
 	// Migration operations
