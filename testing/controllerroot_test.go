@@ -42,7 +42,7 @@ func TestUnimplementedMethodFails(t *testing.T) {
 	defer conn.Close()
 	var resp jujuparams.RedirectInfoResult
 	err := conn.APICall(t.Context(), "Admin", 3, "", "Logout", nil, &resp)
-	c.Assert(err, qt.ErrorMatches, `(?s).*no such request - method Admin.Logout is not implemented \(not implemented\).*`)
+	c.Assert(err, qt.ErrorMatches, `(?s).*juju client not compatible with server: unknown method \"Logout\" at version 0 for facade type \"Admin\" \(not implemented\).*`)
 }
 
 func TestUnimplementedRootFails(t *testing.T) {
