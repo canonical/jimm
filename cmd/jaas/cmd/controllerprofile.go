@@ -5,6 +5,7 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/juju/cmd/v3"
@@ -12,6 +13,7 @@ import (
 	"github.com/juju/gnuflag"
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/modelcmd"
+	"github.com/juju/juju/cmd/output"
 	"github.com/juju/juju/jujuclient"
 	"sigs.k8s.io/yaml"
 
@@ -307,10 +309,36 @@ func (c *listControllerProfilesCommand) Info() *cmd.Info {
 func (c *listControllerProfilesCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
-		"yaml": cmd.FormatYaml,
-		"json": cmd.FormatJson,
+		"yaml":    cmd.FormatYaml,
+		"json":    cmd.FormatJson,
+		"tabular": c.formatTabular,
 	})
 	f.StringVar(&c.jujuVersion, "juju-version", "", "Only return profiles compatible with the specified Juju version.")
+}
+
+// formatTabular formats the controller profile summaries in a tabular format.
+func (c *listControllerProfilesCommand) formatTabular(writer io.Writer, value interface{}) error {
+	info, ok := value.([]apiparams.ControllerProfileSummary)
+	if !ok {
+		return fmt.Errorf("expected []apiparams.ControllerProfileSummary, got %T", value)
+	}
+
+	tw := output.TabWriter(writer)
+	w := output.Wrapper{TabWriter: tw}
+
+	w.PrintHeaders(
+		output.EmphasisHighlight.DefaultBold,
+		"Profile name",
+		"Description",
+		"Created at",
+		"Updated at",
+	)
+	for _, profile := range info {
+		w.Println(profile.Name, profile.Description, profile.CreatedAt, profile.UpdatedAt)
+	}
+	w.Flush()
+
+	return nil
 }
 
 // Init implements cmd.Command.
