@@ -20,7 +20,7 @@ import (
 
 const (
 	addControllerProfileDoc = `
-Adds a saved controller profile to JIMM.
+Adds a controller profile to JIMM.
 
 The controller profile definition is read from a YAML file or from stdin.
 `
@@ -83,6 +83,7 @@ type addControllerProfileCommand struct {
 	name string
 }
 
+// Info implements cmd.Command.
 func (c *addControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "add-controller-profile",
@@ -93,6 +94,7 @@ func (c *addControllerProfileCommand) Info() *cmd.Info {
 	})
 }
 
+// SetFlags implements cmd.Command.
 func (c *addControllerProfileCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
@@ -103,6 +105,7 @@ func (c *addControllerProfileCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.file.Path, "file", "", "Specify a file-path for the controller profile, use '-' to read from stdin.")
 }
 
+// Init implements cmd.Command.
 func (c *addControllerProfileCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.New("controller profile name not specified")
@@ -117,6 +120,7 @@ func (c *addControllerProfileCommand) Init(args []string) error {
 	return nil
 }
 
+// Run implements cmd.Command.
 func (c *addControllerProfileCommand) Run(ctxt *cmd.Context) error {
 	req, err := c.readSaveRequest(ctxt)
 	if err != nil {
@@ -168,6 +172,7 @@ type updateControllerProfileCommand struct {
 	addControllerProfileCommand
 }
 
+// Info implements cmd.Command.
 func (c *updateControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "update-controller-profile",
@@ -178,6 +183,7 @@ func (c *updateControllerProfileCommand) Info() *cmd.Info {
 	})
 }
 
+// Run implements cmd.Command.
 func (c *updateControllerProfileCommand) Run(ctxt *cmd.Context) error {
 	req, err := c.readSaveRequest(ctxt)
 	if err != nil {
@@ -221,6 +227,7 @@ type showControllerProfileCommand struct {
 	name string
 }
 
+// Info implements cmd.Command.
 func (c *showControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "show-controller-profile",
@@ -231,6 +238,7 @@ func (c *showControllerProfileCommand) Info() *cmd.Info {
 	})
 }
 
+// SetFlags implements cmd.Command.
 func (c *showControllerProfileCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
@@ -239,6 +247,7 @@ func (c *showControllerProfileCommand) SetFlags(f *gnuflag.FlagSet) {
 	})
 }
 
+// Init implements cmd.Command.
 func (c *showControllerProfileCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.New("controller profile name not specified")
@@ -250,6 +259,7 @@ func (c *showControllerProfileCommand) Init(args []string) error {
 	return nil
 }
 
+// Run implements cmd.Command.
 func (c *showControllerProfileCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.getJIMMAPI()
 	if err != nil {
@@ -280,6 +290,7 @@ type listControllerProfilesCommand struct {
 	jujuVersion string
 }
 
+// Info implements cmd.Command.
 func (c *listControllerProfilesCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "list-controller-profiles",
@@ -289,6 +300,7 @@ func (c *listControllerProfilesCommand) Info() *cmd.Info {
 	})
 }
 
+// SetFlags implements cmd.Command.
 func (c *listControllerProfilesCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	c.out.AddFlags(f, "yaml", map[string]cmd.Formatter{
@@ -298,6 +310,7 @@ func (c *listControllerProfilesCommand) SetFlags(f *gnuflag.FlagSet) {
 	f.StringVar(&c.jujuVersion, "juju-version", "", "Only return profiles compatible with the specified Juju version.")
 }
 
+// Init implements cmd.Command.
 func (c *listControllerProfilesCommand) Init(args []string) error {
 	if len(args) > 0 {
 		return errors.New("too many args")
@@ -305,6 +318,7 @@ func (c *listControllerProfilesCommand) Init(args []string) error {
 	return nil
 }
 
+// Run implements cmd.Command.
 func (c *listControllerProfilesCommand) Run(ctxt *cmd.Context) error {
 	client, err := c.getJIMMAPI()
 	if err != nil {
@@ -337,6 +351,7 @@ type removeControllerProfileCommand struct {
 	force bool
 }
 
+// Info implements cmd.Command.
 func (c *removeControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "remove-controller-profile",
@@ -347,11 +362,13 @@ func (c *removeControllerProfileCommand) Info() *cmd.Info {
 	})
 }
 
+// SetFlags implements cmd.Command.
 func (c *removeControllerProfileCommand) SetFlags(f *gnuflag.FlagSet) {
 	c.CommandBase.SetFlags(f)
 	f.BoolVar(&c.force, "force", false, "delete controller profile without prompt")
 }
 
+// Init implements cmd.Command.
 func (c *removeControllerProfileCommand) Init(args []string) error {
 	if len(args) < 1 {
 		return errors.New("controller profile name not specified")
@@ -363,6 +380,7 @@ func (c *removeControllerProfileCommand) Init(args []string) error {
 	return nil
 }
 
+// Run implements cmd.Command.
 func (c *removeControllerProfileCommand) Run(ctxt *cmd.Context) error {
 	if !c.force {
 		reader := bufio.NewReader(ctxt.Stdin)
