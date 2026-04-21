@@ -20,7 +20,7 @@ import (
 
 const (
 	addControllerProfileDoc = `
-Adds a controller profile to JIMM.
+Adds a controller profile.
 
 The controller profile definition is read from a YAML file or from stdin.
 `
@@ -30,7 +30,7 @@ The controller profile definition is read from a YAML file or from stdin.
 `
 
 	updateControllerProfileDoc = `
-Updates a saved controller profile in JIMM.
+Updates a saved controller profile.
 
 The controller profile definition is read from a YAML file or from stdin.
 If the provided profile does not specify a version, the current version is
@@ -42,7 +42,7 @@ retrieved before saving.
 `
 
 	showControllerProfileDoc = `
-Shows a saved controller profile from JIMM.
+Shows a saved controller profile.
 `
 	showControllerProfileExample = `
     juju jaas show-controller-profile my-profile
@@ -50,7 +50,7 @@ Shows a saved controller profile from JIMM.
 `
 
 	listControllerProfilesDoc = `
-Lists saved controller profiles in JIMM.
+Lists saved controller profiles.
 `
 	listControllerProfilesExample = `
     juju jaas list-controller-profiles
@@ -58,7 +58,7 @@ Lists saved controller profiles in JIMM.
 `
 
 	removeControllerProfileDoc = `
-Removes a saved controller profile from JIMM.
+Removes a saved controller profile.
 `
 	removeControllerProfileExample = `
     juju jaas remove-controller-profile my-profile
@@ -88,7 +88,7 @@ func (c *addControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "add-controller-profile",
 		Args:     "<name>",
-		Purpose:  "Add a saved controller profile to jimm.",
+		Purpose:  "Add a controller profile.",
 		Doc:      addControllerProfileDoc,
 		Examples: addControllerProfileExample,
 	})
@@ -126,7 +126,6 @@ func (c *addControllerProfileCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
-	req.Version = 0
 
 	client, err := c.getJIMMAPI()
 	if err != nil {
@@ -156,6 +155,10 @@ func (c *addControllerProfileCommand) readSaveRequest(ctxt *cmd.Context) (apipar
 	req.Name = c.name
 	req.CreatedAt = ""
 	req.UpdatedAt = ""
+	// This may look odd, but if a user accidentally puts a version here,
+	// the server will reject it with a profile does not exist error which
+	// would be confusing to users.
+	req.Version = 0
 	return req, nil
 }
 
@@ -177,7 +180,7 @@ func (c *updateControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "update-controller-profile",
 		Args:     "<name>",
-		Purpose:  "Update a saved controller profile in jimm.",
+		Purpose:  "Update a saved controller profile.",
 		Doc:      updateControllerProfileDoc,
 		Examples: updateControllerProfileExample,
 	})
@@ -232,7 +235,7 @@ func (c *showControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "show-controller-profile",
 		Args:     "<name>",
-		Purpose:  "Show a saved controller profile from jimm.",
+		Purpose:  "Show a saved controller profile.",
 		Doc:      showControllerProfileDoc,
 		Examples: showControllerProfileExample,
 	})
@@ -294,7 +297,7 @@ type listControllerProfilesCommand struct {
 func (c *listControllerProfilesCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "list-controller-profiles",
-		Purpose:  "List saved controller profiles in jimm.",
+		Purpose:  "List saved controller profiles.",
 		Doc:      listControllerProfilesDoc,
 		Examples: listControllerProfilesExample,
 	})
@@ -356,7 +359,7 @@ func (c *removeControllerProfileCommand) Info() *cmd.Info {
 	return jujucmd.Info(&cmd.Info{
 		Name:     "remove-controller-profile",
 		Args:     "<name>",
-		Purpose:  "Remove a saved controller profile from jimm.",
+		Purpose:  "Remove a saved controller profile.",
 		Doc:      removeControllerProfileDoc,
 		Examples: removeControllerProfileExample,
 	})
