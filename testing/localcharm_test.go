@@ -31,14 +31,31 @@ func TestLocalCharmDeploy(t *testing.T) {
 
 	client, err := charms.NewLocalCharmClient(conn)
 	c.Assert(err, qt.IsNil)
+
 	charmArchive := testcharms.Repo.CharmArchive(c.TempDir(), "dummy")
+
 	curl := charm.MustParseURL(
+		// Revision only need be sent for pre-4.0.
 		fmt.Sprintf("local:quantal/%s-%d", charmArchive.Meta().Name, charmArchive.Revision()),
 	)
+
 	vers := semversion.MustParse("2.6.6")
+
 	url, err := client.AddLocalCharm(curl, charmArchive, false, vers)
 	c.Assert(err, qt.IsNil)
-	c.Assert(url.String(), qt.Equals, curl.String())
+
+	ctrlVers, _ := conn.ServerVersion()
+
+	if ctrlVers.Compare(semversion.MustParse("4.0.0")) == -1 {
+		c.Assert(url.String(), qt.Equals, curl.String())
+	} else {
+		// In 4.0, it is auto-incremented for us from 0.
+		c.Assert(url.String(), qt.Equals, "local:dummy-0")
+		// As such, we'll upload it twice and verify it is incremented accordingly.
+		url, err := client.AddLocalCharm(curl, charmArchive, false, vers)
+		c.Assert(err, qt.IsNil)
+		c.Assert(url.String(), qt.Equals, "local:dummy-1")
+	}
 }
 
 func TestResourceEndpoint(t *testing.T) {
@@ -55,10 +72,11 @@ func TestResourceEndpoint(t *testing.T) {
 	charmClient, err := charms.NewLocalCharmClient(conn)
 	c.Assert(err, qt.IsNil)
 
-	charmArchive := testcharms.Repo.CharmArchive(c.TempDir(), "dummy")
+	charmArchive := testcharms.Repo.CharmArchive(c.TempDir(), "starsay")
 	curl := charm.MustParseURL(
 		fmt.Sprintf("local:quantal/%s-%d", charmArchive.Meta().Name, charmArchive.Revision()),
 	)
+
 	url, err := charmClient.AddLocalCharm(curl, charmArchive, false, semversion.MustParse("2.6.6"))
 	c.Assert(err, qt.IsNil)
 
@@ -72,7 +90,7 @@ func TestResourceEndpoint(t *testing.T) {
 		CharmID:       resources.CharmID{URL: url.String()},
 		Resources: []resource.Resource{
 			{
-				Meta:   resource.Meta{Name: "test", Type: 1, Path: "file"},
+				Meta:   resource.Meta{Name: "store-resource", Type: 1, Path: "filename.tgz"},
 				Origin: resource.OriginStore,
 			},
 		},
@@ -82,6 +100,6 @@ func TestResourceEndpoint(t *testing.T) {
 	pendingId := pendingIDs[0]
 
 	// act
-	err = uploadClient.Upload(t.Context(), appName, "test", "file", pendingId, strings.NewReader("<data>"))
+	err = uploadClient.Upload(t.Context(), appName, "store-resource", "filename.tgz", pendingId, strings.NewReader("<data>"))
 	c.Assert(err, qt.IsNil)
 }
