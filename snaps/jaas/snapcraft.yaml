@@ -82,4 +82,8 @@ parts:
       ln -sf jaas bin/juju-show-model
       ln -sf jaas bin/juju-list-jobs
       ln -sf jaas bin/juju-jobs
-
+      ln -sf jaas bin/juju-add-controller-profile
+      ln -sf jaas bin/juju-list-controller-profiles
+      ln -sf jaas bin/juju-remove-controller-profile
+      ln -sf jaas bin/juju-show-controller-profile
+      ln -sf jaas bin/juju-update-controller-profile
