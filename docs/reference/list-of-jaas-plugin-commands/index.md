@@ -59,6 +59,35 @@ Add a controller profile.
 Adds a controller profile.
 
 The controller profile definition is read from a YAML file or from stdin.
+The command argument sets the saved profile name.
+
+The YAML schema mirrors the saved controller profile payload:
+
+description: Production AWS bootstrap defaults
+juju-version: 3.6
+cloud:
+	name: aws
+	region:
+		name: eu-west-1
+bootstrap-options:
+	bootstrap-base: ubuntu@24.04
+	bootstrap-constraints:
+		mem: 8G
+	model-constraints:
+		arch: amd64
+	model-default:
+		logging-config: &lt;root&gt;=INFO
+	storage-pool:
+		name: controller-pool
+		type: ebs
+		attributes:
+			volume-type: gp3
+	bootstrap-config:
+		controller-service-type: loadbalancer
+	controller-config:
+		audit-log-enabled: "true"
+	controller-model-config:
+		automatically-retry-hooks: "false"
 
 
 (command-jaas-add-group)=
@@ -275,12 +304,14 @@ Bootstrap a Juju controller via JIMM
 | `--format` | json | Specify output format (json&#x7c;yaml) |
 | `--model-default` |  | Specify a configuration file, or one or more configuration options to be set for all models, unless otherwise specified.     (`--model-default config.yaml [--model-default key=value ...])` |
 | `-o`, `--output` |  | Specify an output file |
+| `--profile` |  | Apply a saved controller profile before processing explicit bootstrap flags. Explicit command line values override the profile. |
 | `--storage-pool` |  | Specify options for an initial storage pool. 'name' and 'type' are required, plus any additional attributes.     (`--storage-pool pool-config.yaml [--storage-pool key=value ...])` |
 
 ## Examples
 
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --profile production-aws
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --config controller-service-type=loadbalancer
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --bootstrap-base ubuntu@24.04 --bootstrap-constraints mem=8G --constraints arch=amd64
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --storage-pool name=controller-pool --storage-pool type=ebs --config audit-log-enabled=true
@@ -291,6 +322,10 @@ Bootstrap a Juju controller via JIMM
 Requests the JIMM server to bootstrap a Juju controller.
 The controller will be created asychronously on the specificed
 cloud and region.
+
+Saved controller profiles can be applied with --profile. The profile's saved
+cloud definition and bootstrap options are used as defaults, and any explicit
+command line arguments or flags override those saved values.
 
 By default the command will wait for the bootstrap job to complete
 while printing the job logs. Note that the logs will not follow the
@@ -1537,8 +1572,9 @@ Update a saved controller profile.
 Updates a saved controller profile.
 
 The controller profile definition is read from a YAML file or from stdin.
-If the provided profile does not specify a version, the current version is
-retrieved before saving.
+The same YAML schema accepted by add-controller-profile is used here.
+
+The command argument sets the profile name.
 
 
 (command-jaas-update-migrated-model)=

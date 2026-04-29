@@ -147,6 +147,69 @@ use the command in your desired use-case.
 
 ````
 
+
+## Controller profiles
+
+Controller profiles let JIMM administrators store reusable, non-secret bootstrap defaults on the server and apply them later with `juju jaas bootstrap --profile ...`.
+
+A profile can capture:
+
+- The cloud metadata and bootstrap region the profile was created for.
+- The Juju version the profile is intended to be used with.
+- Bootstrap settings such as bootstrap-base, constraints, model defaults, storage pool configuration, and bootstrap/controller/controller-model config maps.
+
+Controller profiles can be created, viewed, updated, listed, and removed with the `juju jaas` {doc}`commands <../reference/list-of-jaas-plugin-commands/index.md>` including `add-controller-profile`, `show-controller-profile`, `update-controller-profile`, `list-controller-profiles`, and `remove-controller-profile`.
+
+A typical profile looks like this:
+
+```yaml
+description: Production AWS bootstrap defaults
+juju-version: 3.6
+cloud:
+  name: aws
+  region:
+    name: eu-west-1
+bootstrap-options:
+  bootstrap-base: ubuntu@24.04
+  bootstrap-constraints:
+    mem: 8G
+  model-constraints:
+    arch: amd64
+  model-default:
+    logging-config: <root>=INFO
+  storage-pool:
+    name: controller-pool
+    type: ebs
+    attributes:
+      volume-type: gp3
+  bootstrap-config:
+    controller-service-type: loadbalancer
+  controller-config:
+    audit-log-enabled: "true"
+```
+
+Create the profile by passing the profile name on the command line and the YAML definition via `--file`:
+
+```text
+juju switch jimm
+juju jaas add-controller-profile aws-production --file ./aws-production.yaml
+```
+
+Later, apply the saved profile during bootstrap:
+
+```text
+juju switch jimm
+juju jaas bootstrap aws/eu-west-1 mycontroller 3.6.8 --profile aws-production
+```
+
+Any bootstrap flags you pass alongside `--profile` are merged with and override the saved defaults. For example, you can keep a common profile but override a single setting for a controller:
+
+```text
+juju jaas bootstrap aws/eu-west-1 mycontroller 3.6.8 --profile aws-production --config controller-service-type=loadbalancer
+```
+
+Use `juju jaas list-controller-profiles --juju-version 3.6.8` to discover profiles intended for the Juju version you plan to bootstrap.
+
 (control-user-access-to-a-juju-controller)=
 ## Control user access to a Juju controller
 
