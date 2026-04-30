@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/juju/cmd/v3"
@@ -26,6 +27,10 @@ const (
 Requests the JIMM server to bootstrap a Juju controller.
 The controller will be created asychronously on the specificed
 cloud and region.
+
+Saved controller profiles can be applied with --profile. The profile's saved
+cloud definition and bootstrap options are used as defaults, and any explicit
+command line arguments or flags override those saved values.
 
 By default the command will wait for the bootstrap job to complete
 while printing the job logs. Note that the logs will not follow the
@@ -75,6 +80,7 @@ Note that JIMM will internally do the following:
 	bootstrapExamples = `
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --profile production-aws
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --config controller-service-type=loadbalancer
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --bootstrap-base ubuntu@24.04 --bootstrap-constraints mem=8G --constraints arch=amd64
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --storage-pool name=controller-pool --storage-pool type=ebs --config audit-log-enabled=true
@@ -95,6 +101,7 @@ type bootstrapCommand struct {
 
 	credentialName string
 	detach         bool
+	profileName    string
 	bootstrapBase  string
 	constraints    common.ConstraintsFlag
 	bootstrapCons  common.BootstrapConstraintsFlag
@@ -143,6 +150,7 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 	f.StringVar(&c.credentialName, "credential", "", "The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud.")
+	f.StringVar(&c.profileName, "profile", "", "Apply a saved controller profile before processing explicit bootstrap flags. Explicit command line values override the profile.")
 	f.StringVar(&c.bootstrapBase, "bootstrap-base", "", "Specify the base of the bootstrap machine.")
 	f.Var(&c.bootstrapCons, "bootstrap-constraints", "Specify bootstrap machine constraints.")
 	f.Var(&c.constraints, "constraints", "Set model constraints")
@@ -226,22 +234,32 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		return err
 	}
 
+	client, err := c.getJIMMAPI()
+	if err != nil {
+		return fmt.Errorf("could not create JIMM client: %v", err)
+	}
+	defer client.Close()
+
+	bootstrapCloudParams := cloudToParams(c.cloud, c.region, bootstrapCloud)
+	if c.profileName != "" {
+		resp, err := client.GetControllerProfile(&apiparams.GetControllerProfileRequest{Name: c.profileName})
+		if err != nil {
+			return fmt.Errorf("failed to get controller profile %q: %w", c.profileName, err)
+		}
+		bootstrapCloudParams = mergeBootstrapCloud(resp.Cloud, bootstrapCloudParams)
+		bootstrapOptions = mergeBootstrapOptions(resp.BootstrapOptions, bootstrapOptions)
+	}
+
 	req := apiparams.BootstrapParams{
 		ControllerName:    c.controllerName,
 		ControllerVersion: c.controllerVersion,
-		Cloud:             cloudToParams(c.cloud, c.region, bootstrapCloud),
+		Cloud:             bootstrapCloudParams,
 		Credential: jujuparams.CloudCredential{
 			Attributes: bootstrapCred.Attributes(),
 			AuthType:   string(bootstrapCred.AuthType()),
 		},
 		BootstrapOptions: bootstrapOptions,
 	}
-
-	client, err := c.getJIMMAPI()
-	if err != nil {
-		return fmt.Errorf("could not create JIMM client: %v", err)
-	}
-	defer client.Close()
 
 	resp, err := client.StartBootstrap(&req)
 	if err != nil {
@@ -322,6 +340,57 @@ func cloudToParams(cloudName, regionName string, cloud *jujucloud.Cloud) apipara
 	return paramsCloud
 }
 
+// mergeBootstrapCloud merges parameters from a profile with those explicitly provided.
+// All fields are copied to avoid re-using the underlying data structures from the profile.
+func mergeBootstrapCloud(profile, explicit apiparams.BootstrapCloud) apiparams.BootstrapCloud {
+	merged := profile
+	if explicit.Name != "" {
+		merged.Name = explicit.Name
+	}
+	if explicit.Type != "" {
+		merged.Type = explicit.Type
+	}
+	if len(explicit.AuthTypes) > 0 {
+		merged.AuthTypes = append([]string(nil), explicit.AuthTypes...)
+	} else if len(merged.AuthTypes) > 0 {
+		// Create a new slice to avoid sharing the underlying array with the profile.
+		merged.AuthTypes = append([]string(nil), merged.AuthTypes...)
+	}
+	if len(explicit.CACertificates) > 0 {
+		merged.CACertificates = append([]string(nil), explicit.CACertificates...)
+	} else if len(merged.CACertificates) > 0 {
+		// Create a new slice to avoid sharing the underlying array with the profile.
+		merged.CACertificates = append([]string(nil), merged.CACertificates...)
+	}
+	merged.Config = mergeMaps(profile.Config, explicit.Config)
+	if explicit.Endpoint != "" {
+		merged.Endpoint = explicit.Endpoint
+	}
+	if explicit.HostCloudRegion != "" {
+		merged.HostCloudRegion = explicit.HostCloudRegion
+	}
+	merged.Region = mergeBootstrapCloudRegion(profile.Region, explicit.Region)
+	return merged
+}
+
+// mergeBootstrapCloudRegion merges parameters from a profile with those explicitly provided for the cloud region.
+func mergeBootstrapCloudRegion(profile, explicit apiparams.BootstrapCloudRegion) apiparams.BootstrapCloudRegion {
+	merged := profile
+	if explicit.Name != "" {
+		merged.Name = explicit.Name
+	}
+	if explicit.Endpoint != "" {
+		merged.Endpoint = explicit.Endpoint
+	}
+	if explicit.IdentityEndpoint != "" {
+		merged.IdentityEndpoint = explicit.IdentityEndpoint
+	}
+	if explicit.StorageEndpoint != "" {
+		merged.StorageEndpoint = explicit.StorageEndpoint
+	}
+	return merged
+}
+
 func (c *bootstrapCommand) bootstrapOptions(ctxt *cmd.Context) (apiparams.BootstrapOptions, error) {
 	bootstrapConfig, err := readStringMapFlag(ctxt, &c.config, "config")
 	if err != nil {
@@ -355,6 +424,49 @@ func (c *bootstrapCommand) bootstrapOptions(ctxt *cmd.Context) (apiparams.Bootst
 		// but JIMM merges those maps again when it shells out to juju bootstrap.
 		BootstrapConfig: bootstrapConfig,
 	}, nil
+}
+
+// mergeBootstrapOptions merges parameters from a profile with those explicitly provided for the bootstrap options.
+func mergeBootstrapOptions(profile, explicit apiparams.BootstrapOptions) apiparams.BootstrapOptions {
+	merged := apiparams.BootstrapOptions{
+		BootstrapBase:         profile.BootstrapBase,
+		BootstrapConstraints:  mergeMaps(profile.BootstrapConstraints, explicit.BootstrapConstraints),
+		ModelConstraints:      mergeMaps(profile.ModelConstraints, explicit.ModelConstraints),
+		ModelDefault:          mergeMaps(profile.ModelDefault, explicit.ModelDefault),
+		StoragePool:           cloneStoragePool(profile.StoragePool),
+		BootstrapConfig:       mergeMaps(profile.BootstrapConfig, explicit.BootstrapConfig),
+		ControllerConfig:      mergeMaps(profile.ControllerConfig, explicit.ControllerConfig),
+		ControllerModelConfig: mergeMaps(profile.ControllerModelConfig, explicit.ControllerModelConfig),
+	}
+	if explicit.BootstrapBase != "" {
+		merged.BootstrapBase = explicit.BootstrapBase
+	}
+	if explicit.StoragePool != nil {
+		merged.StoragePool = cloneStoragePool(explicit.StoragePool)
+	}
+	return merged
+}
+
+// mergeMaps merges two maps of the same type.
+// See maps.Copy where the generic type signatures were lifted from.
+func mergeMaps[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](base M1, override M2) map[K]V {
+	if len(base) == 0 && len(override) == 0 {
+		return nil
+	}
+	merged := maps.Clone(base)
+	maps.Copy(merged, override)
+	return merged
+}
+
+func cloneStoragePool(pool *apiparams.BootstrapStoragePool) *apiparams.BootstrapStoragePool {
+	if pool == nil {
+		return nil
+	}
+	return &apiparams.BootstrapStoragePool{
+		Name:       pool.Name,
+		Type:       pool.Type,
+		Attributes: maps.Clone(pool.Attributes),
+	}
 }
 
 func readStoragePoolFlag(ctxt *cmd.Context, flag *common.ConfigFlag) (*apiparams.BootstrapStoragePool, error) {

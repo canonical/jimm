@@ -62,6 +62,7 @@ func TestBootstrapArgParsing(t *testing.T) {
 				"test-cloud/region",
 				"controller-name",
 				"controller-version",
+				"--profile", "aws-prod",
 				"--bootstrap-base", "ubuntu@24.04",
 				"--bootstrap-constraints", "mem=8G",
 				"--constraints", "arch=amd64",
@@ -74,6 +75,7 @@ func TestBootstrapArgParsing(t *testing.T) {
 			checkFlags: func(c *qt.C, command *bootstrapCommand) {
 				c.Check(command.cloud, qt.Equals, "test-cloud")
 				c.Check(command.region, qt.Equals, "region")
+				c.Check(command.profileName, qt.Equals, "aws-prod")
 				c.Check(command.bootstrapBase, qt.Equals, "ubuntu@24.04")
 				c.Check([]string(command.bootstrapCons), qt.DeepEquals, []string{"mem=8G"})
 				c.Check([]string(command.constraints), qt.DeepEquals, []string{"arch=amd64"})
@@ -258,6 +260,101 @@ func TestBootstrapApiParams(t *testing.T) {
 	ctx := newTestContext(c)
 	mcmd := modelcmd.WrapBase(command)
 	err = mcmd.Run(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestBootstrapProfileMergesWithExplicitFlags(t *testing.T) {
+	c := qt.New(t)
+	s := setupCmdMocks(c)
+
+	cloudName := "aws"
+
+	s.store.EXPECT().CredentialForCloud(cloudName).Return(&jujucloud.CloudCredential{
+		AuthCredentials: map[string]jujucloud.Credential{
+			"cred-1": jujucloud.NewCredential(jujucloud.UserPassAuthType, map[string]string{}),
+		},
+	}, nil)
+	s.client.EXPECT().GetControllerProfile(&params.GetControllerProfileRequest{Name: "aws-prod"}).Return(
+		params.GetControllerProfileResponse{ControllerProfile: params.ControllerProfile{
+			Name:        "aws-prod",
+			JujuVersion: "3.6",
+			Cloud: params.BootstrapCloud{
+				Name:      cloudName,
+				Type:      "ec2",
+				AuthTypes: []string{string(jujucloud.UserPassAuthType)},
+				Region: params.BootstrapCloudRegion{
+					Name: "eu-west-1",
+				},
+			},
+			BootstrapOptions: params.BootstrapOptions{
+				BootstrapBase: "ubuntu@22.04",
+				BootstrapConstraints: map[string]string{
+					"mem": "4G",
+				},
+				ModelDefault: map[string]string{
+					"logging-config": "<root>=WARNING",
+				},
+				BootstrapConfig: map[string]string{
+					"bootstrap-timeout":       "30",
+					"controller-service-type": "loadbalancer",
+				},
+				ControllerConfig: map[string]string{
+					"audit-log-enabled": "true",
+				},
+			},
+		}},
+		nil,
+	)
+	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
+		c.Check(bsp.Cloud, qt.DeepEquals, params.BootstrapCloud{
+			Name:      cloudName,
+			Type:      "ec2",
+			AuthTypes: []string{string(jujucloud.UserPassAuthType)},
+			Region: params.BootstrapCloudRegion{
+				Name: "region",
+			},
+		})
+		c.Check(bsp.BootstrapOptions, qt.DeepEquals, params.BootstrapOptions{
+			BootstrapBase: "ubuntu@24.04",
+			BootstrapConstraints: map[string]string{
+				"mem":   "4G",
+				"cores": "2",
+			},
+			ModelDefault: map[string]string{
+				"logging-config": "<root>=INFO",
+			},
+			BootstrapConfig: map[string]string{
+				"bootstrap-timeout":       "30",
+				"controller-service-type": "loadbalancer",
+				"image-stream":            "released",
+			},
+			ControllerConfig: map[string]string{
+				"audit-log-enabled": "true",
+			},
+		})
+		return &params.StartBootstrapResponse{JobID: "test-job-id"}, nil
+	})
+	s.client.EXPECT().Close().Return(nil)
+
+	command := &bootstrapCommand{}
+	command.setJIMMAPI(s.client)
+	command.SetClientStore(s.store)
+
+	initCommand(c, command,
+		fmt.Sprintf("%s/region", cloudName),
+		"controller-name",
+		"controller-version",
+		"--detach",
+		"--profile", "aws-prod",
+		"--bootstrap-base", "ubuntu@24.04",
+		"--bootstrap-constraints", "cores=2",
+		"--model-default", "logging-config=<root>=INFO",
+		"--config", "image-stream=released",
+	)
+
+	ctx := newTestContext(c)
+	mcmd := modelcmd.WrapBase(command)
+	err := mcmd.Run(ctx)
 	c.Assert(err, qt.IsNil)
 }
 

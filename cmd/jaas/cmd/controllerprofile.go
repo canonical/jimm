@@ -25,6 +25,35 @@ const (
 Adds a controller profile.
 
 The controller profile definition is read from a YAML file or from stdin.
+The command argument sets the saved profile name.
+
+The YAML schema mirrors the saved controller profile payload:
+
+description: Production AWS bootstrap defaults
+juju-version: 3.6
+cloud:
+	name: aws
+	region:
+		name: eu-west-1
+bootstrap-options:
+	bootstrap-base: ubuntu@24.04
+	bootstrap-constraints:
+		mem: 8G
+	model-constraints:
+		arch: amd64
+	model-default:
+		logging-config: <root>=INFO
+	storage-pool:
+		name: controller-pool
+		type: ebs
+		attributes:
+			volume-type: gp3
+	bootstrap-config:
+		controller-service-type: loadbalancer
+	controller-config:
+		audit-log-enabled: "true"
+	controller-model-config:
+		automatically-retry-hooks: "false"
 `
 	addControllerProfileExample = `
     juju jaas add-controller-profile my-profile --file ./profile.yaml
@@ -35,8 +64,9 @@ The controller profile definition is read from a YAML file or from stdin.
 Updates a saved controller profile.
 
 The controller profile definition is read from a YAML file or from stdin.
-If the provided profile does not specify a version, the current version is
-retrieved before saving.
+The same YAML schema accepted by add-controller-profile is used here.
+
+The command argument sets the profile name.
 `
 	updateControllerProfileExample = `
     juju jaas update-controller-profile my-profile --file ./profile.yaml
@@ -67,6 +97,16 @@ Removes a saved controller profile.
     juju jaas remove-controller-profile my-profile --force
 `
 )
+
+// controllerProfileFileInput is the accepted payload shape for --file input.
+// Metadata fields (name/version/timestamps) are intentionally omitted because
+// those are managed by the command argument and server state.
+type controllerProfileFileInput struct {
+	Description      string                     `json:"description" yaml:"description"`
+	JujuVersion      string                     `json:"juju-version" yaml:"juju-version"`
+	Cloud            apiparams.BootstrapCloud   `json:"cloud" yaml:"cloud"`
+	BootstrapOptions apiparams.BootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
+}
 
 // NewAddControllerProfileCommand returns a command to add a controller profile.
 func NewAddControllerProfileCommand() cmd.Command {
@@ -147,21 +187,22 @@ func (c *addControllerProfileCommand) readSaveRequest(ctxt *cmd.Context) (apipar
 	if err != nil {
 		return apiparams.SaveControllerProfileRequest{}, err
 	}
-	var req apiparams.SaveControllerProfileRequest
-	if err := yaml.Unmarshal(data, &req); err != nil {
+	var in controllerProfileFileInput
+	if err := yaml.Unmarshal(data, &in); err != nil {
 		return apiparams.SaveControllerProfileRequest{}, err
 	}
-	if req.Name != "" && req.Name != c.name {
-		return apiparams.SaveControllerProfileRequest{}, fmt.Errorf("provided controller profile name doesn't match, %s != %s", c.name, req.Name)
-	}
-	req.Name = c.name
-	req.CreatedAt = ""
-	req.UpdatedAt = ""
-	// This may look odd, but if a user accidentally puts a version here,
-	// the server will reject it with a profile does not exist error which
-	// would be confusing to users.
-	req.Version = 0
-	return req, nil
+	// Ignore metadata fields from file input so name/version are controlled by
+	// command arguments and update flow can fetch the latest server version.
+	return apiparams.SaveControllerProfileRequest{
+		ControllerProfile: apiparams.ControllerProfile{
+			Name:             c.name,
+			Description:      in.Description,
+			JujuVersion:      in.JujuVersion,
+			Cloud:            in.Cloud,
+			BootstrapOptions: in.BootstrapOptions,
+			Version:          0,
+		},
+	}, nil
 }
 
 // NewUpdateControllerProfileCommand returns a command to update a controller profile.
