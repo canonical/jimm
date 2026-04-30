@@ -373,6 +373,7 @@ func mergeBootstrapCloud(profile, explicit apiparams.BootstrapCloud) apiparams.B
 	return merged
 }
 
+// mergeBootstrapCloudRegion merges parameters from a profile with those explicitly provided for the cloud region.
 func mergeBootstrapCloudRegion(profile, explicit apiparams.BootstrapCloudRegion) apiparams.BootstrapCloudRegion {
 	merged := profile
 	if explicit.Name != "" {
@@ -425,6 +426,7 @@ func (c *bootstrapCommand) bootstrapOptions(ctxt *cmd.Context) (apiparams.Bootst
 	}, nil
 }
 
+// mergeBootstrapOptions merges parameters from a profile with those explicitly provided for the bootstrap options.
 func mergeBootstrapOptions(profile, explicit apiparams.BootstrapOptions) apiparams.BootstrapOptions {
 	merged := apiparams.BootstrapOptions{
 		BootstrapBase:         profile.BootstrapBase,
@@ -451,8 +453,7 @@ func mergeMaps[M1 ~map[K]V, M2 ~map[K]V, K comparable, V any](base M1, override 
 	if len(base) == 0 && len(override) == 0 {
 		return nil
 	}
-	merged := make(map[K]V, len(base)+len(override))
-	maps.Copy(merged, base)
+	merged := maps.Clone(base)
 	maps.Copy(merged, override)
 	return merged
 }
