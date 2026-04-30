@@ -4,6 +4,7 @@ package jimmtest
 
 import (
 	"context"
+	"maps"
 	"sync"
 
 	"github.com/juju/names/v5"
@@ -41,9 +42,7 @@ func (s *InMemoryCredentialStore) Get(ctx context.Context, credTag names.CloudCr
 		return nil, errors.Codef(errors.CodeNotFound, "not found")
 	}
 	attrsCopy := make(map[string]string, len(attrs))
-	for k, v := range attrs {
-		attrsCopy[k] = v
-	}
+	maps.Copy(attrsCopy, attrs)
 	return attrsCopy, nil
 }
 
@@ -57,9 +56,7 @@ func (s *InMemoryCredentialStore) Put(ctx context.Context, credTag names.CloudCr
 	}
 
 	attrsCopy := make(map[string]string, len(attrs))
-	for k, v := range attrs {
-		attrsCopy[k] = v
-	}
+	maps.Copy(attrsCopy, attrs)
 	s.cloudCredentialAttributes[credTag.String()] = attrsCopy
 	return nil
 }

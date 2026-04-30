@@ -8,7 +8,6 @@ import (
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
-	"github.com/canonical/jimm/v3/internal/common/utils"
 )
 
 func TestOffsetFilter(t *testing.T) {
@@ -76,34 +75,34 @@ func TestCreatePagination(t *testing.T) {
 			size:         nil,
 			page:         nil,
 			wantPage:     0,
-			wantNextPage: utils.IntToPointer(1),
+			wantNextPage: new(1),
 			wantOffset:   0,
 			wantLimit:    pagination.DefaultPageSize,
 		},
 		{
 			desc:         "test with set page size",
-			size:         utils.IntToPointer(100),
-			page:         utils.IntToPointer(1),
+			size:         new(100),
+			page:         new(1),
 			total:        1000,
 			wantPage:     1,
-			wantNextPage: utils.IntToPointer(2),
+			wantNextPage: new(2),
 			wantOffset:   100,
 			wantLimit:    100,
 		},
 		{
 			desc:         "test with set page size number 2",
-			size:         utils.IntToPointer(100),
-			page:         utils.IntToPointer(5),
+			size:         new(100),
+			page:         new(5),
 			total:        1000,
 			wantPage:     5,
-			wantNextPage: utils.IntToPointer(6),
+			wantNextPage: new(6),
 			wantOffset:   500,
 			wantLimit:    100,
 		},
 		{
 			desc:         "test with last current page and nextPage not present",
-			size:         utils.IntToPointer(10),
-			page:         utils.IntToPointer(0),
+			size:         new(10),
+			page:         new(0),
 			total:        10,
 			wantPage:     0,
 			wantNextPage: nil,
@@ -112,8 +111,8 @@ func TestCreatePagination(t *testing.T) {
 		},
 		{
 			desc:         "test with current page over the total",
-			size:         utils.IntToPointer(10),
-			page:         utils.IntToPointer(2),
+			size:         new(10),
+			page:         new(2),
 			total:        10,
 			wantPage:     2,
 			wantNextPage: nil,
@@ -140,8 +139,8 @@ func TestCreatePagination(t *testing.T) {
 // test the requested size is 1 more than then page size.
 func TestCreatePaginationWithoutTotal(t *testing.T) {
 	c := qt.New(t)
-	pPage := utils.IntToPointer(0)
-	pSize := utils.IntToPointer(10)
+	pPage := new(0)
+	pSize := new(10)
 	page, size, pag := pagination.CreatePaginationWithoutTotal(pSize, pPage)
 	c.Assert(page, qt.Equals, 0)
 	c.Assert(pag.Limit(), qt.Equals, 11)

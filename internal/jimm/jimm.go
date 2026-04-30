@@ -16,6 +16,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/auditlog"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
+	"github.com/canonical/jimm/v3/internal/jimm/controllerprofile"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
 	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
@@ -265,6 +266,13 @@ func New(p Parameters) (*JIMM, error) {
 
 	j.BootstrapManager = bootstrapManager
 
+	controllerProfileManager, err := controllerprofile.NewControllerProfileManager(j.Database)
+	if err != nil {
+		return nil, err
+	}
+
+	j.ControllerProfileManager = controllerProfileManager
+
 	upgradeManager, err := upgrade.NewUpgradeManager(j.JujuManager, j.Database, j.Dialer, j.RiverClient)
 	if err != nil {
 		return nil, err
@@ -325,6 +333,9 @@ type JIMM struct {
 
 	// BootstrapManager provides a means to manage bootstrap jobs.
 	BootstrapManager *bootstrap.BootstrapManager
+
+	// ControllerProfileManager provides a means to manage saved controller profiles.
+	ControllerProfileManager *controllerprofile.ControllerProfileManager
 
 	// UpgradeManager provides a means to manage controller cloning and model automated upgrades.
 	UpgradeManager *upgrade.UpgradeManager

@@ -87,16 +87,16 @@ This section describes how to migrate a model to JAAS from an existing Juju cont
 
 ### Changes caused by model migration
 
-When migrating a model to JAAS, local users are replaced with external users. 
+When migrating a model to JAAS, local users are replaced with external users.
 
 What this means is clearer if we take a look at a model's fully qualified name using the command `juju show-model`.
-The full model name is `<model-owner>/<model-name>` where `<model-owner>` represents a Juju user like "admin". 
-When we migrate a model to JAAS we will create a yaml file where we provide a mapping of local users to 
+The full model name is `<model-owner>/<model-name>` where `<model-owner>` represents a Juju user like "admin".
+When we migrate a model to JAAS we will create a yaml file where we provide a mapping of local users to
 external users (users that come from an identity provider). This is important for 2 reasons:
 
 1. Across controllers, multiple models can exist with the same name. E.g. Controller A hosts model `admin/foo`
 and controller B hosts `admin/foo`.
-By changing the model owner during import, we avoid conflicts importing many models with 
+By changing the model owner during import, we avoid conflicts importing many models with
 the same name, owned by the same user.
 
 2. When a controller is connected to JAAS, all application-offers are authorised by JAAS - see our {doc}`authorization doc <../explanation/jaas-authorization>` for more details on how JAAS authorises access to resources. This impacts any
@@ -160,13 +160,13 @@ bob: null # or ""
 
 The mapping is consulted when Juju relations are periodically validated.
 
-I.e. if an offer was previously consumed by the local Juju user "alice", when JIMM validates the relation it 
+I.e. if an offer was previously consumed by the local Juju user "alice", when JIMM validates the relation it
 will map user "alice" to "alice@canonical.com" to authorise access to the offer.
 Revoking access from "alice@canonical.com" will result in the relation encountering an error.
 
-It may not be possible to know all users that have have consumed offers when you wish to migrate a model, 
-especially if the `everyone@external` user was granted consume access but, using 
-[juju show-offer](https://documentation.ubuntu.com/juju/3.6/howto/manage-offers/#view-an-offers-details) 
+It may not be possible to know all users that have have consumed offers when you wish to migrate a model,
+especially if the `everyone@external` user was granted consume access but, using
+[juju show-offer](https://documentation.ubuntu.com/juju/3.6/howto/manage-offers/#view-an-offers-details)
 will help you to see all users that currently have access to an offer.
 
 With a user mapping created, we can move onto the next step.
@@ -183,17 +183,17 @@ Run `juju show-model` and look for the `credential` field which should resemble 
     validity-check: valid
 ```
 
-The new model owner must have a cloud-credential with the same name and for the same cloud. 
+The new model owner must have a cloud-credential with the same name and for the same cloud.
 
 Using the credential details above as an example - if model `admin/foo` is being migrated
-and the user mapping contains the row `admin: joe@canonical` then `joe@canonical` must have a 
+and the user mapping contains the row `admin: joe@canonical` then `joe@canonical` must have a
 credential (`juju show-credentials --controller`) named `lxd-creds` for cloud `localhost` in JIMM.
 
 If you do not see a matching cloud-credential, you can add one by following the instructions in [managing cloud-credentials](https://juju.is/docs/juju/manage-credentials).
 
 ### 4. Migrate desired models
 
-Once you have identified which models to migrate, created a user mapping file and validated that 
+Once you have identified which models to migrate, created a user mapping file and validated that
 the new owner has a valid cloud-credential, we can begin the process of model migration.
 
 We will assume a model called `admin/my-model` is currently hosted on a controller called `my-controller` and a controller
@@ -213,7 +213,7 @@ juju models
 At this point we should see the model has been migrated. If the model migration fails, `juju debug-log` should contain more info
 and the migration will be aborted, leaving the model on the original controller.
 
-After a successful migration, it is now possible to grant other users access to the model. 
+After a successful migration, it is now possible to grant other users access to the model.
 See Juju documentation for [more info](https://juju.is/docs/juju/user-permissions).
 
 (migrate-a-model-within-jaas)=
@@ -281,15 +281,4 @@ To inspect the reason for failure, consult the output from `juju debug-log` and 
 
 To grant a (collection of) user(s) access to a model, add a `reader`, `writer`, or `administrator` permission between the user(s) and the model.
 
-For example:
-
-```text
-# Make Alice model admin:
-juju add-permission user-alice@canonical.com administrator cloud-mycloud
-
-# Let all users with role myrole have read access to model mymodel:
-juju add-permission role-myrole#assignee reader model-mycontroller/mymodel
-
-```
-
-> See more: {ref}`manage-permissions`
+> See more: {ref}`add-a-permission`

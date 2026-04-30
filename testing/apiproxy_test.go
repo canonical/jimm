@@ -31,7 +31,7 @@ func TestConnectToModel(t *testing.T) {
 		SkipLogin: true,
 	}, "test", nil)
 	defer conn.Close()
-	var resp map[string]interface{}
+	var resp map[string]any
 	err := conn.APICall("Admin", 3, "", "TestMethod", nil, &resp)
 	c.Assert(err, qt.ErrorMatches, `(?s).*no such request - method Admin.TestMethod is not implemented \(not implemented\).*`)
 }
@@ -114,7 +114,7 @@ func TestAgentLoginModelDoesNotExist(t *testing.T) {
 
 type logger struct{}
 
-func (l logger) Errorf(string, ...interface{}) {}
+func (l logger) Errorf(string, ...any) {}
 
 func TestProxyModelStatus(t *testing.T) {
 	c := qt.New(t)

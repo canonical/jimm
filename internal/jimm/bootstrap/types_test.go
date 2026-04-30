@@ -66,6 +66,20 @@ func TestValidateBootstrapParams_EmptyFields(t *testing.T) {
 				"controller name cannot be empty",
 			},
 		},
+		{
+			name: "storage pool missing type",
+			params: BootstrapParams{
+				CLIVersion:         "1.0.0",
+				CloudNameAndRegion: "cloud/region",
+				ControllerName:     "my-controller",
+				BootstrapOptions: BootstrapOptions{
+					StoragePool: &StoragePool{Name: "pool-only-name"},
+				},
+			},
+			want: []string{
+				"storage pool requires both name and type",
+			},
+		},
 	}
 
 	for _, tt := range tests {

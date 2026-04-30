@@ -11,24 +11,25 @@ import (
 )
 
 // JIMM is a default implementation of the jujuapi.JIMM interface. Every method
-// has a corresponding funcion field. Whenever the method is called it
-// will delegate to the requested funcion or if the funcion is nil return
+// has a corresponding function field. Whenever the method is called it
+// will delegate to the requested function or if the function is nil return
 // a NotImplemented error.
 type JIMM struct {
-	AuditLogManager_   func() jujuapi.AuditLogManager
-	GroupManager_      func() jujuapi.GroupManager
-	IdentityManager_   func() jujuapi.IdentityManager
-	LoginManager_      func() jujuapi.LoginManager
-	RoleManager_       func() jujuapi.RoleManager
-	PermissionManager_ func() jujuapi.PermissionManager
-	JujuManager_       func() jujuapi.JujuManager
-	PubSubHub_         func() *pubsub.Hub
-	ResourceTag_       func() names.ControllerTag
-	ConfigManager_     func() jujuapi.ConfigManager
-	OfferAuthorizer_   func() jujuapi.OfferAuthorizer
-	BootstapManager_   func() jujuapi.BootstrapManager
-	UpgradeManager_    func() jujuapi.UpgradeManager
-	JobManager_        func() jujuapi.JobManager
+	AuditLogManager_          func() jujuapi.AuditLogManager
+	GroupManager_             func() jujuapi.GroupManager
+	IdentityManager_          func() jujuapi.IdentityManager
+	LoginManager_             func() jujuapi.LoginManager
+	RoleManager_              func() jujuapi.RoleManager
+	PermissionManager_        func() jujuapi.PermissionManager
+	JujuManager_              func() jujuapi.JujuManager
+	PubSubHub_                func() *pubsub.Hub
+	ResourceTag_              func() names.ControllerTag
+	ConfigManager_            func() jujuapi.ConfigManager
+	OfferAuthorizer_          func() jujuapi.OfferAuthorizer
+	BootstapManager_          func() jujuapi.BootstrapManager
+	ControllerProfileManager_ func() jujuapi.ControllerProfileManager
+	UpgradeManager_           func() jujuapi.UpgradeManager
+	JobManager_               func() jujuapi.JobManager
 }
 
 func (j *JIMM) RoleManager() jujuapi.RoleManager {
@@ -113,6 +114,13 @@ func (j *JIMM) BootstrapManager() jujuapi.BootstrapManager {
 		return nil
 	}
 	return j.BootstapManager_()
+}
+
+func (j *JIMM) ControllerProfileManager() jujuapi.ControllerProfileManager {
+	if j.ControllerProfileManager_ == nil {
+		return nil
+	}
+	return j.ControllerProfileManager_()
 }
 
 func (j *JIMM) UpgradeManager() jujuapi.UpgradeManager {

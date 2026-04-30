@@ -97,7 +97,7 @@ func (s *VaultStore) Put(ctx context.Context, tag names.CloudCredentialTag, attr
 		return err
 	}
 
-	data := make(map[string]interface{}, len(attr))
+	data := make(map[string]any, len(attr))
 	for k, v := range attr {
 		data[k] = v
 	}
@@ -181,7 +181,7 @@ func (s *VaultStore) PutControllerCredentials(ctx context.Context, controllerNam
 		return err
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		usernameKey: username,
 		passwordKey: password,
 	}

@@ -40,6 +40,7 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 	sessionStore, err := pgstore.NewPGStoreFromPool(sqldb, []byte("secretsecretdigletts"))
 	c.Assert(err, qt.IsNil)
 
+	// #nosec G101 Fake test credentials and keys.
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
 		IssuerURL:           "http://localhost:8082/realms/jimm",
 		ClientID:            "jimm-device",

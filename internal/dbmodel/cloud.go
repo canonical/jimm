@@ -92,15 +92,15 @@ func (c Cloud) ToJujuCloud() jujuparams.Cloud {
 	cl.IdentityEndpoint = c.IdentityEndpoint
 	cl.StorageEndpoint = c.StorageEndpoint
 	cl.Regions = make([]jujuparams.CloudRegion, len(c.Regions))
-	cl.RegionConfig = make(map[string]map[string]interface{}, len(c.Regions))
+	cl.RegionConfig = make(map[string]map[string]any, len(c.Regions))
 	for i, r := range c.Regions {
 		cl.Regions[i] = r.ToJujuCloudRegion()
 		if r.Config != nil {
-			cl.RegionConfig[r.Name] = map[string]interface{}(r.Config)
+			cl.RegionConfig[r.Name] = map[string]any(r.Config)
 		}
 	}
 	cl.CACertificates = []string(c.CACertificates)
-	cl.Config = map[string]interface{}(c.Config)
+	cl.Config = map[string]any(c.Config)
 	return cl
 }
 

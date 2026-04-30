@@ -30,7 +30,7 @@ func TestListControllersSuperuser(t *testing.T) {
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "",
-				Data:   map[string]interface{}{},
+				Data:   map[string]any{},
 			},
 		},
 		{
@@ -45,7 +45,7 @@ func TestListControllersSuperuser(t *testing.T) {
 			Status: jujuparams.EntityStatus{
 				Status: "available",
 				Info:   "",
-				Data:   map[string]interface{}{},
+				Data:   map[string]any{},
 			},
 		},
 	}

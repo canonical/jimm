@@ -61,7 +61,7 @@ func TestAddController(t *testing.T) {
 						StorageEndpoint:  "https://eu-west-2.storage.example.com",
 					}},
 					CACertificates: []string{"CA CERT 1", "CA CERT 2"},
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"A": "a",
 						"B": 0xb,
 					},
@@ -247,7 +247,7 @@ func TestAddControllerWithVault(t *testing.T) {
 						StorageEndpoint:  "https://eu-west-2.storage.example.com",
 					}},
 					CACertificates: []string{"CA CERT 1", "CA CERT 2"},
-					Config: map[string]interface{}{
+					Config: map[string]any{
 						"A": "a",
 						"B": 0xb,
 					},
@@ -411,7 +411,7 @@ func TestControllerConfig(t *testing.T) {
 
 	api := &jimmtest.API{
 		ControllerConfig_: func(_ context.Context) (jujucontroller.Config, error) {
-			return jujucontroller.Config(map[string]interface{}{
+			return jujucontroller.Config(map[string]any{
 				"controller-uuid": "00000001-0000-0000-0000-000000000001",
 			},
 			), nil

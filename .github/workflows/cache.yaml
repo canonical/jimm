@@ -6,6 +6,35 @@ on:
       - "feature*"
 
 jobs:
+  docker_cache:
+    name: Cache Docker Images
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Docker image cache
+        id: docker-cache
+        uses: actions/cache@v5
+        with:
+          path: /tmp/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('docker-compose.yaml', 'docker-compose.common.yaml', 'local/*/Dockerfile') }}
+
+      - name: Load Docker images from cache
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/docker-images.tar
+
+      - name: Pull all Docker Compose images
+        run: docker compose --profile dev pull --ignore-buildable
+
+      - name: Build custom Docker images
+        run: docker compose --profile dev build
+
+      - name: Save Docker images for cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: docker save $(docker images --format '{{.Repository}}:{{.Tag}}' | grep -v '<none>') -o /tmp/docker-images.tar
+
   go_cache:
     name: Cache Go Dependencies and Build/Lint Artifacts
     runs-on: ubuntu-22.04
@@ -18,9 +47,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses:   actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
+          cache: true
 
       - name: Build
         run: go build ./...
@@ -28,5 +58,5 @@ jobs:
       - name: Run Golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.8.0
+          version: v2.11.4
           args: --timeout 30m --verbose

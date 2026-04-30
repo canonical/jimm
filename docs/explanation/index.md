@@ -7,6 +7,24 @@ myst:
 (explanation)=
 # Explanation
 
+Discussion and clarification of key JAAS topics, including architectural details, security models, and deployment considerations.
+
+## Architecture and deployment
+
+High-level and detailed views of JAAS components, deployment patterns, and scalability.
+
+- {ref}`Reference architecture <reference-architecture>`
+- {ref}`Architecture <jaas-architecture>`
+
+## Access and security
+
+Authentication, authorization, and security considerations for JAAS deployments.
+
+- {ref}`Authentication <jaas-authentication>`
+- {ref}`Authorization <jaas-authorization>`
+- {ref}`ReBAC admin backend <jaas-rebac-admin-backend>`
+- {ref}`Security overview <jaas-security-overview>`
+- {ref}`Security scope <jaas-security-scope>`
 
 ```{toctree}
 :titlesonly:
@@ -15,35 +33,3 @@ myst:
 
 *
 ```
-
-## JAAS at a glance
-
-- {ref}`Reference architecture <reference-architecture>`
-- {ref}`Architecture <jaas-architecture>`
-- {ref}`Authentication <jaas-authentication>`
-- {ref}`Authorization <jaas-authorization>`
-- {ref}`Security <jaas-security-overview>`
-
-## JAAS tooling
-
-- {ref}`JAAS plugin <jaas-plugin>`
-
-<!--
-An important precursor to understanding JAAS, is Juju, the open source orchestration engine for software operators.
-
-Read more about Juju over at [their docs](https://juju.is).
-
-## JAAS Concepts
-
-
-```{toctree}
-:maxdepth: 2
-
-Overview <jaas_overview>
-Architecture <jaas_architecture>
-Security <jaas_security_scope>
-Authentication <authentication>
-Authorisation <authorisation>
-CLI Tools <cli_tools>
-```
--->

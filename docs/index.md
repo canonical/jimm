@@ -20,84 +20,45 @@ explanation/index
 
 JAAS is an enterprise layer on top of [Juju](https://documentation.ubuntu.com/juju/).
 
-JAAS provides:
+JAAS provides JIMM (the Juju Infinite Model Manager), a Juju enterprise-level controller, as well as JIMM-specific extensions to the [`juju` CLI](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/), the [Juju dashboard](https://documentation.ubuntu.com/juju/3.6/reference/juju-dashboard/), and the [Terraform Provider for Juju](https://documentation.ubuntu.com/terraform-provider-juju/).
 
-- The Juju Infinite Model Manager, JIMM (and its [backing charm](https://charmhub.io/juju-jimm-k8s)): A Juju enterprise-level controller.
-
-- JIMM-specific extensions to existing Juju machinery, including
-
-* the {doc}`jaas plugin <./reference/jaas>` which enhances the [`juju` CLI](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/),
-
-* the [Juju dashboard](https://documentation.ubuntu.com/juju/3.6/reference/juju-dashboard/) (with its [backing charm](https://charmhub.io/juju-dashboard)), and
-
-* the [Terraform Provider for Juju](https://documentation.ubuntu.com/terraform-provider-juju/).
-
-When you use an existing Juju on Kubernetes controller to deploy JIMM and its dependencies, and then connect your Juju controllers to JIMM, you gain the ability to:
-
-- use OIDC authentication for integration with your existing identity provider for federated login, service accounts, and other features offered by identity providers;
-- use ReBAC for authorisation;
-- use the Juju CLI, Juju Dashboard, and the Terraform Provider for Juju to interact with multiple Juju controllers from a single point of contact.
+When you use an existing Juju controller to deploy JIMM and its dependencies, and then connect your Juju controllers to JIMM, you gain the ability to use [OIDC](https://openid.net/developers/how-connect-works/) to authenticate with your Juju controller, use [ReBAC](https://auth0.com/blog/relationship-based-access-control-rebac/) for authorization, and interact with multiple Juju controllers from a single point of contact.
 
 If you are a site reliability engineer looking to take Juju to the enterprise level, you need JAAS.
 
----------
-
 ## In this documentation
-- **Learn more about JAAS:** {ref}`Architecture <jaas-architecture>`, {ref}`Security <jaas-security-overview>`
-- **Set up JAAS:** {ref}`Deploy JAAS <tutorial>`, {ref}`Connect a Juju controller <add-a-juju-controller>`
-- **Handle authentication and authorization:** {ref}`Set up a new user <manage-users>`, {ref}`manage-permissions`
+- **Learn more about JAAS:** {ref}`Get started with JAAS <tutorial>` • {ref}`Architecture <jaas-architecture>` • {ref}`Security <jaas-security-overview>`
+- **Set up JAAS:** {ref}`Deploy JIMM <tutorial>` • {ref}`Add a Juju controller <add-a-juju-controller>`
+- **Handle authentication and authorization:** {ref}`Add a user <add-a-user>` • {ref}`Manage user access <control-user-access>`
 - **Deploy infrastructure and applications:** Use {external+juju:ref}`the juju CLI <juju-cli>` or [the Terraform Provider for Juju](https://canonical-terraform-provider-juju.readthedocs-hosted.com).
 
-````{grid} 1 1 2 2
+## How this documentation is organised
 
-```{grid-item-card} [Tutorial](tutorial)
-:link: tutorial/index
-:link-type: doc
+This documentation uses the [Diátaxis documentation structure](https://diataxis.fr/).
 
-**Start here**: a hands-on introduction to Juju for new users
-```
-
-```{grid-item-card} [How-to guides](/index)
-:link: howto/index
-:link-type: doc
-
-**Step-by-step guides** covering key operations and common tasks
-```
-
-````
-
-````{grid} 1 1 2 2
-:reverse:
-
-```{grid-item-card} [Reference](/index)
-:link: reference/index
-:link-type: doc
-
-**Technical information** - specifications, APIs, architecture
-```
-
-```{grid-item-card} [Explanation](/index)
-:link: explanation/index
-:link-type: doc
-
-**Discussion and clarification** of key topics
-```
-
-````
-
----------
+- The {ref}`Tutorial <tutorial>` takes you step-by-step through setting up JAAS, connecting controllers, and managing permissions.
+- {ref}`How-to guides <howtos>` assume you have basic familiarity with JAAS and Juju.
+- {ref}`Reference <reference>` provides technical specifications and command references.
+- {ref}`Explanation <explanation>` includes architecture overviews, security models, and detailed discussions.
 
 ## Project and community
 
+JAAS is a member of the Ubuntu family. It's an open source project that warmly welcomes community contributions, suggestions, fixes and constructive feedback.
 
-JAAS is a member of the Ubuntu family and warmly welcomes community contributions, suggestions, fixes and constructive feedback.
+### Get involved
 
-* [Release notes](https://github.com/canonical/jimm/releases)
-* [Code of conduct](https://ubuntu.com/community/ethos/code-of-conduct)
 * [Join our chat](https://matrix.to/#/#jimm:ubuntu.com)
 * [Join our forum](https://discourse.charmhub.io/)
 * [Report a bug](https://github.com/canonical/jimm/issues)
 * [Contribute](https://github.com/canonical/jimm/blob/v3/CONTRIBUTING.md)
+
+### Releases
+
+* [Release notes](https://github.com/canonical/jimm/releases)
+
+### Governance and policies
+
+* [Code of conduct](https://ubuntu.com/community/ethos/code-of-conduct)
 * [Visit our careers page](https://canonical.com/careers/engineering)
 
 Thinking about using Juju for your next project? [Get in touch!](https://canonical.com/contact-us)

@@ -194,12 +194,12 @@ func (s *dbSuite) TestListGroups(c *qt.C) {
 	ctx := context.Background()
 	firstGroups, err := s.Database.ListGroups(ctx, 5, 0, "")
 	c.Assert(err, qt.IsNil)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.Assert(firstGroups[i].Name, qt.Equals, fmt.Sprintf("test-group-%d", i))
 	}
 	secondGroups, err := s.Database.ListGroups(ctx, 5, 5, "")
 	c.Assert(err, qt.IsNil)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		c.Assert(secondGroups[i].Name, qt.Equals, fmt.Sprintf("test-group-%d", i+5))
 	}
 

@@ -64,7 +64,8 @@ func TestDialWithJWT(t *testing.T) {
 	}
 
 	dialer := &jujuclient.Dialer{
-		JWTService: s.JIMM.JWTService,
+		JWTService:    s.JIMM.JWTService,
+		AdminUsername: "jaas-test@external",
 	}
 
 	// Check dial is OK

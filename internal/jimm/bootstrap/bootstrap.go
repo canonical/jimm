@@ -252,7 +252,8 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	bootstrapArgs := rivertypes.BootstrapArgs{
 		Username: user.Name,
 		// Binary args.
-		CLIVersion: params.CLIVersion,
+		CLIVersion:   params.CLIVersion,
+		AgentVersion: params.CLIVersion,
 		// User defined command arguments
 		CloudNameAndRegion: params.CloudNameAndRegion,
 		ControllerName:     params.ControllerName,
@@ -260,8 +261,17 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 		Cloud:              params.Cloud,
 		// JIMM Provided command arguments (i.e., ones that must be set by JIMM when bootstrapping).
 		LoginTokenRefreshURL: b.jimmWellknownJWKSEndpoint,
-		// User defined config
-		UserConfig: params.UserConfig,
+		// Supported bootstrap options.
+		BootstrapOptions: rivertypes.BootstrapOptions{
+			BootstrapBase:         params.BootstrapOptions.BootstrapBase,
+			BootstrapConstraints:  params.BootstrapOptions.BootstrapConstraints,
+			ModelConstraints:      params.BootstrapOptions.ModelConstraints,
+			ModelDefault:          params.BootstrapOptions.ModelDefault,
+			StoragePool:           riverStoragePool(params.BootstrapOptions.StoragePool),
+			BootstrapConfig:       params.BootstrapOptions.BootstrapConfig,
+			ControllerConfig:      params.BootstrapOptions.ControllerConfig,
+			ControllerModelConfig: params.BootstrapOptions.ControllerModelConfig,
+		},
 	}
 	job, err := b.jobQueue.EnqueueBootstrap(ctx, bootstrapArgs)
 	if err != nil {
@@ -397,7 +407,16 @@ func (b *BootstrapManager) runBootstrap(
 			DefaultLoginTokenURL: p.LoginTokenRefreshURL,
 			Cloud:                p.Cloud,
 			CloudCred:            p.CloudCred,
-			UserConfig:           p.UserConfig,
+			BootstrapOptions: jujucommands.BootstrapOptions{
+				BootstrapBase:         p.BootstrapOptions.BootstrapBase,
+				BootstrapConstraints:  p.BootstrapOptions.BootstrapConstraints,
+				ModelConstraints:      p.BootstrapOptions.ModelConstraints,
+				ModelDefault:          p.BootstrapOptions.ModelDefault,
+				StoragePool:           commandStoragePool(p.BootstrapOptions.StoragePool),
+				BootstrapConfig:       p.BootstrapOptions.BootstrapConfig,
+				ControllerConfig:      p.BootstrapOptions.ControllerConfig,
+				ControllerModelConfig: p.BootstrapOptions.ControllerModelConfig,
+			},
 		},
 	)
 	if err != nil {
@@ -488,6 +507,28 @@ func (b *BootstrapManager) runBootstrap(
 	}
 
 	return nil
+}
+
+func riverStoragePool(pool *StoragePool) *rivertypes.BootstrapStoragePool {
+	if pool == nil {
+		return nil
+	}
+	return &rivertypes.BootstrapStoragePool{
+		Name:       pool.Name,
+		Type:       pool.Type,
+		Attributes: pool.Attributes,
+	}
+}
+
+func commandStoragePool(pool *rivertypes.BootstrapStoragePool) *jujucommands.StoragePool {
+	if pool == nil {
+		return nil
+	}
+	return &jujucommands.StoragePool{
+		Name:       pool.Name,
+		Type:       pool.Type,
+		Attributes: pool.Attributes,
+	}
 }
 
 func (b *BootstrapManager) tryCleanupController(ctx context.Context, jujuCmd JujuCommands, jobID int64, controllerName string) error {

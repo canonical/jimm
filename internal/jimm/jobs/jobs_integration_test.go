@@ -192,7 +192,7 @@ func TestListJobs_ErrorState(t *testing.T) {
 	jobManager, client := setupJobsIntegrationTest(c)
 
 	// Insert jobs that will fail
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := client.Insert(ctx, failureJobArgs{
 			Name: "test-fail",
 		}, nil)

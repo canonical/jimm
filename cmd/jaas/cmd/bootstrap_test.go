@@ -57,13 +57,38 @@ func TestBootstrapArgParsing(t *testing.T) {
 				c.Check(command.detach, qt.Equals, true)
 			},
 		}, {
+			name: "bootstrap-option-flags",
+			args: []string{
+				"test-cloud/region",
+				"controller-name",
+				"controller-version",
+				"--bootstrap-base", "ubuntu@24.04",
+				"--bootstrap-constraints", "mem=8G",
+				"--constraints", "arch=amd64",
+				"--model-default", "logging-config=<root>=INFO",
+				"--storage-pool", "name=controller-pool",
+				"--storage-pool", "type=ebs",
+				"--config", "audit-log-enabled=true",
+				"--config", "image-stream=released",
+			},
+			checkFlags: func(c *qt.C, command *bootstrapCommand) {
+				c.Check(command.cloud, qt.Equals, "test-cloud")
+				c.Check(command.region, qt.Equals, "region")
+				c.Check(command.bootstrapBase, qt.Equals, "ubuntu@24.04")
+				c.Check([]string(command.bootstrapCons), qt.DeepEquals, []string{"mem=8G"})
+				c.Check([]string(command.constraints), qt.DeepEquals, []string{"arch=amd64"})
+			},
+		}, {
+			name:     "invalid-bootstrap-base",
+			args:     []string{"test-cloud/region", "controller-name", "controller-version", "--bootstrap-base", "not-a-base"},
+			errMatch: `invalid bootstrap base "not-a-base": .*`,
+		}, {
 			name:     "too-few-args",
 			args:     []string{"test-cloud/region"},
 			errMatch: "expected at least 3 arguments, got 1",
 		},
 	}
 	for i, test := range tests {
-		test := test
 		t.Run(fmt.Sprintf("%02d-%s", i, test.name), func(t *testing.T) {
 			c := qt.New(t)
 			command := &bootstrapCommand{}
@@ -92,8 +117,12 @@ func TestBootstrapWithPublicCloud(t *testing.T) {
 	}, nil)
 
 	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
-		// If the cloud is public, the Cloud field should be empty.
-		c.Check(bsp.Cloud, qt.DeepEquals, jujuparams.Cloud{})
+		c.Check(bsp.Cloud, qt.DeepEquals, params.BootstrapCloud{
+			Name: cloudName,
+			Region: params.BootstrapCloudRegion{
+				Name: "region",
+			},
+		})
 		return &params.StartBootstrapResponse{JobID: "test-job-id"}, nil
 	})
 	s.client.EXPECT().Close().Return(nil)
@@ -149,30 +178,52 @@ func TestBootstrapApiParams(t *testing.T) {
 	s.client.EXPECT().StartBootstrap(gomock.Any()).DoAndReturn(func(bsp *params.BootstrapParams) (*params.StartBootstrapResponse, error) {
 		expected := &params.BootstrapParams{
 			ControllerName: "controller-name",
-			CloudName:      cloudName,
-			RegionName:     "region",
-			Cloud: jujuparams.Cloud{
+			Cloud: params.BootstrapCloud{
+				Name:      cloudName,
 				Type:      "openstack",
 				AuthTypes: []string{string(jujucloud.UserPassAuthType)},
 				Endpoint:  "some-endpoint",
-				Regions:   []jujuparams.CloudRegion{},
+				Region: params.BootstrapCloudRegion{
+					Name: "region",
+				},
 			},
 			Credential: jujuparams.CloudCredential{
 				AuthType:   string(jujucloud.UserPassAuthType),
 				Attributes: map[string]string{},
 			},
-			Config: map[string]string{
-				"bootstrap-timeout": "60",
-				"string-option":     "value",
+			BootstrapOptions: params.BootstrapOptions{
+				BootstrapBase: "ubuntu@24.04",
+				BootstrapConstraints: map[string]string{
+					"mem":       "8G",
+					"cores":     "2",
+					"root-disk": "10G",
+				},
+				ModelConstraints: map[string]string{
+					"arch": "amd64",
+				},
+				ModelDefault: map[string]string{
+					"logging-config": "<root>=INFO",
+				},
+				StoragePool: &params.BootstrapStoragePool{
+					Name: "controller-pool",
+					Type: "ebs",
+					Attributes: map[string]string{
+						"volume-type": "gp3",
+					},
+				},
+				BootstrapConfig: map[string]string{
+					"audit-log-enabled": "true",
+					"bootstrap-timeout": "60",
+					"image-stream":      "released",
+					"string-option":     "value",
+				},
 			},
 			ControllerVersion: "controller-version",
 		}
 		c.Check(bsp.ControllerName, qt.Equals, expected.ControllerName)
-		c.Check(bsp.CloudName, qt.Equals, expected.CloudName)
-		c.Check(bsp.RegionName, qt.Equals, expected.RegionName)
 		c.Check(bsp.Cloud, qt.DeepEquals, expected.Cloud)
 		c.Check(bsp.Credential, qt.DeepEquals, expected.Credential)
-		c.Check(bsp.Config, qt.DeepEquals, expected.Config)
+		c.Check(bsp.BootstrapOptions, qt.DeepEquals, expected.BootstrapOptions)
 		c.Check(bsp.ControllerVersion, qt.Equals, expected.ControllerVersion)
 
 		return &params.StartBootstrapResponse{
@@ -190,7 +241,17 @@ func TestBootstrapApiParams(t *testing.T) {
 		"controller-name",
 		"controller-version",
 		"--detach",
+		"--bootstrap-base", "ubuntu@24.04",
+		"--bootstrap-constraints", "mem=8G",
+		"--bootstrap-constraints", "cores=2 root-disk=10G",
+		"--constraints", "arch=amd64",
+		"--model-default", "logging-config=<root>=INFO",
+		"--storage-pool", "name=controller-pool",
+		"--storage-pool", "type=ebs",
+		"--storage-pool", "volume-type=gp3",
+		"--config", "audit-log-enabled=true",
 		"--config", "bootstrap-timeout=60",
+		"--config", "image-stream=released",
 		"--config", "string-option=value",
 	)
 
@@ -406,4 +467,88 @@ func TestBootstrapSpecifiedCredentialWithDefault(t *testing.T) {
 	mcmd := modelcmd.WrapBase(command)
 	err := mcmd.Run(ctx)
 	c.Assert(err, qt.ErrorMatches, `no credential found with name "cred-3"`)
+}
+
+func TestSplitEscapedFields(t *testing.T) {
+	c := qt.New(t)
+	tests := []struct {
+		name     string
+		value    string
+		expected []string
+	}{
+		{
+			name:     "empty",
+			value:    "",
+			expected: nil,
+		},
+		{
+			name:     "plain fields",
+			value:    "mem=8G arch=amd64",
+			expected: []string{"mem=8G", "arch=amd64"},
+		},
+		{
+			name:     "escaped spaces",
+			value:    `tags=prod\ blue zones=us-east-1a`,
+			expected: []string{"tags=prod blue", "zones=us-east-1a"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			c.Check(splitEscapedFields(test.value), qt.DeepEquals, test.expected)
+		})
+	}
+}
+
+func TestStringifyScalar(t *testing.T) {
+	c := qt.New(t)
+	tests := []struct {
+		name     string
+		value    any
+		expected string
+		errMatch string
+	}{
+		{
+			name:     "string",
+			value:    "value",
+			expected: "value",
+		},
+		{
+			name:     "bool",
+			value:    true,
+			expected: "true",
+		},
+		{
+			name:     "integer",
+			value:    42,
+			expected: "42",
+		},
+		{
+			name:     "float",
+			value:    3.5,
+			expected: "3.5",
+		},
+		{
+			name:     "nil",
+			value:    nil,
+			errMatch: "nil value",
+		},
+		{
+			name:     "non scalar",
+			value:    []string{"nope"},
+			errMatch: `unsupported type \[\]string`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			value, err := stringifyScalar(test.value)
+			if test.errMatch != "" {
+				c.Assert(err, qt.ErrorMatches, test.errMatch)
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(value, qt.Equals, test.expected)
+		})
+	}
 }

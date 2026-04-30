@@ -27,8 +27,8 @@ import (
 
 // A Tester is the test interface required by this package.
 type Tester interface {
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
+	Fatalf(format string, args ...any)
+	Logf(format string, args ...any)
 	Name() string
 	Cleanup(f func())
 }
@@ -105,6 +105,8 @@ func dbCleanup(t Tester, gdb *gorm.DB, databaseName string) {
 }
 
 const unsafeCharsPattern = "[ .:;`'\"|<>~/\\?!@#$%^&*()[\\]{}=+-]"
+
+// #nosec G101 Test DSN for the local development Postgres instance.
 const defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 
 // maxDatabaseNameLength Postgres's limit on database name length.

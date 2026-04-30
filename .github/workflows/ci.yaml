@@ -19,9 +19,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses:   actions/setup-go@v6
         with:
           go-version-file: "go.mod"
+          cache: false
 
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
@@ -46,9 +47,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses:   actions/setup-go@v6
         with:
           go-version-file: "go.mod"
+          cache: false
 
       - name: Run generators
         shell: bash
@@ -72,9 +74,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses:   actions/setup-go@v6
         with:
           go-version-file: "go.mod"
+          cache: false
 
       - name: Build JAAS binary
         shell: bash

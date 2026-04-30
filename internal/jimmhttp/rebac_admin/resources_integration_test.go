@@ -10,7 +10,6 @@ import (
 	"github.com/canonical/rebac-admin-ui-handlers/v1/resources"
 	qt "github.com/frankban/quicktest"
 
-	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -117,33 +116,33 @@ func TestListResourcesIntegration(t *testing.T) {
 		},
 		{
 			desc:     "test default sizes",
-			page:     utils.IntToPointer(0),
+			page:     new(0),
 			wantPage: 0,
 			wantSize: 5,
 			ids:      ids,
 		},
 		{
 			desc:         "test with first page",
-			size:         utils.IntToPointer(2),
-			page:         utils.IntToPointer(0),
+			size:         new(2),
+			page:         new(0),
 			wantPage:     0,
 			wantSize:     2,
-			wantNextpage: utils.IntToPointer(1),
+			wantNextpage: new(1),
 			ids:          []testEntity{ids[0], ids[1]},
 		},
 		{
 			desc:         "test with second page",
-			size:         utils.IntToPointer(2),
-			page:         utils.IntToPointer(1),
+			size:         new(2),
+			page:         new(1),
 			wantPage:     1,
 			wantSize:     2,
-			wantNextpage: utils.IntToPointer(2),
+			wantNextpage: new(2),
 			ids:          []testEntity{ids[2], ids[3]},
 		},
 		{
 			desc:         "test with last page",
-			size:         utils.IntToPointer(2),
-			page:         utils.IntToPointer(2),
+			size:         new(2),
+			page:         new(2),
 			wantPage:     2,
 			wantSize:     1,
 			wantNextpage: nil,
@@ -151,12 +150,12 @@ func TestListResourcesIntegration(t *testing.T) {
 		},
 		{
 			desc:         "test first page with model name filter",
-			size:         utils.IntToPointer(2),
-			page:         utils.IntToPointer(0),
+			size:         new(2),
+			page:         new(0),
 			nameFilter:   "model",
 			wantPage:     0,
 			wantSize:     2,
-			wantNextpage: utils.IntToPointer(1),
+			wantNextpage: new(1),
 			ids: func() []testEntity {
 				filteredIds := make([]testEntity, 0)
 				for _, id := range ids {
@@ -169,8 +168,8 @@ func TestListResourcesIntegration(t *testing.T) {
 		},
 		{
 			desc:         "test first page with model name filter",
-			size:         utils.IntToPointer(2),
-			page:         utils.IntToPointer(1),
+			size:         new(2),
+			page:         new(1),
 			nameFilter:   "model",
 			wantPage:     1,
 			wantSize:     1,
@@ -187,8 +186,8 @@ func TestListResourcesIntegration(t *testing.T) {
 		},
 		{
 			desc:         "test first page with controller entity type",
-			size:         utils.IntToPointer(2),
-			page:         utils.IntToPointer(0),
+			size:         new(2),
+			page:         new(0),
 			typeFilter:   rebac_admin.Controller,
 			wantPage:     0,
 			wantSize:     1,
@@ -205,8 +204,8 @@ func TestListResourcesIntegration(t *testing.T) {
 		},
 		{
 			desc:         "test big page with model entity type",
-			size:         utils.IntToPointer(10),
-			page:         utils.IntToPointer(0),
+			size:         new(10),
+			page:         new(0),
 			typeFilter:   rebac_admin.Model,
 			wantPage:     0,
 			wantSize:     3,

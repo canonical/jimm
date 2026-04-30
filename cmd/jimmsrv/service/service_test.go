@@ -46,6 +46,7 @@ func newTestServiceParameters(c *qt.C) jimmsvc.Params {
 	jwksParams, err := jimmtest.StaticJWKSServiceParams(c)
 	c.Assert(err, qt.IsNil)
 
+	// #nosec G101 Fixed test keys
 	return jimmsvc.Params{
 		DSN:                testdb.CreateEmptyDatabase(c),
 		ControllerUUID:     "6acf4fd8-32d6-49ea-b4eb-dcb9d1590c11",

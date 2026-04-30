@@ -416,7 +416,7 @@ var addHostedCloudTests = []struct {
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
-		cld.Config = map[string]interface{}{"A": "a"}
+		cld.Config = map[string]any{"A": "a"}
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
@@ -473,7 +473,7 @@ var addHostedCloudTests = []struct {
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
-		cld.Config = map[string]interface{}{"A": "a"}
+		cld.Config = map[string]any{"A": "a"}
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
@@ -530,7 +530,7 @@ var addHostedCloudTests = []struct {
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
-		cld.Config = map[string]interface{}{"A": "a"}
+		cld.Config = map[string]any{"A": "a"}
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
@@ -764,7 +764,7 @@ var addHostedCloudToControllerTests = []struct {
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
-		cld.Config = map[string]interface{}{"A": "a"}
+		cld.Config = map[string]any{"A": "a"}
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}
@@ -821,7 +821,7 @@ var addHostedCloudToControllerTests = []struct {
 			Name: "default",
 		}}
 		cld.CACertificates = []string{"CACERT"}
-		cld.Config = map[string]interface{}{"A": "a"}
+		cld.Config = map[string]any{"A": "a"}
 		cld.RegionConfig = jujucloud.RegionConfig{
 			"default": {"B": 2},
 		}

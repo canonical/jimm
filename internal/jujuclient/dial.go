@@ -36,10 +36,6 @@ import (
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
-const (
-	adminUser = "admin"
-)
-
 // A ControllerCredentialsStore is a store for controller credentials.
 type ControllerCredentialsStore interface {
 	// GetControllerCredentials retrieves the credentials for the given controller from a vault
@@ -52,8 +48,20 @@ type ControllerCredentialsStore interface {
 type Dialer struct {
 	ControllerCredentialsStore ControllerCredentialsStore
 	JWTService                 *jimmjwx.JWTService
+	AdminUsername              string
 }
 
+// NewDialer creates a new Dialer from dependencies.
+func NewDialer(store ControllerCredentialsStore, jwtService *jimmjwx.JWTService, controllerUUID string) *Dialer {
+	return &Dialer{
+		ControllerCredentialsStore: store,
+		JWTService:                 jwtService,
+		// The admin username is a Juju external user, just like the JIMM users.
+		AdminUsername: fmt.Sprintf("jaas-%s@external", controllerUUID),
+	}
+}
+
+// createLoginRequest creates a jujuparams.LoginRequest for the given controller, model and user.
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (*jujuparams.LoginRequest, error) {
 	// Always request superuser permissions, even when representing a non-admin user
 	// This is only safe because we have already checked the user's openfga permissions in a layer above.
@@ -95,7 +103,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	client := rpc.NewClient(conn)
 
 	if user == nil {
-		user = &openfga.User{Identity: &dbmodel.Identity{Name: adminUser}}
+		user = &openfga.User{Identity: &dbmodel.Identity{Name: d.AdminUsername}}
 	}
 
 	var loginRequest *jujuparams.LoginRequest
@@ -228,7 +236,7 @@ func (c *Connection) hasFacadeVersion(facade string, version int) bool {
 // Call makes an RPC call to the server. Call sends the request message to
 // the server and waits for the response to be returned or the context to
 // be canceled.
-func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) (err error) {
+func (c *Connection) Call(ctx context.Context, facade string, version int, id, method string, args, resp any) (err error) {
 	labels := []string{facade, method, ""}
 	if c.ctl != nil {
 		labels = []string{facade, method, c.ctl.UUID}
@@ -246,7 +254,7 @@ func (c *Connection) Call(ctx context.Context, facade string, version int, id, m
 
 // CallHighestFacadeVersion calls the specified method on the highest supported version of
 // the facade.
-func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp interface{}) error {
+func (c *Connection) CallHighestFacadeVersion(ctx context.Context, facade string, versions []int, id, method string, args, resp any) error {
 	sort.Sort(sort.Reverse(sort.IntSlice(versions)))
 
 	for _, version := range versions {
@@ -295,7 +303,7 @@ func (c *Connection) BakeryClient() base.MacaroonDischarger {
 // APICall makes a call to the API server with the given object type,
 // id, request and parameters. The response is filled in with the
 // call's result if the call is successful.
-func (c *Connection) APICall(objType string, version int, id, request string, params, response interface{}) error {
+func (c *Connection) APICall(objType string, version int, id, request string, params, response any) error {
 	return c.Call(c.ctx, objType, version, id, request, params, response)
 }
 

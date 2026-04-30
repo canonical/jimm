@@ -26,7 +26,7 @@ func TestSetCloudDefaults(t *testing.T) {
 		user             *dbmodel.Identity
 		cloud            names.CloudTag
 		region           string
-		defaults         map[string]interface{}
+		defaults         map[string]any
 		expectedError    string
 		expectedDefaults *dbmodel.CloudDefaults
 	}
@@ -51,7 +51,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-			defaults := map[string]interface{}{
+			defaults := map[string]any{
 				"key1": float64(42),
 				"key2": "a test string",
 			}
@@ -91,7 +91,7 @@ func TestSetCloudDefaults(t *testing.T) {
 			}
 			c.Assert(j.Database.DB.Create(&cloud).Error, qt.IsNil)
 
-			defaults := map[string]interface{}{
+			defaults := map[string]any{
 				"key1": float64(42),
 				"key2": "a test string",
 			}
@@ -136,14 +136,14 @@ func TestSetCloudDefaults(t *testing.T) {
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       cloud.Regions[0].Name,
-				Defaults: map[string]interface{}{
+				Defaults: map[string]any{
 					"key1": float64(17),
 					"key2": "a test string",
 				},
 			})
 			c.Assert(err, qt.IsNil)
 
-			defaults := map[string]interface{}{
+			defaults := map[string]any{
 				"key1": float64(42),
 				"key2": "a changed string",
 				"key3": "a new value",
@@ -182,7 +182,7 @@ func TestSetCloudDefaults(t *testing.T) {
 				}},
 			}
 
-			defaults := map[string]interface{}{
+			defaults := map[string]any{
 				"key1": float64(42),
 				"key2": "a changed string",
 				"key3": "a new value",
@@ -211,7 +211,7 @@ func TestSetCloudDefaults(t *testing.T) {
 				}},
 			}
 
-			defaults := map[string]interface{}{
+			defaults := map[string]any{
 				"agent-version": "2.0",
 				"key2":          "a changed string",
 				"key3":          "a new value",
@@ -292,7 +292,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 				IdentityName: user.Name,
 				CloudID:      cloud.ID,
 				Region:       cloud.Regions[0].Name,
-				Defaults: map[string]interface{}{
+				Defaults: map[string]any{
 					"key1": float64(17),
 					"key2": "a test string",
 					"key3": "some value",
@@ -313,7 +313,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       "test-region",
-				Defaults: map[string]interface{}{
+				Defaults: map[string]any{
 					"key2": "a test string",
 				},
 			}
@@ -346,7 +346,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 			err = j.Database.SetCloudDefaults(ctx, &dbmodel.CloudDefaults{
 				IdentityName: user.Name,
 				CloudID:      cloud.ID,
-				Defaults: map[string]interface{}{
+				Defaults: map[string]any{
 					"key1": float64(17),
 					"key2": "a test string",
 					"key3": "some value",
@@ -367,7 +367,7 @@ func TestUnsetCloudDefaults(t *testing.T) {
 				CloudID:      cloud.ID,
 				Cloud:        cloud,
 				Region:       "",
-				Defaults: map[string]interface{}{
+				Defaults: map[string]any{
 					"key2": "a test string",
 				},
 			}
@@ -478,7 +478,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 		IdentityName: user.Name,
 		CloudID:      cloud1.ID,
 		Region:       cloud1.Regions[0].Name,
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"key1": float64(17),
 			"key2": "a test string",
 			"key3": "some value",
@@ -490,7 +490,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 		IdentityName: user.Name,
 		CloudID:      cloud1.ID,
 		Region:       cloud1.Regions[1].Name,
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"key2": "a different string",
 			"key4": float64(42),
 		},
@@ -501,7 +501,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 		IdentityName: user.Name,
 		CloudID:      cloud2.ID,
 		Region:       cloud2.Regions[0].Name,
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"key2": "a different string",
 			"key4": float64(42),
 			"key5": "test",
@@ -513,7 +513,7 @@ func TestModelDefaultsForCloud(t *testing.T) {
 		IdentityName: user.Name,
 		CloudID:      cloud2.ID,
 		Region:       "",
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"key1": "value",
 			"key4": float64(37),
 		},

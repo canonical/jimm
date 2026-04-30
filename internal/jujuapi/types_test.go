@@ -25,6 +25,7 @@ func TestModelCreateArgs(t *testing.T) {
 
 	authenticatedUser := names.NewUserTag("vorbis@canonical.com")
 
+	// #nosec G101 No secret fields
 	tests := []struct {
 		about         string
 		args          jujuparams.ModelCreateArgs
@@ -317,7 +318,7 @@ func TestToFullModelInfo(t *testing.T) {
 				Name:                "vault",
 				BackendType:         "vault",
 				TokenRotateInterval: &rotateInterval,
-				Config: map[string]interface{}{
+				Config: map[string]any{
 					"endpoint": "https://vault.example.com",
 				},
 			},
@@ -348,7 +349,7 @@ func TestToFullModelInfo(t *testing.T) {
 			Name:                "vault",
 			BackendType:         "vault",
 			TokenRotateInterval: &rotateInterval,
-			Config: map[string]interface{}{
+			Config: map[string]any{
 				"endpoint": "https://vault.example.com",
 			},
 		},

@@ -4,6 +4,7 @@ package jujucommands_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -80,6 +81,32 @@ func (s *jujucommandsSuite) TestRunCmdWithOutputRetriever_Error(c *qt.C) {
 
 func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 	testCtx := c.Context()
+	oldProxyEnv := make(map[string]string, 8)
+	proxyKeys := []string{"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "no_proxy", "all_proxy"}
+	for _, key := range proxyKeys {
+		oldProxyEnv[key] = os.Getenv(key)
+	}
+	oldAppEnv := os.Getenv("APP_ENV")
+	c.Cleanup(func() {
+		for _, key := range proxyKeys {
+			if oldProxyEnv[key] == "" {
+				_ = os.Unsetenv(key)
+			} else {
+				_ = os.Setenv(key, oldProxyEnv[key])
+			}
+		}
+		if oldAppEnv == "" {
+			_ = os.Unsetenv("APP_ENV")
+		} else {
+			_ = os.Setenv("APP_ENV", oldAppEnv)
+		}
+	})
+	for _, key := range proxyKeys {
+		_ = os.Unsetenv(key)
+	}
+	c.Assert(os.Setenv("HTTP_PROXY", "http://proxy.example:3128"), qt.IsNil)
+	c.Assert(os.Setenv("HTTPS_PROXY", "https://proxy.example:4443"), qt.IsNil)
+	c.Assert(os.Setenv("APP_ENV", "secret-value"), qt.IsNil)
 
 	runner := jujucommands.NewCommandRunner("env", "testing-data-is-set")
 	outputCh, err := runner.RunJujuCmd(testCtx, []string{})
@@ -93,7 +120,13 @@ func (s *jujucommandsSuite) TestEnvironmentIsCorrectlySet(c *qt.C) {
 		b.WriteString(out.Line + "\n")
 	}
 
-	c.Assert(b.String(), qt.Equals, "JUJU_DATA=testing-data-is-set\n")
+	envOutput := b.String()
+	c.Assert(envOutput, qt.Equals, strings.Join([]string{
+		"HTTP_PROXY=http://proxy.example:3128",
+		"HTTPS_PROXY=https://proxy.example:4443",
+		"JUJU_DATA=testing-data-is-set",
+		"",
+	}, "\n"))
 }
 
 //go:generate go tool mockgen -destination=./mocks/runner.go -package=mocks . Runner

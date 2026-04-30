@@ -14,7 +14,10 @@ sudo microk8s config | juju add-k8s testk8s --cluster-name=microk8s-cluster --cl
 
 echo
 echo "Bootstrapping controller on microk8s"
-$JAAS bootstrap testk8s test-controller 3.6.19 --config controller-service-type=loadbalancer
+$JAAS bootstrap testk8s test-controller 3.6.19 \
+  --config controller-service-type=loadbalancer \
+  --bootstrap-constraints cores=2 \
+  --model-default 'logging-config=<root>=INFO'
 
 CERT=$(sudo microk8s config | yq '.users[0].user."client-certificate-data"')
 KEY=$(sudo microk8s config | yq '.users[0].user."client-key-data"' )

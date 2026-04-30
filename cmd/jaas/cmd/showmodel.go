@@ -104,7 +104,7 @@ func (c *showModelCommand) Run(ctxt *cmd.Context) error {
 }
 
 // formatTabular formats the model controller info in a tabular format.
-func (c *showModelCommand) formatTabular(writer io.Writer, value interface{}) error {
+func (c *showModelCommand) formatTabular(writer io.Writer, value any) error {
 	info, ok := value.(*apiparams.ModelControllerInfo)
 	if !ok {
 		return fmt.Errorf("expected *apiparams.ModelControllerInfo, got %T", value)

@@ -246,6 +246,143 @@ type SetControllerDeprecatedRequest struct {
 	Deprecated bool `json:"deprecated"`
 }
 
+// ControllerProfile stores reusable, non-secret controller bootstrap settings.
+type ControllerProfile struct {
+	// Name is the profile's name and must be unique across all profiles.
+	Name string `json:"name" yaml:"name"`
+	// Description is an optional human-readable summary of the profile.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// JujuVersion is the Juju version(s) this profile is intended for e.g. 3, 3.6, 3.6.1.
+	JujuVersion string `json:"juju-version" yaml:"juju-version"`
+	// Version must be provided when updating an existing profile.
+	Version uint `json:"version" yaml:"version"`
+	// CreatedAt is the time the profile was first created.
+	CreatedAt string `json:"created-at,omitempty" yaml:"created-at,omitempty"`
+	// UpdatedAt is the time the profile was last updated.
+	UpdatedAt string `json:"updated-at,omitempty" yaml:"updated-at,omitempty"`
+	// Cloud stores the cloud definition for the profile.
+	Cloud BootstrapCloud `json:"cloud" yaml:"cloud"`
+	// BootstrapOptions holds the reusable bootstrap settings saved in the profile.
+	BootstrapOptions BootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
+}
+
+// ControllerProfileSummary contains the fields returned when listing controller profiles.
+type ControllerProfileSummary struct {
+	// Name is the profile's name and must be unique across all profiles.
+	Name string `json:"name" yaml:"name"`
+	// Description is an optional human-readable summary of the profile.
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	// CreatedAt is the time the profile was first created.
+	CreatedAt string `json:"created-at,omitempty" yaml:"created-at,omitempty"`
+	// UpdatedAt is the time the profile was last updated.
+	UpdatedAt string `json:"updated-at,omitempty" yaml:"updated-at,omitempty"`
+}
+
+// BootstrapCloud stores the cloud definition used for controller bootstrap.
+type BootstrapCloud struct {
+	// Name is the cloud's name, e.g. "aws", "azure", "gcp", "localhost", etc.
+	Name string `json:"name" yaml:"name"`
+	// Type is the cloud's type, e.g. "ec2", "azure", "openstack", etc.
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	// AuthTypes contains the supported cloud auth types.
+	AuthTypes []string `json:"auth-types,omitempty" yaml:"auth-types,omitempty"`
+	// CACertificates contains the cloud CA certificates.
+	CACertificates []string `json:"ca-certificates,omitempty" yaml:"ca-certificates,omitempty"`
+	// Config contains cloud-specific configuration.
+	Config map[string]any `json:"config,omitempty" yaml:"config,omitempty"`
+	// Endpoint contains the cloud API endpoint, if needed.
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	// HostCloudRegion contains the host cloud region for the cloud, if any.
+	HostCloudRegion string `json:"host-cloud-region,omitempty" yaml:"host-cloud-region,omitempty"`
+	// Region contains the cloud region definition for the controller.
+	Region BootstrapCloudRegion `json:"region" yaml:"region"`
+}
+
+// BootstrapCloudRegion stores the single bootstrap region definition for controller bootstrap.
+type BootstrapCloudRegion struct {
+	// Name is the region's name, e.g. "us-east-1".
+	Name string `json:"name" yaml:"name"`
+	// Endpoint contains the region-specific cloud API endpoint, if needed.
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	// IdentityEndpoint contains the region-specific cloud identity API endpoint, if needed.
+	IdentityEndpoint string `json:"identity-endpoint,omitempty" yaml:"identity-endpoint,omitempty"`
+	// StorageEndpoint contains the region-specific cloud storage API endpoint, if needed.
+	StorageEndpoint string `json:"storage-endpoint,omitempty" yaml:"storage-endpoint,omitempty"`
+}
+
+// BootstrapOptions stores the supported bootstrap settings shared by
+// controller profiles and bootstrap requests.
+type BootstrapOptions struct {
+	// BootstrapBase specifies the base of the bootstrap machine, e.g. "ubuntu@24.04".
+	BootstrapBase string `json:"bootstrap-base,omitempty" yaml:"bootstrap-base,omitempty"`
+	// BootstrapConstraints specifies bootstrap machine constraints.
+	BootstrapConstraints map[string]string `json:"bootstrap-constraints,omitempty" yaml:"bootstrap-constraints,omitempty"`
+	// ModelConstraints sets the default constraints for workload machines in the controller model.
+	ModelConstraints map[string]string `json:"model-constraints,omitempty" yaml:"model-constraints,omitempty"`
+	// ModelDefault specifies default model configuration values.
+	ModelDefault map[string]string `json:"model-default,omitempty" yaml:"model-default,omitempty"`
+	// StoragePool holds the options for an initial storage pool created in the controller model.
+	StoragePool *BootstrapStoragePool `json:"storage-pool,omitempty" yaml:"storage-pool,omitempty"`
+	// BootstrapConfig holds bootstrap configuration values.
+	BootstrapConfig map[string]string `json:"bootstrap-config,omitempty" yaml:"bootstrap-config,omitempty"`
+	// ControllerConfig holds controller configuration.
+	ControllerConfig map[string]string `json:"controller-config,omitempty" yaml:"controller-config,omitempty"`
+	// ControllerModelConfig holds model configuration values that apply only to the controller model.
+	ControllerModelConfig map[string]string `json:"controller-model-config,omitempty" yaml:"controller-model-config,omitempty"`
+}
+
+// BootstrapStoragePool stores the optional storage pool configuration used by
+// bootstrap settings.
+type BootstrapStoragePool struct {
+	// Name is the storage pool name and is required.
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	// Type is the storage pool type and is required.
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	// Attributes holds additional storage pool attributes.
+	Attributes map[string]string `json:"attributes,omitempty" yaml:"attributes,omitempty"`
+}
+
+// SaveControllerProfileRequest saves or replaces a named controller profile.
+type SaveControllerProfileRequest struct {
+	ControllerProfile
+}
+
+// SaveControllerProfileResponse contains the saved controller profile.
+type SaveControllerProfileResponse struct {
+	ControllerProfile
+}
+
+// GetControllerProfileRequest retrieves a controller profile by name.
+type GetControllerProfileRequest struct {
+	Name string `json:"name" yaml:"name"`
+}
+
+// GetControllerProfileResponse contains a single controller profile.
+type GetControllerProfileResponse struct {
+	ControllerProfile
+}
+
+// ListControllerProfilesRequest lists saved controller profiles and can filter
+// them by Juju version.
+type ListControllerProfilesRequest struct {
+	// JujuVersion allows clients to filter profiles to those appropriate for the
+	// Juju version(s) they are intending to use. The filter matches profiles that
+	// specify a Juju version that is a prefix of the provided version. For example,
+	// a filter value of "3.6.7" will show profiles with juju-version set to "3",
+	// "3.6", and "3.6.7" but not "3.6.5", or "3.7", or "4".
+	JujuVersion string `json:"juju-version,omitempty" yaml:"juju-version,omitempty"`
+}
+
+// ListControllerProfilesResponse contains the summary fields for all saved controller profiles.
+type ListControllerProfilesResponse struct {
+	Profiles []ControllerProfileSummary `json:"profiles" yaml:"profiles"`
+}
+
+// RemoveControllerProfileRequest removes a controller profile by name.
+type RemoveControllerProfileRequest struct {
+	Name string `json:"name" yaml:"name"`
+}
+
 // UpgradeToRequest holds the parameters for phase 1 for automated upgrades.
 type UpgradeToRequest struct {
 	// ModelTag is the tag of the model to upgrade.
@@ -256,7 +393,8 @@ type UpgradeToRequest struct {
 
 // UpgradeToResponse holds the response for phase 1 of an automated upgrade.
 type UpgradeToResponse struct {
-	Success bool `json:"success"`
+	Success bool  `json:"success" yaml:"success"`
+	JobID   int64 `json:"job-id" yaml:"job-id"`
 }
 
 // FullModelStatusRequest is the request that is sent in a FullModelStatus method.
@@ -398,7 +536,7 @@ type CheckRelationsResponse struct {
 
 // ListRelationshipTuplesRequests holds the request information to list tuples.
 type ListRelationshipTuplesRequest struct {
-	Tuple             RelationshipTuple `json:"tuple,omitempty"`
+	Tuple             RelationshipTuple `json:"tuple"`
 	PageSize          int32             `json:"page_size,omitempty"`
 	ContinuationToken string            `json:"continuation_token,omitempty"`
 	ResolveUUIDs      bool              `json:"resolve_uuids,omitempty"`
@@ -639,23 +777,20 @@ type StartBootstrapResponse struct {
 // BootstrapParams holds parameters for starting
 // a controller bootstrap job.
 type BootstrapParams struct {
-	// CloudName specifies the target cloud for the controller.
-	CloudName string `json:"cloud-name"`
-	// RegionName specifies the target region for the controller.
-	RegionName string `json:"region-name"`
 	// Cloud holds the cloud definition that will be used to bootstrap the controller.
-	Cloud jujuparams.Cloud `json:"cloud,omitempty"`
+	// The cloud name and bootstrap region are carried inside this object.
+	Cloud BootstrapCloud `json:"cloud" yaml:"cloud"`
 	// Credential contains the cloud credential and its tag, this credential will be used against the
 	// the cloud provided to bootstrap the controller.
-	Credential jujuparams.CloudCredential `json:"credential"`
+	Credential jujuparams.CloudCredential `json:"credential" yaml:"credential"`
 
 	// ControllerName specifies the name of the controller as recorded in JIMM.
-	ControllerName string `json:"controller-name"`
-	// Config holds configuration options for the bootstrap job.
-	Config map[string]string `json:"config"`
+	ControllerName string `json:"controller-name" yaml:"controller-name"`
+	// BootstrapOptions holds the supported bootstrap settings for the job.
+	BootstrapOptions BootstrapOptions `json:"bootstrap-options" yaml:"bootstrap-options"`
 
 	// ControllerVersion is the version of the controller to be bootstrapped.
-	ControllerVersion string `json:"controller-version"`
+	ControllerVersion string `json:"controller-version" yaml:"controller-version"`
 }
 
 // DestroyControllerRequest holds the name of

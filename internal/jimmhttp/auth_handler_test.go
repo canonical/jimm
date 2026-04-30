@@ -140,7 +140,7 @@ func TestCallbackFailsNoState(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - no state cookie present")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - no state cookie present\n")
 }
 
 func TestCallbackFailsStateNoMatch(t *testing.T) {
@@ -159,7 +159,7 @@ func TestCallbackFailsStateNoMatch(t *testing.T) {
 	defer res.Body.Close()
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - state does not match")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - state does not match\n")
 }
 
 func TestCallbackFailsNoCodePresent(t *testing.T) {
@@ -180,7 +180,7 @@ func TestCallbackFailsNoCodePresent(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - missing auth code")
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+" - missing auth code\n")
 }
 
 func TestCallbackFailsExchange(t *testing.T) {
@@ -201,5 +201,5 @@ func TestCallbackFailsExchange(t *testing.T) {
 
 	b, err := io.ReadAll(res.Body)
 	c.Assert(err, qt.IsNil)
-	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+` - authorisation code exchange failed: oauth2: "invalid_grant" "Code not valid"`)
+	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+` - authorisation code exchange failed: oauth2: "invalid_grant" "Code not valid"`+"\n")
 }

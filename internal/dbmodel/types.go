@@ -26,7 +26,7 @@ func (j JSON) Value() (driver.Value, error) {
 }
 
 // Scan scan value into Jsonb, implements sql.Scanner interface
-func (j *JSON) Scan(value interface{}) error {
+func (j *JSON) Scan(value any) error {
 	if value == nil {
 		*j = JSON("null")
 		return nil
@@ -83,7 +83,7 @@ func (s *Strings) FromPointer(sp *[]string) {
 }
 
 // Scan implements sql.Scanner.
-func (s *Strings) Scan(src interface{}) error {
+func (s *Strings) Scan(src any) error {
 	if src == nil {
 		*s = nil
 		return nil
@@ -119,7 +119,7 @@ func (m StringMap) Value() (driver.Value, error) {
 }
 
 // Scan implements sql.Scanner.
-func (m *StringMap) Scan(src interface{}) error {
+func (m *StringMap) Scan(src any) error {
 	if src == nil {
 		*m = nil
 		return nil
@@ -138,7 +138,7 @@ func (m *StringMap) Scan(src interface{}) error {
 
 // A Map stores a generic map in a database column. The map is encoded as
 // JSON and stored in a BLOB element.
-type Map map[string]interface{}
+type Map map[string]any
 
 // GormDataType implements schema.GormDataTypeInterface.
 func (m Map) GormDataType() string {
@@ -154,7 +154,7 @@ func (m Map) Value() (driver.Value, error) {
 }
 
 // Scan implements sql.Scanner.
-func (m *Map) Scan(src interface{}) error {
+func (m *Map) Scan(src any) error {
 	if src == nil {
 		*m = nil
 		return nil
@@ -194,7 +194,7 @@ func (hp HostPorts) Value() (driver.Value, error) {
 }
 
 // Scan implements sql.Scanner.
-func (hp *HostPorts) Scan(src interface{}) error {
+func (hp *HostPorts) Scan(src any) error {
 	if src == nil {
 		*hp = nil
 		return nil

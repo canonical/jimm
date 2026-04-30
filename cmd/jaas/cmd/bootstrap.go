@@ -12,6 +12,8 @@ import (
 	jujucmd "github.com/juju/juju/cmd"
 	"github.com/juju/juju/cmd/juju/common"
 	"github.com/juju/juju/cmd/modelcmd"
+	corebase "github.com/juju/juju/core/base"
+	"github.com/juju/juju/core/constraints"
 	"github.com/juju/juju/jujuclient"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -46,10 +48,11 @@ file contents.
 These config options must match the config options supported by the Juju CLI
 for the version of Juju being bootstrapped. See the Juju documentation for
 the version specified for the full list of supported bootstrap config
-options.
+options. Additional bootstrap settings can be supplied with --bootstrap-base,
+--bootstrap-constraints, --constraints, --model-default, and --storage-pool,
+these align with the corresponding Juju CLI options.
 
-Note that some config options may not be specified as they will automatically
-be set.
+Note that some config options will be automatically set but can be overriden.
 These are:
 
 - login-token-refresh-url
@@ -73,6 +76,8 @@ Note that JIMM will internally do the following:
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --config controller-service-type=loadbalancer
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --bootstrap-base ubuntu@24.04 --bootstrap-constraints mem=8G --constraints arch=amd64
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --storage-pool name=controller-pool --storage-pool type=ebs --config audit-log-enabled=true
 `
 )
 
@@ -90,7 +95,12 @@ type bootstrapCommand struct {
 
 	credentialName string
 	detach         bool
+	bootstrapBase  string
+	constraints    common.ConstraintsFlag
+	bootstrapCons  common.BootstrapConstraintsFlag
 	config         common.ConfigFlag
+	modelDefaults  common.ConfigFlag
+	storagePool    common.ConfigFlag
 }
 
 // NewBootstrapStartCommand returns a command to start a job
@@ -106,6 +116,11 @@ func NewBootstrapStartCommand() cmd.Command {
 func (c *bootstrapCommand) Init(args []string) error {
 	if len(args) < 3 {
 		return fmt.Errorf("expected at least 3 arguments, got %d", len(args))
+	}
+	if c.bootstrapBase != "" {
+		if _, err := corebase.ParseBaseFromString(c.bootstrapBase); err != nil {
+			return fmt.Errorf("invalid bootstrap base %q: %w", c.bootstrapBase, err)
+		}
 	}
 	c.cloud = args[0]
 	if i := strings.IndexRune(c.cloud, '/'); i > 0 {
@@ -128,8 +143,15 @@ func (c *bootstrapCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 	f.StringVar(&c.credentialName, "credential", "", "The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud.")
+	f.StringVar(&c.bootstrapBase, "bootstrap-base", "", "Specify the base of the bootstrap machine.")
+	f.Var(&c.bootstrapCons, "bootstrap-constraints", "Specify bootstrap machine constraints.")
+	f.Var(&c.constraints, "constraints", "Set model constraints")
 	f.Var(&c.config, "config",
 		"Specify a configuration file, or one or more configuration options.\n    (`--config config.yaml [--config key=value ...])`")
+	f.Var(&c.modelDefaults, "model-default",
+		"Specify a configuration file, or one or more configuration options to be set for all models, unless otherwise specified.\n    (`--model-default config.yaml [--model-default key=value ...])`")
+	f.Var(&c.storagePool, "storage-pool",
+		"Specify options for an initial storage pool. 'name' and 'type' are required, plus any additional attributes.\n    (`--storage-pool pool-config.yaml [--storage-pool key=value ...])`")
 	f.BoolVar(&c.detach, "detach", false, "If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete.")
 }
 
@@ -199,31 +221,20 @@ func (c *bootstrapCommand) Run(ctxt *cmd.Context) error {
 		return fmt.Errorf("multiple credentials found for cloud %q, please set a default or specify one using --credential", c.cloud)
 	}
 
-	configValues, err := c.config.ReadAttrs(ctxt)
+	bootstrapOptions, err := c.bootstrapOptions(ctxt)
 	if err != nil {
-		return fmt.Errorf("failed to read config values: %v", err)
-	}
-
-	stringConfigValues := make(map[string]string, len(configValues))
-	for k, v := range configValues {
-		strVal, ok := v.(string)
-		if !ok {
-			return fmt.Errorf("config value for %q must be a string, got %T", k, v)
-		}
-		stringConfigValues[k] = strVal
+		return err
 	}
 
 	req := apiparams.BootstrapParams{
-		CloudName:         c.cloud,
-		RegionName:        c.region,
 		ControllerName:    c.controllerName,
 		ControllerVersion: c.controllerVersion,
-		Cloud:             cloudToParams(bootstrapCloud),
+		Cloud:             cloudToParams(c.cloud, c.region, bootstrapCloud),
 		Credential: jujuparams.CloudCredential{
 			Attributes: bootstrapCred.Attributes(),
 			AuthType:   string(bootstrapCred.AuthType()),
 		},
-		Config: stringConfigValues,
+		BootstrapOptions: bootstrapOptions,
 	}
 
 	client, err := c.getJIMMAPI()
@@ -276,44 +287,180 @@ Should you cancel this process, you can track the progress via bootstrap-status 
 	return poller.watchBootstrapLogs()
 }
 
-// CloudToParams converts a jujucloud.Cloud to a jujuparams.Cloud.
-// Copied from api/client/cloud/cloud.go.
-func cloudToParams(cloud *jujucloud.Cloud) jujuparams.Cloud {
+// cloudToParams converts a jujucloud.Cloud to the bootstrap request cloud shape.
+func cloudToParams(cloudName, regionName string, cloud *jujucloud.Cloud) apiparams.BootstrapCloud {
+	paramsCloud := apiparams.BootstrapCloud{
+		Name: cloudName,
+		Region: apiparams.BootstrapCloudRegion{
+			Name: regionName,
+		},
+	}
 	if cloud == nil {
-		return jujuparams.Cloud{}
+		return paramsCloud
 	}
 	authTypes := make([]string, len(cloud.AuthTypes))
 	for i, authType := range cloud.AuthTypes {
 		authTypes[i] = string(authType)
 	}
-	regions := make([]jujuparams.CloudRegion, len(cloud.Regions))
-	for i, region := range cloud.Regions {
-		regions[i] = jujuparams.CloudRegion{
-			Name:             region.Name,
-			Endpoint:         region.Endpoint,
-			IdentityEndpoint: region.IdentityEndpoint,
-			StorageEndpoint:  region.StorageEndpoint,
+	paramsCloud.Type = cloud.Type
+	paramsCloud.AuthTypes = authTypes
+	paramsCloud.Endpoint = cloud.Endpoint
+	paramsCloud.CACertificates = cloud.CACertificates
+	paramsCloud.HostCloudRegion = cloud.HostCloudRegion
+	paramsCloud.Config = cloud.Config
+	for _, region := range cloud.Regions {
+		if region.Name == regionName {
+			paramsCloud.Region = apiparams.BootstrapCloudRegion{
+				Name:             region.Name,
+				Endpoint:         region.Endpoint,
+				IdentityEndpoint: region.IdentityEndpoint,
+				StorageEndpoint:  region.StorageEndpoint,
+			}
+			break
 		}
 	}
-	var regionConfig map[string]map[string]interface{}
-	for r, attr := range cloud.RegionConfig {
-		if regionConfig == nil {
-			regionConfig = make(map[string]map[string]interface{})
+	return paramsCloud
+}
+
+func (c *bootstrapCommand) bootstrapOptions(ctxt *cmd.Context) (apiparams.BootstrapOptions, error) {
+	bootstrapConfig, err := readStringMapFlag(ctxt, &c.config, "config")
+	if err != nil {
+		return apiparams.BootstrapOptions{}, err
+	}
+	modelDefault, err := readStringMapFlag(ctxt, &c.modelDefaults, "model-default")
+	if err != nil {
+		return apiparams.BootstrapOptions{}, err
+	}
+	bootstrapConstraints, err := parseConstraintFlag(ctxt, []string(c.bootstrapCons), "bootstrap-constraints")
+	if err != nil {
+		return apiparams.BootstrapOptions{}, err
+	}
+	modelConstraints, err := parseConstraintFlag(ctxt, []string(c.constraints), "constraints")
+	if err != nil {
+		return apiparams.BootstrapOptions{}, err
+	}
+	storagePool, err := readStoragePoolFlag(ctxt, &c.storagePool)
+	if err != nil {
+		return apiparams.BootstrapOptions{}, err
+	}
+
+	return apiparams.BootstrapOptions{
+		BootstrapBase:        c.bootstrapBase,
+		BootstrapConstraints: bootstrapConstraints,
+		ModelConstraints:     modelConstraints,
+		ModelDefault:         modelDefault,
+		StoragePool:          storagePool,
+		// The CLI intentionally keeps Juju's single --config entrypoint.
+		// StartBootstrap splits bootstrap, controller, and controller-model config,
+		// but JIMM merges those maps again when it shells out to juju bootstrap.
+		BootstrapConfig: bootstrapConfig,
+	}, nil
+}
+
+func readStoragePoolFlag(ctxt *cmd.Context, flag *common.ConfigFlag) (*apiparams.BootstrapStoragePool, error) {
+	attrs, err := flag.ReadAttrs(ctxt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read storage pool values: %w", err)
+	}
+	if len(attrs) == 0 {
+		return nil, nil
+	}
+	values, err := stringifyMapValues(attrs, "storage-pool")
+	if err != nil {
+		return nil, err
+	}
+	pool := &apiparams.BootstrapStoragePool{
+		Name: values["name"],
+		Type: values["type"],
+	}
+	delete(values, "name")
+	delete(values, "type")
+	if pool.Name == "" || pool.Type == "" {
+		return nil, fmt.Errorf("storage-pool requires both name and type")
+	}
+	if len(values) > 0 {
+		pool.Attributes = values
+	}
+	return pool, nil
+}
+
+func readStringMapFlag(ctxt *cmd.Context, flag *common.ConfigFlag, flagName string) (map[string]string, error) {
+	attrs, err := flag.ReadAttrs(ctxt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s values: %w", flagName, err)
+	}
+	return stringifyMapValues(attrs, flagName)
+}
+
+func stringifyMapValues(attrs map[string]any, flagName string) (map[string]string, error) {
+	if len(attrs) == 0 {
+		return nil, nil
+	}
+	values := make(map[string]string, len(attrs))
+	for key, value := range attrs {
+		strValue, err := stringifyScalar(value)
+		if err != nil {
+			return nil, fmt.Errorf("%s value for %q must be a scalar, got %T", flagName, key, value)
 		}
-		regionConfig[r] = attr
+		values[key] = strValue
 	}
-	return jujuparams.Cloud{
-		Type:              cloud.Type,
-		HostCloudRegion:   cloud.HostCloudRegion,
-		AuthTypes:         authTypes,
-		Endpoint:          cloud.Endpoint,
-		IdentityEndpoint:  cloud.IdentityEndpoint,
-		StorageEndpoint:   cloud.StorageEndpoint,
-		Regions:           regions,
-		CACertificates:    cloud.CACertificates,
-		SkipTLSVerify:     cloud.SkipTLSVerify,
-		Config:            cloud.Config,
-		RegionConfig:      regionConfig,
-		IsControllerCloud: cloud.IsControllerCloud,
+	return values, nil
+}
+
+func stringifyScalar(value any) (string, error) {
+	if value == nil {
+		return "", fmt.Errorf("nil value")
 	}
+	switch value.(type) {
+	case string,
+		bool,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return fmt.Sprint(value), nil
+	default:
+		return "", fmt.Errorf("unsupported type %T", value)
+	}
+}
+
+func parseConstraintFlag(ctxt *cmd.Context, values []string, flagName string) (map[string]string, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	// ParseWithAliases requires only spaces and name=value pairs.
+	joined := strings.Join(values, " ")
+	_, aliases, err := constraints.ParseWithAliases(joined)
+	common.WarnConstraintAliases(ctxt, aliases)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", flagName, err)
+	}
+	parsedValues := splitEscapedFields(joined)
+	result := make(map[string]string, len(parsedValues))
+	for _, value := range parsedValues {
+		keyValue := strings.SplitN(value, "=", 2)
+		if len(keyValue) != 2 {
+			return nil, fmt.Errorf("failed to parse %s: invalid constraint %q", flagName, value)
+		}
+		key := keyValue[0]
+		if canonical, ok := aliases[key]; ok {
+			key = canonical
+		}
+		result[key] = keyValue[1]
+	}
+	return result, nil
+}
+
+// splitEscapedFields splits a whitespace-delimited constraint string while
+// preserving spaces that were escaped as `\ ` inside an individual field.
+func splitEscapedFields(value string) []string {
+	if value == "" {
+		return nil
+	}
+	normalized := strings.ReplaceAll(value, `\ `, "\x00")
+	rawFields := strings.Fields(normalized)
+	fields := make([]string, 0, len(rawFields))
+	for _, field := range rawFields {
+		fields = append(fields, strings.ReplaceAll(field, "\x00", " "))
+	}
+	return fields
 }

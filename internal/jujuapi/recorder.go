@@ -53,7 +53,7 @@ func (r auditLogger) newEntry(header *rpc.Header) dbmodel.AuditLogEntry {
 }
 
 // LogRequest creates an audit log entry from a client request.
-func (r auditLogger) LogRequest(header *rpc.Header, body interface{}) error {
+func (r auditLogger) LogRequest(header *rpc.Header, body any) error {
 	ale := r.newEntry(header)
 	ale.ObjectId = header.Request.Id
 	ale.FacadeName = header.Request.Type
@@ -72,7 +72,7 @@ func (r auditLogger) LogRequest(header *rpc.Header, body interface{}) error {
 }
 
 // LogResponse creates an audit log entry from a controller response.
-func (o auditLogger) LogResponse(r rpc.Request, header *rpc.Header, body interface{}) error {
+func (o auditLogger) LogResponse(r rpc.Request, header *rpc.Header, body any) error {
 	var allErrors params.ErrorResults
 	bulkError, ok := body.(params.ErrorResults)
 	if ok {
@@ -116,12 +116,12 @@ func NewRecorder(logger auditLogger) recorder {
 }
 
 // HandleRequest implements rpc.Recorder.
-func (r recorder) HandleRequest(header *rpc.Header, body interface{}) error {
+func (r recorder) HandleRequest(header *rpc.Header, body any) error {
 	return r.logger.LogRequest(header, body)
 }
 
 // HandleReply implements rpc.Recorder.
-func (o recorder) HandleReply(r rpc.Request, header *rpc.Header, body interface{}) error {
+func (o recorder) HandleReply(r rpc.Request, header *rpc.Header, body any) error {
 	d := time.Since(o.start)
 	servermon.WebsocketRequestDuration.WithLabelValues(r.Type, r.Action).Observe(float64(d) / float64(time.Second))
 	return o.logger.LogResponse(r, header, body)

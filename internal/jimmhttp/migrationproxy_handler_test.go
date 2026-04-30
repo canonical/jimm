@@ -103,14 +103,14 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 			url:            "/foo",
 			headers:        http.Header{"X-Juju-Migration-Model-UUID": []string{"non-existent-model-uuid"}},
 			statusExpected: http.StatusNotFound,
-			bodyExpected:   `Not Found - model not found`,
+			bodyExpected:   `Not Found - model not found\n`,
 		},
 		{
 			description:    "missing model header",
 			url:            "/foo",
 			headers:        http.Header{"X-Juju-Migration-Model-UUID": []string{""}},
 			statusExpected: http.StatusBadRequest,
-			bodyExpected:   "Bad Request - missing X-Juju-Migration-Model-UUID header value",
+			bodyExpected:   "Bad Request - missing X-Juju-Migration-Model-UUID header value\n",
 		},
 	}
 

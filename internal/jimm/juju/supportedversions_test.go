@@ -22,11 +22,11 @@ import (
 // makeRelease builds a RepositoryRelease pointer suitable for use in tests.
 func makeRelease(tag string, draft, prerelease bool, publishedAt time.Time, htmlURL string) *github.RepositoryRelease {
 	return &github.RepositoryRelease{
-		TagName:     github.Ptr(tag),
-		Draft:       github.Ptr(draft),
-		Prerelease:  github.Ptr(prerelease),
+		TagName:     new(tag),
+		Draft:       new(draft),
+		Prerelease:  new(prerelease),
 		PublishedAt: &github.Timestamp{Time: publishedAt},
-		HTMLURL:     github.Ptr(htmlURL),
+		HTMLURL:     new(htmlURL),
 	}
 }
 

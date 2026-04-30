@@ -21,7 +21,7 @@ type httpLogEntry struct {
 }
 
 // Write is called when the request handler has finished.
-func (l *httpLogEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {
+func (l *httpLogEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra any) {
 	fields := make([]zap.Field, 0)
 
 	if status != 0 {
@@ -42,7 +42,7 @@ func (l *httpLogEntry) Write(status, bytes int, header http.Header, elapsed time
 }
 
 // Panic is called when the request handler panicked.
-func (l *httpLogEntry) Panic(v interface{}, stack []byte) {
+func (l *httpLogEntry) Panic(v any, stack []byte) {
 	middleware.PrintPrettyStack(v)
 }
 

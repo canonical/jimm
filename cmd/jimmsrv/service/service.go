@@ -473,10 +473,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		JWKS:   jwksService,
 	})
 
-	dialer := &jujuclient.Dialer{
-		ControllerCredentialsStore: credentialStore,
-		JWTService:                 jwtService,
-	}
+	dialer := jujuclient.NewDialer(credentialStore, jwtService, controllerUUID)
 
 	deps := &ServiceDependencies{
 		ControllerUUID:                controllerUUID,

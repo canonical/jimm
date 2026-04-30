@@ -193,7 +193,7 @@ func (s *roleManagerSuite) TestListRoles(c *qt.C) {
 	// Check happypath
 	s.user.JimmAdmin = true
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, err = s.db.AddRole(ctx, "r"+strconv.Itoa(i))
 		c.Assert(err, qt.IsNil)
 	}
@@ -224,7 +224,7 @@ func (s *roleManagerSuite) TestCountRoles(c *qt.C) {
 	// Check happypath
 	s.user.JimmAdmin = true
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		_, err = s.db.AddRole(ctx, "r"+strconv.Itoa(i))
 		c.Assert(err, qt.IsNil)
 	}

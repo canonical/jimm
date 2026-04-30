@@ -56,7 +56,6 @@ func (dh *DebugHandler) Status(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	wg.Add(len(checks))
 	for k, check := range checks {
-		k, check := k, check
 		go func() {
 			defer wg.Done()
 			result := statusResult{
@@ -84,7 +83,7 @@ func (dh *DebugHandler) Status(w http.ResponseWriter, r *http.Request) {
 // in the /debug/status response body.
 type statusResult struct {
 	Name     string
-	Value    interface{}
+	Value    any
 	Passed   bool
 	Duration time.Duration
 }
@@ -95,12 +94,12 @@ type StatusCheck interface {
 	Name() string
 
 	// Check runs the actual check.
-	Check(ctx context.Context) (interface{}, error)
+	Check(ctx context.Context) (any, error)
 }
 
 // MakeStatusCheck creates a status check with the given human readable
 // name which runs the given function.
-func MakeStatusCheck(name string, f func(context.Context) (interface{}, error)) StatusCheck {
+func MakeStatusCheck(name string, f func(context.Context) (any, error)) StatusCheck {
 	return statusCheck{
 		name: name,
 		f:    f,
@@ -111,7 +110,7 @@ func MakeStatusCheck(name string, f func(context.Context) (interface{}, error)) 
 // MakeStatusCheck.
 type statusCheck struct {
 	name string
-	f    func(context.Context) (interface{}, error)
+	f    func(context.Context) (any, error)
 }
 
 // Name implements StatusCheck.Name.
@@ -120,13 +119,13 @@ func (c statusCheck) Name() string {
 }
 
 // Check implements StatusCheck.Check.
-func (c statusCheck) Check(ctx context.Context) (interface{}, error) {
+func (c statusCheck) Check(ctx context.Context) (any, error) {
 	return c.f(ctx)
 }
 
 var startTime = time.Now().UTC()
 
 // ServerStartTime is a StatusCheck that returns the server start time.
-var ServerStartTime = MakeStatusCheck("server start time", func(_ context.Context) (interface{}, error) {
+var ServerStartTime = MakeStatusCheck("server start time", func(_ context.Context) (any, error) {
 	return startTime, nil
 })

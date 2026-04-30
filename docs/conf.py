@@ -252,6 +252,7 @@ extensions = [
     "sphinx_config_options",
     "sphinx_contributor_listing",
     "sphinx_filtered_toctree",
+    "sphinx_llm.txt",
     "sphinx_related_links",
     "sphinx_roles",
     "sphinx_terminal",
@@ -269,6 +270,17 @@ extensions = [
 ]
 
 new_tab_link_show_external_link_icon = True
+
+######################
+# sphinx-llm options #
+######################
+
+llms_txt_description = (
+    "JAAS is an enterprise layer on top of Juju that provides centralized controller management, "
+    "OIDC authentication, and ReBAC authorization."
+)
+llms_txt_suffix_mode = "url-suffix"
+markdown_http_base = "https://documentation.ubuntu.com/jaas/latest"
 
 # Excludes files or directories from processing
 

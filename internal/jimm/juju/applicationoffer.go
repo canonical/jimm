@@ -373,7 +373,17 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 
 	offerDetails, err := api.GetApplicationOffer(ctx, offerURL)
 	if err != nil {
-		return nil, err
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			return nil, err
+		}
+
+		// If the offer is not found on the controller, remove it from the database.
+		// This deals with timeouts to Juju in the JIMM DestroyOffer facade.
+		if err := j.deleteApplicationOffer(ctx, &offer); err != nil {
+			zapctx.Error(ctx, "error cleaning up dangling offer", zap.Error(err))
+		}
+
+		return nil, errors.Codef(errors.CodeNotFound, "application offer not found")
 	}
 
 	err = j.enrichOfferDetails(ctx, user, offerDetails)
@@ -386,30 +396,35 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 
 // DestroyOffer removes the application offer.
 func (j *JujuManager) DestroyOffer(ctx context.Context, user *openfga.User, offerURL string, force bool) error {
-
 	err := j.doApplicationOfferAdmin(ctx, user, offerURL, func(offer *dbmodel.ApplicationOffer, api API) error {
 		if err := api.DestroyApplicationOffer(ctx, offerURL, force); err != nil {
 			return err
 		}
-		if err := j.Database.DeleteApplicationOffer(ctx, offer); err != nil {
-			return err
-		}
-		if err := j.OpenFGAClient.RemoveApplicationOffer(
-			ctx,
-			offer.ResourceTag(),
-		); err != nil {
-			zapctx.Error(
-				ctx,
-				"cannot remove application offer",
-				zap.String("application-offer", offer.UUID))
-		}
-
-		return nil
+		return j.deleteApplicationOffer(ctx, offer)
 	})
 	if err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// deleteApplicationOffer removes an application offer from the database and OpenFGA.
+func (j *JujuManager) deleteApplicationOffer(ctx context.Context, offer *dbmodel.ApplicationOffer) error {
+	if err := j.Database.DeleteApplicationOffer(ctx, offer); err != nil {
+		zapctx.Error(
+			ctx,
+			"cannot remove application offer from database",
+			zap.String("application-offer", offer.UUID),
+			zap.Error(err))
+		return err
+	}
+	if err := j.OpenFGAClient.RemoveApplicationOffer(ctx, offer.ResourceTag()); err != nil {
+		zapctx.Error(
+			ctx,
+			"cannot remove application offer from OpenFGA",
+			zap.String("application-offer", offer.UUID))
+	}
 	return nil
 }
 

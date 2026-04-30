@@ -51,8 +51,8 @@ const (
 // that both the GoChecker and QuickTest checker satisfy.
 // Useful for enabling test setup functions to fail without a panic.
 type SimpleTester interface {
-	Fatalf(format string, args ...interface{})
-	Logf(format string, args ...interface{})
+	Fatalf(format string, args ...any)
+	Logf(format string, args ...any)
 }
 
 // An Authenticator is an implementation of jimm.Authenticator that returns
@@ -230,6 +230,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 
 	// Remember redirect url to check it matches after test server starts
 	redirectURL := "http://127.0.0.1:" + port + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+	// #nosec G101 Test credentials
 	authSvc, err := auth.NewAuthenticationService(context.Background(), auth.AuthenticationServiceParams{
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",

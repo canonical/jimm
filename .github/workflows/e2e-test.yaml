@@ -18,13 +18,25 @@ jobs:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
 
+      - name: Restore Docker image cache
+        id: docker-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: /tmp/docker-images.tar
+          key: docker-${{ runner.os }}-${{ hashFiles('docker-compose.yaml', 'docker-compose.common.yaml', 'local/*/Dockerfile') }}
+
+      - name: Load Docker images from cache
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i /tmp/docker-images.tar
+
       - name: Set up Docker Compose
         uses: docker/setup-compose-action@v1
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses:  actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
+          cache: false
 
       - name: Install dependencies
         run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
@@ -60,7 +72,7 @@ jobs:
       - name: Generate certs
         working-directory: local/traefik/certs
         run: ./certs.sh
-      
+
       - name: Start test environment
         run: docker compose up -d --wait
 
@@ -84,7 +96,7 @@ jobs:
               connect=tcp:$host_ip_addr:16443 \
               bind=container
           done
-      
+
       - name: Run E2E tests
         run: go test -v ./testing/... -timeout 30m
         env:

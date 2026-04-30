@@ -32,17 +32,17 @@ func (gl *GormLogger) LogMode(level logger.LogLevel) logger.Interface {
 }
 
 // Error implements logger.Interface, it logs at ERROR level.
-func (GormLogger) Error(ctx context.Context, f string, args ...interface{}) {
+func (GormLogger) Error(ctx context.Context, f string, args ...any) {
 	zapctx.Error(ctx, fmt.Sprintf(f, args...))
 }
 
 // Warn implements logger.Interface, it logs at WARN level.
-func (GormLogger) Warn(ctx context.Context, f string, args ...interface{}) {
+func (GormLogger) Warn(ctx context.Context, f string, args ...any) {
 	zapctx.Warn(ctx, fmt.Sprintf(f, args...))
 }
 
 // Info implements logger.Interface, it logs at INFO level.
-func (GormLogger) Info(ctx context.Context, f string, args ...interface{}) {
+func (GormLogger) Info(ctx context.Context, f string, args ...any) {
 	zapctx.Info(ctx, fmt.Sprintf(f, args...))
 }
 

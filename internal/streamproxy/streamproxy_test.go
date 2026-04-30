@@ -17,7 +17,7 @@ import (
 )
 
 func echoSingleMessage(c *websocket.Conn) error {
-	msg := make(map[string]interface{})
+	msg := make(map[string]any)
 	if err := c.ReadJSON(&msg); err != nil {
 		return err
 	}

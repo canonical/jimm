@@ -14,7 +14,7 @@ import (
 )
 
 // HandlerFunc takes two arguments - a model ID and the message about this model.
-type HandlerFunc func(string, interface{})
+type HandlerFunc func(string, any)
 
 type subscriber struct {
 	matcher func(string) bool
@@ -33,7 +33,7 @@ type Hub struct {
 	parallel    *parallel.Run
 	idx         int
 	subscribers map[int]subscriber
-	messages    map[string]interface{}
+	messages    map[string]any
 }
 
 func (h *Hub) setupParallel() {
@@ -48,7 +48,7 @@ func (h *Hub) setupParallel() {
 
 // Publish notifies all subscribers by calling their notify
 // function.
-func (h *Hub) Publish(model string, content interface{}) <-chan struct{} {
+func (h *Hub) Publish(model string, content any) <-chan struct{} {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -58,7 +58,7 @@ func (h *Hub) Publish(model string, content interface{}) <-chan struct{} {
 	h.setupParallel()
 
 	if h.messages == nil {
-		h.messages = make(map[string]interface{})
+		h.messages = make(map[string]any)
 	}
 	h.messages[model] = content
 	for _, s := range h.subscribers {

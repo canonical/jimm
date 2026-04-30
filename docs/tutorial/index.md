@@ -213,7 +213,7 @@ Now move onto the next step to initialise Vault.
 
 ## Initialise Vault
 
-The Vault charm has documentation on how to initialise it [here](https://charmhub.io/vault-k8s/docs/h-getting-started?channel=1.15/beta). But an abridged version of the steps are provided here.
+The Vault charm has documentation on how to initialise it [here](https://charmhub.io/vault-k8s/docs/h-getting-started). But an abridged version of the steps are provided here.
 
 To communicate with the Vault server we now need to setup 3 environment variables:
 

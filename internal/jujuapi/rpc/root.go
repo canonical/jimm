@@ -73,6 +73,7 @@ func (r *Root) Kill() {
 }
 
 func (r *Root) start(ctx context.Context) (context.Context, uint64) {
+	// #nosec G118 Cancel func is called when end is called
 	ctx, cancel := context.WithCancel(ctx)
 	r.inflightMu.Lock()
 	defer r.inflightMu.Unlock()

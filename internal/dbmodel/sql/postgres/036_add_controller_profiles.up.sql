@@ -1,0 +1,32 @@
+-- Add controller profiles for reusable, non-secret bootstrap settings.
+
+CREATE TABLE IF NOT EXISTS controller_profiles (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    juju_version VARCHAR(20) NOT NULL,
+    version BIGINT NOT NULL CHECK (version > 0),
+    cloud_name VARCHAR(255) NOT NULL,
+    cloud_type VARCHAR(255),
+    cloud_auth_types JSONB,
+    cloud_ca_certificates JSONB,
+    cloud_config JSONB,
+    cloud_endpoint VARCHAR(255),
+    cloud_host_cloud_region VARCHAR(255),
+    cloud_region_name VARCHAR(255) NOT NULL,
+    cloud_region_endpoint VARCHAR(255),
+    cloud_region_identity_endpoint VARCHAR(255),
+    cloud_region_storage_endpoint VARCHAR(255),
+    bootstrap_base VARCHAR(255),
+    bootstrap_constraints JSONB,
+    model_constraints JSONB,
+    model_default JSONB,
+    storage_pool_name VARCHAR(255),
+    storage_pool_type VARCHAR(255),
+    storage_pool_attributes JSONB,
+    bootstrap_config JSONB,
+    controller_config JSONB,
+    controller_model_config JSONB
+);

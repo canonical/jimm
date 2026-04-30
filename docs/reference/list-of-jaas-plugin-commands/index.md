@@ -31,6 +31,36 @@ flag. If the flag is missing, the command will assume the cloud definition
 is already known and will error otherwise.
 
 
+(command-jaas-add-controller-profile)=
+# jaas add-controller-profile
+
+## Summary
+Add a controller profile.
+
+## Usage
+```juju jaas add-controller-profile [options] <name>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--file` |  | Specify a file-path for the controller profile, use '-' to read from stdin. |
+| `--format` | yaml | Specify output format (json&#x7c;yaml) |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju jaas add-controller-profile my-profile --file ./profile.yaml
+    cat profile.yaml | juju jaas add-controller-profile my-profile --file -
+
+
+## Details
+
+Adds a controller profile.
+
+The controller profile definition is read from a YAML file or from stdin.
+
+
 (command-jaas-add-group)=
 # jaas add-group
 
@@ -236,17 +266,24 @@ Bootstrap a Juju controller via JIMM
 | Flag | Default | Usage |
 | --- | --- | --- |
 | `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--bootstrap-base` |  | Specify the base of the bootstrap machine. |
+| `--bootstrap-constraints` | [] | Specify bootstrap machine constraints. |
 | `--config` |  | Specify a configuration file, or one or more configuration options.     (`--config config.yaml [--config key=value ...])` |
+| `--constraints` | [] | Set model constraints |
 | `--credential` |  | The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud. |
 | `--detach` | false | If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete. |
 | `--format` | json | Specify output format (json&#x7c;yaml) |
+| `--model-default` |  | Specify a configuration file, or one or more configuration options to be set for all models, unless otherwise specified.     (`--model-default config.yaml [--model-default key=value ...])` |
 | `-o`, `--output` |  | Specify an output file |
+| `--storage-pool` |  | Specify options for an initial storage pool. 'name' and 'type' are required, plus any additional attributes.     (`--storage-pool pool-config.yaml [--storage-pool key=value ...])` |
 
 ## Examples
 
 	juju [jaas] bootstrap <cloud[/region]> <controller name> <controller version>
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8
 	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --config controller-service-type=loadbalancer
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --bootstrap-base ubuntu@24.04 --bootstrap-constraints mem=8G --constraints arch=amd64
+	juju [jaas] bootstrap mycloud/region mycontroller 3.6.8 --storage-pool name=controller-pool --storage-pool type=ebs --config audit-log-enabled=true
 
 
 ## Details
@@ -276,10 +313,11 @@ file contents.
 These config options must match the config options supported by the Juju CLI
 for the version of Juju being bootstrapped. See the Juju documentation for
 the version specified for the full list of supported bootstrap config
-options.
+options. Additional bootstrap settings can be supplied with --bootstrap-base,
+--bootstrap-constraints, --constraints, --model-default, and --storage-pool,
+these align with the corresponding Juju CLI options.
 
-Note that some config options may not be specified as they will automatically
-be set.
+Note that some config options will be automatically set but can be overriden.
 These are:
 
 - login-token-refresh-url
@@ -655,6 +693,34 @@ Displays audit events
 ## Details
 
 Returns audit log events.
+
+
+(command-jaas-list-controller-profiles)=
+# jaas list-controller-profiles
+
+## Summary
+List saved controller profiles.
+
+## Usage
+```juju jaas list-controller-profiles [options] ```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `--juju-version` |  | Only return profiles compatible with the specified Juju version. |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju jaas list-controller-profiles
+    juju jaas list-controller-profiles --juju-version 3.6.4
+
+
+## Details
+
+Lists saved controller profiles.
 
 
 (command-jaas-list-groups)=
@@ -1068,6 +1134,32 @@ Remove cloud from specific controller in jimm
 Removes the specified cloud from the specified controller in JIMM.
 
 
+(command-jaas-remove-controller-profile)=
+# jaas remove-controller-profile
+
+## Summary
+Remove a saved controller profile.
+
+## Usage
+```juju jaas remove-controller-profile [options] <name>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--force` | false | delete controller profile without prompt |
+
+## Examples
+
+    juju jaas remove-controller-profile my-profile
+    juju jaas remove-controller-profile my-profile --force
+
+
+## Details
+
+Removes a saved controller profile.
+
+
 (command-jaas-remove-group)=
 # jaas remove-group
 
@@ -1327,6 +1419,33 @@ Sets controller deprecated status.
 Sets the deprecated status of a controller.
 
 
+(command-jaas-show-controller-profile)=
+# jaas show-controller-profile
+
+## Summary
+Show a saved controller profile.
+
+## Usage
+```juju jaas show-controller-profile [options] <name>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--format` | yaml | Specify output format (json&#x7c;yaml) |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju jaas show-controller-profile my-profile
+    juju jaas show-controller-profile my-profile --format json
+
+
+## Details
+
+Shows a saved controller profile.
+
+
 (command-jaas-show-model)=
 # jaas show-model
 
@@ -1388,6 +1507,38 @@ Remove controller from jimm
 ## Details
 
 Deregisters a controller from JIMM.
+
+
+(command-jaas-update-controller-profile)=
+# jaas update-controller-profile
+
+## Summary
+Update a saved controller profile.
+
+## Usage
+```juju jaas update-controller-profile [options] <name>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--file` |  | Specify a file-path for the controller profile, use '-' to read from stdin. |
+| `--format` | yaml | Specify output format (json&#x7c;yaml) |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju jaas update-controller-profile my-profile --file ./profile.yaml
+    cat profile.yaml | juju jaas update-controller-profile my-profile --file -
+
+
+## Details
+
+Updates a saved controller profile.
+
+The controller profile definition is read from a YAML file or from stdin.
+If the provided profile does not specify a version, the current version is
+retrieved before saving.
 
 
 (command-jaas-update-migrated-model)=

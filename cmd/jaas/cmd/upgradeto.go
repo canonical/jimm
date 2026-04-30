@@ -96,11 +96,11 @@ func (c *upgradeToCommand) Run(ctxt *cmd.Context) error {
 	if err != nil {
 		return err
 	}
-	if !resp.Success {
-		err = c.out.Write(ctxt, resp)
-		if err != nil {
-			return err
-		}
+
+	err = c.out.Write(ctxt, resp)
+	if err != nil {
+		return err
 	}
+
 	return nil
 }

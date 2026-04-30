@@ -35,7 +35,7 @@ type GeneratorAccessChecker interface {
 	GetUserModelAccess(context.Context, *openfga.User, names.ModelTag) (string, error)
 	GetUserControllerAccess(context.Context, *openfga.User, names.ControllerTag) (string, error)
 	GetUserCloudAccess(context.Context, *openfga.User, names.CloudTag) (string, error)
-	CheckPermission(context.Context, *openfga.User, map[string]string, map[string]interface{}) (map[string]string, error)
+	CheckPermission(context.Context, *openfga.User, map[string]string, map[string]any) (map[string]string, error)
 }
 
 // JWTService specifies the service JWT generator uses to generate JWTs.
@@ -150,7 +150,7 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 // MakeToken assumes MakeLoginToken has already been called and checks the permissions
 // specified in the permissionMap. If the logged in user has all those permissions
 // a JWT will be returned with assertions confirming all those permissions.
-func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
+func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]any) ([]byte, error) {
 
 	auth.mu.Lock()
 	defer auth.mu.Unlock()

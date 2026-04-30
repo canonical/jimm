@@ -11,7 +11,6 @@ import (
 	qt "github.com/frankban/quicktest"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
-	"github.com/canonical/jimm/v3/internal/common/utils"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
@@ -48,10 +47,10 @@ func TestListResources(t *testing.T) {
 	}{
 		{
 			desc:       "test good",
-			size:       utils.IntToPointer(2),
-			page:       utils.IntToPointer(0),
-			nameFilter: utils.StringToPointer(""),
-			typeFilter: utils.StringToPointer(""),
+			size:       new(2),
+			page:       new(0),
+			nameFilter: new(""),
+			typeFilter: new(""),
 		},
 		{
 			desc:       "test good with all params set to nil",
@@ -65,7 +64,7 @@ func TestListResources(t *testing.T) {
 			size:             nil,
 			page:             nil,
 			nameFilter:       nil,
-			typeFilter:       utils.StringToPointer("type-not-found"),
+			typeFilter:       new("type-not-found"),
 			expectErrorMatch: ".*this resource type is not supported.*",
 		},
 	}

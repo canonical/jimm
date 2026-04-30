@@ -48,7 +48,7 @@ func TestCloud(t *testing.T) {
 		Config: dbmodel.Map{
 			"k1": float64(1),
 			"k2": "A",
-			"k3": map[string]interface{}{"k": []interface{}{"v"}},
+			"k3": map[string]any{"k": []any{"v"}},
 		},
 	}
 	result = db.Create(&cl1)
@@ -96,13 +96,13 @@ func TestToJujuCloud(t *testing.T) {
 			Config: dbmodel.Map{
 				"k1": float64(2),
 				"k2": "B",
-				"k3": map[string]interface{}{"k": []interface{}{"V"}},
+				"k3": map[string]any{"k": []any{"V"}},
 			},
 		}},
 		Config: dbmodel.Map{
 			"k1": float64(1),
 			"k2": "A",
-			"k3": map[string]interface{}{"k": []interface{}{"v"}},
+			"k3": map[string]any{"k": []any{"v"}},
 		},
 	}
 	pc := cl.ToJujuCloud()
@@ -119,16 +119,16 @@ func TestToJujuCloud(t *testing.T) {
 			StorageEndpoint:  "https://storage.region.example.com",
 		}},
 		CACertificates: []string{"cert1", "cert2"},
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"k1": float64(1),
 			"k2": "A",
-			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
+			"k3": map[string]any{"k": []any{string("v")}},
 		},
-		RegionConfig: map[string]map[string]interface{}{
+		RegionConfig: map[string]map[string]any{
 			"test-region": {
 				"k1": float64(2),
 				"k2": "B",
-				"k3": map[string]interface{}{"k": []interface{}{string("V")}},
+				"k3": map[string]any{"k": []any{string("V")}},
 			},
 		},
 	})
@@ -151,16 +151,16 @@ func TestFromJujuCloud(t *testing.T) {
 			StorageEndpoint:  "https://storage.region.example.com",
 		}},
 		CACertificates: []string{"cert1", "cert2"},
-		Config: map[string]interface{}{
+		Config: map[string]any{
 			"k1": float64(1),
 			"k2": "A",
-			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
+			"k3": map[string]any{"k": []any{string("v")}},
 		},
 		RegionConfig: jujucloud.RegionConfig{
 			"test-region": {
 				"k1": float64(2),
 				"k2": "B",
-				"k3": map[string]interface{}{"k": []interface{}{string("V")}},
+				"k3": map[string]any{"k": []any{string("V")}},
 			},
 		},
 	}
@@ -186,14 +186,14 @@ func TestFromJujuCloud(t *testing.T) {
 			Config: dbmodel.Map{
 				"k1": float64(2),
 				"k2": "B",
-				"k3": map[string]interface{}{"k": []interface{}{string("V")}},
+				"k3": map[string]any{"k": []any{string("V")}},
 			},
 		}},
 		CACertificates: dbmodel.Strings{"cert1", "cert2"},
 		Config: dbmodel.Map{
 			"k1": float64(1),
 			"k2": "A",
-			"k3": map[string]interface{}{"k": []interface{}{string("v")}},
+			"k3": map[string]any{"k": []any{string("v")}},
 		},
 	})
 }
@@ -217,13 +217,13 @@ func TestToJujuCloudInfo(t *testing.T) {
 			Config: dbmodel.Map{
 				"k1": float64(2),
 				"k2": "B",
-				"k3": map[string]interface{}{"k": []interface{}{"V"}},
+				"k3": map[string]any{"k": []any{"V"}},
 			},
 		}},
 		Config: dbmodel.Map{
 			"k1": float64(1),
 			"k2": "A",
-			"k3": map[string]interface{}{"k": []interface{}{"v"}},
+			"k3": map[string]any{"k": []any{"v"}},
 		},
 	}
 	pci := cl.ToJujuCloudInfo()

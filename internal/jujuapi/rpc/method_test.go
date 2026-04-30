@@ -17,40 +17,40 @@ type S2 struct{}
 
 var procTests = []struct {
 	name             string
-	f                interface{}
+	f                any
 	expectPanic      string
 	expectParamsType reflect.Type
 	expectResultType reflect.Type
 }{{
 	name:             "full",
 	f:                func(ctx context.Context, objID string, params S1) (resutlt S2, err error) { return },
-	expectParamsType: reflect.TypeOf(S1{}),
-	expectResultType: reflect.TypeOf(S2{}),
+	expectParamsType: reflect.TypeFor[S1](),
+	expectResultType: reflect.TypeFor[S2](),
 }, {
 	name:             "no context",
 	f:                func(objID string, params S1) (resutlt S2, err error) { return },
-	expectParamsType: reflect.TypeOf(S1{}),
-	expectResultType: reflect.TypeOf(S2{}),
+	expectParamsType: reflect.TypeFor[S1](),
+	expectResultType: reflect.TypeFor[S2](),
 }, {
 	name:             "no object ID",
 	f:                func(ctx context.Context, params S1) (resutlt S2, err error) { return },
-	expectParamsType: reflect.TypeOf(S1{}),
-	expectResultType: reflect.TypeOf(S2{}),
+	expectParamsType: reflect.TypeFor[S1](),
+	expectResultType: reflect.TypeFor[S2](),
 }, {
 	name:             "no params",
 	f:                func(ctx context.Context, objId string) (resutlt S2, err error) { return },
 	expectParamsType: nil,
-	expectResultType: reflect.TypeOf(S2{}),
+	expectResultType: reflect.TypeFor[S2](),
 }, {
 	name:             "no result",
 	f:                func(ctx context.Context, objId string, params S1) (err error) { return },
-	expectParamsType: reflect.TypeOf(S1{}),
+	expectParamsType: reflect.TypeFor[S1](),
 	expectResultType: nil,
 }, {
 	name:             "no error",
 	f:                func(ctx context.Context, objId string, params S1) (result S2) { return },
-	expectParamsType: reflect.TypeOf(S1{}),
-	expectResultType: reflect.TypeOf(S2{}),
+	expectParamsType: reflect.TypeFor[S1](),
+	expectResultType: reflect.TypeFor[S2](),
 }, {
 	name:             "empty function",
 	f:                func() {},

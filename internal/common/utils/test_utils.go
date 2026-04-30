@@ -1,10 +1,12 @@
 // Copyright 2024 Canonical.
 package utils
 
+//go:fix inline
 func IntToPointer(i int) *int {
-	return &i
+	return new(i)
 }
 
+//go:fix inline
 func StringToPointer(s string) *string {
-	return &s
+	return new(s)
 }

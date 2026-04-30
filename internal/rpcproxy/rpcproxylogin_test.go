@@ -34,18 +34,21 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 		clientSecret = "test-client-secret"
 	)
 
+	// #nosec G101
 	loginData, err := json.Marshal(params.LoginRequest{
 		AuthTag: names.NewUserTag("alice@wonderland.io").String(),
 		Token:   "dGVzdCB0b2tlbg==",
 	})
 	c.Assert(err, qt.IsNil)
 
+	// #nosec G101
 	serviceAccountLoginData, err := json.Marshal(params.LoginRequest{
 		AuthTag: names.NewUserTag("test-client-id@serviceaccount").String(),
 		Token:   "dGVzdCB0b2tlbg==",
 	})
 	c.Assert(err, qt.IsNil)
 
+	// #nosec G117
 	ccData, err := json.Marshal(apiparams.LoginWithClientCredentialsRequest{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
@@ -356,16 +359,14 @@ func TestProxySocketsAdminFacade(t *testing.T) {
 				RedirectInfo:            &mockRedirectInfo{},
 			}
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				err = rpcproxy.ProxySockets(ctx, helpers)
 				if proxyError {
 					c.Assert(err, qt.ErrorMatches, test.expectedProxyError)
 				} else {
 					c.Assert(err, qt.ErrorMatches, "Context cancelled")
 				}
-			}()
+			})
 			data, err := json.Marshal(test.messageToSend)
 			c.Assert(err, qt.IsNil)
 			clientWebsocket.read <- data
@@ -471,13 +472,13 @@ type mockWebsocketConnection struct {
 	once  sync.Once
 }
 
-func (w *mockWebsocketConnection) ReadJSON(v interface{}) error {
+func (w *mockWebsocketConnection) ReadJSON(v any) error {
 	data := <-w.read
 
 	return json.Unmarshal(data, v)
 }
 
-func (w *mockWebsocketConnection) WriteJSON(v interface{}) error {
+func (w *mockWebsocketConnection) WriteJSON(v any) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -508,7 +509,7 @@ func (m *mockTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.U
 	return []byte("test token"), nil
 }
 
-func (m *mockTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]interface{}) ([]byte, error) {
+func (m *mockTokenGenerator) MakeToken(ctx context.Context, permissionMap map[string]any) ([]byte, error) {
 	return []byte("test token"), nil
 }
 
@@ -542,8 +543,8 @@ func (m *mockRedirectInfo) GetRedirectInfo(_ context.Context) (rpcproxy.Controll
 	}, nil
 }
 
-func expectedRedirectInfo() map[string]interface{} {
-	return map[string]interface{}{
+func expectedRedirectInfo() map[string]any {
+	return map[string]any{
 		"servers": []any{
 			[]any{
 				map[string]any{

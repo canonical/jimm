@@ -2274,7 +2274,7 @@ func (s *permissionManagerSuite) TestOpenFGACleanup(c *qt.C) {
 	}}
 
 	orphanedTuples := []ofga.Tuple{}
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		for _, test := range tagTests {
 			objectTag := test.createObjectTag(i)
 			targetTag := test.createTargetTag(i)

@@ -111,7 +111,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 			return m, err
 		},
 	}
-	attrs := map[string]interface{}{
+	attrs := map[string]any{
 		"ssh-server-port": "17023",
 	}
 	cfg, err := jujucontroller.NewConfig(uuid, jujutesting.CACert, attrs)

@@ -174,6 +174,7 @@ In a fresh setup, the first should return an empty list, showing that no control
 The second command returns a list of audited events that JIMM has recorded. More information on JIMM's audit log feature
 is available at the following {ref}`audit-logs`.
 
+(integrate-jaas-with-the-canonical-observability-stack)=
 ## Integrate JAAS with the Canonical Observability Stack
 
 This document shows how to integrate the different components of JAAS with the
@@ -182,7 +183,7 @@ This document shows how to integrate the different components of JAAS with the
 The Canonical Observability Stack is a Juju bundle that includes a series of
 open source observability applications and related automation.
 For the complete list of components in COS, read the
-[Stack variants](https://documentation.ubuntu.com/observability/latest/explanation/stack-variants/).
+[Stack variants](https://documentation.ubuntu.com/observability/latest/explanation/architecture/).
 
 ### Prerequisites
 
@@ -334,6 +335,7 @@ on your Kubernetes cluster.
 With JAAS deployed, you can deploy both LEGO and the integrator, and integrate your LEGO charm deployment
 to your ingress integrator, and then the ingress integrator to JIMM to enable TLS ingress for your deployment.
 
+(integrate-jaas-with-the-juju-dashboard)=
 ## Integrate JAAS with the Juju dashboard
 
 Juju dashboard is a web UI that is intended to supplement the CLI experience with aggregate views and at a glance health checks.
@@ -383,6 +385,7 @@ juju config jimm-app juju-dashboard-location="https://hostname"
 
 Now go to `https://hostname`, sign in through the identity provider you setup during JAAS deployment, and you are in the dashboard.
 
+(harden-your-deployment)=
 ## Harden your deployment
 
 Configure JIMM to use CORS using the configuration option `cors-allowed-origins`.

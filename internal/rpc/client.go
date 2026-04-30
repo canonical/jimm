@@ -26,7 +26,7 @@ const (
 type Error struct {
 	Message string
 	Code    string
-	Info    map[string]interface{}
+	Info    map[string]any
 }
 
 // Error implements the error interface.
@@ -152,7 +152,7 @@ func (c *Client) handleResponse(msg *message) {
 // Call makes an RPC call to the server. Call sends the request message to
 // the server and waits for the response to be returned or the context to
 // be canceled.
-func (c *Client) Call(ctx context.Context, facade string, version int, id, method string, args, resp interface{}) error {
+func (c *Client) Call(ctx context.Context, facade string, version int, id, method string, args, resp any) error {
 
 	var argsb []byte
 	if args != nil {

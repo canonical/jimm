@@ -654,3 +654,49 @@ func TestApplicationOffers(t *testing.T) {
 		}},
 	})
 }
+
+func TestApplicationOfferDangling(t *testing.T) {
+	c := qt.New(t)
+	s, model := SetupAppOfferTest(c)
+	ctx := context.Background()
+
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	url := "bob@canonical.com/" + model.Name + ".test-offer1"
+
+	// Simulate dangling offer
+	offer := dbmodel.ApplicationOffer{
+		ID:      1,
+		UUID:    "00000001-0000-0000-0000-000000000001",
+		Name:    "test-offer1",
+		ModelID: model.ID,
+		URL:     url,
+	}
+	err := s.JIMM.Database.AddApplicationOffer(ctx, &offer)
+	c.Assert(err, qt.IsNil)
+
+	err = s.JIMM.OpenFGAClient.AddModelApplicationOffer(ctx, model.ResourceTag(), offer.ResourceTag())
+	c.Assert(err, qt.IsNil)
+
+	everyoneIdentity := &dbmodel.Identity{Name: ofganames.EveryoneUser}
+	everyoneUser := openfga.NewUser(everyoneIdentity, s.JIMM.OpenFGAClient)
+	err = everyoneUser.SetApplicationOfferAccess(ctx, offer.ResourceTag(), ofganames.ReaderRelation)
+	c.Assert(err, qt.IsNil)
+
+	// Trigger sync cleanup
+	_, err = client.ApplicationOffer(url)
+	c.Assert(err, qt.ErrorMatches, "application offer not found")
+
+	// Ensure offer has been removed from the database
+	offer = dbmodel.ApplicationOffer{
+		URL: url,
+	}
+	err = s.JIMM.Database.GetApplicationOffer(ctx, &offer)
+	c.Assert(err, qt.ErrorMatches, "application offer not found")
+
+	// Ensure offer doesn't show up in endpoint either
+	_, err = client.ApplicationOffer(url)
+	c.Assert(err, qt.ErrorMatches, "application offer not found")
+}

@@ -42,7 +42,6 @@ var (
 func (j *JujuManager) forEachController(ctx context.Context, controllers []dbmodel.Controller, f func(*dbmodel.Controller, API) error) error {
 	eg := new(errgroup.Group)
 	for i := range controllers {
-		i := i
 		eg.Go(func() error {
 			api, err := j.dial(ctx, &controllers[i], names.ModelTag{}, nil)
 			if err != nil {

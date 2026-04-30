@@ -130,7 +130,7 @@ func getFullStatus(
 				Status: "available",
 				Info:   "",
 				Since:  &now,
-				Data:   map[string]interface{}{},
+				Data:   map[string]any{},
 			},
 			SLA: "unsupported",
 		},

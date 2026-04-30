@@ -111,14 +111,14 @@ func TestHTTPProxyHandler(t *testing.T) {
 			url:            fmt.Sprintf("/model/%s/charms", "fake-uuid"),
 			modelUUID:      "fake-uuid",
 			statusExpected: http.StatusBadRequest,
-			bodyExpected:   "Bad Request - invalid model UUID format",
+			bodyExpected:   "Bad Request - invalid model UUID format\n",
 		},
 		{
 			description:    "model not existing",
 			url:            fmt.Sprintf("/model/%s/charms", "54d9f921-c45a-4825-8253-74e7edc28066"),
 			modelUUID:      "54d9f921-c45a-4825-8253-74e7edc28066",
 			statusExpected: http.StatusNotFound,
-			bodyExpected:   "Not Found - model not found",
+			bodyExpected:   "Not Found - model not found\n",
 		},
 	}
 

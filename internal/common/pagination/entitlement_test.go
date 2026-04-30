@@ -14,6 +14,7 @@ import (
 func TestMarshalEntitlementToken(t *testing.T) {
 	c := qt.New(t)
 
+	// #nosec G101 token value is not secret
 	tests := []struct {
 		desc          string
 		token         pagination.ComboToken
@@ -140,6 +141,7 @@ func TestDecodeEntitlementFilter(t *testing.T) {
 
 func TestNextEntitlementToken(t *testing.T) {
 	c := qt.New(t)
+	//nolint:gosec // Test fixtures intentionally include token-shaped values.
 	testCases := []struct {
 		desc          string
 		openFGAToken  string

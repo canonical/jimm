@@ -23,6 +23,7 @@ import (
 )
 
 const (
+	// #nosec G101 Test DSN for the local development Postgres instance.
 	defaultDSN = "postgresql://jimm:jimm@127.0.0.1:5432/jimm"
 )
 

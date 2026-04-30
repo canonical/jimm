@@ -8,7 +8,7 @@ myst:
 # Offer
 > See first: {external+juju:ref}`Juju | Offer <offer>`
 >
-> See also: {ref}`manage-offers`
+> See also: {ref}`control-user-access-to-an-offer`
 
 (offer-tag)=
 ## Offer tag

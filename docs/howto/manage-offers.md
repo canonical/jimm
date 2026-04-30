@@ -1,25 +1,17 @@
 ---
 myst:
   html_meta:
-    description: "Learn how to manage application offers in JAAS and control user access with reader, consumer, and administrator permissions."
+    description: "Learn how to manage application offers in JAAS and control user access with permissions."
 ---
 
 (manage-offers)=
 # Manage offers
-> See also: {ref}`offer`
-
+> See first: {ref}`offer`
 
 (control-user-access-to-an-offer)=
 ## Control user access to an offer
 
-To grant a (collection of) user(s) access to an application offer, add a `reader`, `consumer`, or `administrator` permission between the user(s) and the offer. For example:
+To grant a (collection of) user(s) access to an application offer, add a `reader`, `consumer`, or `administrator` permission between the user(s) and the offer.
 
-For example:
-
-```text
-# Let Alice consume offer myoffer:
-juju add-permission user-alice@canonical.com consumer applicationoffer-mycontroller/mymodel.myoffer
-```
-
-> See more: {ref}`manage-permissions`
+> See more: {ref}`add-a-permission`
 

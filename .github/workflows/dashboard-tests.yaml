@@ -55,9 +55,10 @@ jobs:
         uses: docker/setup-compose-action@v1
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses:   actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
+          cache: false
 
       - name: Go vendor to speed up docker build
         run: go mod vendor

@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"maps"
 
 	"github.com/juju/names/v5"
 	"gorm.io/gorm/clause"
@@ -50,9 +51,7 @@ func (d *Database) SetCloudDefaults(ctx context.Context, defaults *dbmodel.Cloud
 		}
 
 		// update defaults
-		for k, v := range defaults.Defaults {
-			dbDefaults.Defaults[k] = v
-		}
+		maps.Copy(dbDefaults.Defaults, defaults.Defaults)
 		if err := db.Clauses(clause.OnConflict{
 			Columns: []clause.Column{
 				{Name: "identity_name"},

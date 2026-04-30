@@ -56,6 +56,33 @@ func cloudFromParams(cloudName string, p jujuparams.Cloud) cloud.Cloud {
 	}
 }
 
+// bootstrapCloudFromParams converts the bootstrap cloud params into a cloud.Cloud.
+func bootstrapCloudFromParams(p params.BootstrapCloud) cloud.Cloud {
+	authTypes := make([]cloud.AuthType, len(p.AuthTypes))
+	for i, authType := range p.AuthTypes {
+		authTypes[i] = cloud.AuthType(authType)
+	}
+	regions := []cloud.Region{{
+		Name:             p.Region.Name,
+		Endpoint:         p.Region.Endpoint,
+		IdentityEndpoint: p.Region.IdentityEndpoint,
+		StorageEndpoint:  p.Region.StorageEndpoint,
+	}}
+	if p.Region == (params.BootstrapCloudRegion{}) {
+		regions = nil
+	}
+	return cloud.Cloud{
+		Name:            p.Name,
+		Type:            p.Type,
+		AuthTypes:       authTypes,
+		Endpoint:        p.Endpoint,
+		Regions:         regions,
+		CACertificates:  p.CACertificates,
+		HostCloudRegion: p.HostCloudRegion,
+		Config:          p.Config,
+	}
+}
+
 func toAddModelArgs(args jujuparams.ModelCreateArgs, authenticatedUser names.UserTag) (*juju.ModelCreateArgs, error) {
 	// FromJujuModelCreateArgs converts jujuparams.ModelCreateArgs into AddModelArgs.
 	var a juju.ModelCreateArgs

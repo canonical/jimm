@@ -52,7 +52,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 		CloudID:      cloud.ID,
 		Cloud:        cloud,
 		Region:       cloud1.Regions[0].Name,
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"key1": float64(17),
 			"key2": "some other data",
 		},
@@ -110,7 +110,7 @@ func (s *dbSuite) TestModelDefaults(c *qt.C) {
 		CloudID:      cloud1.ID,
 		Cloud:        cloud1,
 		Region:       cloud1.Regions[0].Name,
-		Defaults: map[string]interface{}{
+		Defaults: map[string]any{
 			"key3": "more data",
 		},
 	})

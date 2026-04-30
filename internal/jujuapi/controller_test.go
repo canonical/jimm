@@ -69,7 +69,6 @@ func TestInitiateMigration(t *testing.T) {
 	}}
 
 	for _, test := range tests {
-		test := test
 		c.Run(test.about, func(c *qt.C) {
 			jujuManager := mocks.JujuManager{
 				InitiateMigration_: test.initiateMigration,
