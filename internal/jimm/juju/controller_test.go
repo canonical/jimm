@@ -1583,6 +1583,4 @@ func TestControllerDetailsForModel(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(controllerDetails.ControllerUUID, qt.Equals, env.Controllers[0].UUID)
 	c.Assert(controllerDetails.PublicAddress, qt.Equals, "test-address.com")
-	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "")
-	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "")
 }

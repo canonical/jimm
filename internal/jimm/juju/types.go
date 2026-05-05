@@ -47,8 +47,6 @@ type ControllerConnectionDetails struct {
 	// Addresses holds the known addresses on which the controller is
 	// listening.
 	Addresses []network.MachineHostPorts
-	// Credentials holds legacy controller admin credentials.
-	Credentials ControllerCreds
 }
 
 func toControllerConnectionDetails(controller dbmodel.Controller) ControllerConnectionDetails {

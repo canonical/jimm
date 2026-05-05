@@ -214,8 +214,6 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(controllerDetails.ControllerUUID, qt.Equals, env.Controllers[0].UUID)
 	c.Assert(controllerDetails.PublicAddress, qt.Equals, "foo.com")
-	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "")
-	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "")
 }
 
 func toJimmMigratingInfo(c *qt.C, modelInfo migration.ModelInfo, desc descriptionv9.Model) juju.MigratingModelInfo {
