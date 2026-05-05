@@ -17,8 +17,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// CredentialStore provides the controller connection details for model HTTP proxying.
-type CredentialStore interface {
+// JujuManager provides the controller connection details for model HTTP proxying.
+type JujuManager interface {
 	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 }
@@ -26,10 +26,10 @@ type CredentialStore interface {
 // HTTPProxyHandler is an handler that provides proxying capabilities.
 // It uses the uuid in the path to proxy requests to model's controller.
 type HTTPProxyHandler struct {
-	Router          *chi.Mux
-	authenicator    middleware.Authenticator
-	credentialStore CredentialStore
-	jwtService      jujuclient.JWTMinter
+	Router       *chi.Mux
+	authenicator middleware.Authenticator
+	jujuManager  JujuManager
+	jwtService   jujuclient.JWTMinter
 }
 
 const (
@@ -38,12 +38,12 @@ const (
 )
 
 // NewHTTPProxyHandler creates a proxy http handler.
-func NewHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore, jwtService jujuclient.JWTMinter) *HTTPProxyHandler {
+func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtService jujuclient.JWTMinter) *HTTPProxyHandler {
 	h := &HTTPProxyHandler{
-		Router:          chi.NewRouter(),
-		authenicator:    authenticator,
-		credentialStore: credentialStore,
-		jwtService:      jwtService,
+		Router:       chi.NewRouter(),
+		authenicator: authenticator,
+		jujuManager:  jujuManager,
+		jwtService:   jwtService,
 	}
 	h.SetupMiddleware()
 	h.Router.HandleFunc(ProxyEndpoints, h.ProxyHTTP)
@@ -88,7 +88,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	controllerDetails, err := hph.credentialStore.ControllerDetailsForModel(ctx, modelUUID)
+	controllerDetails, err := hph.jujuManager.ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "model not found")

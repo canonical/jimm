@@ -29,19 +29,19 @@ import (
 // migration state before proxying the request to the controller.
 // 3. Requires the user to be a JIMM admin, rather than just a model writer.
 type MigrationHTTPProxyHandler struct {
-	Router          *chi.Mux
-	authenicator    middleware.Authenticator
-	credentialStore CredentialStore
-	jwtService      jujuclient.JWTMinter
+	Router       *chi.Mux
+	authenicator middleware.Authenticator
+	jujuManager  JujuManager
+	jwtService   jujuclient.JWTMinter
 }
 
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
-func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore, jwtService jujuclient.JWTMinter) *MigrationHTTPProxyHandler {
+func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtService jujuclient.JWTMinter) *MigrationHTTPProxyHandler {
 	return &MigrationHTTPProxyHandler{
-		Router:          chi.NewRouter(),
-		authenicator:    authenticator,
-		credentialStore: credentialStore,
-		jwtService:      jwtService,
+		Router:       chi.NewRouter(),
+		authenicator: authenticator,
+		jujuManager:  jujuManager,
+		jwtService:   jwtService,
 	}
 }
 
@@ -80,7 +80,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	controllerDetails, err := hph.credentialStore.ControllerDetailsForIncomingModel(ctx, modelUUID)
+	controllerDetails, err := hph.jujuManager.ControllerDetailsForIncomingModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
 			writeError(ctx, w, http.StatusNotFound, err, "migrating model not found")
