@@ -31,6 +31,8 @@ type ControllerCreds struct {
 // ControllerConnectionDetails contains details for connecting
 // to a Juju controller and the credentials used to access it.
 type ControllerConnectionDetails struct {
+	// ControllerUUID identifies the controller these connection details belong to.
+	ControllerUUID string
 	// CACertificate is the CA certificate required to access this
 	// controller. This is only set if the controller endpoint's
 	// certificate is not signed by a public CA.
@@ -45,20 +47,17 @@ type ControllerConnectionDetails struct {
 	// Addresses holds the known addresses on which the controller is
 	// listening.
 	Addresses []network.MachineHostPorts
-	// Credentials holds admin credentials for the controller.
+	// Credentials holds legacy controller admin credentials.
 	Credentials ControllerCreds
 }
 
-func toControllerConnectionDetails(controller dbmodel.Controller, username, password string) ControllerConnectionDetails {
+func toControllerConnectionDetails(controller dbmodel.Controller) ControllerConnectionDetails {
 	addresses := jujuparams.ToMachineHostsPorts(controller.Addresses)
 	return ControllerConnectionDetails{
-		CACertificate: controller.CACertificate,
-		PublicAddress: controller.PublicAddress,
-		TLSHostname:   controller.TLSHostname,
-		Addresses:     addresses,
-		Credentials: ControllerCreds{
-			AdminIdentityName: username,
-			AdminPassword:     password,
-		},
+		ControllerUUID: controller.UUID,
+		CACertificate:  controller.CACertificate,
+		PublicAddress:  controller.PublicAddress,
+		TLSHostname:    controller.TLSHostname,
+		Addresses:      addresses,
 	}
 }

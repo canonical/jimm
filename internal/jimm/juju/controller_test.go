@@ -1578,19 +1578,11 @@ func TestControllerDetailsForModel(t *testing.T) {
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	// Expect a failure with a valid UUID but no credentials
-	_, err = j.ControllerDetailsForModel(ctx, validUUID)
-	c.Assert(err, qt.IsNotNil)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-
-	// Set up credentials for the controller
-	err = j.CredentialStore.PutControllerCredentials(ctx, "controller-1", "test-user", "test-password")
-	c.Assert(err, qt.IsNil)
-
-	// Expect a successful retrieval of controller details with valid UUID and credentials
+	// Expect a successful retrieval of controller details with a valid UUID.
 	controllerDetails, err := j.ControllerDetailsForModel(ctx, validUUID)
 	c.Assert(err, qt.IsNil)
+	c.Assert(controllerDetails.ControllerUUID, qt.Equals, env.Controllers[0].UUID)
 	c.Assert(controllerDetails.PublicAddress, qt.Equals, "test-address.com")
-	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
-	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
+	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "")
+	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "")
 }

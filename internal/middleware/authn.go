@@ -137,6 +137,11 @@ func IdentityFromContext(ctx context.Context) (*openfga.User, error) {
 	return user, nil
 }
 
+// ContextWithIdentity returns a context carrying the authenticated user.
+func ContextWithIdentity(ctx context.Context, user *openfga.User) context.Context {
+	return withIdentity(ctx, user)
+}
+
 // withIdentity sets the user into the context and return the context
 func withIdentity(ctx context.Context, user *openfga.User) context.Context {
 	return context.WithValue(ctx, identityContextKey{}, user)

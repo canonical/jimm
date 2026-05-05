@@ -23,6 +23,7 @@ func TestProxyHTTP(t *testing.T) {
 	ctx := context.Background()
 	// we expect the controller to respond with TLS
 	fakeController := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.Check(r.Header.Get("Authorization"), qt.Equals, "Bearer test-token")
 		if strings.HasSuffix(r.URL.String(), "unauth") {
 			w.WriteHeader(401)
 			return
@@ -125,8 +126,7 @@ func TestProxyHTTP(t *testing.T) {
 			recorder := httptest.NewRecorder()
 
 			connectionDetails := test.getConnectionDetails(c)
-			connectionDetails.Username = "test-user"
-			connectionDetails.Password = "test-password"
+			connectionDetails.RequestHeaders = http.Header{"Authorization": []string{"Bearer test-token"}}
 			rpc.ProxyHTTP(ctx, connectionDetails, recorder, req)
 
 			resp := recorder.Result()

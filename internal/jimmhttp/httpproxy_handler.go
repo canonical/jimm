@@ -11,12 +11,13 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// CredentialStore provides the necessary credentials to connect to a model's controller.
+// CredentialStore provides the controller connection details for model HTTP proxying.
 type CredentialStore interface {
 	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
@@ -28,6 +29,7 @@ type HTTPProxyHandler struct {
 	Router          *chi.Mux
 	authenicator    middleware.Authenticator
 	credentialStore CredentialStore
+	jwtService      jujuclient.JWTMinter
 }
 
 const (
@@ -36,11 +38,12 @@ const (
 )
 
 // NewHTTPProxyHandler creates a proxy http handler.
-func NewHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore) *HTTPProxyHandler {
+func NewHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore, jwtService jujuclient.JWTMinter) *HTTPProxyHandler {
 	h := &HTTPProxyHandler{
 		Router:          chi.NewRouter(),
 		authenicator:    authenticator,
 		credentialStore: credentialStore,
+		jwtService:      jwtService,
 	}
 	h.SetupMiddleware()
 	h.Router.HandleFunc(ProxyEndpoints, h.ProxyHTTP)
@@ -79,6 +82,12 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	user, err := middleware.IdentityFromContext(ctx)
+	if err != nil {
+		writeError(ctx, w, http.StatusUnauthorized, err, "failed to get authenticated user")
+		return
+	}
+
 	controllerDetails, err := hph.credentialStore.ControllerDetailsForModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
@@ -89,13 +98,24 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
+	requestHeaders, err := jujuclient.NewControllerAuthorizationHeader(
+		ctx,
+		hph.jwtService,
+		controllerDetails.ControllerUUID,
+		names.NewModelTag(modelUUID),
+		user.ResourceTag().String(),
+	)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")
+		return
+	}
+
 	details := rpc.ConnectionDetails{
-		Addresses:     controllerDetails.Addresses,
-		PublicAddress: controllerDetails.PublicAddress,
-		CACertificate: controllerDetails.CACertificate,
-		TLSHostname:   controllerDetails.TLSHostname,
-		Username:      controllerDetails.Credentials.AdminIdentityName,
-		Password:      controllerDetails.Credentials.AdminPassword,
+		Addresses:      controllerDetails.Addresses,
+		PublicAddress:  controllerDetails.PublicAddress,
+		CACertificate:  controllerDetails.CACertificate,
+		TLSHostname:    controllerDetails.TLSHostname,
+		RequestHeaders: requestHeaders,
 	}
 
 	rpc.ProxyHTTP(ctx, details, w, req)

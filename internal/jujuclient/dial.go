@@ -19,7 +19,6 @@ import (
 	"time"
 
 	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
-	jujuhttp "github.com/juju/http/v2"
 	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
@@ -43,16 +42,21 @@ type ControllerCredentialsStore interface {
 	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
 }
 
+// JWTMinter issues controller JWTs for Juju RPC and HTTP requests.
+type JWTMinter interface {
+	NewJWT(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error)
+}
+
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {
 	ControllerCredentialsStore ControllerCredentialsStore
-	JWTService                 *jimmjwx.JWTService
+	JWTService                 JWTMinter
 	AdminUsername              string
 }
 
 // NewDialer creates a new Dialer from dependencies.
-func NewDialer(store ControllerCredentialsStore, jwtService *jimmjwx.JWTService, controllerUUID string) *Dialer {
+func NewDialer(store ControllerCredentialsStore, jwtService JWTMinter, controllerUUID string) *Dialer {
 	return &Dialer{
 		ControllerCredentialsStore: store,
 		JWTService:                 jwtService,
@@ -61,27 +65,65 @@ func NewDialer(store ControllerCredentialsStore, jwtService *jimmjwx.JWTService,
 	}
 }
 
-// createLoginRequest creates a jujuparams.LoginRequest for the given controller, model and user.
-func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (*jujuparams.LoginRequest, error) {
-	// Always request superuser permissions, even when representing a non-admin user
-	// This is only safe because we have already checked the user's openfga permissions in a layer above.
-	permissions := make(map[string]string)
-	permissions[ctl.ResourceTag().String()] = "superuser"
+func controllerAccessPermissions(controllerUUID string, modelTag names.ModelTag) map[string]string {
+	permissions := map[string]string{
+		names.NewControllerTag(controllerUUID).String(): "superuser",
+	}
 	if modelTag.Id() != "" {
 		permissions[modelTag.String()] = string(jujuparams.ModelAdminAccess)
 	}
+	return permissions
+}
 
-	userTag := user.ResourceTag().String()
+func newControllerJWTToken(ctx context.Context, jwtService JWTMinter, controllerUUID string, modelTag names.ModelTag, userTag string) (string, error) {
+	if jwtService == nil {
+		return "", errors.New("missing jwt service")
+	}
+	if controllerUUID == "" {
+		return "", errors.New("missing controller uuid")
+	}
+	if userTag == "" {
+		return "", errors.New("missing user tag")
+	}
 
-	jwt, err := d.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
-		Controller: ctl.ResourceTag().Id(),
+	jwt, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: controllerUUID,
 		User:       userTag,
-		Access:     permissions,
+		Access:     controllerAccessPermissions(controllerUUID, modelTag),
 	})
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(jwt), nil
+}
+
+// NewControllerAuthorizationHeader returns the Authorization header Juju expects
+// for controller HTTP and websocket requests authenticated with JWTs.
+func NewControllerAuthorizationHeader(ctx context.Context, jwtService JWTMinter, controllerUUID string, modelTag names.ModelTag, userTag string) (http.Header, error) {
+	token, err := newControllerJWTToken(ctx, jwtService, controllerUUID, modelTag, userTag)
 	if err != nil {
 		return nil, err
 	}
-	jwtString := base64.StdEncoding.EncodeToString(jwt)
+	header := make(http.Header)
+	header.Set("Authorization", "Bearer "+token)
+	return header, nil
+}
+
+func (d *Dialer) defaultUser(user *openfga.User) *openfga.User {
+	if user != nil {
+		return user
+	}
+	return &openfga.User{Identity: &dbmodel.Identity{Name: d.AdminUsername}}
+}
+
+// createLoginRequest creates a jujuparams.LoginRequest for the given controller, model and user.
+func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (*jujuparams.LoginRequest, error) {
+	user = d.defaultUser(user)
+	userTag := user.ResourceTag().String()
+	jwtString, err := newControllerJWTToken(ctx, d.JWTService, ctl.UUID, modelTag, userTag)
+	if err != nil {
+		return nil, err
+	}
 
 	return &jujuparams.LoginRequest{
 		AuthTag:       userTag,
@@ -102,9 +144,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	}
 	client := rpc.NewClient(conn)
 
-	if user == nil {
-		user = &openfga.User{Identity: &dbmodel.Identity{Name: d.AdminUsername}}
-	}
+	user = d.defaultUser(user)
 
 	var loginRequest *jujuparams.LoginRequest
 	loginRequest, err = d.createLoginRequest(ctx, ctl, modelTag, user)
@@ -312,6 +352,25 @@ func (c *Connection) Context() context.Context {
 	return c.ctx
 }
 
+func (c *Connection) authorizationHeader(ctx context.Context, modelTag names.ModelTag, extraHeaders http.Header) (http.Header, error) {
+	user := c.user
+	if user == nil {
+		user = c.dialer.defaultUser(nil)
+	}
+
+	header, err := NewControllerAuthorizationHeader(ctx, c.dialer.JWTService, c.ctl.UUID, modelTag, user.ResourceTag().String())
+	if err != nil {
+		return nil, err
+	}
+	for key, vals := range extraHeaders {
+		header.Del(key)
+		for _, val := range vals {
+			header.Add(key, val)
+		}
+	}
+	return header, nil
+}
+
 // ConnectStream connects to the given HTTP websocket
 // endpoint path (interpreted relative to the receiver's
 // model) and returns the resulting connection.
@@ -324,15 +383,10 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 		return nil, errors.New("no model found")
 	}
 
-	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
+	requestHeader, err := c.authorizationHeader(c.ctx, modelTag, nil)
 	if err != nil {
 		return nil, err
 	}
-	ok = names.IsValidUser(user)
-	if !ok {
-		return nil, errors.New("invalid/missing controller credentials")
-	}
-	requestHeader := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
 	conn, err := rpc.Dial(c.ctx, c.ctl, modelTag, path, requestHeader, attrs)
 	if err != nil {
 		return nil, err
@@ -346,17 +400,9 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 // HTTP request. Headers passed in will be added to the HTTP
 // request.
 func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extraHeaders http.Header) (base.Stream, error) {
-
-	user, pass, err := c.dialer.ControllerCredentialsStore.GetControllerCredentials(c.ctx, c.ctl.Name)
+	header, err := c.authorizationHeader(c.ctx, names.ModelTag{}, extraHeaders)
 	if err != nil {
 		return nil, err
-	}
-
-	header := jujuhttp.BasicAuthHeader(names.NewUserTag(user).String(), pass)
-	for key, vals := range extraHeaders {
-		for _, val := range vals {
-			header.Add(key, val)
-		}
 	}
 
 	conn, err := rpc.Dial(c.ctx, c.ctl, names.ModelTag{}, path, header, attrs)

@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/juju/juju/core/network"
-	"github.com/juju/names/v4"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 )
@@ -40,10 +39,9 @@ type ConnectionDetails struct {
 	// Addresses holds the known addresses on which the controller is
 	// listening.
 	Addresses []network.MachineHostPorts
-	// Username used to authentica with the controller.
-	Username string
-	// Password used to authenticate with the controller.
-	Password string
+	// RequestHeaders override any matching incoming request headers when JIMM
+	// proxies the request to the controller.
+	RequestHeaders http.Header
 }
 
 // ProxyHTTP handles HTTP requests by proxying them to the Juju controller.
@@ -95,12 +93,17 @@ func ProxyHTTP(ctx context.Context, ctl ConnectionDetails, w http.ResponseWriter
 		return
 	}
 
-	adminUsername := names.NewUserTag(ctl.Username).String()
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			// The multiBackendTransport will handle URL selection and failover
-			// We just need to set up basic auth here
-			pr.Out.SetBasicAuth(adminUsername, ctl.Password)
+			// while JIMM replaces the client's auth header with controller auth.
+			pr.Out.Header.Del("Authorization")
+			for key, vals := range ctl.RequestHeaders {
+				pr.Out.Header.Del(key)
+				for _, val := range vals {
+					pr.Out.Header.Add(key, val)
+				}
+			}
 		},
 		Transport: multiBackendTransport,
 		ErrorLog:  log.New(&proxyErrorLogger{}, "", 0), // flag=0 to avoid printing extra info that zap already gives us

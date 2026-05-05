@@ -8,10 +8,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -30,14 +32,16 @@ type MigrationHTTPProxyHandler struct {
 	Router          *chi.Mux
 	authenicator    middleware.Authenticator
 	credentialStore CredentialStore
+	jwtService      jujuclient.JWTMinter
 }
 
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
-func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore) *MigrationHTTPProxyHandler {
+func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, credentialStore CredentialStore, jwtService jujuclient.JWTMinter) *MigrationHTTPProxyHandler {
 	return &MigrationHTTPProxyHandler{
 		Router:          chi.NewRouter(),
 		authenicator:    authenticator,
 		credentialStore: credentialStore,
+		jwtService:      jwtService,
 	}
 }
 
@@ -70,6 +74,12 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
+	user, err := middleware.IdentityFromContext(ctx)
+	if err != nil {
+		writeError(ctx, w, http.StatusUnauthorized, err, "failed to get authenticated user")
+		return
+	}
+
 	controllerDetails, err := hph.credentialStore.ControllerDetailsForIncomingModel(ctx, modelUUID)
 	if err != nil {
 		if errors.ErrorCode(err) == errors.CodeNotFound {
@@ -80,13 +90,24 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
+	requestHeaders, err := jujuclient.NewControllerAuthorizationHeader(
+		ctx,
+		hph.jwtService,
+		controllerDetails.ControllerUUID,
+		names.ModelTag{},
+		user.ResourceTag().String(),
+	)
+	if err != nil {
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")
+		return
+	}
+
 	details := rpc.ConnectionDetails{
-		Addresses:     controllerDetails.Addresses,
-		PublicAddress: controllerDetails.PublicAddress,
-		CACertificate: controllerDetails.CACertificate,
-		TLSHostname:   controllerDetails.TLSHostname,
-		Username:      controllerDetails.Credentials.AdminIdentityName,
-		Password:      controllerDetails.Credentials.AdminPassword,
+		Addresses:      controllerDetails.Addresses,
+		PublicAddress:  controllerDetails.PublicAddress,
+		CACertificate:  controllerDetails.CACertificate,
+		TLSHostname:    controllerDetails.TLSHostname,
+		RequestHeaders: requestHeaders,
 	}
 
 	rpc.ProxyHTTP(ctx, details, w, req)

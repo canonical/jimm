@@ -205,24 +205,17 @@ func TestControllerDetailsForIncomingModel(t *testing.T) {
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	// Expect an error when there is no incoming model migration.
-	_, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
+	_, err := j.ControllerDetailsForIncomingModel(ctx, "00000000-0000-0000-0000-000000000099")
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-
-	// Expect an error when the controller credentials are not set.
-	_, err = j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
-	c.Assert(err, qt.IsNotNil)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
-
-	err = j.CredentialStore.PutControllerCredentials(ctx, "test1", "test-user", "test-password")
-	c.Assert(err, qt.IsNil)
 
 	// Expect to retrieve the controller details successfully.
 	controllerDetails, err := j.ControllerDetailsForIncomingModel(ctx, migratingModelUUID)
 	c.Assert(err, qt.IsNil)
+	c.Assert(controllerDetails.ControllerUUID, qt.Equals, env.Controllers[0].UUID)
 	c.Assert(controllerDetails.PublicAddress, qt.Equals, "foo.com")
-	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "test-user")
-	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "test-password")
+	c.Assert(controllerDetails.Credentials.AdminIdentityName, qt.Equals, "")
+	c.Assert(controllerDetails.Credentials.AdminPassword, qt.Equals, "")
 }
 
 func toJimmMigratingInfo(c *qt.C, modelInfo migration.ModelInfo, desc descriptionv9.Model) juju.MigratingModelInfo {

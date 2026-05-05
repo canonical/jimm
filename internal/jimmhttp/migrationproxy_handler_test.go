@@ -5,6 +5,7 @@ package jimmhttp_test
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
+	"github.com/canonical/jimm/v3/internal/middleware"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
@@ -59,11 +63,12 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 	}
 	err = db.AddOrUpdateIncomingModelMigration(c.Context(), incomingModel)
 	c.Assert(err, qt.IsNil)
+	user := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, nil)
+	user.JimmAdmin = true
+	var gotJWTParams jimmjwx.JWTParams
 
 	fakeController := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		u, p, _ := r.BasicAuth()
-		c.Check(u, qt.Equals, names.NewUserTag("admin").String())
-		c.Check(p, qt.Equals, "test")
+		c.Check(r.Header.Get("Authorization"), qt.Equals, "Bearer "+base64.StdEncoding.EncodeToString([]byte("test-token")))
 		_, err := w.Write([]byte("OK"))
 		c.Check(err, qt.IsNil)
 	}))
@@ -75,14 +80,15 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 				return juju.ControllerConnectionDetails{}, errors.Codef(errors.CodeNotFound, "model not found")
 			}
 			return juju.ControllerConnectionDetails{
-				PublicAddress: fakeController.URL,
-				Credentials: juju.ControllerCreds{
-					AdminPassword:     "test",
-					AdminIdentityName: "admin",
-				},
+				ControllerUUID: env.Controllers[0].UUID,
+				PublicAddress:  fakeController.URL,
 			}, nil
 		}}
-	migrationProxier := jimmhttp.NewMigrationHTTPProxyHandler(nil, &ctrlService)
+	jwtService := mocks.JWTService{NewJWT_: func(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
+		gotJWTParams = params
+		return []byte("test-token"), nil
+	}}
+	migrationProxier := jimmhttp.NewMigrationHTTPProxyHandler(nil, &ctrlService, jwtService)
 
 	tests := []struct {
 		description    string
@@ -123,6 +129,7 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 					req.Header.Add(key, value)
 				}
 			}
+			req = req.WithContext(middleware.ContextWithIdentity(req.Context(), user))
 
 			recorder := httptest.NewRecorder()
 			migrationProxier.ProxyHTTP(recorder, req)
@@ -136,4 +143,12 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 			c.Assert(string(body), qt.Matches, test.bodyExpected)
 		})
 	}
+
+	c.Assert(gotJWTParams, qt.DeepEquals, jimmjwx.JWTParams{
+		Controller: env.Controllers[0].UUID,
+		User:       names.NewUserTag("admin@canonical.com").String(),
+		Access: map[string]string{
+			names.NewControllerTag(env.Controllers[0].UUID).String(): "superuser",
+		},
+	})
 }

@@ -747,8 +747,7 @@ func (j *JujuManager) ControllerConfig(ctx context.Context, user *openfga.User, 
 	return cfg, nil
 }
 
-// ControllerDetailsForModel returns the controller details for the specified model
-// including the controller, and the admin credentials (username and password) for the controller.
+// ControllerDetailsForModel returns the controller details for the specified model.
 func (j *JujuManager) ControllerDetailsForModel(ctx context.Context, modelUUID string) (ControllerConnectionDetails, error) {
 
 	model := dbmodel.Model{
@@ -765,14 +764,5 @@ func (j *JujuManager) ControllerDetailsForModel(ctx context.Context, modelUUID s
 		return ControllerConnectionDetails{}, err
 	}
 
-	username, password, err := j.CredentialStore.GetControllerCredentials(ctx, model.Controller.Name)
-	if err != nil {
-		return ControllerConnectionDetails{}, err
-	}
-
-	if username == "" || password == "" {
-		return ControllerConnectionDetails{}, errors.Codef(errors.CodeNotFound, "missing credentials for controller %q", model.Controller.Name)
-	}
-
-	return toControllerConnectionDetails(model.Controller, username, password), nil
+	return toControllerConnectionDetails(model.Controller), nil
 }
