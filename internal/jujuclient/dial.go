@@ -35,13 +35,6 @@ import (
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
-// A ControllerCredentialsStore is a store for controller credentials.
-type ControllerCredentialsStore interface {
-	// GetControllerCredentials retrieves the credentials for the given controller from a vault
-	// service.
-	GetControllerCredentials(ctx context.Context, controllerName string) (string, string, error)
-}
-
 // JWTMinter issues controller JWTs for Juju RPC and HTTP requests.
 type JWTMinter interface {
 	NewJWT(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error)
@@ -50,16 +43,14 @@ type JWTMinter interface {
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {
-	ControllerCredentialsStore ControllerCredentialsStore
-	JWTService                 JWTMinter
-	AdminUsername              string
+	JWTService    JWTMinter
+	AdminUsername string
 }
 
 // NewDialer creates a new Dialer from dependencies.
-func NewDialer(store ControllerCredentialsStore, jwtService JWTMinter, controllerUUID string) *Dialer {
+func NewDialer(jwtService JWTMinter, controllerUUID string) *Dialer {
 	return &Dialer{
-		ControllerCredentialsStore: store,
-		JWTService:                 jwtService,
+		JWTService: jwtService,
 		// The admin username is a Juju external user, just like the JIMM users.
 		AdminUsername: fmt.Sprintf("jaas-%s@external", controllerUUID),
 	}
