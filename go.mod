@@ -9,7 +9,7 @@ require (
 	github.com/juju/description/v9 v9.0.0
 	github.com/juju/errors v1.0.0
 	github.com/juju/gnuflag v1.0.0
-	github.com/juju/http/v2 v2.0.1
+	github.com/juju/http/v2 v2.0.1 // indirect
 	github.com/juju/juju v0.0.0-20260325121537-78832a31ad6b // Tip of 3.6
 	github.com/juju/loggo v1.0.0 // indirect
 	github.com/juju/names/v4 v4.0.0
