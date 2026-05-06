@@ -91,16 +91,16 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	jwt, err := hph.jwtFactory.NewControllerSuperuserToken(
-		ctx,
-		controllerDetails.ControllerUUID,
-		names.ModelTag{},
-		user,
-	)
+	mt := names.NewModelTag(modelUUID)
+	ct := names.NewControllerTag(controllerDetails.ControllerUUID)
+	loginTokenGen := hph.jwtFactory.NewLoginGenerator()
+	loginTokenGen.SetTags(mt, ct)
+	jwt, err := loginTokenGen.MakeLoginToken(ctx, user)
 	if err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate login token")
 		return
 	}
+
 	requestHeaders := make(http.Header)
 	requestHeaders.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(jwt))
 

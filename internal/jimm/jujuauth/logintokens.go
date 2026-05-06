@@ -84,9 +84,8 @@ func (auth *LoginTokenGenerator) GetUser() names.UserTag {
 	return names.UserTag{}
 }
 
-// MakeLoginToken authorizes the user based on the provided login requests and returns
-// a JWT containing claims about user's access to the controller, model (if applicable)
-// and all clouds that the controller knows about.
+// MakeLoginToken authorizes the user and returns a JWT containing claims about user's access
+// to the controller, model and all clouds that the controller knows about.
 func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openfga.User) ([]byte, error) {
 
 	auth.mu.Lock()
