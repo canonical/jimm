@@ -18,7 +18,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -32,6 +34,7 @@ const (
 func TestHTTPProxyHandler(t *testing.T) {
 	c := qt.New(t)
 	user := openfga.NewUser(&dbmodel.Identity{Name: "alice@canonical.com"}, nil)
+	var gotJWTParams jimmjwx.JWTParams
 
 	fakeController := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.Check(r.Header.Get("Authorization"), qt.Equals, "Bearer "+base64.StdEncoding.EncodeToString([]byte("test-token")))
@@ -50,14 +53,12 @@ func TestHTTPProxyHandler(t *testing.T) {
 				PublicAddress:  fakeController.URL,
 			}, nil
 		},
-		ControllerSuperuserAuthorizationHeader_: func(ctx context.Context, controllerUUID string, modelTag names.ModelTag, gotUser *openfga.User) (http.Header, error) {
-			c.Check(controllerUUID, qt.Equals, httpProxyControllerUUID)
-			c.Check(modelTag, qt.Equals, names.NewModelTag(httpProxyModelUUID))
-			c.Check(gotUser.ResourceTag().String(), qt.Equals, user.ResourceTag().String())
-			return http.Header{"Authorization": []string{"Bearer " + base64.StdEncoding.EncodeToString([]byte("test-token"))}}, nil
-		},
 	}
-	httpProxier := jimmhttp.NewHTTPProxyHandler(nil, &ctrlService)
+	authFactory := jujuauth.NewFactory(nil, mocks.JWTService{NewJWT_: func(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
+		gotJWTParams = params
+		return []byte("test-token"), nil
+	}}, nil)
+	httpProxier := jimmhttp.NewHTTPProxyHandler(nil, &ctrlService, authFactory)
 
 	tests := []struct {
 		description    string
@@ -109,4 +110,13 @@ func TestHTTPProxyHandler(t *testing.T) {
 			c.Assert(string(body), qt.Matches, test.bodyExpected)
 		})
 	}
+
+	c.Assert(gotJWTParams, qt.DeepEquals, jimmjwx.JWTParams{
+		Controller: httpProxyControllerUUID,
+		User:       user.ResourceTag().String(),
+		Access: map[string]string{
+			names.NewModelTag(httpProxyModelUUID).String():           "admin",
+			names.NewControllerTag(httpProxyControllerUUID).String(): "superuser",
+		},
+	})
 }

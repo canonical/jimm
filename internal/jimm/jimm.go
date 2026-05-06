@@ -198,7 +198,6 @@ func New(p Parameters) (*JIMM, error) {
 		j.Database,
 		j.OpenFGAClient,
 		j.CredentialStore,
-		j.JWTService,
 		j.PermissionManager,
 		jimmResourceTag,
 		p.ReservedCloudNames,

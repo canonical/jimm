@@ -3,6 +3,7 @@
 package jimmhttp
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 
@@ -13,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -31,14 +33,16 @@ type MigrationHTTPProxyHandler struct {
 	Router       *chi.Mux
 	authenicator middleware.Authenticator
 	jujuManager  JujuManager
+	jwtFactory   *jujuauth.Factory
 }
 
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
-func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager) *MigrationHTTPProxyHandler {
+func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtFactory *jujuauth.Factory) *MigrationHTTPProxyHandler {
 	return &MigrationHTTPProxyHandler{
 		Router:       chi.NewRouter(),
 		authenicator: authenticator,
 		jujuManager:  jujuManager,
+		jwtFactory:   jwtFactory,
 	}
 }
 
@@ -87,7 +91,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	requestHeaders, err := hph.jujuManager.ControllerSuperuserAuthorizationHeader(
+	jwt, err := hph.jwtFactory.NewControllerSuperuserToken(
 		ctx,
 		controllerDetails.ControllerUUID,
 		names.ModelTag{},
@@ -97,6 +101,8 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")
 		return
 	}
+	requestHeaders := make(http.Header)
+	requestHeaders.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(jwt))
 
 	details := rpc.ConnectionDetails{
 		Addresses:      controllerDetails.Addresses,

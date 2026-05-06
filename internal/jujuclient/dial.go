@@ -56,7 +56,7 @@ func NewDialer(jwtService JWTMinter, controllerUUID string) *Dialer {
 	}
 }
 
-func controllerSuperuserPermissions(controllerUUID string, modelTag names.ModelTag) map[string]string {
+func controllerAccessPermissions(controllerUUID string, modelTag names.ModelTag) map[string]string {
 	permissions := map[string]string{
 		names.NewControllerTag(controllerUUID).String(): "superuser",
 	}
@@ -66,7 +66,7 @@ func controllerSuperuserPermissions(controllerUUID string, modelTag names.ModelT
 	return permissions
 }
 
-func newControllerSuperuserJWTToken(ctx context.Context, jwtService JWTMinter, controllerUUID string, modelTag names.ModelTag, userTag string) (string, error) {
+func newControllerJWTToken(ctx context.Context, jwtService JWTMinter, controllerUUID string, modelTag names.ModelTag, userTag string) (string, error) {
 	if jwtService == nil {
 		return "", errors.New("missing jwt service")
 	}
@@ -80,24 +80,12 @@ func newControllerSuperuserJWTToken(ctx context.Context, jwtService JWTMinter, c
 	jwt, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: controllerUUID,
 		User:       userTag,
-		Access:     controllerSuperuserPermissions(controllerUUID, modelTag),
+		Access:     controllerAccessPermissions(controllerUUID, modelTag),
 	})
 	if err != nil {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(jwt), nil
-}
-
-// NewControllerSuperuserAuthorizationHeader returns the Authorization header Juju expects
-// for controller HTTP and websocket requests that need controller-superuser access.
-func NewControllerSuperuserAuthorizationHeader(ctx context.Context, jwtService JWTMinter, controllerUUID string, modelTag names.ModelTag, userTag string) (http.Header, error) {
-	token, err := newControllerSuperuserJWTToken(ctx, jwtService, controllerUUID, modelTag, userTag)
-	if err != nil {
-		return nil, err
-	}
-	header := make(http.Header)
-	header.Set("Authorization", "Bearer "+token)
-	return header, nil
 }
 
 func (d *Dialer) defaultUser(user *openfga.User) *openfga.User {
@@ -111,7 +99,7 @@ func (d *Dialer) defaultUser(user *openfga.User) *openfga.User {
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (*jujuparams.LoginRequest, error) {
 	user = d.defaultUser(user)
 	userTag := user.ResourceTag().String()
-	jwtString, err := newControllerSuperuserJWTToken(ctx, d.JWTService, ctl.UUID, modelTag, userTag)
+	jwtString, err := newControllerJWTToken(ctx, d.JWTService, ctl.UUID, modelTag, userTag)
 	if err != nil {
 		return nil, err
 	}
@@ -343,16 +331,18 @@ func (c *Connection) Context() context.Context {
 	return c.ctx
 }
 
-func (c *Connection) controllerSuperuserAuthorizationHeader(ctx context.Context, modelTag names.ModelTag, extraHeaders http.Header) (http.Header, error) {
+func (c *Connection) authorizationHeader(ctx context.Context, modelTag names.ModelTag, extraHeaders http.Header) (http.Header, error) {
 	user := c.user
 	if user == nil {
 		user = c.dialer.defaultUser(nil)
 	}
 
-	header, err := NewControllerSuperuserAuthorizationHeader(ctx, c.dialer.JWTService, c.ctl.UUID, modelTag, user.ResourceTag().String())
+	jwtString, err := newControllerJWTToken(ctx, c.dialer.JWTService, c.ctl.UUID, modelTag, user.ResourceTag().String())
 	if err != nil {
 		return nil, err
 	}
+	header := make(http.Header)
+	header.Set("Authorization", "Bearer "+jwtString)
 	for key, vals := range extraHeaders {
 		header.Del(key)
 		for _, val := range vals {
@@ -374,7 +364,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 		return nil, errors.New("no model found")
 	}
 
-	requestHeader, err := c.controllerSuperuserAuthorizationHeader(c.ctx, modelTag, nil)
+	requestHeader, err := c.authorizationHeader(c.ctx, modelTag, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +381,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 // HTTP request. Headers passed in will be added to the HTTP
 // request.
 func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extraHeaders http.Header) (base.Stream, error) {
-	header, err := c.controllerSuperuserAuthorizationHeader(c.ctx, names.ModelTag{}, extraHeaders)
+	header, err := c.authorizationHeader(c.ctx, names.ModelTag{}, extraHeaders)
 	if err != nil {
 		return nil, err
 	}

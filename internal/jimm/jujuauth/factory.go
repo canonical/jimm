@@ -3,8 +3,8 @@
 package jujuauth
 
 // Factory holds the necessary components for producing
-// Juju authenticator objects. Currently a login token generator
-// and an SSH token generator are available.
+// Juju authenticator objects. Currently login token generators,
+// direct controller-superuser tokens, and SSH token generators are available.
 type Factory struct {
 	db            GeneratorDatabase
 	jwtService    JWTService

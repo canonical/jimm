@@ -4,6 +4,7 @@ package jimmhttp
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -11,18 +12,16 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/middleware"
-	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// JujuManager provides the controller connection details and controller-superuser
-// authorization headers used for model HTTP proxying.
+// JujuManager provides the controller connection details used for model HTTP proxying.
 type JujuManager interface {
 	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-	ControllerSuperuserAuthorizationHeader(ctx context.Context, controllerUUID string, modelTag names.ModelTag, user *openfga.User) (http.Header, error)
 }
 
 // HTTPProxyHandler is an handler that provides proxying capabilities.
@@ -31,6 +30,7 @@ type HTTPProxyHandler struct {
 	Router       *chi.Mux
 	authenicator middleware.Authenticator
 	jujuManager  JujuManager
+	jwtFactory   *jujuauth.Factory
 }
 
 const (
@@ -39,11 +39,12 @@ const (
 )
 
 // NewHTTPProxyHandler creates a proxy http handler.
-func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager) *HTTPProxyHandler {
+func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtFactory *jujuauth.Factory) *HTTPProxyHandler {
 	h := &HTTPProxyHandler{
 		Router:       chi.NewRouter(),
 		authenicator: authenticator,
 		jujuManager:  jujuManager,
+		jwtFactory:   jwtFactory,
 	}
 	h.SetupMiddleware()
 	h.Router.HandleFunc(ProxyEndpoints, h.ProxyHTTP)
@@ -98,7 +99,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	requestHeaders, err := hph.jujuManager.ControllerSuperuserAuthorizationHeader(
+	jwt, err := hph.jwtFactory.NewControllerSuperuserToken(
 		ctx,
 		controllerDetails.ControllerUUID,
 		names.NewModelTag(modelUUID),
@@ -108,6 +109,8 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")
 		return
 	}
+	requestHeaders := make(http.Header)
+	requestHeaders.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(jwt))
 
 	details := rpc.ConnectionDetails{
 		Addresses:      controllerDetails.Addresses,

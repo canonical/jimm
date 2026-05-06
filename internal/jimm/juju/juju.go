@@ -4,7 +4,6 @@ package juju
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/juju/names/v5"
@@ -13,7 +12,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
-	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
@@ -22,7 +20,6 @@ type JujuManager struct {
 	Database                *db.Database
 	OpenFGAClient           *openfga.OFGAClient
 	CredentialStore         credentials.CredentialStore
-	JWTService              jujuclient.JWTMinter
 	permissionManager       PermissionManager
 	resourceTag             names.ControllerTag
 	ReservedCloudNames      []string
@@ -39,7 +36,6 @@ func NewJujuManager(
 	store *db.Database,
 	authSvc *openfga.OFGAClient,
 	credentialStore credentials.CredentialStore,
-	jwtService jujuclient.JWTMinter,
 	permissionManager PermissionManager,
 	resourceTag names.ControllerTag,
 	reservedCloudNames []string,
@@ -55,9 +51,6 @@ func NewJujuManager(
 	}
 	if credentialStore == nil {
 		return nil, errors.New("credential store cannot be nil")
-	}
-	if jwtService == nil {
-		return nil, errors.New("jwt service cannot be nil")
 	}
 	if permissionManager == nil {
 		return nil, errors.New("permission manager cannot be nil")
@@ -75,7 +68,6 @@ func NewJujuManager(
 		Database:                store,
 		OpenFGAClient:           authSvc,
 		CredentialStore:         credentialStore,
-		JWTService:              jwtService,
 		permissionManager:       permissionManager,
 		resourceTag:             resourceTag,
 		ReservedCloudNames:      reservedCloudNames,
@@ -99,16 +91,4 @@ func (j *JujuManager) dial(ctx context.Context, ctl *dbmodel.Controller, modelTa
 // ResourceTag returns JIMM's controller tag stating its UUID.
 func (j *JujuManager) ResourceTag() names.ControllerTag {
 	return j.resourceTag
-}
-
-// ControllerSuperuserAuthorizationHeader returns a controller-superuser bearer header
-// for Juju controller HTTP and websocket requests.
-func (j *JujuManager) ControllerSuperuserAuthorizationHeader(ctx context.Context, controllerUUID string, modelTag names.ModelTag, user *openfga.User) (http.Header, error) {
-	if j == nil {
-		return nil, errors.New("juju manager not specified")
-	}
-	if user == nil {
-		return nil, errors.New("user not specified")
-	}
-	return jujuclient.NewControllerSuperuserAuthorizationHeader(ctx, j.JWTService, controllerUUID, modelTag, user.ResourceTag().String())
 }
