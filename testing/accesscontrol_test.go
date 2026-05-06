@@ -1485,16 +1485,61 @@ func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
 
 func TestModifyModelAccessDowngradesUserToNoAccess(t *testing.T) {
 	c := qt.New(t)
+	revoke, charlieAccess, charlieClient, modelTag := setupModelWithCharlieAsAdmin(c)
+
+	c.Assert(charlieAccess(), qt.Equals, "admin")
+
+	revoke(jujuparams.ModelAdminAccess)
+	c.Assert(charlieAccess(), qt.Equals, "write")
+
+	revoke(jujuparams.ModelWriteAccess)
+	c.Assert(charlieAccess(), qt.Equals, "read")
+
+	revoke(jujuparams.ModelReadAccess)
+	c.Assert(charlieAccess(), qt.Equals, "")
+
+	charlieInfo, err := charlieClient.ModelInfo([]names.ModelTag{modelTag})
+	c.Assert(err, qt.IsNil)
+	c.Assert(charlieInfo, qt.HasLen, 1)
+	c.Assert(charlieInfo[0].Error, qt.Not(qt.IsNil))
+	c.Assert(charlieInfo[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+}
+
+// TestModifyModelAccessRevocationCascadesToReader tests that the "writer" permission is removed from an "admin",
+// then a "reader" is left. This matches Juju behaviour.
+func TestModifyModelAccessRevocationCascadesToReader(t *testing.T) {
+	c := qt.New(t)
+	revoke, charlieAccess, charlieClient, modelTag := setupModelWithCharlieAsAdmin(c)
+
+	c.Assert(charlieAccess(), qt.Equals, "admin")
+
+	revoke(jujuparams.ModelWriteAccess)
+	c.Assert(charlieAccess(), qt.Equals, "read")
+
+	revoke(jujuparams.ModelReadAccess)
+	c.Assert(charlieAccess(), qt.Equals, "")
+
+	charlieInfo, err := charlieClient.ModelInfo([]names.ModelTag{modelTag})
+	c.Assert(err, qt.IsNil)
+	c.Assert(charlieInfo, qt.HasLen, 1)
+	c.Assert(charlieInfo[0].Error, qt.Not(qt.IsNil))
+	c.Assert(charlieInfo[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+}
+
+func setupModelWithCharlieAsAdmin(c *qt.C) (func(jujuparams.UserAccessPermission), func() string, *modelmanager.Client, names.ModelTag) {
 	s := jimmtest.SetupJimmWithControllers(c)
 	model := s.CreateModelForBob(c)
 
 	connBob := s.Open(c, nil, "bob", nil)
-	defer connBob.Close()
 	bobClient := modelmanager.NewClient(connBob)
 
 	connCharlie := s.Open(c, nil, "charlie", nil)
-	defer connCharlie.Close()
 	charlieClient := modelmanager.NewClient(connCharlie)
+
+	c.Cleanup(func() {
+		connBob.Close()
+		connCharlie.Close()
+	})
 
 	modelTag := names.NewModelTag(model.UUID.String)
 
@@ -1529,22 +1574,7 @@ func TestModifyModelAccessDowngradesUserToNoAccess(t *testing.T) {
 		c.Assert(result.Results[0].Error, qt.Equals, (*jujuparams.Error)(nil))
 	}
 
-	c.Assert(charlieAccess(), qt.Equals, "admin")
-
-	revoke(jujuparams.ModelAdminAccess)
-	c.Assert(charlieAccess(), qt.Equals, "write")
-
-	revoke(jujuparams.ModelWriteAccess)
-	c.Assert(charlieAccess(), qt.Equals, "read")
-
-	revoke(jujuparams.ModelReadAccess)
-	c.Assert(charlieAccess(), qt.Equals, "")
-
-	charlieInfo, err := charlieClient.ModelInfo([]names.ModelTag{modelTag})
-	c.Assert(err, qt.IsNil)
-	c.Assert(charlieInfo, qt.HasLen, 1)
-	c.Assert(charlieInfo[0].Error, qt.Not(qt.IsNil))
-	c.Assert(charlieInfo[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+	return revoke, charlieAccess, charlieClient, modelTag
 }
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:
