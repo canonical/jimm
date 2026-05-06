@@ -516,6 +516,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 
 	currentRelation := targetOfgaUser.GetModelAccess(ctx, mt)
 
+	relationToSet := ofganames.NoRelation
 	var relationsToRevoke []openfga.Relation
 	switch targetRelation {
 	case ofganames.ReaderRelation:
@@ -533,7 +534,14 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		switch currentRelation {
 		case ofganames.NoRelation, ofganames.ReaderRelation:
 			return nil
+		case ofganames.AdministratorRelation:
+			relationToSet = ofganames.ReaderRelation
+			relationsToRevoke = []openfga.Relation{
+				ofganames.WriterRelation,
+				ofganames.AdministratorRelation,
+			}
 		default:
+			relationToSet = ofganames.ReaderRelation
 			relationsToRevoke = []openfga.Relation{
 				ofganames.WriterRelation,
 				ofganames.AdministratorRelation,
@@ -544,9 +552,25 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		case ofganames.NoRelation, ofganames.ReaderRelation, ofganames.WriterRelation:
 			return nil
 		default:
+			relationToSet = ofganames.WriterRelation
 			relationsToRevoke = []openfga.Relation{
 				ofganames.AdministratorRelation,
 			}
+		}
+	}
+
+	if relationToSet != ofganames.NoRelation {
+		err = targetOfgaUser.SetModelAccess(ctx, mt, relationToSet)
+		if err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to downgrade model access",
+				zaputil.Error(err),
+				zap.String("targetUser", string(ut.Id())),
+				zap.String("model", string(mt.Id())),
+				zap.String("access", string(access)),
+			)
+			return fmt.Errorf("failed to set model access: %w", err)
 		}
 	}
 

@@ -175,10 +175,6 @@ var grantModelAccessTests = []struct {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
-		Relation: ofganames.WriterRelation,
-		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
-	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -193,10 +189,6 @@ var grantModelAccessTests = []struct {
 	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
-	}, {
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
-		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
@@ -515,6 +507,10 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -634,6 +630,10 @@ var revokeModelAccessTests = []struct {
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
 		Relation: ofganames.WriterRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
@@ -657,6 +657,10 @@ var revokeModelAccessTests = []struct {
 	expectRelations: []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
+		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
@@ -735,6 +739,10 @@ var revokeModelAccessTests = []struct {
 	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("charlie@canonical.com")),
+		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
 		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
