@@ -18,9 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
-	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -34,7 +32,12 @@ const (
 func TestHTTPProxyHandler(t *testing.T) {
 	c := qt.New(t)
 	user := openfga.NewUser(&dbmodel.Identity{Name: "alice@canonical.com"}, nil)
-	var gotJWTParams jimmjwx.JWTParams
+	modelTag := names.NewModelTag(httpProxyModelUUID)
+	controllerTag := names.NewControllerTag(httpProxyControllerUUID)
+	var gotModelTag names.ModelTag
+	var gotControllerTag names.ControllerTag
+	var gotUser *openfga.User
+	callCount := 0
 
 	fakeController := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.Check(r.Header.Get("Authorization"), qt.Equals, "Bearer "+base64.StdEncoding.EncodeToString([]byte("test-token")))
@@ -54,11 +57,14 @@ func TestHTTPProxyHandler(t *testing.T) {
 			}, nil
 		},
 	}
-	authFactory := jujuauth.NewFactory(nil, mocks.JWTService{NewJWT_: func(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
-		gotJWTParams = params
+	loginTokens := loginTokenProvider{NewLoginToken_: func(ctx context.Context, gotMT names.ModelTag, gotCT names.ControllerTag, gotU *openfga.User) ([]byte, error) {
+		callCount++
+		gotModelTag = gotMT
+		gotControllerTag = gotCT
+		gotUser = gotU
 		return []byte("test-token"), nil
-	}}, nil)
-	httpProxier := jimmhttp.NewHTTPProxyHandler(nil, &ctrlService, authFactory)
+	}}
+	httpProxier := jimmhttp.NewHTTPProxyHandler(nil, &ctrlService, loginTokens)
 
 	tests := []struct {
 		description    string
@@ -111,12 +117,16 @@ func TestHTTPProxyHandler(t *testing.T) {
 		})
 	}
 
-	c.Assert(gotJWTParams, qt.DeepEquals, jimmjwx.JWTParams{
-		Controller: httpProxyControllerUUID,
-		User:       user.ResourceTag().String(),
-		Access: map[string]string{
-			names.NewModelTag(httpProxyModelUUID).String():           "admin",
-			names.NewControllerTag(httpProxyControllerUUID).String(): "superuser",
-		},
-	})
+	c.Assert(callCount, qt.Equals, 1)
+	c.Assert(gotModelTag, qt.Equals, modelTag)
+	c.Assert(gotControllerTag, qt.Equals, controllerTag)
+	c.Assert(gotUser, qt.Equals, user)
+}
+
+type loginTokenProvider struct {
+	NewLoginToken_ func(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error)
+}
+
+func (p loginTokenProvider) NewLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error) {
+	return p.NewLoginToken_(ctx, modelTag, controllerTag, user)
 }

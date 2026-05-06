@@ -2,6 +2,14 @@
 
 package jujuauth
 
+import (
+	"context"
+
+	"github.com/juju/names/v5"
+
+	"github.com/canonical/jimm/v3/internal/openfga"
+)
+
 // Factory holds the necessary components for producing
 // Juju authenticator objects. Currently a login token generator
 // and an SSH token generator are available.
@@ -25,6 +33,17 @@ func NewFactory(db GeneratorDatabase, jwtService JWTService, accessChecker Gener
 // of a single connection, and recreated for each new connection.
 func (f *Factory) NewLoginGenerator() LoginTokenGenerator {
 	return newLoginTokenGenerator(f.db, f.accessChecker, f.jwtService)
+}
+
+// NewLoginToken returns a Juju login token for the given user, model, and controller.
+//
+// This is a convenience method that wraps the creation of a LoginTokenGenerator and
+// the generation of a login token in one step. This is useful for scenarios where we
+// don't have a long lived connection that may need multiple tokens.
+func (f *Factory) NewLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error) {
+	generator := f.NewLoginGenerator()
+	generator.SetTags(modelTag, controllerTag)
+	return generator.MakeLoginToken(ctx, user)
 }
 
 // NewSSHGenerator returns a new token generator for Juju SSH connections.

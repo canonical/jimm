@@ -16,9 +16,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
-	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest/mocks"
@@ -33,7 +31,12 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 	c := qt.New(t)
 	user := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, nil)
 	user.JimmAdmin = true
-	var gotJWTParams jimmjwx.JWTParams
+	modelTag := names.NewModelTag(incomingModelUUID)
+	controllerTag := names.NewControllerTag(migrationControllerUUID)
+	var gotModelTag names.ModelTag
+	var gotControllerTag names.ControllerTag
+	var gotUser *openfga.User
+	callCount := 0
 
 	fakeController := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.Check(r.Header.Get("Authorization"), qt.Equals, "Bearer "+base64.StdEncoding.EncodeToString([]byte("test-token")))
@@ -53,11 +56,14 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 			}, nil
 		},
 	}
-	authFactory := jujuauth.NewFactory(nil, mocks.JWTService{NewJWT_: func(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error) {
-		gotJWTParams = params
+	loginTokens := loginTokenProvider{NewLoginToken_: func(ctx context.Context, gotMT names.ModelTag, gotCT names.ControllerTag, gotU *openfga.User) ([]byte, error) {
+		callCount++
+		gotModelTag = gotMT
+		gotControllerTag = gotCT
+		gotUser = gotU
 		return []byte("test-token"), nil
-	}}, nil)
-	migrationProxier := jimmhttp.NewMigrationHTTPProxyHandler(nil, &ctrlService, authFactory)
+	}}
+	migrationProxier := jimmhttp.NewMigrationHTTPProxyHandler(nil, &ctrlService, loginTokens)
 
 	tests := []struct {
 		description    string
@@ -113,11 +119,8 @@ func TestMigrationHTTPProxyHandler(t *testing.T) {
 		})
 	}
 
-	c.Assert(gotJWTParams, qt.DeepEquals, jimmjwx.JWTParams{
-		Controller: migrationControllerUUID,
-		User:       user.ResourceTag().String(),
-		Access: map[string]string{
-			names.NewControllerTag(migrationControllerUUID).String(): "superuser",
-		},
-	})
+	c.Assert(callCount, qt.Equals, 1)
+	c.Assert(gotModelTag, qt.Equals, modelTag)
+	c.Assert(gotControllerTag, qt.Equals, controllerTag)
+	c.Assert(gotUser, qt.Equals, user)
 }

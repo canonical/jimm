@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -30,19 +29,19 @@ import (
 // migration state before proxying the request to the controller.
 // 3. Requires the user to be a JIMM admin, rather than just a model writer.
 type MigrationHTTPProxyHandler struct {
-	Router       *chi.Mux
-	authenicator middleware.Authenticator
-	jujuManager  JujuManager
-	jwtFactory   *jujuauth.Factory
+	Router             *chi.Mux
+	authenicator       middleware.Authenticator
+	jujuManager        JujuManager
+	loginTokenProvider LoginTokenProvider
 }
 
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
-func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtFactory *jujuauth.Factory) *MigrationHTTPProxyHandler {
+func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, loginTokenProvider LoginTokenProvider) *MigrationHTTPProxyHandler {
 	return &MigrationHTTPProxyHandler{
-		Router:       chi.NewRouter(),
-		authenicator: authenticator,
-		jujuManager:  jujuManager,
-		jwtFactory:   jwtFactory,
+		Router:             chi.NewRouter(),
+		authenicator:       authenticator,
+		jujuManager:        jujuManager,
+		loginTokenProvider: loginTokenProvider,
 	}
 }
 
@@ -93,9 +92,7 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 
 	mt := names.NewModelTag(modelUUID)
 	ct := names.NewControllerTag(controllerDetails.ControllerUUID)
-	loginTokenGen := hph.jwtFactory.NewLoginGenerator()
-	loginTokenGen.SetTags(mt, ct)
-	jwt, err := loginTokenGen.MakeLoginToken(ctx, user)
+	jwt, err := hph.loginTokenProvider.NewLoginToken(ctx, mt, ct, user)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate login token")
 		return

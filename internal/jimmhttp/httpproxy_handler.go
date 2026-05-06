@@ -12,8 +12,8 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/middleware"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -24,13 +24,18 @@ type JujuManager interface {
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 }
 
+// LoginTokenProvider mints a Juju login token for a user operating on a model and controller.
+type LoginTokenProvider interface {
+	NewLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error)
+}
+
 // HTTPProxyHandler is an handler that provides proxying capabilities.
 // It uses the uuid in the path to proxy requests to model's controller.
 type HTTPProxyHandler struct {
-	Router       *chi.Mux
-	authenicator middleware.Authenticator
-	jujuManager  JujuManager
-	jwtFactory   *jujuauth.Factory
+	Router             *chi.Mux
+	authenicator       middleware.Authenticator
+	jujuManager        JujuManager
+	loginTokenProvider LoginTokenProvider
 }
 
 const (
@@ -39,12 +44,12 @@ const (
 )
 
 // NewHTTPProxyHandler creates a proxy http handler.
-func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtFactory *jujuauth.Factory) *HTTPProxyHandler {
+func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, loginTokenProvider LoginTokenProvider) *HTTPProxyHandler {
 	h := &HTTPProxyHandler{
-		Router:       chi.NewRouter(),
-		authenicator: authenticator,
-		jujuManager:  jujuManager,
-		jwtFactory:   jwtFactory,
+		Router:             chi.NewRouter(),
+		authenicator:       authenticator,
+		jujuManager:        jujuManager,
+		loginTokenProvider: loginTokenProvider,
 	}
 	h.SetupMiddleware()
 	h.Router.HandleFunc(ProxyEndpoints, h.ProxyHTTP)
@@ -101,9 +106,7 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 
 	mt := names.NewModelTag(modelUUID)
 	ct := names.NewControllerTag(controllerDetails.ControllerUUID)
-	loginTokenGen := hph.jwtFactory.NewLoginGenerator()
-	loginTokenGen.SetTags(mt, ct)
-	jwt, err := loginTokenGen.MakeLoginToken(ctx, user)
+	jwt, err := hph.loginTokenProvider.NewLoginToken(ctx, mt, ct, user)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate login token")
 		return
