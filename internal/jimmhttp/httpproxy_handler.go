@@ -11,16 +11,18 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/middleware"
+	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// JujuManager provides the controller connection details for model HTTP proxying.
+// JujuManager provides the controller connection details and controller-superuser
+// authorization headers used for model HTTP proxying.
 type JujuManager interface {
 	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerDetailsForIncomingModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
+	ControllerSuperuserAuthorizationHeader(ctx context.Context, controllerUUID string, modelTag names.ModelTag, user *openfga.User) (http.Header, error)
 }
 
 // HTTPProxyHandler is an handler that provides proxying capabilities.
@@ -29,7 +31,6 @@ type HTTPProxyHandler struct {
 	Router       *chi.Mux
 	authenicator middleware.Authenticator
 	jujuManager  JujuManager
-	jwtService   jujuclient.JWTMinter
 }
 
 const (
@@ -38,12 +39,11 @@ const (
 )
 
 // NewHTTPProxyHandler creates a proxy http handler.
-func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtService jujuclient.JWTMinter) *HTTPProxyHandler {
+func NewHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager) *HTTPProxyHandler {
 	h := &HTTPProxyHandler{
 		Router:       chi.NewRouter(),
 		authenicator: authenticator,
 		jujuManager:  jujuManager,
-		jwtService:   jwtService,
 	}
 	h.SetupMiddleware()
 	h.Router.HandleFunc(ProxyEndpoints, h.ProxyHTTP)
@@ -98,12 +98,11 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	requestHeaders, err := jujuclient.NewControllerAuthorizationHeader(
+	requestHeaders, err := hph.jujuManager.ControllerSuperuserAuthorizationHeader(
 		ctx,
-		hph.jwtService,
 		controllerDetails.ControllerUUID,
 		names.NewModelTag(modelUUID),
-		user.ResourceTag().String(),
+		user,
 	)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")

@@ -4,8 +4,10 @@ package mocks
 
 import (
 	"context"
+	"net/http"
 
 	jujucontroller "github.com/juju/juju/controller"
+	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -16,15 +18,16 @@ import (
 
 // ControllerService is an implementation of the jujuapi.ControllerService interface.
 type ControllerService struct {
-	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
-	ControllerDetailsForModel_         func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-	ControllerDetailsForIncomingModel_ func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-	ControllerInfo_                    func(ctx context.Context, name string) (*dbmodel.Controller, error)
-	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
-	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
-	RemoveController_                  func(ctx context.Context, user *openfga.User, controllerName string, force bool) error
-	SetControllerDeprecated_           func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
-	ControllerConfig_                  func(ctx context.Context, user *openfga.User, controllerName string) (jujucontroller.Config, error)
+	AddController_                          func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
+	ControllerDetailsForModel_              func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
+	ControllerDetailsForIncomingModel_      func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
+	ControllerSuperuserAuthorizationHeader_ func(ctx context.Context, controllerUUID string, modelTag names.ModelTag, user *openfga.User) (http.Header, error)
+	ControllerInfo_                         func(ctx context.Context, name string) (*dbmodel.Controller, error)
+	EarliestControllerVersion_              func(ctx context.Context) (version.Number, error)
+	ListControllers_                        func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
+	RemoveController_                       func(ctx context.Context, user *openfga.User, controllerName string, force bool) error
+	SetControllerDeprecated_                func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
+	ControllerConfig_                       func(ctx context.Context, user *openfga.User, controllerName string) (jujucontroller.Config, error)
 }
 
 func (j *ControllerService) AddController(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error {
@@ -46,6 +49,13 @@ func (j *ControllerService) ControllerDetailsForIncomingModel(ctx context.Contex
 		return juju.ControllerConnectionDetails{}, errors.New("not implemented")
 	}
 	return j.ControllerDetailsForIncomingModel_(ctx, modelUUID)
+}
+
+func (j *ControllerService) ControllerSuperuserAuthorizationHeader(ctx context.Context, controllerUUID string, modelTag names.ModelTag, user *openfga.User) (http.Header, error) {
+	if j.ControllerSuperuserAuthorizationHeader_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return j.ControllerSuperuserAuthorizationHeader_(ctx, controllerUUID, modelTag, user)
 }
 
 func (j *ControllerService) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {

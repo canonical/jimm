@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/errors"
-	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -32,16 +31,14 @@ type MigrationHTTPProxyHandler struct {
 	Router       *chi.Mux
 	authenicator middleware.Authenticator
 	jujuManager  JujuManager
-	jwtService   jujuclient.JWTMinter
 }
 
 // NewMigrationHTTPProxyHandler creates a model migration proxy http handler.
-func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager, jwtService jujuclient.JWTMinter) *MigrationHTTPProxyHandler {
+func NewMigrationHTTPProxyHandler(authenticator middleware.Authenticator, jujuManager JujuManager) *MigrationHTTPProxyHandler {
 	return &MigrationHTTPProxyHandler{
 		Router:       chi.NewRouter(),
 		authenicator: authenticator,
 		jujuManager:  jujuManager,
-		jwtService:   jwtService,
 	}
 }
 
@@ -90,12 +87,11 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	requestHeaders, err := jujuclient.NewControllerAuthorizationHeader(
+	requestHeaders, err := hph.jujuManager.ControllerSuperuserAuthorizationHeader(
 		ctx,
-		hph.jwtService,
 		controllerDetails.ControllerUUID,
 		names.ModelTag{},
-		user.ResourceTag().String(),
+		user,
 	)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to authorize controller request")
