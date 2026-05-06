@@ -35,20 +35,15 @@ import (
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
-// JWTMinter issues controller JWTs for Juju RPC and HTTP requests.
-type JWTMinter interface {
-	NewJWT(ctx context.Context, params jimmjwx.JWTParams) ([]byte, error)
-}
-
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {
-	JWTService    JWTMinter
+	JWTService    *jimmjwx.JWTService
 	AdminUsername string
 }
 
 // NewDialer creates a new Dialer from dependencies.
-func NewDialer(jwtService JWTMinter, controllerUUID string) *Dialer {
+func NewDialer(jwtService *jimmjwx.JWTService, controllerUUID string) *Dialer {
 	return &Dialer{
 		JWTService: jwtService,
 		// The admin username is a Juju external user, just like the JIMM users.
@@ -56,31 +51,20 @@ func NewDialer(jwtService JWTMinter, controllerUUID string) *Dialer {
 	}
 }
 
-func controllerAccessPermissions(controllerUUID string, modelTag names.ModelTag) map[string]string {
+func (d *Dialer) newControllerJWTToken(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, userTag string) (string, error) {
+	// Always request superuser permissions, even when representing a non-admin user
+	// This is only safe because we have already checked the user's openfga permissions in a layer above.
 	permissions := map[string]string{
-		names.NewControllerTag(controllerUUID).String(): "superuser",
+		ctl.ResourceTag().String(): "superuser",
 	}
 	if modelTag.Id() != "" {
 		permissions[modelTag.String()] = string(jujuparams.ModelAdminAccess)
 	}
-	return permissions
-}
 
-func newControllerJWTToken(ctx context.Context, jwtService JWTMinter, controllerUUID string, modelTag names.ModelTag, userTag string) (string, error) {
-	if jwtService == nil {
-		return "", errors.New("missing jwt service")
-	}
-	if controllerUUID == "" {
-		return "", errors.New("missing controller uuid")
-	}
-	if userTag == "" {
-		return "", errors.New("missing user tag")
-	}
-
-	jwt, err := jwtService.NewJWT(ctx, jimmjwx.JWTParams{
-		Controller: controllerUUID,
+	jwt, err := d.JWTService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: ctl.ResourceTag().Id(),
 		User:       userTag,
-		Access:     controllerAccessPermissions(controllerUUID, modelTag),
+		Access:     permissions,
 	})
 	if err != nil {
 		return "", err
@@ -88,18 +72,10 @@ func newControllerJWTToken(ctx context.Context, jwtService JWTMinter, controller
 	return base64.StdEncoding.EncodeToString(jwt), nil
 }
 
-func (d *Dialer) defaultUser(user *openfga.User) *openfga.User {
-	if user != nil {
-		return user
-	}
-	return &openfga.User{Identity: &dbmodel.Identity{Name: d.AdminUsername}}
-}
-
 // createLoginRequest creates a jujuparams.LoginRequest for the given controller, model and user.
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (*jujuparams.LoginRequest, error) {
-	user = d.defaultUser(user)
 	userTag := user.ResourceTag().String()
-	jwtString, err := newControllerJWTToken(ctx, d.JWTService, ctl.UUID, modelTag, userTag)
+	jwtString, err := d.newControllerJWTToken(ctx, ctl, modelTag, userTag)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +99,9 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	}
 	client := rpc.NewClient(conn)
 
-	user = d.defaultUser(user)
+	if user == nil {
+		user = &openfga.User{Identity: &dbmodel.Identity{Name: d.AdminUsername}}
+	}
 
 	var loginRequest *jujuparams.LoginRequest
 	loginRequest, err = d.createLoginRequest(ctx, ctl, modelTag, user)
@@ -331,20 +309,19 @@ func (c *Connection) Context() context.Context {
 	return c.ctx
 }
 
-func (c *Connection) authorizationHeader(ctx context.Context, modelTag names.ModelTag, extraHeaders http.Header) (http.Header, error) {
+func (c *Connection) authorizationHeader(modelTag names.ModelTag, extraHeaders http.Header) (http.Header, error) {
 	user := c.user
 	if user == nil {
-		user = c.dialer.defaultUser(nil)
+		user = &openfga.User{Identity: &dbmodel.Identity{Name: c.dialer.AdminUsername}}
 	}
 
-	jwtString, err := newControllerJWTToken(ctx, c.dialer.JWTService, c.ctl.UUID, modelTag, user.ResourceTag().String())
+	jwtString, err := c.dialer.newControllerJWTToken(c.ctx, c.ctl, modelTag, user.ResourceTag().String())
 	if err != nil {
 		return nil, err
 	}
 	header := make(http.Header)
 	header.Set("Authorization", "Bearer "+jwtString)
 	for key, vals := range extraHeaders {
-		header.Del(key)
 		for _, val := range vals {
 			header.Add(key, val)
 		}
@@ -364,7 +341,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 		return nil, errors.New("no model found")
 	}
 
-	requestHeader, err := c.authorizationHeader(c.ctx, modelTag, nil)
+	requestHeader, err := c.authorizationHeader(modelTag, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -381,7 +358,7 @@ func (c *Connection) ConnectStream(path string, attrs url.Values) (base.Stream, 
 // HTTP request. Headers passed in will be added to the HTTP
 // request.
 func (c *Connection) ConnectControllerStream(path string, attrs url.Values, extraHeaders http.Header) (base.Stream, error) {
-	header, err := c.authorizationHeader(c.ctx, names.ModelTag{}, extraHeaders)
+	header, err := c.authorizationHeader(names.ModelTag{}, extraHeaders)
 	if err != nil {
 		return nil, err
 	}
