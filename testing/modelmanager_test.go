@@ -457,7 +457,7 @@ func TestGrantAndRevokeModel(t *testing.T) {
 	c.Assert(res[0].Error, qt.ErrorMatches, "unauthorized")
 }
 
-func TestUserRevokeOwnAccess(t *testing.T) {
+func TestUserCannotRevokeOwnAccessWithoutAdmin(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
 	model := s.CreateModelForBob(c)
@@ -480,13 +480,13 @@ func TestUserRevokeOwnAccess(t *testing.T) {
 	c.Assert(res[0].Result.UUID, qt.Equals, model.UUID.String)
 
 	err = client2.RevokeModel("charlie@canonical.com", "read", model.UUID.String)
-	c.Assert(err, qt.Equals, nil)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
 
 	res, err = client2.ModelInfo([]names.ModelTag{names.NewModelTag(model.UUID.String)})
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(res, qt.HasLen, 1)
-	c.Assert(res[0].Error, qt.Not(qt.IsNil))
-	c.Assert(res[0].Error, qt.ErrorMatches, "unauthorized")
+	c.Assert(res[0].Error, qt.Equals, (*jujuparams.Error)(nil))
+	c.Assert(res[0].Result.UUID, qt.Equals, model.UUID.String)
 }
 
 func TestModifyModelAccessErrors(t *testing.T) {

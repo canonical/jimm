@@ -479,8 +479,16 @@ func (j *PermissionManager) GrantModelAccess(ctx context.Context, user *openfga.
 // RevokeModelAccess revokes the given access level on the given model from
 // the given user. If the model is not found then an error with the code
 // CodeNotFound is returned. If the authenticated user does not have admin
-// access to the model, and is not attempting to revoke their own access,
-// then an error with the code CodeUnauthorized is returned.
+// access to the model then an error with the code CodeUnauthorized is
+// returned.
+//
+// This function follows Juju semantics of revocation, that is:
+//  1. Admins can revoke access sequentially of other users, i.e.:
+//     If you remove "admin" from an "admin", they will cascade down to write and not remove their access
+//     entirely.
+//  2. Admins can only revoke their access to writer, at which point they can no longer revoke their access to reader,
+//     and thus cannot fully revoke their access to the model.
+//  3. If an admin is revoking "write" from another "admin", they are downgraded to "reader".
 func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga.User, mt names.ModelTag, ut names.UserTag, access jujuparams.UserAccessPermission) error {
 	targetRelation, err := ToModelRelation(string(access))
 	if err != nil {
@@ -493,13 +501,7 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		return errors.Codef(errors.CodeBadRequest, "failed to recognize given access: %q", access)
 	}
 
-	requiredAccess := ofganames.AdministratorRelation
-	if user.Tag() == ut {
-		// If the user is attempting to revoke their own access.
-		requiredAccess = ofganames.ReaderRelation
-	}
-
-	modelAdmin, err := user.HasModelRelation(ctx, mt, requiredAccess)
+	modelAdmin, err := user.HasModelRelation(ctx, mt, ofganames.AdministratorRelation)
 	if err != nil {
 		return err
 	}
@@ -516,7 +518,9 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 
 	currentRelation := targetOfgaUser.GetModelAccess(ctx, mt)
 
+	relationToSet := ofganames.NoRelation
 	var relationsToRevoke []openfga.Relation
+
 	switch targetRelation {
 	case ofganames.ReaderRelation:
 		switch currentRelation {
@@ -533,7 +537,14 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		switch currentRelation {
 		case ofganames.NoRelation, ofganames.ReaderRelation:
 			return nil
+		case ofganames.AdministratorRelation:
+			relationToSet = ofganames.ReaderRelation
+			relationsToRevoke = []openfga.Relation{
+				ofganames.WriterRelation,
+				ofganames.AdministratorRelation,
+			}
 		default:
+			relationToSet = ofganames.ReaderRelation
 			relationsToRevoke = []openfga.Relation{
 				ofganames.WriterRelation,
 				ofganames.AdministratorRelation,
@@ -544,9 +555,25 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		case ofganames.NoRelation, ofganames.ReaderRelation, ofganames.WriterRelation:
 			return nil
 		default:
+			relationToSet = ofganames.WriterRelation
 			relationsToRevoke = []openfga.Relation{
 				ofganames.AdministratorRelation,
 			}
+		}
+	}
+
+	if relationToSet != ofganames.NoRelation {
+		err = targetOfgaUser.SetModelAccess(ctx, mt, relationToSet)
+		if err != nil {
+			zapctx.Error(
+				ctx,
+				"failed to downgrade model access",
+				zaputil.Error(err),
+				zap.String("targetUser", string(ut.Id())),
+				zap.String("model", string(mt.Id())),
+				zap.String("access", string(access)),
+			)
+			return fmt.Errorf("failed to set model access: %w", err)
 		}
 	}
 

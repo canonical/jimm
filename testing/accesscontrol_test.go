@@ -10,8 +10,11 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/core/crossmodel"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
+	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -1479,6 +1482,100 @@ func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
 /*
  None-facade related tests
 */
+
+func TestModifyModelAccessDowngradesUserToNoAccess(t *testing.T) {
+	c := qt.New(t)
+	revoke, charlieAccess, charlieClient, modelTag := setupModelWithCharlieAsAdmin(c)
+
+	c.Assert(charlieAccess(), qt.Equals, "admin")
+
+	revoke(jujuparams.ModelAdminAccess)
+	c.Assert(charlieAccess(), qt.Equals, "write")
+
+	revoke(jujuparams.ModelWriteAccess)
+	c.Assert(charlieAccess(), qt.Equals, "read")
+
+	revoke(jujuparams.ModelReadAccess)
+	c.Assert(charlieAccess(), qt.Equals, "")
+
+	charlieInfo, err := charlieClient.ModelInfo([]names.ModelTag{modelTag})
+	c.Assert(err, qt.IsNil)
+	c.Assert(charlieInfo, qt.HasLen, 1)
+	c.Assert(charlieInfo[0].Error, qt.Not(qt.IsNil))
+	c.Assert(charlieInfo[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+}
+
+// TestModifyModelAccessRevocationCascadesToReader tests that the "writer" permission is removed from an "admin",
+// then a "reader" is left. This matches Juju behaviour.
+func TestModifyModelAccessRevocationCascadesToReader(t *testing.T) {
+	c := qt.New(t)
+	revoke, charlieAccess, charlieClient, modelTag := setupModelWithCharlieAsAdmin(c)
+
+	c.Assert(charlieAccess(), qt.Equals, "admin")
+
+	revoke(jujuparams.ModelWriteAccess)
+	c.Assert(charlieAccess(), qt.Equals, "read")
+
+	revoke(jujuparams.ModelReadAccess)
+	c.Assert(charlieAccess(), qt.Equals, "")
+
+	charlieInfo, err := charlieClient.ModelInfo([]names.ModelTag{modelTag})
+	c.Assert(err, qt.IsNil)
+	c.Assert(charlieInfo, qt.HasLen, 1)
+	c.Assert(charlieInfo[0].Error, qt.Not(qt.IsNil))
+	c.Assert(charlieInfo[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+}
+
+func setupModelWithCharlieAsAdmin(c *qt.C) (func(jujuparams.UserAccessPermission), func() string, *modelmanager.Client, names.ModelTag) {
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+
+	connBob := s.Open(c, nil, "bob", nil)
+	bobClient := modelmanager.NewClient(connBob)
+
+	connCharlie := s.Open(c, nil, "charlie", nil)
+	charlieClient := modelmanager.NewClient(connCharlie)
+
+	c.Cleanup(func() {
+		connBob.Close()
+		connCharlie.Close()
+	})
+
+	modelTag := names.NewModelTag(model.UUID.String)
+
+	err := bobClient.GrantModel("charlie@canonical.com", "admin", model.UUID.String)
+	c.Assert(err, qt.IsNil)
+
+	charlieAccess := func() string {
+		info, err := bobClient.ModelInfo([]names.ModelTag{modelTag})
+		c.Assert(err, qt.IsNil)
+		c.Assert(info, qt.HasLen, 1)
+		c.Assert(info[0].Error, qt.Equals, (*jujuparams.Error)(nil))
+		for _, userInfo := range info[0].Result.Users {
+			if userInfo.UserName == "charlie@canonical.com" {
+				return string(userInfo.Access)
+			}
+		}
+		return ""
+	}
+
+	revoke := func(access jujuparams.UserAccessPermission) {
+		var result jujuparams.ErrorResults
+		err := connBob.APICall("ModelManager", 10, "", "ModifyModelAccess", jujuparams.ModifyModelAccessRequest{
+			Changes: []jujuparams.ModifyModelAccess{{
+				UserTag:  names.NewUserTag("charlie@canonical.com").String(),
+				Action:   jujuparams.RevokeModelAccess,
+				Access:   access,
+				ModelTag: modelTag.String(),
+			}},
+		}, &result)
+		c.Assert(err, qt.IsNil)
+		c.Assert(result.Results, qt.HasLen, 1)
+		c.Assert(result.Results[0].Error, qt.Equals, (*jujuparams.Error)(nil))
+	}
+
+	return revoke, charlieAccess, charlieClient, modelTag
+}
 
 // createTestControllerEnvironment is a utility function creating the necessary components of adding a:
 //   - user
