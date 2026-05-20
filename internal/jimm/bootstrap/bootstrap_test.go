@@ -144,6 +144,8 @@ func setupTest(c *qt.C) (
 		credentialStore: bootstrapmocks.NewMockCredentialStore(ctrl),
 		jobQueue:        bootstrapmocks.NewMockJobQueue(ctrl),
 	}
+	m.store.EXPECT().AddController(gomock.Any(), gomock.AssignableToTypeOf(&dbmodel.Controller{})).Return(nil).AnyTimes()
+	m.store.EXPECT().DeleteController(gomock.Any(), gomock.AssignableToTypeOf(&dbmodel.Controller{})).Return(nil).AnyTimes()
 
 	i, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)

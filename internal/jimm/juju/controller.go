@@ -153,6 +153,26 @@ func (act *addControllerTransactor) setCloudRegionControllerPriorities(cloud dbm
 
 // Run runs the transactor to add a controller to JIMM.
 func (act *addControllerTransactor) Run(ctx context.Context) error {
+	existingController := dbmodel.Controller{Name: act.controller.Name}
+
+	// When adding a controller, we want to allow the addition to succeed if there
+	// already exists a controller with the same name but it is in the bootstrapping
+	// state. This is because the bootstrapping process creates a temporary controller
+	// entry in the database before it has successfully bootstrapped.
+	err := act.tx.GetController(ctx, &existingController)
+	switch {
+	case err == nil:
+		if !existingController.IsBootstrapping() {
+			return errors.Codef(errors.CodeAlreadyExists, "controller %q already exists", act.controller.Name)
+		}
+		act.controller.ID = existingController.ID
+		act.controller.CreatedAt = existingController.CreatedAt
+	case errors.ErrorCode(err) != errors.CodeNotFound:
+		return err
+	}
+
+	act.controller.State = dbmodel.ControllerStateActive
+
 	// Add clouds and their regions to db and sets the controllers
 	// cloud region priorities
 	for i := range act.jujuClouds {
@@ -179,7 +199,13 @@ func (act *addControllerTransactor) Run(ctx context.Context) error {
 		act.setCloudRegionControllerPriorities(addedCloud, act.jujuClouds[i].Regions)
 	}
 
-	// Finally, add the controller with all clouds and their regions set
+	// Finally, persist the controller with all clouds and their regions set.
+	if act.controller.ID != 0 {
+		if err := act.tx.UpdateControllerWithCloudRegions(ctx, act.controller); err != nil {
+			return err
+		}
+		return nil
+	}
 	if err := act.tx.AddController(ctx, act.controller); err != nil {
 		return err
 	}
@@ -301,6 +327,9 @@ func (j *JujuManager) EarliestControllerVersion(ctx context.Context) (version.Nu
 	var v *version.Number
 
 	err := j.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
+		if !controller.IsOperational() {
+			return nil
+		}
 		if controller.AgentVersion == "" {
 			return nil
 		}

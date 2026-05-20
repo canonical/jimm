@@ -57,6 +57,9 @@ func (j *JujuManager) getControllerByName(ctx context.Context, controllerName st
 	if err != nil {
 		return nil, errors.Codef(errors.CodeNotFound, "controller not found")
 	}
+	if !controller.IsOperational() {
+		return nil, errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", controllerName)
+	}
 	return &controller, nil
 }
 

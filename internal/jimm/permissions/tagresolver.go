@@ -221,6 +221,9 @@ func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db
 	if err != nil {
 		return nil, errors.New("controller not found")
 	}
+	if !controller.IsOperational() {
+		return nil, errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", controller.Name)
+	}
 	return ofganames.ConvertTagWithRelation(controller.ResourceTag(), t.relation), nil
 }
 

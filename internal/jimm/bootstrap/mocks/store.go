@@ -41,6 +41,44 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
+// AddController mocks base method.
+func (m *MockStore) AddController(ctx context.Context, controller *dbmodel.Controller) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddController", ctx, controller)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddController indicates an expected call of AddController.
+func (mr *MockStoreMockRecorder) AddController(ctx, controller any) *MockStoreAddControllerCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddController", reflect.TypeOf((*MockStore)(nil).AddController), ctx, controller)
+	return &MockStoreAddControllerCall{Call: call}
+}
+
+// MockStoreAddControllerCall wrap *gomock.Call
+type MockStoreAddControllerCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockStoreAddControllerCall) Return(err error) *MockStoreAddControllerCall {
+	c.Call = c.Call.Return(err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockStoreAddControllerCall) Do(f func(context.Context, *dbmodel.Controller) error) *MockStoreAddControllerCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockStoreAddControllerCall) DoAndReturn(f func(context.Context, *dbmodel.Controller) error) *MockStoreAddControllerCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // AddJobLog mocks base method.
 func (m *MockStore) AddJobLog(ctx context.Context, jobId int64, logLine string) error {
 	m.ctrl.T.Helper()
@@ -75,6 +113,44 @@ func (c *MockStoreAddJobLogCall) Do(f func(context.Context, int64, string) error
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockStoreAddJobLogCall) DoAndReturn(f func(context.Context, int64, string) error) *MockStoreAddJobLogCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteController mocks base method.
+func (m *MockStore) DeleteController(ctx context.Context, controller *dbmodel.Controller) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteController", ctx, controller)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteController indicates an expected call of DeleteController.
+func (mr *MockStoreMockRecorder) DeleteController(ctx, controller any) *MockStoreDeleteControllerCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteController", reflect.TypeOf((*MockStore)(nil).DeleteController), ctx, controller)
+	return &MockStoreDeleteControllerCall{Call: call}
+}
+
+// MockStoreDeleteControllerCall wrap *gomock.Call
+type MockStoreDeleteControllerCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockStoreDeleteControllerCall) Return(err error) *MockStoreDeleteControllerCall {
+	c.Call = c.Call.Return(err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockStoreDeleteControllerCall) Do(f func(context.Context, *dbmodel.Controller) error) *MockStoreDeleteControllerCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockStoreDeleteControllerCall) DoAndReturn(f func(context.Context, *dbmodel.Controller) error) *MockStoreDeleteControllerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

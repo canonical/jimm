@@ -8,11 +8,19 @@ import (
 	"strconv"
 	"time"
 
+	jujustatus "github.com/juju/juju/core/status"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"gorm.io/gorm"
 
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+)
+
+type ControllerState string
+
+const (
+	ControllerStateActive        ControllerState = "active"
+	ControllerStateBootstrapping ControllerState = "bootstrapping"
 )
 
 // A controller represents a juju controller which is hosting models
@@ -25,6 +33,9 @@ type Controller struct {
 
 	// Name is the name given to this controller.
 	Name string `gorm:"not null;uniqueIndex"`
+
+	// State records whether this controller is ready for normal use.
+	State ControllerState `gorm:"not null;default:'active'"`
 
 	// UUID is the UUID of the controller. Note this is not being made a
 	// unique value because we occasionally want to add the same
@@ -80,6 +91,28 @@ type Controller struct {
 	// TODO(mhilton) Save controller statistics?
 }
 
+func (c *Controller) BeforeCreate(*gorm.DB) error {
+	if c.State == "" {
+		c.State = ControllerStateActive
+	}
+	return nil
+}
+
+func (c Controller) LifecycleState() ControllerState {
+	if c.State == "" {
+		return ControllerStateActive
+	}
+	return c.State
+}
+
+func (c Controller) IsBootstrapping() bool {
+	return c.LifecycleState() == ControllerStateBootstrapping
+}
+
+func (c Controller) IsOperational() bool {
+	return c.LifecycleState() == ControllerStateActive
+}
+
 // Tag returns a names.Tag for this controller.
 func (c Controller) Tag() names.Tag {
 	return c.ResourceTag()
@@ -103,7 +136,9 @@ func (c *Controller) SetTag(t names.ControllerTag) {
 func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	var ci apiparams.ControllerInfo
 	ci.Name = c.Name
-	ci.UUID = c.UUID
+	if c.IsOperational() {
+		ci.UUID = c.UUID
+	}
 	ci.PublicAddress = c.PublicAddress
 	for _, hps := range c.Addresses {
 		for _, hp := range hps {
@@ -111,10 +146,16 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 		}
 	}
 	ci.CACertificate = c.CACertificate
-	ci.CloudTag = names.NewCloudTag(c.CloudName).String()
+	if c.CloudName != "" {
+		ci.CloudTag = names.NewCloudTag(c.CloudName).String()
+	}
 	ci.CloudRegion = c.CloudRegion
 	ci.AgentVersion = c.AgentVersion
 	switch {
+	case c.IsBootstrapping():
+		ci.Status = jujuparams.EntityStatus{
+			Status: jujustatus.Status(ControllerStateBootstrapping),
+		}
 	case c.UnavailableSince.Valid:
 		ci.Status = jujuparams.EntityStatus{
 			Status: "unavailable",

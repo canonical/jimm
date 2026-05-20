@@ -89,6 +89,53 @@ func (d *Database) UpdateController(ctx context.Context, controller *dbmodel.Con
 	return nil
 }
 
+// UpdateControllerWithCloudRegions updates the given controller record and replaces
+// its cloud-region priority associations.
+func (d *Database) UpdateControllerWithCloudRegions(ctx context.Context, controller *dbmodel.Controller) (err error) {
+	const op = "db.UpdateControllerWithCloudRegions"
+
+	if controller.ID == 0 {
+		return errors.Codef(errors.CodeNotFound, `controller not found`)
+	}
+
+	if err := d.ready(); err != nil {
+		return err
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	db := d.DB.WithContext(ctx)
+	if err := db.Omit("CloudRegions").Omit("Models").Save(controller).Error; err != nil {
+		return dbError(err)
+	}
+	if err := db.Unscoped().Where("controller_id = ?", controller.ID).Delete(&dbmodel.CloudRegionControllerPriority{}).Error; err != nil {
+		return dbError(err)
+	}
+	if len(controller.CloudRegions) == 0 {
+		return nil
+	}
+
+	priorities := make([]dbmodel.CloudRegionControllerPriority, len(controller.CloudRegions))
+	for i, priority := range controller.CloudRegions {
+		cloudRegionID := priority.CloudRegionID
+		if cloudRegionID == 0 {
+			cloudRegionID = priority.CloudRegion.ID
+		}
+		priorities[i] = dbmodel.CloudRegionControllerPriority{
+			CloudRegionID: cloudRegionID,
+			ControllerID:  controller.ID,
+			Priority:      priority.Priority,
+		}
+	}
+	if err := db.Create(&priorities).Error; err != nil {
+		return dbError(err)
+	}
+	controller.CloudRegions = priorities
+	return nil
+}
+
 // DeleteController removes the specified controller from the database.
 func (d *Database) DeleteController(ctx context.Context, controller *dbmodel.Controller) (err error) {
 	const op = "db.DeleteController"

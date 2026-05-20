@@ -61,6 +61,9 @@ func (w *Watcher) WatchAllModelSummaries(ctx context.Context, interval time.Dura
 	defer ticker.Stop()
 	for {
 		err := w.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+			if !ctl.IsOperational() {
+				return nil
+			}
 			ctx := zapctx.WithFields(ctx, zap.String("controller", ctl.Name))
 			r.run(ctl.Name, func() {
 				zapctx.Info(ctx, "starting model summary watcher")

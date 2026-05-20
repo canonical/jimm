@@ -51,6 +51,8 @@ type Store interface {
 	QueryJobLog(ctx context.Context, jobId int64, offset int) (loggies []string, nextOffsetValue int, err error)
 
 	// BootstrapJob store methods:
+	AddController(ctx context.Context, controller *dbmodel.Controller) (err error)
+	DeleteController(ctx context.Context, controller *dbmodel.Controller) (err error)
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
 	AddJobLog(ctx context.Context, jobId int64, logLine string) (err error)
 }
@@ -355,6 +357,27 @@ func (b *BootstrapManager) BootstrapController(
 		return fmt.Errorf("failed to check if controller exists: %w", err)
 	}
 
+	seededController := &dbmodel.Controller{
+		Name:  p.ControllerName,
+		State: dbmodel.ControllerStateBootstrapping,
+	}
+	if err := b.store.AddController(ctx, seededController); err != nil {
+		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+			return errors.Codef(errors.CodeAlreadyExists, "controller %q already exists", p.ControllerName)
+		}
+		return fmt.Errorf("failed to seed controller in database: %w", err)
+	}
+	removeSeededController := true
+	defer func() {
+		if !removeSeededController {
+			return
+		}
+		cleanupCtx := context.WithoutCancel(ctx)
+		if err := b.store.DeleteController(cleanupCtx, seededController); err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			zapctx.Error(cleanupCtx, "failed to remove bootstrapping controller", zap.Error(err), zap.String("controller", seededController.Name))
+		}
+	}()
+
 	b.writeJobLog(ctx, p.JobID,
 		fmt.Sprintf("Downloading the Juju CLI, version %s for bootstrap. This may take a few minutes", p.CLIVersion))
 
@@ -380,6 +403,7 @@ func (b *BootstrapManager) BootstrapController(
 	if err := b.runBootstrap(ctx, p, jujuCmds, user); err != nil {
 		return fmt.Errorf("run bootstrap failed: %w", err)
 	}
+	removeSeededController = false
 	return nil
 }
 
