@@ -41,18 +41,18 @@ const (
 type Model struct {
 	// Note this cannot use the standard gorm.Model as the soft-delete does
 	// not work with the unique constraints.
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// Name is the name of the model.
-	Name string `gorm:"uniqueIndex:unique_model_names;not null"`
+	Name string
 
 	// UUID is the UUID of the model.
 	UUID sql.NullString
 
 	// Owner is identity that owns the model.
-	OwnerIdentityName string   `gorm:"uniqueIndex:unique_model_names;not null"`
+	OwnerIdentityName string
 	Owner             Identity `gorm:"foreignkey:OwnerIdentityName;references:Name"`
 
 	// Controller is the controller that is hosting the model.
@@ -65,7 +65,7 @@ type Model struct {
 
 	// CloudCredential is the credential used with the model.
 	CloudCredentialID uint
-	CloudCredential   CloudCredential `gorm:"foreignkey:CloudCredentialID;references:ID"`
+	CloudCredential   CloudCredential
 
 	// Life holds the life status of the model.
 	Life string
@@ -74,7 +74,7 @@ type Model struct {
 	Offers []ApplicationOffer
 
 	// MigrationMode is the migration mode of the model.
-	MigrationMode MigrationMode `gorm:"default:''"`
+	MigrationMode MigrationMode
 }
 
 // Tag returns a names.Tag for the model.

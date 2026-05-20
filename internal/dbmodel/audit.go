@@ -12,15 +12,15 @@ import (
 // An AuditLogEntry is an entry in the audit log.
 type AuditLogEntry struct {
 	// ID contains the ID of the entry.
-	ID uint `gorm:"primarykey"`
+	ID uint
 
 	// Time holds the time of event creation.
-	Time time.Time `gorm:"index"`
+	Time time.Time
 
 	// Model contains the name of the model accessed.
 	// Will be empty when accessing controller facades, as they are handled
 	// by JIMM.
-	Model string `gorm:"index"`
+	Model string
 
 	// ConversationId contains a unique ID per websocket request.
 	ConversationId string
@@ -32,7 +32,7 @@ type AuditLogEntry struct {
 	FacadeName string
 
 	// FacadeMethod contains the specific method to be executed on the facade.
-	FacadeMethod string `gorm:"index"`
+	FacadeMethod string
 
 	// FacadeVersion contains the requested version for the facade method.
 	FacadeVersion int
@@ -41,7 +41,7 @@ type AuditLogEntry struct {
 	ObjectId string
 
 	// IdentityTag is the tag of the identity that performed the action.
-	IdentityTag string `gorm:"index"`
+	IdentityTag string
 
 	// IsResponse indicates whether the action was a Response/Request.
 	IsResponse bool

@@ -13,15 +13,15 @@ import (
 
 // A Cloud represents a cloud service.
 type Cloud struct {
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// Name is the name of the cloud.
-	Name string `gorm:"not null;uniqueIndex"`
+	Name string
 
 	// Type is the provider type of cloud.
-	Type string `gorm:"not null"`
+	Type string
 
 	// HostCloudRegion is the "cloud/region" that hosts this cloud, if the
 	// cloud is hosted.
@@ -163,11 +163,11 @@ type CloudRegion struct {
 	gorm.Model
 
 	// Cloud is the cloud this region belongs to.
-	CloudName string `gorm:"uniqueIndex:idx_cloud_region_cloud_name_name"`
-	Cloud     Cloud  `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
+	CloudName string
+	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name"`
 
 	// Name is the name of the region.
-	Name string `gorm:"not null;uniqueIndex:idx_cloud_region_cloud_name_name"`
+	Name string
 
 	// Endpoint is the API endpoint URL for the region.
 	Endpoint string

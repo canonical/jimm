@@ -13,14 +13,14 @@ import (
 // the last version they read when updating an existing profile. A zero value is
 // used when creating a new profile.
 type ControllerProfile struct {
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	Name        string `gorm:"not null;uniqueIndex"`
+	Name        string
 	Description string
-	JujuVersion string `gorm:"column:juju_version;not null"`
-	Version     uint   `gorm:"not null"`
+	JujuVersion string
+	Version     uint
 
 	Cloud            ControllerProfileCloud            `gorm:"embedded"`
 	BootstrapOptions ControllerProfileBootstrapOptions `gorm:"embedded"`
@@ -44,7 +44,7 @@ func PartialJujuVersionPrefixes(version string) []string {
 // ControllerProfileCloud stores the cloud definition persisted in a controller
 // profile.
 type ControllerProfileCloud struct {
-	Name            string                       `gorm:"column:cloud_name;not null"`
+	Name            string                       `gorm:"column:cloud_name"`
 	Type            string                       `gorm:"column:cloud_type"`
 	AuthTypes       Strings                      `gorm:"column:cloud_auth_types"`
 	CACertificates  Strings                      `gorm:"column:cloud_ca_certificates"`
@@ -57,7 +57,7 @@ type ControllerProfileCloud struct {
 // ControllerProfileCloudRegion stores the single bootstrap region definition
 // persisted for a controller profile.
 type ControllerProfileCloudRegion struct {
-	Name             string `gorm:"column:cloud_region_name;not null"`
+	Name             string `gorm:"column:cloud_region_name"`
 	Endpoint         string `gorm:"column:cloud_region_endpoint"`
 	IdentityEndpoint string `gorm:"column:cloud_region_identity_endpoint"`
 	StorageEndpoint  string `gorm:"column:cloud_region_storage_endpoint"`

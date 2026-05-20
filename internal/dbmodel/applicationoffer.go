@@ -10,7 +10,7 @@ import (
 
 // An ApplicationOffer is an offer for an application.
 type ApplicationOffer struct {
-	ID        uint `gorm:"primaryKey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
@@ -22,10 +22,10 @@ type ApplicationOffer struct {
 	Name string
 
 	// UUID is the unique ID of the offer.
-	UUID string `gorm:"not null;uniqueIndex"`
+	UUID string
 
 	// Application offer URL.
-	URL string `gorm:"unique;not null"`
+	URL string
 }
 
 // Tag returns a names.Tag for the application-offer.

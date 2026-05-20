@@ -19,18 +19,18 @@ import (
 // within the JAAS system.
 type Controller struct {
 	// Note that we do not use gorm.Model to avoid the use of soft-deletes.
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// Name is the name given to this controller.
-	Name string `gorm:"not null;uniqueIndex"`
+	Name string
 
 	// UUID is the UUID of the controller. Note this is not being made a
 	// unique value because we occasionally want to add the same
 	// controller to the database with different names for testing
 	// purposes.
-	UUID string `gorm:"not null"`
+	UUID string
 
 	// CACertificate is the CA certificate required to access this
 	// controller. This is only set if the controller endpoint's
@@ -44,7 +44,7 @@ type Controller struct {
 
 	// TLSHostname provides a hostname that will be used for TLS verfication.
 	// Useful for local dev to avoid TLS issues.
-	TLSHostname string `gorm:"column:tls_hostname"`
+	TLSHostname string
 
 	// CloudName is the name of the cloud which is hosting this
 	// controller.
@@ -56,7 +56,7 @@ type Controller struct {
 
 	// Deprecated records whether this controller is deprecated, and
 	// therefore no new models or clouds will be added to the controller.
-	Deprecated bool `gorm:"not null;default:FALSE"`
+	Deprecated bool
 
 	// AgentVersion holds the string representation of the controller's
 	// agent version.
@@ -152,11 +152,11 @@ type CloudRegionControllerPriority struct {
 
 	// CloudRegion is the cloud-region this pertains to.
 	CloudRegionID uint
-	CloudRegion   CloudRegion `gorm:"constraint:OnDelete:CASCADE"`
+	CloudRegion   CloudRegion
 
 	// Controller is the controller this pertains to.
 	ControllerID uint
-	Controller   Controller `gorm:"constraint:OnDelete:CASCADE"`
+	Controller   Controller
 
 	// Priority is the priority with which this controller should be
 	// chosen when deploying to a cloud-region.

@@ -11,7 +11,7 @@ import (
 // mapping local users to external users.
 type UserMapping struct {
 	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 

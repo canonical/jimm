@@ -8,20 +8,20 @@ import "time"
 type SSHKey struct {
 	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
 
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// IdentityName is the unique name (email or client-id) of this entity.
-	IdentityName string   `gorm:"uniqueIndex:unique_identity_ssh_key"`
+	IdentityName string
 	Identity     Identity `gorm:"foreignKey:IdentityName;references:Name"`
 
 	// IdentityName is the unique name (email or client-id) of this entity.
-	ModelUUID string `gorm:"uniqueIndex:unique_identity_ssh_key"`
-	Model     Model  `gorm:"foreignKey:ModelUUID;references:uuid"`
+	ModelUUID string
+	Model     Model `gorm:"foreignKey:ModelUUID;references:uuid"`
 
 	// PublicKey holds the user's public SSH key.
-	PublicKey []byte `gorm:"uniqueIndex:unique_identity_ssh_key"`
+	PublicKey []byte
 	// MD5Fingerprint is the MD5 fingerprint of the public key.
 	MD5Fingerprint string
 	// KeyComment holds a user provided comment.

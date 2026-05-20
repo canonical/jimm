@@ -13,15 +13,15 @@ import (
 // RoleEntry holds a role entry.
 type RoleEntry struct {
 	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// Name holds the name of the role.
-	Name string `gorm:"index;column:name"`
+	Name string
 
 	// UUID holds the uuid of the role.
-	UUID string `gorm:"index;column:uuid"`
+	UUID string
 }
 
 // TableName overrides the table name gorm will use to find

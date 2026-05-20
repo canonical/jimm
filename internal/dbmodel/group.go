@@ -14,15 +14,15 @@ import (
 // A GroupEntry holds information about a user group.
 type GroupEntry struct {
 	// Note this doesn't use the standard gorm.Model to avoid soft-deletes.
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
 	// Name holds the name of the group.
-	Name string `gorm:"index;column:name"`
+	Name string
 
 	// UUID holds the uuid of the group.
-	UUID string `gotm:"index;column:uuid"`
+	UUID string
 }
 
 // ToAPIGroup converts a group entry to a JIMM API

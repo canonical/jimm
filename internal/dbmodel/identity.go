@@ -42,10 +42,10 @@ type Identity struct {
 	// representing a Juju user (i.e. with an @canonical.com suffix), or the client
 	// ID for a service account. The Name will have originated at an
 	// external identity provider in JAAS deployments.
-	Name string `gorm:"not null;uniqueIndex"`
+	Name string
 
 	// DisplayName is the display name of the identity.
-	DisplayName string `gorm:"not null"`
+	DisplayName string
 
 	// LastLogin is the time the identity last authenticated to the JIMM
 	// server. LastLogin will only be a valid time if the identity has
@@ -54,7 +54,7 @@ type Identity struct {
 
 	// Disabled records whether the identity has been disabled or not, disabled
 	// identities are not allowed to authenticate.
-	Disabled bool `gorm:"not null;default:FALSE"`
+	Disabled bool
 
 	// CloudCredentials are the cloud credentials owned by this identity.
 	CloudCredentials []CloudCredential `gorm:"foreignKey:OwnerIdentityName;references:Name"`
@@ -71,13 +71,9 @@ type Identity struct {
 
 	// AccessTokenExpiry is the expiration date for this access token.
 	//
-	// Note:
-	// We're using gorm type to dictate the timezone, such that the
-	// database doesn't drop the time zone part for the access token,
-	// and then on retrievals we can perform a safe check for the validity
-	// based on the timezone that was initially sent with the token
-	// from the authentication server.
-	AccessTokenExpiry time.Time `gorm:"type:timestamp with time zone"`
+	// The database schema stores this as "timestamp with time zone" so
+	// retrieval preserves the timezone provided by the authentication server.
+	AccessTokenExpiry time.Time
 
 	// AccessTokenType is the type for the token, typically bearer.
 	AccessTokenType string

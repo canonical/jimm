@@ -9,12 +9,12 @@ import (
 // JobLog represents a log entry for a job.
 type JobLog struct {
 	// JobID is the unique identifier for the job. References a [JobTrackerEntry].
-	JobID int64 `gorm:"type:bigint;not null;primaryKey"`
+	JobID int64 `gorm:"primaryKey"`
 	// LineNumber is the line number of a running job. It is used to offset the log lines
 	// when fetching logs.
-	LineNumber int `gorm:"not null;primaryKey"`
+	LineNumber int `gorm:"primaryKey"`
 	// LogLine is an actual log line from the job.
-	LogLine string `gorm:"type:text;not null"`
+	LogLine string
 }
 
 // NewJobLog creates a new JobLog with the given jobId, lineNumber, and logLine.

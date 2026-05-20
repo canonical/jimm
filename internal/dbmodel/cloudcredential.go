@@ -13,7 +13,7 @@ import (
 // A CloudCredential is a credential that is used to access a cloud.
 type CloudCredential struct {
 	// Note that we do not use gorm.Model to avoid the use of soft-deletes.
-	ID        uint `gorm:"primarykey"`
+	ID        uint
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
@@ -22,7 +22,7 @@ type CloudCredential struct {
 
 	// Cloud is the cloud this credential is for.
 	CloudName string
-	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name;constraint:OnDelete:CASCADE"`
+	Cloud     Cloud `gorm:"foreignKey:CloudName;references:Name"`
 
 	// Owner is the identity that owns this credential.
 	OwnerIdentityName string
