@@ -3,12 +3,20 @@
 // Package description provides version-agnostic wrappers around major versions
 // of `github.com/juju/description` which hold Juju model descriptions, to
 // facilitate migrations between different Juju versions.
+// When deserializing, the wrapper will select the appropriate description version
+// based on the target controller version being migrated to. When serializing,
+// the wrapper will use the same description version as was used for deserialization.
+//
+// When updating this package to accomodate a new major version of `github.com/juju/description`,
+// a new wrapper struct should be added that implements the Model interface, and the
+// Deserialize and migrationDescriptionVersion functions should be updated to support the new version.
 package description
 
 import (
 	"fmt"
 
 	descriptionv10 "github.com/juju/description/v10"
+	descriptionv11 "github.com/juju/description/v11"
 	descriptionv9 "github.com/juju/description/v9"
 	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v5"
@@ -17,7 +25,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 )
 
-const latestDescriptionVersion = 10
+const latestDescriptionVersion = 11
 
 // CloudCredentialArgs holds the arguments needed to set a cloud credential.
 type CloudCredentialArgs struct {
@@ -92,6 +100,12 @@ func Deserialize(raw []byte, targetControllerVersion version.Number) (Model, err
 			return nil, fmt.Errorf("failed to deserialize v10 model description: %w", err)
 		}
 		return &migrationDescriptionV10{desc: desc}, nil
+	case 11:
+		desc, err := descriptionv11.Deserialize(raw)
+		if err != nil {
+			return nil, fmt.Errorf("failed to deserialize v11 model description: %w", err)
+		}
+		return &migrationDescriptionV11{desc: desc}, nil
 	default:
 		return nil, errors.New("unsupported description version")
 	}
@@ -107,8 +121,10 @@ func migrationDescriptionVersion(controllerVersion version.Number) (int, error) 
 		return 0, fmt.Errorf("unsupported controller version %s, must be at least 3.6.9", controllerVersion)
 	case v.Compare(version.MustParse("3.6.9")) >= 0 && v.Compare(version.MustParse("3.6.12")) <= 0:
 		return 9, nil
-	case v.Compare(version.MustParse("3.6.13")) == 0:
+	case v.Compare(version.MustParse("3.6.13")) >= 0 && v.Compare(version.MustParse("3.6.22")) <= 0:
 		return 10, nil
+	case v.Compare(version.MustParse("3.6.23")) == 0:
+		return 11, nil
 	default:
 		return latestDescriptionVersion, nil
 	}

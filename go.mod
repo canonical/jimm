@@ -275,6 +275,7 @@ require (
 require (
 	github.com/google/go-github/v69 v69.2.0
 	github.com/juju/description/v10 v10.0.0
+	github.com/juju/description/v11 v11.0.1
 	github.com/riverqueue/river v0.30.0
 	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.30.0
 	github.com/riverqueue/river/rivertype v0.30.0

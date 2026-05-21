@@ -7,6 +7,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	descriptionv10 "github.com/juju/description/v10"
+	descriptionv11 "github.com/juju/description/v11"
 	descriptionv9 "github.com/juju/description/v9"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
@@ -14,123 +15,216 @@ import (
 
 func TestDescriptionWrappers(t *testing.T) {
 	c := qt.New(t)
+	const firstDescriptionVersion = 9
 
-	// Common data
 	ownerTag := names.NewUserTag("admin")
 	userTag := names.NewUserTag("user1")
 	cloudTag := names.NewCloudTag("aws")
+	updatedOwnerTag := names.NewUserTag("admin-2")
+	updatedCloudTag := names.NewCloudTag("gce")
 
-	// Setup v9 model
-	m9 := descriptionv9.NewModel(descriptionv9.ModelArgs{
-		Owner: ownerTag,
-		Config: map[string]any{
-			"uuid": "model-uuid",
+	tests := []struct {
+		name               string
+		descriptionVersion int
+		controllerVersion  version.Number
+		serialize          func(*qt.C) []byte
+		matchesWrapper     func(Model) bool
+	}{
+		{
+			name:               "v9",
+			descriptionVersion: 9,
+			controllerVersion:  version.MustParse("3.6.12"),
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv9.NewModel(descriptionv9.ModelArgs{
+					Owner: ownerTag,
+					Config: map[string]any{
+						"uuid": "model-uuid",
+					},
+					AgentVersion: "3.6.12",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+				m.AddUser(descriptionv9.UserArgs{Name: userTag, Access: "read"})
+				m.SetCloudCredential(descriptionv9.CloudCredentialArgs{
+					Owner:      ownerTag,
+					Cloud:      cloudTag,
+					Name:       "cred1",
+					AuthType:   "oauth2",
+					Attributes: map[string]string{"a": "b"},
+				})
+				app := m.AddApplication(descriptionv9.ApplicationArgs{Tag: names.NewApplicationTag("app1")})
+				app.SetStatus(descriptionv9.StatusArgs{Value: "active"})
+				app.AddOffer(descriptionv9.ApplicationOfferArgs{
+					OfferName:              "offer1",
+					OfferUUID:              "offer-uuid",
+					ACL:                    map[string]string{"user": "read"},
+					Endpoints:              map[string]string{"relation": "remote"},
+					ApplicationName:        "app1",
+					ApplicationDescription: "desc",
+				})
+				bytes, err := descriptionv9.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+			matchesWrapper: func(m Model) bool {
+				_, ok := m.(*migrationDescriptionV9)
+				return ok
+			},
 		},
-		AgentVersion: "3.6.12",
-		Type:         "iaas",
-	})
-	m9.SetStatus(descriptionv9.StatusArgs{Value: "available"})
-	m9.AddUser(descriptionv9.UserArgs{
-		Name:   userTag,
-		Access: "read",
-	})
-	m9.SetCloudCredential(descriptionv9.CloudCredentialArgs{
-		Owner:      ownerTag,
-		Cloud:      cloudTag,
-		Name:       "cred1",
-		AuthType:   "oauth2",
-		Attributes: map[string]string{"a": "b"},
-	})
-	app9 := m9.AddApplication(descriptionv9.ApplicationArgs{
-		Tag: names.NewApplicationTag("app1"),
-	})
-	app9.SetStatus(descriptionv9.StatusArgs{Value: "active"})
-	app9.AddOffer(descriptionv9.ApplicationOfferArgs{
-		OfferName:              "offer1",
-		OfferUUID:              "offer-uuid",
-		ACL:                    map[string]string{"user": "read"},
-		Endpoints:              map[string]string{"relation": "remote"},
-		ApplicationName:        "app1",
-		ApplicationDescription: "desc",
-	})
-
-	// Serialize v9
-	bytes9, err := descriptionv9.Serialize(m9)
-	c.Assert(err, qt.IsNil)
-
-	// Deserialize using wrapper
-	wrapper9, err := Deserialize(bytes9, version.MustParse("3.6.12"))
-	c.Assert(err, qt.IsNil)
-
-	// Setup v10 model
-	m10 := descriptionv10.NewModel(descriptionv10.ModelArgs{
-		Owner: ownerTag,
-		Config: map[string]any{
-			"uuid": "model-uuid",
+		{
+			name:               "v10",
+			descriptionVersion: 10,
+			controllerVersion:  version.MustParse("3.6.13"),
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv10.NewModel(descriptionv10.ModelArgs{
+					Owner: ownerTag,
+					Config: map[string]any{
+						"uuid": "model-uuid",
+					},
+					AgentVersion: "3.6.13",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv10.StatusArgs{Value: "available"})
+				m.AddUser(descriptionv10.UserArgs{Name: userTag, Access: "read"})
+				m.SetCloudCredential(descriptionv10.CloudCredentialArgs{
+					Owner:      ownerTag,
+					Cloud:      cloudTag,
+					Name:       "cred1",
+					AuthType:   "oauth2",
+					Attributes: map[string]string{"a": "b"},
+				})
+				app := m.AddApplication(descriptionv10.ApplicationArgs{Tag: names.NewApplicationTag("app1")})
+				app.SetStatus(descriptionv10.StatusArgs{Value: "active"})
+				app.AddOffer(descriptionv10.ApplicationOfferArgs{
+					OfferName:              "offer1",
+					OfferUUID:              "offer-uuid",
+					ACL:                    map[string]string{"user": "read"},
+					Endpoints:              map[string]string{"relation": "remote"},
+					ApplicationName:        "app1",
+					ApplicationDescription: "desc",
+				})
+				bytes, err := descriptionv10.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+			matchesWrapper: func(m Model) bool {
+				_, ok := m.(*migrationDescriptionV10)
+				return ok
+			},
 		},
-		AgentVersion: "3.6.13",
-		Type:         "iaas",
-	})
-	m10.SetStatus(descriptionv10.StatusArgs{Value: "available"})
-	m10.AddUser(descriptionv10.UserArgs{
-		Name:   userTag,
-		Access: "read",
-	})
-	m10.SetCloudCredential(descriptionv10.CloudCredentialArgs{
-		Owner:      ownerTag,
-		Cloud:      cloudTag,
-		Name:       "cred1",
-		AuthType:   "oauth2",
-		Attributes: map[string]string{"a": "b"},
-	})
-	app10 := m10.AddApplication(descriptionv10.ApplicationArgs{
-		Tag: names.NewApplicationTag("app1"),
-	})
-	app10.SetStatus(descriptionv10.StatusArgs{Value: "active"})
-	app10.AddOffer(descriptionv10.ApplicationOfferArgs{
-		OfferName:              "offer1",
-		OfferUUID:              "offer-uuid",
-		ACL:                    map[string]string{"user": "read"},
-		Endpoints:              map[string]string{"relation": "remote"},
-		ApplicationName:        "app1",
-		ApplicationDescription: "desc",
-	})
-
-	// Serialize v10
-	bytes10, err := descriptionv10.Serialize(m10)
-	c.Assert(err, qt.IsNil)
-
-	// Deserialize using wrapper
-	wrapper10, err := Deserialize(bytes10, version.MustParse("3.6.13"))
-	c.Assert(err, qt.IsNil)
-
-	// Verify both wrappers return same values
-	wrappers := []Model{wrapper9, wrapper10}
-	for _, w := range wrappers {
-		c.Check(w.Owner(), qt.Equals, ownerTag)
-
-		users := w.Users()
-		c.Assert(users, qt.HasLen, 1)
-		c.Check(users[0].Name(), qt.Equals, userTag)
-		c.Check(users[0].Access(), qt.Equals, "read")
-
-		cred := w.CloudCredential()
-		c.Check(cred.Owner(), qt.Equals, ownerTag.Id())
-		c.Check(cred.Cloud(), qt.Equals, cloudTag.Id())
-		c.Check(cred.Name(), qt.Equals, "cred1")
-		c.Check(cred.AuthType(), qt.Equals, "oauth2")
-		c.Check(cred.Attributes(), qt.DeepEquals, map[string]string{"a": "b"})
-
-		apps := w.Applications()
-		c.Assert(apps, qt.HasLen, 1)
-		c.Check(apps[0].Name(), qt.Equals, "app1")
-
-		offers := apps[0].Offers()
-		c.Assert(offers, qt.HasLen, 1)
-		c.Check(offers[0].OfferName(), qt.Equals, "offer1")
-		c.Check(offers[0].OfferUUID(), qt.Equals, "offer-uuid")
-		c.Check(offers[0].ACL(), qt.DeepEquals, map[string]string{"user": "read"})
+		{
+			name:               "v11",
+			descriptionVersion: 11,
+			controllerVersion:  version.MustParse("3.6.23"),
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv11.NewModel(descriptionv11.ModelArgs{
+					Owner: ownerTag,
+					Config: map[string]any{
+						"uuid": "model-uuid",
+					},
+					AgentVersion: "3.6.23",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv11.StatusArgs{Value: "available"})
+				m.AddUser(descriptionv11.UserArgs{Name: userTag, Access: "read"})
+				m.SetCloudCredential(descriptionv11.CloudCredentialArgs{
+					Owner:      ownerTag,
+					Cloud:      cloudTag,
+					Name:       "cred1",
+					AuthType:   "oauth2",
+					Attributes: map[string]string{"a": "b"},
+				})
+				app := m.AddApplication(descriptionv11.ApplicationArgs{Tag: names.NewApplicationTag("app1")})
+				app.SetStatus(descriptionv11.StatusArgs{Value: "active"})
+				app.AddOffer(descriptionv11.ApplicationOfferArgs{
+					OfferName:              "offer1",
+					OfferUUID:              "offer-uuid",
+					ACL:                    map[string]string{"user": "read"},
+					Endpoints:              map[string]string{"relation": "remote"},
+					ApplicationName:        "app1",
+					ApplicationDescription: "desc",
+				})
+				bytes, err := descriptionv11.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+			matchesWrapper: func(m Model) bool {
+				_, ok := m.(*migrationDescriptionV11)
+				return ok
+			},
+		},
 	}
+
+	c.Assert(tests, qt.HasLen, latestDescriptionVersion-firstDescriptionVersion+1)
+	for i, tt := range tests {
+		c.Assert(tt.descriptionVersion, qt.Equals, firstDescriptionVersion+i)
+	}
+
+	for _, tt := range tests {
+		c.Run(tt.name, func(c *qt.C) {
+			// Create a wrapper around a specific version of the model description
+			wrapper, err := Deserialize(tt.serialize(c), tt.controllerVersion)
+			c.Assert(err, qt.IsNil)
+			c.Assert(tt.matchesWrapper(wrapper), qt.IsTrue)
+
+			// Check the wrapper's fields match what we expect from the original description
+			assertWrappedModel(c, wrapper, ownerTag, userTag, cloudTag)
+			c.Check(wrapper.Config()["uuid"], qt.Equals, "model-uuid")
+			c.Check(wrapper.CloudRegion(), qt.Equals, "")
+
+			// Update some fields in the wrapper, serialize it, and deserialize it again to check that updates are preserved
+			wrapper.SetOwner(updatedOwnerTag)
+			wrapper.ClearUsers()
+			wrapper.SetCloudCredential(CloudCredentialArgs{
+				Owner:      updatedOwnerTag,
+				Cloud:      updatedCloudTag,
+				Name:       "cred2",
+				AuthType:   "userpass",
+				Attributes: map[string]string{"c": "d"},
+			})
+
+			roundTrip, err := wrapper.Serialize()
+			c.Assert(err, qt.IsNil)
+
+			updatedWrapper, err := Deserialize(roundTrip, tt.controllerVersion)
+			c.Assert(err, qt.IsNil)
+			c.Check(updatedWrapper.Owner(), qt.Equals, updatedOwnerTag)
+			c.Check(updatedWrapper.Users(), qt.HasLen, 0)
+			assertCloudCredential(c, updatedWrapper.CloudCredential(), updatedOwnerTag.Id(), updatedCloudTag.Id(), "cred2", "userpass", map[string]string{"c": "d"})
+			apps := updatedWrapper.Applications()
+			c.Assert(apps, qt.HasLen, 1)
+			c.Check(apps[0].Offers(), qt.HasLen, 1)
+		})
+	}
+}
+
+func assertWrappedModel(c *qt.C, w Model, ownerTag, userTag names.UserTag, cloudTag names.CloudTag) {
+	c.Check(w.Owner(), qt.Equals, ownerTag)
+
+	users := w.Users()
+	c.Assert(users, qt.HasLen, 1)
+	c.Check(users[0].Name(), qt.Equals, userTag)
+	c.Check(users[0].Access(), qt.Equals, "read")
+
+	assertCloudCredential(c, w.CloudCredential(), ownerTag.Id(), cloudTag.Id(), "cred1", "oauth2", map[string]string{"a": "b"})
+
+	apps := w.Applications()
+	c.Assert(apps, qt.HasLen, 1)
+	c.Check(apps[0].Name(), qt.Equals, "app1")
+
+	offers := apps[0].Offers()
+	c.Assert(offers, qt.HasLen, 1)
+	c.Check(offers[0].OfferName(), qt.Equals, "offer1")
+	c.Check(offers[0].OfferUUID(), qt.Equals, "offer-uuid")
+	c.Check(offers[0].ACL(), qt.DeepEquals, map[string]string{"user": "read"})
+}
+
+func assertCloudCredential(c *qt.C, cred CloudCredential, owner, cloud, name, authType string, attributes map[string]string) {
+	c.Check(cred.Owner(), qt.Equals, owner)
+	c.Check(cred.Cloud(), qt.Equals, cloud)
+	c.Check(cred.Name(), qt.Equals, name)
+	c.Check(cred.AuthType(), qt.Equals, authType)
+	c.Check(cred.Attributes(), qt.DeepEquals, attributes)
 }
 
 func TestMigrationDescriptionVersion(t *testing.T) {
@@ -168,17 +262,17 @@ func TestMigrationDescriptionVersion(t *testing.T) {
 			expected: 10,
 		},
 		{
-			name:     "version 3.6.14 returns latest (10)",
+			name:     "version 3.6.14 returns 10",
 			version:  "3.6.14",
-			expected: latestDescriptionVersion,
+			expected: 10,
 		},
 		{
-			name:     "version 3.7.0 returns latest (10)",
+			name:     "version 3.7.0 returns latest (11)",
 			version:  "3.7.0",
 			expected: latestDescriptionVersion,
 		},
 		{
-			name:     "version 4.0.0 returns latest (10)",
+			name:     "version 4.0.0 returns latest (11)",
 			version:  "4.0.0",
 			expected: latestDescriptionVersion,
 		},
