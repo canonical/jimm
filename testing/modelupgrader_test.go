@@ -12,7 +12,10 @@ import (
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	"github.com/canonical/jimm/v3/pkg/api"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func TestUpgradeModelDryRun(t *testing.T) {
@@ -33,33 +36,49 @@ func TestUpgradeModel(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
 
-	// Create a reference model to discover the controller's current agent version.
-	refModel := s.CreateModelForBob(c)
-	ctrlVersion := version.MustParse(refModel.Controller.AgentVersion)
-	if ctrlVersion.Patch == 0 {
-		c.Skip("controller patch version is 0, cannot create a model at a lower patch version")
-	}
-	lowerVersion := version.Number{
-		Major: ctrlVersion.Major,
-		Minor: ctrlVersion.Minor,
-		Patch: ctrlVersion.Patch - 1,
+	ctrlName, _ := s.GetOneControllerConfig(c)
+	controller := dbmodel.Controller{Name: ctrlName}
+	err := s.JIMM.Database.GetController(c.Context(), &controller)
+	c.Assert(err, qt.IsNil)
+	c.Assert(controller.AgentVersion, qt.Not(qt.Equals), "")
+
+	ctrlVersion := version.MustParse(controller.AgentVersion)
+	var lowerVersion version.Number
+	switch ctrlVersion.Major {
+	case 3:
+		lowerVersion = version.Number{
+			Major: 3,
+			Minor: 6,
+			Patch: 20,
+		}
+	case 4:
+		lowerVersion = version.Number{
+			Major: 4,
+			Minor: 0,
+			Patch: 6,
+		}
+	default:
+		c.Fatalf("unexpected controller major version %d", ctrlVersion.Major)
 	}
 
 	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
+	jimmClient := api.NewClient(conn)
 
 	// Create a model pinned to a lower agent version so there is something to upgrade.
-	var mi jujuparams.ModelInfo
-	err := conn.APICall("ModelManager", 10, "", "CreateModel", jujuparams.ModelCreateArgs{
-		Name:               petname.Generate(2, "-"),
-		OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
-		CloudTag:           names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
-		CloudRegion:        jimmtest.TestE2ECloudRegionName,
-		CloudCredentialTag: "cloudcred-" + jimmtest.TestE2ECloudName + "_bob@canonical.com_cred",
-		Config: map[string]any{
-			"agent-version": lowerVersion.String(),
+	mi, err := jimmClient.AddModelToController(&apiparams.AddModelToControllerRequest{
+		ModelCreateArgs: jujuparams.ModelCreateArgs{
+			Name:               petname.Generate(2, "-"),
+			OwnerTag:           names.NewUserTag("bob@canonical.com").String(),
+			CloudTag:           names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
+			CloudRegion:        jimmtest.TestE2ECloudRegionName,
+			CloudCredentialTag: "cloudcred-" + jimmtest.TestE2ECloudName + "_bob@canonical.com_cred",
+			Config: map[string]any{
+				"agent-version": lowerVersion.String(),
+			},
 		},
-	}, &mi)
+		ControllerName: controller.Name,
+	})
 	c.Assert(err, qt.IsNil)
 	c.Cleanup(func() {
 		s.DestroyModelAndDeleteFromDatabase(c, names.NewModelTag(mi.UUID))
