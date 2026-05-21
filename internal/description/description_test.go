@@ -9,6 +9,7 @@ import (
 	descriptionv10 "github.com/juju/description/v10"
 	descriptionv11 "github.com/juju/description/v11"
 	descriptionv9 "github.com/juju/description/v9"
+	"github.com/juju/juju/environs/config"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 )
@@ -196,6 +197,101 @@ func TestDescriptionWrappers(t *testing.T) {
 			c.Check(apps[0].Offers(), qt.HasLen, 1)
 		})
 	}
+}
+
+func TestTryDetermineModelUUID(t *testing.T) {
+	c := qt.New(t)
+	const firstDescriptionVersion = 9
+
+	ownerTag := names.NewUserTag("admin")
+	tests := []struct {
+		name               string
+		descriptionVersion int
+		serialize          func(*qt.C) []byte
+	}{
+		{
+			name:               "v9",
+			descriptionVersion: 9,
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv9.NewModel(descriptionv9.ModelArgs{
+					Owner: ownerTag,
+					Config: map[string]any{
+						config.UUIDKey: "model-uuid",
+					},
+					AgentVersion: "3.6.12",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+				bytes, err := descriptionv9.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+		},
+		{
+			name:               "v10",
+			descriptionVersion: 10,
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv10.NewModel(descriptionv10.ModelArgs{
+					Owner: ownerTag,
+					Config: map[string]any{
+						config.UUIDKey: "model-uuid",
+					},
+					AgentVersion: "3.6.13",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv10.StatusArgs{Value: "available"})
+				bytes, err := descriptionv10.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+		},
+		{
+			name:               "v11",
+			descriptionVersion: 11,
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv11.NewModel(descriptionv11.ModelArgs{
+					Owner: ownerTag,
+					Config: map[string]any{
+						config.UUIDKey: "model-uuid",
+					},
+					AgentVersion: "3.6.23",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv11.StatusArgs{Value: "available"})
+				bytes, err := descriptionv11.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+		},
+	}
+
+	c.Assert(tests, qt.HasLen, latestDescriptionVersion-firstDescriptionVersion+1)
+	for i, tt := range tests {
+		c.Assert(tt.descriptionVersion, qt.Equals, firstDescriptionVersion+i)
+	}
+
+	for _, tt := range tests {
+		c.Run(tt.name, func(c *qt.C) {
+			modelUUID, err := TryDetermineModelUUID(tt.serialize(c))
+			c.Assert(err, qt.IsNil)
+			c.Check(modelUUID, qt.Equals, "model-uuid")
+		})
+	}
+
+	c.Run("missing uuid returns error", func(c *qt.C) {
+		m := descriptionv11.NewModel(descriptionv11.ModelArgs{
+			Owner:        ownerTag,
+			Config:       map[string]any{},
+			AgentVersion: "3.6.23",
+			Type:         "iaas",
+		})
+		m.SetStatus(descriptionv11.StatusArgs{Value: "available"})
+		bytes, err := descriptionv11.Serialize(m)
+		c.Assert(err, qt.IsNil)
+
+		_, err = TryDetermineModelUUID(bytes)
+		c.Assert(err, qt.ErrorMatches, `model config must contain a string value for key "uuid"`)
+	})
 }
 
 func assertWrappedModel(c *qt.C, w Model, ownerTag, userTag names.UserTag, cloudTag names.CloudTag) {

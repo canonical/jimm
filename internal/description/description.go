@@ -27,6 +27,11 @@ import (
 
 const latestDescriptionVersion = 11
 
+// latestDescriptionTargetVersion is intentionally higher than any released
+// controller version so migrationDescriptionVersion resolves to the newest
+// supported description wrapper.
+var latestDescriptionTargetVersion = version.MustParse("999.0.0")
+
 // CloudCredentialArgs holds the arguments needed to set a cloud credential.
 type CloudCredentialArgs struct {
 	Owner      names.UserTag
@@ -131,9 +136,9 @@ func migrationDescriptionVersion(controllerVersion version.Number) (int, error) 
 }
 
 // TryDetermineModelUUID attempts to extract the model UUID from the
-// migration description data using the latest known description format.
+// migration description data using the newest supported description wrapper.
 func TryDetermineModelUUID(raw []byte) (string, error) {
-	model, err := descriptionv10.Deserialize(raw)
+	model, err := Deserialize(raw, latestDescriptionTargetVersion)
 	if err != nil {
 		return "", fmt.Errorf("failed to deserialize model description: %w", err)
 	}
