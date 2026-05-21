@@ -289,6 +289,18 @@ func (r *controllerRoot) ListControllers(ctx context.Context) (apiparams.ListCon
 	for _, ctl := range dbControllers {
 		controllersInfo = append(controllersInfo, ctl.ToAPIControllerInfo())
 	}
+	if r.user.JimmAdmin {
+		bootstraps, err := r.jimm.JujuManager().ListControllerBootstraps(ctx)
+		if err != nil {
+			return apiparams.ListControllersResponse{}, err
+		}
+		for _, bootstrap := range bootstraps {
+			controllersInfo = append(controllersInfo, bootstrap.ToAPIControllerInfo())
+		}
+		slices.SortFunc(controllersInfo, func(a, b apiparams.ControllerInfo) int {
+			return strings.Compare(a.Name, b.Name)
+		})
+	}
 
 	return apiparams.ListControllersResponse{
 		Controllers: controllersInfo,

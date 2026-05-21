@@ -21,6 +21,7 @@ type ControllerService struct {
 	ControllerDetailsForIncomingModel_ func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerInfo_                    func(ctx context.Context, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
+	ListControllerBootstraps_          func(ctx context.Context) ([]dbmodel.ControllerBootstrap, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
 	RemoveController_                  func(ctx context.Context, user *openfga.User, controllerName string, force bool) error
 	SetControllerDeprecated_           func(ctx context.Context, user *openfga.User, controllerName string, deprecated bool) error
@@ -60,6 +61,13 @@ func (j *ControllerService) EarliestControllerVersion(ctx context.Context) (vers
 		return version.Number{}, errors.New("not implemented")
 	}
 	return j.EarliestControllerVersion_(ctx)
+}
+
+func (j *ControllerService) ListControllerBootstraps(ctx context.Context) ([]dbmodel.ControllerBootstrap, error) {
+	if j.ListControllerBootstraps_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return j.ListControllerBootstraps_(ctx)
 }
 
 func (j *ControllerService) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {

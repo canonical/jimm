@@ -41,40 +41,40 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
-// AddController mocks base method.
-func (m *MockStore) AddController(ctx context.Context, controller *dbmodel.Controller) error {
+// AddControllerBootstrap mocks base method.
+func (m *MockStore) AddControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddController", ctx, controller)
+	ret := m.ctrl.Call(m, "AddControllerBootstrap", ctx, bootstrap)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// AddController indicates an expected call of AddController.
-func (mr *MockStoreMockRecorder) AddController(ctx, controller any) *MockStoreAddControllerCall {
+// AddControllerBootstrap indicates an expected call of AddControllerBootstrap.
+func (mr *MockStoreMockRecorder) AddControllerBootstrap(ctx, bootstrap any) *MockStoreAddControllerBootstrapCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddController", reflect.TypeOf((*MockStore)(nil).AddController), ctx, controller)
-	return &MockStoreAddControllerCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddControllerBootstrap", reflect.TypeOf((*MockStore)(nil).AddControllerBootstrap), ctx, bootstrap)
+	return &MockStoreAddControllerBootstrapCall{Call: call}
 }
 
-// MockStoreAddControllerCall wrap *gomock.Call
-type MockStoreAddControllerCall struct {
+// MockStoreAddControllerBootstrapCall wrap *gomock.Call
+type MockStoreAddControllerBootstrapCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockStoreAddControllerCall) Return(err error) *MockStoreAddControllerCall {
+func (c *MockStoreAddControllerBootstrapCall) Return(err error) *MockStoreAddControllerBootstrapCall {
 	c.Call = c.Call.Return(err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockStoreAddControllerCall) Do(f func(context.Context, *dbmodel.Controller) error) *MockStoreAddControllerCall {
+func (c *MockStoreAddControllerBootstrapCall) Do(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreAddControllerBootstrapCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreAddControllerCall) DoAndReturn(f func(context.Context, *dbmodel.Controller) error) *MockStoreAddControllerCall {
+func (c *MockStoreAddControllerBootstrapCall) DoAndReturn(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreAddControllerBootstrapCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -117,40 +117,40 @@ func (c *MockStoreAddJobLogCall) DoAndReturn(f func(context.Context, int64, stri
 	return c
 }
 
-// DeleteController mocks base method.
-func (m *MockStore) DeleteController(ctx context.Context, controller *dbmodel.Controller) error {
+// DeleteControllerBootstrap mocks base method.
+func (m *MockStore) DeleteControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteController", ctx, controller)
+	ret := m.ctrl.Call(m, "DeleteControllerBootstrap", ctx, bootstrap)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteController indicates an expected call of DeleteController.
-func (mr *MockStoreMockRecorder) DeleteController(ctx, controller any) *MockStoreDeleteControllerCall {
+// DeleteControllerBootstrap indicates an expected call of DeleteControllerBootstrap.
+func (mr *MockStoreMockRecorder) DeleteControllerBootstrap(ctx, bootstrap any) *MockStoreDeleteControllerBootstrapCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteController", reflect.TypeOf((*MockStore)(nil).DeleteController), ctx, controller)
-	return &MockStoreDeleteControllerCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteControllerBootstrap", reflect.TypeOf((*MockStore)(nil).DeleteControllerBootstrap), ctx, bootstrap)
+	return &MockStoreDeleteControllerBootstrapCall{Call: call}
 }
 
-// MockStoreDeleteControllerCall wrap *gomock.Call
-type MockStoreDeleteControllerCall struct {
+// MockStoreDeleteControllerBootstrapCall wrap *gomock.Call
+type MockStoreDeleteControllerBootstrapCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockStoreDeleteControllerCall) Return(err error) *MockStoreDeleteControllerCall {
+func (c *MockStoreDeleteControllerBootstrapCall) Return(err error) *MockStoreDeleteControllerBootstrapCall {
 	c.Call = c.Call.Return(err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockStoreDeleteControllerCall) Do(f func(context.Context, *dbmodel.Controller) error) *MockStoreDeleteControllerCall {
+func (c *MockStoreDeleteControllerBootstrapCall) Do(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreDeleteControllerBootstrapCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockStoreDeleteControllerCall) DoAndReturn(f func(context.Context, *dbmodel.Controller) error) *MockStoreDeleteControllerCall {
+func (c *MockStoreDeleteControllerBootstrapCall) DoAndReturn(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreDeleteControllerBootstrapCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -193,6 +193,44 @@ func (c *MockStoreGetControllerCall) DoAndReturn(f func(context.Context, *dbmode
 	return c
 }
 
+// GetControllerBootstrap mocks base method.
+func (m *MockStore) GetControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetControllerBootstrap", ctx, bootstrap)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// GetControllerBootstrap indicates an expected call of GetControllerBootstrap.
+func (mr *MockStoreMockRecorder) GetControllerBootstrap(ctx, bootstrap any) *MockStoreGetControllerBootstrapCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetControllerBootstrap", reflect.TypeOf((*MockStore)(nil).GetControllerBootstrap), ctx, bootstrap)
+	return &MockStoreGetControllerBootstrapCall{Call: call}
+}
+
+// MockStoreGetControllerBootstrapCall wrap *gomock.Call
+type MockStoreGetControllerBootstrapCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockStoreGetControllerBootstrapCall) Return(err error) *MockStoreGetControllerBootstrapCall {
+	c.Call = c.Call.Return(err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockStoreGetControllerBootstrapCall) Do(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreGetControllerBootstrapCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockStoreGetControllerBootstrapCall) DoAndReturn(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreGetControllerBootstrapCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // QueryJobLog mocks base method.
 func (m *MockStore) QueryJobLog(ctx context.Context, jobId int64, offset int) ([]string, int, error) {
 	m.ctrl.T.Helper()
@@ -229,6 +267,44 @@ func (c *MockStoreQueryJobLogCall) Do(f func(context.Context, int64, int) ([]str
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockStoreQueryJobLogCall) DoAndReturn(f func(context.Context, int64, int) ([]string, int, error)) *MockStoreQueryJobLogCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpdateControllerBootstrap mocks base method.
+func (m *MockStore) UpdateControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateControllerBootstrap", ctx, bootstrap)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateControllerBootstrap indicates an expected call of UpdateControllerBootstrap.
+func (mr *MockStoreMockRecorder) UpdateControllerBootstrap(ctx, bootstrap any) *MockStoreUpdateControllerBootstrapCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateControllerBootstrap", reflect.TypeOf((*MockStore)(nil).UpdateControllerBootstrap), ctx, bootstrap)
+	return &MockStoreUpdateControllerBootstrapCall{Call: call}
+}
+
+// MockStoreUpdateControllerBootstrapCall wrap *gomock.Call
+type MockStoreUpdateControllerBootstrapCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockStoreUpdateControllerBootstrapCall) Return(err error) *MockStoreUpdateControllerBootstrapCall {
+	c.Call = c.Call.Return(err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockStoreUpdateControllerBootstrapCall) Do(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreUpdateControllerBootstrapCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockStoreUpdateControllerBootstrapCall) DoAndReturn(f func(context.Context, *dbmodel.ControllerBootstrap) error) *MockStoreUpdateControllerBootstrapCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

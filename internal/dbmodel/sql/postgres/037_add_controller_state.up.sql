@@ -1,15 +1,9 @@
--- Add a state field to the controllers table with a 
--- default value of 'active' that cannot be null.
-
-ALTER TABLE controllers
-    ADD COLUMN IF NOT EXISTS state TEXT;
-
-UPDATE controllers
-SET state = 'active'
-WHERE state IS NULL OR state = '';
-
-ALTER TABLE controllers
-    ALTER COLUMN state SET DEFAULT 'active';
-
-ALTER TABLE controllers
-    ALTER COLUMN state SET NOT NULL;
+CREATE TABLE IF NOT EXISTS controller_bootstraps (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    name TEXT NOT NULL UNIQUE,
+    cloud_name TEXT,
+    cloud_region TEXT,
+    job_id BIGINT UNIQUE
+);

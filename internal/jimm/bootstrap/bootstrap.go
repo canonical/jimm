@@ -6,6 +6,7 @@ package bootstrap
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/url"
 	"runtime"
@@ -51,9 +52,11 @@ type Store interface {
 	QueryJobLog(ctx context.Context, jobId int64, offset int) (loggies []string, nextOffsetValue int, err error)
 
 	// BootstrapJob store methods:
-	AddController(ctx context.Context, controller *dbmodel.Controller) (err error)
-	DeleteController(ctx context.Context, controller *dbmodel.Controller) (err error)
+	AddControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) (err error)
+	DeleteControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) (err error)
 	GetController(ctx context.Context, controller *dbmodel.Controller) (err error)
+	GetControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) (err error)
+	UpdateControllerBootstrap(ctx context.Context, bootstrap *dbmodel.ControllerBootstrap) (err error)
 	AddJobLog(ctx context.Context, jobId int64, logLine string) (err error)
 }
 
@@ -250,6 +253,40 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	if err := params.validate(); err != nil {
 		return 0, fmt.Errorf("invalid bootstrap parameters: %v", err)
 	}
+	if err := b.store.GetController(ctx, &dbmodel.Controller{Name: params.ControllerName}); err == nil {
+		return 0, errors.Codef(errors.CodeAlreadyExists, "controller %q already exists", params.ControllerName)
+	} else if errors.ErrorCode(err) != errors.CodeNotFound {
+		return 0, fmt.Errorf("failed to check if controller exists: %w", err)
+	}
+	if err := b.store.GetControllerBootstrap(ctx, &dbmodel.ControllerBootstrap{Name: params.ControllerName}); err == nil {
+		return 0, errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", params.ControllerName)
+	} else if errors.ErrorCode(err) != errors.CodeNotFound {
+		return 0, fmt.Errorf("failed to check if controller bootstrap exists: %w", err)
+	}
+
+	bootstrapReservation := &dbmodel.ControllerBootstrap{
+		Name:      params.ControllerName,
+		CloudName: params.Cloud.Name,
+	}
+	if len(params.Cloud.Regions) > 0 {
+		bootstrapReservation.CloudRegion = params.Cloud.Regions[0].Name
+	}
+	if err := b.store.AddControllerBootstrap(ctx, bootstrapReservation); err != nil {
+		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+			return 0, errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", params.ControllerName)
+		}
+		return 0, fmt.Errorf("failed to reserve controller bootstrap: %w", err)
+	}
+	cleanupReservation := true
+	defer func() {
+		if !cleanupReservation {
+			return
+		}
+		cleanupCtx := context.WithoutCancel(ctx)
+		if err := b.store.DeleteControllerBootstrap(cleanupCtx, bootstrapReservation); err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			zapctx.Error(cleanupCtx, "failed to remove controller bootstrap reservation", zap.Error(err), zap.String("controller", params.ControllerName))
+		}
+	}()
 
 	bootstrapArgs := rivertypes.BootstrapArgs{
 		Username: user.Name,
@@ -282,7 +319,16 @@ func (b *BootstrapManager) StartBootstrapJob(ctx context.Context, user *openfga.
 	if job.UniqueSkippedAsDuplicate {
 		return 0, errors.Codef(errors.CodeInProgress, "a bootstrap job is already in progress - please wait for it to complete before starting a new one")
 	}
+	bootstrapReservation.JobID = sql.NullInt64{Int64: job.Job.ID, Valid: true}
+	if err := b.store.UpdateControllerBootstrap(ctx, bootstrapReservation); err != nil {
+		cleanupCtx := context.WithoutCancel(ctx)
+		if _, cancelErr := b.jobQueue.CancelJob(cleanupCtx, job.Job.ID); cancelErr != nil {
+			zapctx.Error(cleanupCtx, "failed to cancel bootstrap job after reservation update failure", zap.Error(cancelErr), zap.Int64("job-id", job.Job.ID))
+		}
+		return 0, fmt.Errorf("failed to attach bootstrap reservation to job: %w", err)
+	}
 
+	cleanupReservation = false
 	return job.Job.ID, nil
 }
 
@@ -357,24 +403,19 @@ func (b *BootstrapManager) BootstrapController(
 		return fmt.Errorf("failed to check if controller exists: %w", err)
 	}
 
-	seededController := &dbmodel.Controller{
-		Name:  p.ControllerName,
-		State: dbmodel.ControllerStateBootstrapping,
+	bootstrapReservation := &dbmodel.ControllerBootstrap{
+		JobID: sql.NullInt64{Int64: p.JobID, Valid: true},
 	}
-	if err := b.store.AddController(ctx, seededController); err != nil {
-		if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-			return errors.Codef(errors.CodeAlreadyExists, "controller %q already exists", p.ControllerName)
+	if err := b.store.GetControllerBootstrap(ctx, bootstrapReservation); err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.Codef(errors.CodeNotFound, "controller bootstrap %q not found", p.ControllerName)
 		}
-		return fmt.Errorf("failed to seed controller in database: %w", err)
+		return fmt.Errorf("failed to get controller bootstrap reservation: %w", err)
 	}
-	removeSeededController := true
 	defer func() {
-		if !removeSeededController {
-			return
-		}
 		cleanupCtx := context.WithoutCancel(ctx)
-		if err := b.store.DeleteController(cleanupCtx, seededController); err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-			zapctx.Error(cleanupCtx, "failed to remove bootstrapping controller", zap.Error(err), zap.String("controller", seededController.Name))
+		if err := b.store.DeleteControllerBootstrap(cleanupCtx, bootstrapReservation); err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+			zapctx.Error(cleanupCtx, "failed to remove controller bootstrap reservation", zap.Error(err), zap.String("controller", p.ControllerName))
 		}
 	}()
 
@@ -403,7 +444,6 @@ func (b *BootstrapManager) BootstrapController(
 	if err := b.runBootstrap(ctx, p, jujuCmds, user); err != nil {
 		return fmt.Errorf("run bootstrap failed: %w", err)
 	}
-	removeSeededController = false
 	return nil
 }
 
@@ -522,7 +562,7 @@ func (b *BootstrapManager) runBootstrap(
 		AdminPassword:     account.Password,
 	}
 	if err := b.jujuManager.AddController(
-		ctx,
+		juju.WithBootstrapJobID(ctx, p.JobID),
 		user,
 		&dbCtrl,
 		dbCtrlCreds,

@@ -258,7 +258,6 @@ controllers:
 		Controllers: []dbmodel.CloudRegionControllerPriority{{
 			Controller: dbmodel.Controller{
 				Name:        "test",
-				State:       dbmodel.ControllerStateActive,
 				UUID:        "00000001-0000-0000-0000-000000000001",
 				CloudName:   "test",
 				CloudRegion: "test-region",
@@ -304,7 +303,6 @@ controllers:
 		Controllers: []dbmodel.CloudRegionControllerPriority{{
 			Controller: dbmodel.Controller{
 				Name:        "test",
-				State:       dbmodel.ControllerStateActive,
 				UUID:        "00000001-0000-0000-0000-000000000001",
 				CloudName:   "test",
 				CloudRegion: "test-region",

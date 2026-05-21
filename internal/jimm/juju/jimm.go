@@ -66,6 +66,11 @@ func (j *JujuManager) ControllerInfo(ctx context.Context, name string) (*dbmodel
 	return &ctl, nil
 }
 
+// ListControllerBootstraps returns the currently pending controller bootstraps.
+func (j *JujuManager) ListControllerBootstraps(ctx context.Context) ([]dbmodel.ControllerBootstrap, error) {
+	return j.Database.ListControllerBootstraps(ctx)
+}
+
 // ListControllers returns a list of controllers the user has can_addmodel to.
 // JIMM admins get all controllers.
 func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {

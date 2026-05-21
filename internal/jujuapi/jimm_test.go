@@ -116,6 +116,50 @@ func TestAddController_Success(t *testing.T) {
 	c.Assert(info.AgentVersion, qt.Equals, "3.6.9")
 }
 
+func TestListControllers_AdminIncludesPendingBootstraps(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &mocks.JujuManager{
+				ControllerService: mocks.ControllerService{
+					ListControllers_: func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
+						c.Assert(user.JimmAdmin, qt.Equals, true)
+						return []dbmodel.Controller{{
+							Name:      "active-controller",
+							UUID:      "982b16d9-a945-4762-b684-fd4fd885aa11",
+							CloudName: "aws",
+						}}, nil
+					},
+					ListControllerBootstraps_: func(ctx context.Context) ([]dbmodel.ControllerBootstrap, error) {
+						return []dbmodel.ControllerBootstrap{{
+							Name:        "bootstrapping-controller",
+							CloudName:   "aws",
+							CloudRegion: "eu-west-1",
+						}}, nil
+					},
+				},
+			}
+		},
+	}
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	resp, err := root.ListControllers(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(resp.Controllers, qt.DeepEquals, []apiparams.ControllerInfo{{
+		Name:     "active-controller",
+		UUID:     "982b16d9-a945-4762-b684-fd4fd885aa11",
+		CloudTag: names.NewCloudTag("aws").String(),
+		Status: jujuparams.EntityStatus{Status: "available"},
+	}, {
+		Name:        "bootstrapping-controller",
+		CloudTag:    names.NewCloudTag("aws").String(),
+		CloudRegion: "eu-west-1",
+		Status:      jujuparams.EntityStatus{Status: "bootstrapping"},
+	}})
+}
+
 func TestRemoveController_UnauthorizedUser(t *testing.T) {
 	c := qt.New(t)
 
