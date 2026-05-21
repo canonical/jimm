@@ -76,13 +76,6 @@ func (j *JujuManager) ListControllerBootstraps(ctx context.Context) ([]dbmodel.C
 func (j *JujuManager) ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error) {
 	var controllers []dbmodel.Controller
 	err := j.Database.ForEachController(ctx, func(c *dbmodel.Controller) error {
-		if user.JimmAdmin {
-			controllers = append(controllers, *c)
-			return nil
-		}
-		if !c.IsOperational() {
-			return nil
-		}
 		canAddModel, err := user.IsAllowedAddModelToController(ctx, c.ResourceTag())
 		if err != nil {
 			zapctx.Error(ctx, "error checking user permissions for controller", zap.String("controller", c.Name), zap.Error(err))
@@ -211,9 +204,6 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 			return jujuparams.MigrationTargetInfo{}, 0, errors.Codef(errors.CodeNotFound, "controller not found")
 		}
 		return jujuparams.MigrationTargetInfo{}, 0, fmt.Errorf("failed to get controller with name %q: %w", controllerName, err)
-	}
-	if !dbController.IsOperational() {
-		return jujuparams.MigrationTargetInfo{}, 0, errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", controllerName)
 	}
 	adminUser, adminPass, err := credStore.GetControllerCredentials(ctx, controllerName)
 	if err != nil {

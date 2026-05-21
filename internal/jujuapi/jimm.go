@@ -747,9 +747,6 @@ func (r *controllerRoot) StartDestroyController(ctx context.Context, req apipara
 	if err != nil {
 		return apiparams.StartBootstrapResponse{}, fmt.Errorf("failed to fetch controller info: %w", err)
 	}
-	if !ctrl.IsOperational() {
-		return apiparams.StartBootstrapResponse{}, errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", req.ControllerName)
-	}
 
 	if len(ctrl.Models) != 0 {
 		return apiparams.StartBootstrapResponse{}, errors.Codef(errors.CodeBadRequest, "cannot destroy controller with models")

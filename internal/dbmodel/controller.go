@@ -79,9 +79,6 @@ type Controller struct {
 
 	// TODO(mhilton) Save controller statistics?
 }
-func (c Controller) IsOperational() bool {
-	return true
-}
 
 // Tag returns a names.Tag for this controller.
 func (c Controller) Tag() names.Tag {
@@ -114,9 +111,7 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 		}
 	}
 	ci.CACertificate = c.CACertificate
-	if c.CloudName != "" {
-		ci.CloudTag = names.NewCloudTag(c.CloudName).String()
-	}
+	ci.CloudTag = names.NewCloudTag(c.CloudName).String()
 	ci.CloudRegion = c.CloudRegion
 	ci.AgentVersion = c.AgentVersion
 	switch {

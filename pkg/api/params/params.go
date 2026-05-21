@@ -182,7 +182,7 @@ type ControllerInfo struct {
 	AgentVersion string `json:"agent-version"`
 
 	// Status contains the current status of the controller. The status
-	// will either be "available", "bootstrapping", "deprecated", or "unavailable".
+	// will either be "available", "deprecated", or "unavailable".
 	Status jujuparams.EntityStatus `json:"status"`
 }
 

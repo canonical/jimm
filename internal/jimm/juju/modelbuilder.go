@@ -164,10 +164,6 @@ func (b *modelBuilder) WithController(controllerName string) *modelBuilder {
 		b.err = fmt.Errorf("controller %q not found: %w", controllerName, err)
 		return b
 	}
-	if !targetController.IsOperational() {
-		b.err = errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", controllerName)
-		return b
-	}
 	ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, targetController.ResourceTag())
 	if err != nil {
 		b.err = fmt.Errorf("failed to verify permissions for adding model to controller: %w", err)
@@ -196,7 +192,7 @@ func (b *modelBuilder) WithAnyController() *modelBuilder {
 	}
 	var candidateControllers []candidateController
 	err := b.jujuManager.Database.ForEachController(b.ctx, func(c *dbmodel.Controller) error {
-		if c.Deprecated || !c.IsOperational() {
+		if c.Deprecated {
 			return nil
 		}
 		ok, err := b.ofgaUser.IsAllowedAddModelToController(b.ctx, c.ResourceTag())

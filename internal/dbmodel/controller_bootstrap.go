@@ -18,7 +18,7 @@ type ControllerBootstrap struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 
-	Name        string        `gorm:"not null;uniqueIndex"`
+	Name        string `gorm:"not null;uniqueIndex"`
 	CloudName   string
 	CloudRegion string
 	JobID       sql.NullInt64 `gorm:"column:job_id;uniqueIndex"`

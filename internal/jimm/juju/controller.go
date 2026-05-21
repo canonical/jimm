@@ -337,9 +337,6 @@ func (j *JujuManager) EarliestControllerVersion(ctx context.Context) (version.Nu
 	var v *version.Number
 
 	err := j.Database.ForEachController(ctx, func(controller *dbmodel.Controller) error {
-		if !controller.IsOperational() {
-			return nil
-		}
 		if controller.AgentVersion == "" {
 			return nil
 		}
