@@ -151,7 +151,7 @@ func TestListControllers_AdminIncludesPendingBootstraps(t *testing.T) {
 		Name:     "active-controller",
 		UUID:     "982b16d9-a945-4762-b684-fd4fd885aa11",
 		CloudTag: names.NewCloudTag("aws").String(),
-		Status: jujuparams.EntityStatus{Status: "available"},
+		Status:   jujuparams.EntityStatus{Status: "available"},
 	}, {
 		Name:        "bootstrapping-controller",
 		CloudTag:    names.NewCloudTag("aws").String(),

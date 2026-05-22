@@ -166,10 +166,14 @@ func (act *addControllerTransactor) Run(ctx context.Context) error {
 	err = act.tx.GetControllerBootstrap(ctx, &bootstrapReservation)
 	switch {
 	case err == nil:
+		// If the calling code is a bootstrap job, then we know we
+		// have completed the bootstrap process.
 		jobID, ok := bootstrapJobIDFromContext(ctx)
 		if !ok || !bootstrapReservation.JobID.Valid || bootstrapReservation.JobID.Int64 != jobID {
 			return errors.Codef(errors.CodeInProgress, "controller %q is bootstrapping", act.controller.Name)
 		}
+		// The reserved controller name has been created, so this reservation
+		// can be safely deleted before the controller is added.
 		if err := act.tx.DeleteControllerBootstrap(ctx, &bootstrapReservation); err != nil {
 			return err
 		}
