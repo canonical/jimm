@@ -121,6 +121,11 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.Up
 	return nil
 }
 
+// loadUpgradeToSupervisorOutput loads stored output from supervisor job, ensuring that any
+// existing output is consistent with the job args.
+//
+// The output is expected to contain the child job IDs of any previously started child jobs,
+// so that they can be tracked across restarts of the supervisor job.
 func loadUpgradeToSupervisorOutput(job *river.Job[rivertypes.UpgradeToArgs]) (rivertypes.UpgradeToSupervisorOutput, error) {
 	output := rivertypes.UpgradeToSupervisorOutput{
 		ModelUUID:            job.Args.ModelUUID,
