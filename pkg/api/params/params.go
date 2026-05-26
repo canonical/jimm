@@ -184,6 +184,10 @@ type ControllerInfo struct {
 	// Status contains the current status of the controller. The status
 	// will either be "available", "deprecated", or "unavailable".
 	Status jujuparams.EntityStatus `json:"status"`
+
+	// BootstrapJobStatus holds the status of a bootstrap job if this
+	// controller is currently being bootstrapped.
+	BootstrapJobStatus *BootstrapJobStatus `json:"bootstrap-job-status,omitempty" yaml:"bootstrap-job-status,omitempty"`
 }
 
 // A FindAuditEventsRequest finds audit events that match the specified
@@ -826,6 +830,9 @@ type ModelControllerInfo struct {
 	ControllerName string `json:"controller-name" yaml:"controller-name"`
 	// ControllerUUID is the UUID of the controller hosting the model.
 	ControllerUUID string `json:"controller-uuid" yaml:"controller-uuid"`
+
+	// UpgradeToJobStatus optionally holds the status of an upgrade job for the model.
+	UpgradeToJobStatus *UpgradeToJobStatus `json:"upgrade-to-job-status,omitempty" yaml:"upgrade-to-job-status,omitempty"`
 }
 
 // JobInfoRequest holds the request to get information about a job.
@@ -908,4 +915,39 @@ type VersionElem struct {
 // SupportedJujuVersionsResponse holds the response for a SupportedJujuVersions call.
 type SupportedJujuVersionsResponse struct {
 	Versions []VersionElem `json:"versions"`
+}
+
+// ShowControllerRequest holds the request to show details about a controller.
+type ShowControllerRequest struct {
+	ControllerName string `json:"controller-name" yaml:"controller-name"`
+}
+
+// JobAttemptError represents an error that occurred during a job attempt.
+type JobAttemptError struct {
+	Attempt int       `json:"attempt" yaml:"attempt"`
+	At      time.Time `json:"at" yaml:"at"`
+	Error   string    `json:"error" yaml:"error"`
+}
+
+// JobDetail represents the details of a job, including its state, attempts, and errors.
+type JobDetail struct {
+	State       string            `json:"state" yaml:"state"`
+	Attempt     int               `json:"attempt" yaml:"attempt"`
+	MaxAttempts int               `json:"max_attempts" yaml:"max_attempts"`
+	AttemptedAt *time.Time        `json:"attempted_at,omitempty" yaml:"attempted_at,omitempty"`
+	FinalizedAt *time.Time        `json:"finalized_at,omitempty" yaml:"finalized_at,omitempty"`
+	Errors      []JobAttemptError `json:"errors,omitempty" yaml:"errors,omitempty"`
+}
+
+// UpgradeToJobStatus holds the status of an upgrade job, including details about the
+// root job and migration and upgrade child-jobs.
+type UpgradeToJobStatus struct {
+	Root      JobDetail  `json:"root" yaml:"root"`
+	Migration *JobDetail `json:"migration,omitempty" yaml:"migration,omitempty"`
+	Upgrade   *JobDetail `json:"upgrade,omitempty" yaml:"upgrade,omitempty"`
+}
+
+// BootstrapJobStatus holds the status of a bootstrap job.
+type BootstrapJobStatus struct {
+	Bootstrap JobDetail `json:"bootstrap" yaml:"bootstrap"`
 }
