@@ -287,6 +287,218 @@ func TestUpgradeToWorker_SuccessAfterTransientFailures(t *testing.T) {
 	c.Assert(row.Errors, qt.HasLen, 0)
 }
 
+func TestUpgradeToWorker_PersistsMigrationJobIDBeforeWaiting(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	migrationAwaitStarted := make(chan struct{})
+	allowMigrationAwait := make(chan struct{})
+	awaitCalls := 0
+
+	testDeps := setupIntegrationTest(
+		c,
+		setupWorkerParams{
+			migrateRetryCount: 1,
+			upgradeRetryCount: 1,
+			awaitFunc: func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
+				awaitCalls++
+				if awaitCalls == 1 {
+					close(migrationAwaitStarted)
+					<-allowMigrationAwait
+				}
+				return waitForJobToFinalise(ctx, result, eventCh)
+			},
+		},
+	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
+
+	upgradeManager.EXPECT().
+		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
+		Return(nil)
+	upgradeManager.EXPECT().
+		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
+		Return(nil)
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("2.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller",
+	}, nil)
+	c.Assert(err, qt.IsNil)
+
+	<-migrationAwaitStarted
+
+	output := getUpgradeToSupervisorOutput(c, ctx, riverClient, insRes.Job.ID)
+	c.Assert(output.ModelUUID, qt.Equals, "model-uuid")
+	c.Assert(output.TargetControllerName, qt.Equals, "target-controller")
+	c.Assert(output.MigrationJobID, qt.IsNotNil)
+	c.Assert(output.UpgradeJobID, qt.IsNil)
+
+	migrateListRes, err := riverClient.JobList(ctx, river.NewJobListParams().Kinds(migrationWorkerArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrateListRes.Jobs, qt.HasLen, 1)
+	c.Assert(*output.MigrationJobID, qt.Equals, migrateListRes.Jobs[0].ID)
+
+	close(allowMigrationAwait)
+
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
+	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
+	output = getUpgradeToSupervisorOutput(c, ctx, riverClient, insRes.Job.ID)
+	c.Assert(output.MigrationJobID, qt.IsNotNil)
+	c.Assert(output.UpgradeJobID, qt.IsNotNil)
+}
+
+func TestUpgradeToWorker_PersistsBothChildJobIDsBeforeUpgradeWait(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	upgradeAwaitStarted := make(chan struct{})
+	allowUpgradeAwait := make(chan struct{})
+	awaitCalls := 0
+
+	testDeps := setupIntegrationTest(
+		c,
+		setupWorkerParams{
+			migrateRetryCount: 1,
+			upgradeRetryCount: 1,
+			awaitFunc: func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
+				awaitCalls++
+				if awaitCalls == 2 {
+					close(upgradeAwaitStarted)
+					<-allowUpgradeAwait
+				}
+				return waitForJobToFinalise(ctx, result, eventCh)
+			},
+		},
+	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
+
+	upgradeManager.EXPECT().
+		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
+		Return(nil)
+	upgradeManager.EXPECT().
+		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
+		Return(nil)
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("2.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller",
+	}, nil)
+	c.Assert(err, qt.IsNil)
+
+	<-upgradeAwaitStarted
+
+	output := getUpgradeToSupervisorOutput(c, ctx, riverClient, insRes.Job.ID)
+	c.Assert(output.MigrationJobID, qt.IsNotNil)
+	c.Assert(output.UpgradeJobID, qt.IsNotNil)
+
+	upgradeListRes, err := riverClient.JobList(ctx, river.NewJobListParams().Kinds(upgradeWorkerArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(upgradeListRes.Jobs, qt.HasLen, 1)
+	c.Assert(*output.UpgradeJobID, qt.Equals, upgradeListRes.Jobs[0].ID)
+
+	close(allowUpgradeAwait)
+
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
+	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
+}
+
+func TestUpgradeToWorker_RetryPreservesStoredUpgradeJobID(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	secondAttemptAfterMigratePersist := make(chan struct{})
+	allowSecondAttemptMigrateWait := make(chan struct{})
+	secondAttemptUpgradeAwaitStarted := make(chan struct{})
+	allowUpgradeToComplete := make(chan struct{})
+	awaitCalls := 0
+
+	testDeps := setupIntegrationTest(
+		c,
+		setupWorkerParams{
+			migrateRetryCount: 1,
+			upgradeRetryCount: 1,
+			awaitFunc: func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
+				awaitCalls++
+				switch awaitCalls {
+				case 2:
+					return errors.New("simulated crash after first upgrade insert")
+				case 3:
+					close(secondAttemptAfterMigratePersist)
+					<-allowSecondAttemptMigrateWait
+				case 4:
+					close(secondAttemptUpgradeAwaitStarted)
+				}
+				return waitForJobToFinalise(ctx, result, eventCh)
+			},
+		},
+	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+	upgradeManager := testDeps.mockUpgradeManager
+
+	upgradeManager.EXPECT().
+		MigrateModel(gomock.Any(), gomock.Any(), "model-uuid", "target-controller").
+		Return(nil).
+		Times(2)
+	upgradeManager.EXPECT().
+		UpgradeModel(gomock.Any(), "model-uuid", version.MustParse("2.0.0")).
+		DoAndReturn(func(context.Context, string, version.Number) error {
+			<-allowUpgradeToComplete
+			return nil
+		})
+
+	sub, cancel := riverClient.Subscribe(river.EventKindJobCompleted)
+	c.Cleanup(cancel)
+
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("2.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller",
+	}, nil)
+	c.Assert(err, qt.IsNil)
+
+	<-secondAttemptAfterMigratePersist
+
+	output := getUpgradeToSupervisorOutput(c, ctx, riverClient, insRes.Job.ID)
+	c.Assert(output.MigrationJobID, qt.IsNotNil)
+	c.Assert(output.UpgradeJobID, qt.IsNotNil)
+
+	upgradeListRes, err := riverClient.JobList(ctx, river.NewJobListParams().Kinds(upgradeWorkerArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(upgradeListRes.Jobs, qt.HasLen, 1)
+	c.Assert(*output.UpgradeJobID, qt.Equals, upgradeListRes.Jobs[0].ID)
+
+	close(allowSecondAttemptMigrateWait)
+	<-secondAttemptUpgradeAwaitStarted
+	close(allowUpgradeToComplete)
+
+	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
+	c.Assert(row.State, qt.Equals, rivertype.JobStateCompleted)
+
+	output = getUpgradeToSupervisorOutput(c, ctx, riverClient, insRes.Job.ID)
+	c.Assert(output.MigrationJobID, qt.IsNotNil)
+	c.Assert(output.UpgradeJobID, qt.IsNotNil)
+	c.Assert(*output.UpgradeJobID, qt.Equals, upgradeListRes.Jobs[0].ID)
+}
+
 func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()

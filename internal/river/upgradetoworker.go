@@ -5,7 +5,9 @@ package river
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/riverqueue/river"
@@ -56,6 +58,10 @@ func (w *upgradeToWorker) Timeout(*river.Job[rivertypes.UpgradeToArgs]) time.Dur
 // of the migration job and the insertion of the upgrade job).
 func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.UpgradeToArgs]) error {
 	client := river.ClientFromContext[*sql.Tx](ctx)
+	supervisorOutput, err := loadUpgradeToSupervisorOutput(job)
+	if err != nil {
+		return err
+	}
 
 	eventCh, cancel := client.Subscribe(
 		river.EventKindJobCompleted,
@@ -79,6 +85,11 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.Up
 		return err
 	}
 
+	supervisorOutput = withMigrationJobID(supervisorOutput, migrateInsertResponse.Job.ID)
+	if err := persistUpgradeToSupervisorOutput(ctx, client, job.ID, supervisorOutput); err != nil {
+		return err
+	}
+
 	if err := w.awaitCompletion(ctx, migrateInsertResponse, eventCh); err != nil {
 		return err
 	}
@@ -97,11 +108,71 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.Up
 		return err
 	}
 
+	supervisorOutput = withUpgradeJobID(supervisorOutput, upgradeInsertResponse.Job.ID)
+	if err := persistUpgradeToSupervisorOutput(ctx, client, job.ID, supervisorOutput); err != nil {
+		return err
+	}
+
 	if err := w.awaitCompletion(ctx, upgradeInsertResponse, eventCh); err != nil {
 		return err
 	}
 
 	// All done.
+	return nil
+}
+
+func loadUpgradeToSupervisorOutput(job *river.Job[rivertypes.UpgradeToArgs]) (rivertypes.UpgradeToSupervisorOutput, error) {
+	output := rivertypes.UpgradeToSupervisorOutput{
+		ModelUUID:            job.Args.ModelUUID,
+		TargetControllerName: job.Args.TargetControllerName,
+	}
+
+	if len(job.Output()) == 0 {
+		return output, nil
+	}
+
+	var stored rivertypes.UpgradeToSupervisorOutput
+	if err := json.Unmarshal(job.Output(), &stored); err != nil {
+		return output, fmt.Errorf("failed to decode existing supervisor output: %w", err)
+	}
+	if stored.ModelUUID != "" && stored.ModelUUID != job.Args.ModelUUID {
+		return output, fmt.Errorf("stored supervisor output model UUID %q does not match job args %q", stored.ModelUUID, job.Args.ModelUUID)
+	}
+	if stored.TargetControllerName != "" && stored.TargetControllerName != job.Args.TargetControllerName {
+		return output, fmt.Errorf("stored supervisor output target controller %q does not match job args %q", stored.TargetControllerName, job.Args.TargetControllerName)
+	}
+
+	if stored.ModelUUID != "" {
+		output.ModelUUID = stored.ModelUUID
+	}
+	if stored.TargetControllerName != "" {
+		output.TargetControllerName = stored.TargetControllerName
+	}
+	output.MigrationJobID = stored.MigrationJobID
+	output.UpgradeJobID = stored.UpgradeJobID
+	output.UpdatedAt = stored.UpdatedAt
+
+	return output, nil
+}
+
+func withMigrationJobID(output rivertypes.UpgradeToSupervisorOutput, jobID int64) rivertypes.UpgradeToSupervisorOutput {
+	migrationJobID := jobID
+	output.MigrationJobID = &migrationJobID
+	output.UpdatedAt = time.Now().UTC()
+	return output
+}
+
+func withUpgradeJobID(output rivertypes.UpgradeToSupervisorOutput, jobID int64) rivertypes.UpgradeToSupervisorOutput {
+	upgradeJobID := jobID
+	output.UpgradeJobID = &upgradeJobID
+	output.UpdatedAt = time.Now().UTC()
+	return output
+}
+
+func persistUpgradeToSupervisorOutput(ctx context.Context, client *river.Client[*sql.Tx], jobID int64, output rivertypes.UpgradeToSupervisorOutput) error {
+	if _, err := client.JobUpdate(ctx, jobID, &river.JobUpdateParams{Output: output}); err != nil {
+		return fmt.Errorf("failed to persist supervisor output: %w", err)
+	}
 	return nil
 }
 

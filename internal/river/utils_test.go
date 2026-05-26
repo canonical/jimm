@@ -5,6 +5,7 @@ package river
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -16,6 +17,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
@@ -153,4 +155,17 @@ func waitForJobState(c *qt.C, ctx context.Context, riverClient *river.Client[*sq
 			c.Fatal("timed out waiting for job state")
 		}
 	}
+}
+
+func getUpgradeToSupervisorOutput(c *qt.C, ctx context.Context, riverClient *river.Client[*sql.Tx], jobID int64) rivertypes.UpgradeToSupervisorOutput {
+	job, err := riverClient.JobGet(ctx, jobID)
+	c.Assert(err, qt.IsNil)
+
+	var output rivertypes.UpgradeToSupervisorOutput
+	if len(job.Output()) == 0 {
+		return output
+	}
+
+	c.Assert(json.Unmarshal(job.Output(), &output), qt.IsNil)
+	return output
 }

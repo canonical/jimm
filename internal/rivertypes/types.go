@@ -3,6 +3,8 @@
 package rivertypes
 
 import (
+	"time"
+
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/version/v2"
 	"github.com/riverqueue/river"
@@ -37,6 +39,16 @@ func (UpgradeToArgs) InsertOpts() river.InsertOpts {
 			},
 		},
 	}
+}
+
+// UpgradeToSupervisorOutput stores the child-job IDs discovered by the
+// UpgradeTo supervisor so later status lookups can traverse the full tree.
+type UpgradeToSupervisorOutput struct {
+	ModelUUID            string    `json:"model_uuid"`
+	TargetControllerName string    `json:"target_controller_name"`
+	MigrationJobID       *int64    `json:"migration_job_id,omitempty"`
+	UpgradeJobID         *int64    `json:"upgrade_job_id,omitempty"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // BootstrapArgs are the arguments for the bootstrap-controller worker.
