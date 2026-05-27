@@ -7,7 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/frankban/quicktest"
+	qt "github.com/frankban/quicktest"
+	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ type testDeps struct {
 	jobQuerier *MockJobQuerier
 }
 
-func setupDeps(c *quicktest.C) testDeps {
+func setupDeps(c *qt.C) testDeps {
 	ctrl := gomock.NewController(c)
 	jobQuerier := NewMockJobQuerier(ctrl)
 	c.Cleanup(ctrl.Finish)
@@ -38,7 +39,7 @@ func setupDeps(c *quicktest.C) testDeps {
 }
 
 func TestGetJobInfo_Success(t *testing.T) {
-	c := quicktest.New(t)
+	c := qt.New(t)
 	deps := setupDeps(c)
 
 	ctx := context.Background()
@@ -68,7 +69,7 @@ func TestGetJobInfo_Success(t *testing.T) {
 }
 
 func TestGetJobInfo_QueryError(t *testing.T) {
-	c := quicktest.New(t)
+	c := qt.New(t)
 	deps := setupDeps(c)
 
 	ctx := context.Background()
@@ -78,13 +79,41 @@ func TestGetJobInfo_QueryError(t *testing.T) {
 		Return(nil, errors.New("query error"))
 
 	_, err := deps.jobManager.GetJobInfo(ctx, jobID)
-	c.Assert(err, quicktest.IsNotNil)
-	c.Assert(err, quicktest.ErrorMatches, "query error")
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(err, qt.ErrorMatches, "query error")
 }
 
 func TestNewJobManager_NilQuerier(t *testing.T) {
-	c := quicktest.New(t)
+	c := qt.New(t)
 
 	_, err := NewJobManager(nil)
-	c.Assert(err, quicktest.IsNotNil)
+	c.Assert(err, qt.IsNotNil)
+}
+
+func TestGetUpgradeToStatusForModel_NoJob(t *testing.T) {
+	c := qt.New(t)
+	deps := setupDeps(c)
+
+	ctx := context.Background()
+	modelUUID := "model-uuid"
+
+	deps.jobQuerier.EXPECT().ListJobs(gomock.Any(), gomock.Any()).Return(&river.JobListResult{}, nil)
+	deps.jobQuerier.EXPECT().ListJobs(gomock.Any(), gomock.Any()).Return(&river.JobListResult{}, nil)
+
+	status, err := deps.jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(status, qt.IsNil)
+}
+
+func TestGetUpgradeToStatusForModel_ActiveQueryError(t *testing.T) {
+	c := qt.New(t)
+	deps := setupDeps(c)
+
+	ctx := context.Background()
+
+	deps.jobQuerier.EXPECT().ListJobs(gomock.Any(), gomock.Any()).Return(nil, errors.New("query error"))
+
+	status, err := deps.jobManager.GetUpgradeToStatusForModel(ctx, "model-uuid")
+	c.Assert(err, qt.ErrorMatches, "query error")
+	c.Assert(status, qt.IsNil)
 }

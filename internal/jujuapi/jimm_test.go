@@ -812,6 +812,87 @@ func TestModelControllerInfo(t *testing.T) {
 	}
 }
 
+func TestModelControllerInfo_HydratesUpgradeToStatus(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
+	status := &apiparams.UpgradeToJobStatus{
+		Root: apiparams.JobDetail{
+			State:       "running",
+			Attempt:     1,
+			MaxAttempts: 3,
+		},
+	}
+
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &mocks.JujuManager{
+				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
+					return &apiparams.ModelControllerInfo{
+						ModelName:      "test-model",
+						ModelUUID:      "12345678-1234-1234-1234-123456789abc",
+						ControllerName: "test-controller",
+						ControllerUUID: "87654321-4321-4321-4321-cba987654321",
+					}, nil
+				},
+			}
+		},
+		JobManager_: func() jujuapi.JobManager {
+			return &mocks.JobManager{
+				GetUpgradeToStatusForModel_: func(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
+					c.Assert(modelUUID, qt.Equals, "12345678-1234-1234-1234-123456789abc")
+					return status, nil
+				},
+			}
+		},
+	}
+
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	info, err := root.ModelControllerInfo(ctx, apiparams.ModelControllerInfoRequest{ModelQualifier: "12345678-1234-1234-1234-123456789abc"})
+	c.Assert(err, qt.IsNil)
+	c.Assert(info, qt.DeepEquals, apiparams.ModelControllerInfo{
+		ModelName:          "test-model",
+		ModelUUID:          "12345678-1234-1234-1234-123456789abc",
+		ControllerName:     "test-controller",
+		ControllerUUID:     "87654321-4321-4321-4321-cba987654321",
+		UpgradeToJobStatus: status,
+	})
+}
+
+func TestModelControllerInfo_UpgradeStatusError(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
+
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &mocks.JujuManager{
+				ModelControllerInfo_: func(ctx context.Context, user *openfga.User, qualifier juju.ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
+					return &apiparams.ModelControllerInfo{
+						ModelName:      "test-model",
+						ModelUUID:      "12345678-1234-1234-1234-123456789abc",
+						ControllerName: "test-controller",
+						ControllerUUID: "87654321-4321-4321-4321-cba987654321",
+					}, nil
+				},
+			}
+		},
+		JobManager_: func() jujuapi.JobManager {
+			return &mocks.JobManager{
+				GetUpgradeToStatusForModel_: func(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
+					return nil, errors.New("river query failed")
+				},
+			}
+		},
+	}
+
+	root := newTestControllerRoot(jimm, "alice@canonical.com", true)
+
+	_, err := root.ModelControllerInfo(ctx, apiparams.ModelControllerInfoRequest{ModelQualifier: "12345678-1234-1234-1234-123456789abc"})
+	c.Assert(err, qt.ErrorMatches, "river query failed")
+}
+
 func TestJobInfo(t *testing.T) {
 	c := qt.New(t)
 

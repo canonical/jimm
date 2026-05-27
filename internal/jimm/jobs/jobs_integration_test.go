@@ -5,15 +5,20 @@ package jobs
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	jimmriver "github.com/canonical/jimm/v3/internal/river"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
@@ -62,6 +67,19 @@ func (w *failureJobWorker) Work(ctx context.Context, job *river.Job[failureJobAr
 	return &river.JobCancelError{}
 }
 
+// upgradeToTestWorker exists only to register the upgrade-to kind with the test
+// client. Tests place root jobs on an unworked queue so this worker should not run.
+type upgradeToTestWorker struct {
+	river.WorkerDefaults[rivertypes.UpgradeToArgs]
+}
+
+func (w *upgradeToTestWorker) Work(ctx context.Context, job *river.Job[rivertypes.UpgradeToArgs]) error {
+	if strings.HasPrefix(job.Args.Username, "discard-") {
+		return fmt.Errorf("discarded upgrade root for %s", job.Args.Username)
+	}
+	return nil
+}
+
 // waitForJobs waits for the specified number of jobs to complete or fail.
 // Returns when all jobs have finalized or timeout occurs.
 func waitForJobs(c *qt.C, client *river.Client[*sql.Tx], expectedCount int, timeout time.Duration) {
@@ -102,6 +120,8 @@ func setupJobsIntegrationTest(c *qt.C) (*JobManager, *river.Client[*sql.Tx]) {
 	err = river.AddWorkerSafely(workers, &successJobWorker{})
 	c.Assert(err, qt.IsNil)
 	err = river.AddWorkerSafely(workers, &failureJobWorker{})
+	c.Assert(err, qt.IsNil)
+	err = river.AddWorkerSafely(workers, &upgradeToTestWorker{})
 	c.Assert(err, qt.IsNil)
 
 	// Start River client
@@ -277,4 +297,105 @@ func TestListJobs_FilterByKind(t *testing.T) {
 	}
 	c.Assert(successCount, qt.Equals, 3, qt.Commentf("Expected 3 success jobs, got %d", successCount))
 	c.Assert(failureCount, qt.Equals, 2, qt.Commentf("Expected 2 failure jobs, got %d", failureCount))
+}
+
+func TestGetUpgradeToStatusForModel_HydratesChildJobs(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	jobManager, client := setupJobsIntegrationTest(c)
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+
+	migrationRes, err := client.Insert(ctx, successJobArgs{Name: "migration"}, nil)
+	c.Assert(err, qt.IsNil)
+	upgradeRes, err := client.Insert(ctx, failureJobArgs{Name: "upgrade"}, nil)
+	c.Assert(err, qt.IsNil)
+
+	waitForJobs(c, client, 2, defaultTestTimeout)
+
+	metadata, err := json.Marshal(rivertypes.JobModelUUIDMetadata{ModelUUID: modelUUID})
+	c.Assert(err, qt.IsNil)
+	rootRes, err := client.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		Username:             "alice@canonical.com",
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{Metadata: metadata, Queue: "inactive"})
+	c.Assert(err, qt.IsNil)
+
+	_, err = client.JobUpdate(ctx, rootRes.Job.ID, &river.JobUpdateParams{Output: rivertypes.UpgradeToSupervisorOutput{
+		ModelUUID:            modelUUID,
+		TargetControllerName: "target-controller",
+		MigrationJobID:       &migrationRes.Job.ID,
+		UpgradeJobID:         &upgradeRes.Job.ID,
+		UpdatedAt:            time.Now().UTC(),
+	}})
+	c.Assert(err, qt.IsNil)
+
+	status, err := jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(status, qt.IsNotNil)
+	c.Assert(status.Root.State, qt.Equals, string(rootRes.Job.State))
+	c.Assert(status.Migration, qt.IsNotNil)
+	c.Assert(status.Migration.State, qt.Equals, string(rivertype.JobStateCompleted))
+	c.Assert(status.Upgrade, qt.IsNotNil)
+	c.Assert(status.Upgrade.State, qt.Equals, string(rivertype.JobStateCancelled))
+	c.Assert(status.Upgrade.Errors, qt.HasLen, 1)
+	c.Assert(status.Upgrade.Errors[0].Error, qt.Not(qt.Equals), "")
+}
+
+func TestGetUpgradeToStatusForModel_InvalidSupervisorOutput(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	jobManager, client := setupJobsIntegrationTest(c)
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+
+	metadata, err := json.Marshal(rivertypes.JobModelUUIDMetadata{ModelUUID: modelUUID})
+	c.Assert(err, qt.IsNil)
+	rootRes, err := client.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		Username:             "alice@canonical.com",
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{Metadata: metadata, Queue: "inactive"})
+	c.Assert(err, qt.IsNil)
+
+	_, err = client.JobUpdate(ctx, rootRes.Job.ID, &river.JobUpdateParams{Output: "not-a-supervisor-output-object"})
+	c.Assert(err, qt.IsNil)
+
+	status, err := jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
+	c.Assert(err, qt.ErrorMatches, "failed to decode upgrade-to supervisor output: .*")
+	c.Assert(status, qt.IsNil)
+}
+
+func TestGetUpgradeToStatusForModel_UsesLatestDiscardedRoot(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	jobManager, client := setupJobsIntegrationTest(c)
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+	metadata, err := json.Marshal(rivertypes.JobModelUUIDMetadata{ModelUUID: modelUUID})
+	c.Assert(err, qt.IsNil)
+
+	_, err = client.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		Username:             "discard-first",
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{Metadata: metadata, MaxAttempts: 1})
+	c.Assert(err, qt.IsNil)
+	waitForJobs(c, client, 1, defaultTestTimeout)
+
+	_, err = client.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		Username:             "discard-second",
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{Metadata: metadata, MaxAttempts: 1})
+	c.Assert(err, qt.IsNil)
+	waitForJobs(c, client, 1, defaultTestTimeout)
+
+	status, err := jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(status, qt.IsNotNil)
+	c.Assert(status.Root.State, qt.Equals, string(rivertype.JobStateDiscarded))
+	c.Assert(status.Root.Errors, qt.HasLen, 1)
+	c.Assert(status.Root.Errors[0].Error, qt.Equals, "discarded upgrade root for discard-second")
 }

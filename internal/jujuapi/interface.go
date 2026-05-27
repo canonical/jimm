@@ -344,5 +344,6 @@ type UpgradeManager interface {
 // JobManager provides methods to manage long-running jobs such as bootstrapping and upgrading.
 type JobManager interface {
 	GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error)
+	GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*params.UpgradeToJobStatus, error)
 	ListJobs(ctx context.Context, params params.ListJobsRequest) (params.ListJobsResponse, error)
 }

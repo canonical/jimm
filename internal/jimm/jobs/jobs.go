@@ -4,17 +4,27 @@ package jobs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 const defaultListJobsCount = 100
 const maxListJobsCount = 10_000
+
+var activeUpgradeToJobStates = []rivertype.JobState{
+	rivertype.JobStateAvailable,
+	rivertype.JobStatePending,
+	rivertype.JobStateRunning,
+	rivertype.JobStateRetryable,
+	rivertype.JobStateScheduled,
+}
 
 // JobQuerier defines the interface for querying and managing jobs in JIMM.
 type JobQuerier interface {
@@ -59,6 +69,51 @@ func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (JobInfo, erro
 		FinishedAt:     jobRow.FinalizedAt,
 		Errors:         jobErrors,
 	}, nil
+}
+
+// GetUpgradeToStatusForModel returns the status of the current or most recent
+// discarded upgrade-to supervisor job for the specified model.
+func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
+	rootJob, err := j.findUpgradeToRootJob(ctx, modelUUID)
+	if err != nil {
+		return nil, err
+	}
+	if rootJob == nil {
+		return nil, nil
+	}
+
+	status := &apiparams.UpgradeToJobStatus{
+		Root: toJobDetail(rootJob),
+	}
+
+	if len(rootJob.Output()) == 0 {
+		return status, nil
+	}
+
+	var output rivertypes.UpgradeToSupervisorOutput
+	if err := json.Unmarshal(rootJob.Output(), &output); err != nil {
+		return nil, fmt.Errorf("failed to decode upgrade-to supervisor output: %w", err)
+	}
+
+	if output.MigrationJobID != nil {
+		migrationJob, err := j.jobQuerier.GetJobInfo(ctx, *output.MigrationJobID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get migration job info: %w", err)
+		}
+		migration := toJobDetail(migrationJob)
+		status.Migration = &migration
+	}
+
+	if output.UpgradeJobID != nil {
+		upgradeJob, err := j.jobQuerier.GetJobInfo(ctx, *output.UpgradeJobID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get upgrade job info: %w", err)
+		}
+		upgrade := toJobDetail(upgradeJob)
+		status.Upgrade = &upgrade
+	}
+
+	return status, nil
 }
 
 // ListJobs returns a list of jobs based on the provided parameters. It converts the API parameters to the internal river job query parameters and retrieves the job list from the job querier.
@@ -155,6 +210,67 @@ func convertJobStates(statuses []apiparams.JobStatus) ([]rivertype.JobState, err
 	}
 
 	return riverStates, nil
+}
+
+func (j *JobManager) findUpgradeToRootJob(ctx context.Context, modelUUID string) (*rivertype.JobRow, error) {
+	activeJobs, err := j.jobQuerier.ListJobs(
+		ctx,
+		river.NewJobListParams().
+			Kinds(rivertypes.UpgradeToJobKind).
+			First(1).
+			States(activeUpgradeToJobStates...).
+			Where(
+				"metadata->>'model-uuid' = @model_uuid",
+				river.NamedArgs{"model_uuid": modelUUID},
+			),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(activeJobs.Jobs) > 0 {
+		return activeJobs.Jobs[0], nil
+	}
+
+	discardedJobs, err := j.jobQuerier.ListJobs(
+		ctx,
+		river.NewJobListParams().
+			Kinds(rivertypes.UpgradeToJobKind).
+			First(1).
+			States(rivertype.JobStateDiscarded).
+			Where(
+				"metadata->>'model-uuid' = @model_uuid",
+				river.NamedArgs{"model_uuid": modelUUID},
+			).
+			OrderBy(river.JobListOrderByTime, river.SortOrderDesc),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(discardedJobs.Jobs) == 0 {
+		return nil, nil
+	}
+
+	return discardedJobs.Jobs[0], nil
+}
+
+func toJobDetail(jobRow *rivertype.JobRow) apiparams.JobDetail {
+	var jobErrors []apiparams.JobAttemptError
+	for _, err := range jobRow.Errors {
+		jobErrors = append(jobErrors, apiparams.JobAttemptError{
+			Attempt: err.Attempt,
+			At:      err.At,
+			Error:   err.Error,
+		})
+	}
+
+	return apiparams.JobDetail{
+		State:       string(jobRow.State),
+		Attempt:     jobRow.Attempt,
+		MaxAttempts: jobRow.MaxAttempts,
+		AttemptedAt: jobRow.AttemptedAt,
+		FinalizedAt: jobRow.FinalizedAt,
+		Errors:      jobErrors,
+	}
 }
 
 // toJobStatus converts a rivertype.JobState to a params.JobStatus.

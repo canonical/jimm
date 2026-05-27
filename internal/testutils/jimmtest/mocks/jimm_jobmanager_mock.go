@@ -11,8 +11,9 @@ import (
 )
 
 type JobManager struct {
-	GetJobInfo_ func(ctx context.Context, jobID int64) (jobs.JobInfo, error)
-	ListJobs_   func(ctx context.Context, req params.ListJobsRequest) (params.ListJobsResponse, error)
+	GetJobInfo_                 func(ctx context.Context, jobID int64) (jobs.JobInfo, error)
+	GetUpgradeToStatusForModel_ func(ctx context.Context, modelUUID string) (*params.UpgradeToJobStatus, error)
+	ListJobs_                   func(ctx context.Context, req params.ListJobsRequest) (params.ListJobsResponse, error)
 }
 
 func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error) {
@@ -20,6 +21,13 @@ func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo,
 		return jobs.JobInfo{}, errors.New("not implemented")
 	}
 	return j.GetJobInfo_(ctx, jobID)
+}
+
+func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*params.UpgradeToJobStatus, error) {
+	if j.GetUpgradeToStatusForModel_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return j.GetUpgradeToStatusForModel_(ctx, modelUUID)
 }
 
 func (j *JobManager) ListJobs(ctx context.Context, req params.ListJobsRequest) (params.ListJobsResponse, error) {

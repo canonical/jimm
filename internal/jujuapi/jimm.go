@@ -859,6 +859,12 @@ func (r *controllerRoot) ModelControllerInfo(ctx context.Context, req apiparams.
 		return apiparams.ModelControllerInfo{}, err
 	}
 
+	upgradeToStatus, err := r.jimm.JobManager().GetUpgradeToStatusForModel(ctx, response.ModelUUID)
+	if err != nil {
+		return apiparams.ModelControllerInfo{}, err
+	}
+	response.UpgradeToJobStatus = upgradeToStatus
+
 	return *response, nil
 }
 
