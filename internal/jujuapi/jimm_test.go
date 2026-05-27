@@ -791,11 +791,20 @@ func TestModelControllerInfo(t *testing.T) {
 		expectedError: "model not found",
 	}}
 
+	jobManagerMock := &mocks.JobManager{
+		GetUpgradeToStatusForModel_: func(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
+			return nil, nil
+		},
+	}
+
 	for _, test := range testCases {
 		c.Log(test.about)
 		jimm := &jimmtest.JIMM{
 			JujuManager_: func() jujuapi.JujuManager {
 				return test.jujuManager(c)
+			},
+			JobManager_: func() jujuapi.JobManager {
+				return jobManagerMock
 			},
 		}
 		root := newTestControllerRoot(jimm, "alice@canonical.com", test.admin)
