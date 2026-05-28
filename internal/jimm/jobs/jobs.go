@@ -26,6 +26,12 @@ var activeUpgradeToJobStates = []rivertype.JobState{
 	rivertype.JobStateScheduled,
 }
 
+var finalizedUpgradeToJobStates = []rivertype.JobState{
+	rivertype.JobStateCancelled,
+	rivertype.JobStateCompleted,
+	rivertype.JobStateDiscarded,
+}
+
 // JobQuerier defines the interface for querying and managing jobs in JIMM.
 type JobQuerier interface {
 	GetJobInfo(ctx context.Context, jobID int64) (*rivertype.JobRow, error)
@@ -72,7 +78,7 @@ func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (JobInfo, erro
 }
 
 // GetUpgradeToStatusForModel returns the status of the current or most recent
-// discarded upgrade-to supervisor job for the specified model.
+// finalized upgrade-to supervisor job for the specified model.
 func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
 	rootJob, err := j.findUpgradeToRootJob(ctx, modelUUID)
 	if err != nil {
@@ -212,6 +218,13 @@ func convertJobStates(statuses []apiparams.JobStatus) ([]rivertype.JobState, err
 	return riverStates, nil
 }
 
+// findUpgradeToRootJob finds the current active or most recently finalized
+// upgrade-to supervisor job for the specified model.
+//
+// This uses two queries so an in-flight supervisor job is preferred over any
+// older finalized job. If no active job exists, it falls back to the most
+// recently finalized supervisor so callers can still see the last terminal
+// upgrade-to status.
 func (j *JobManager) findUpgradeToRootJob(ctx context.Context, modelUUID string) (*rivertype.JobRow, error) {
 	activeJobs, err := j.jobQuerier.ListJobs(
 		ctx,
@@ -231,12 +244,12 @@ func (j *JobManager) findUpgradeToRootJob(ctx context.Context, modelUUID string)
 		return activeJobs.Jobs[0], nil
 	}
 
-	discardedJobs, err := j.jobQuerier.ListJobs(
+	finalizedJobs, err := j.jobQuerier.ListJobs(
 		ctx,
 		river.NewJobListParams().
 			Kinds(rivertypes.UpgradeToJobKind).
 			First(1).
-			States(rivertype.JobStateDiscarded).
+			States(finalizedUpgradeToJobStates...).
 			Where(
 				"metadata->>'model-uuid' = @model_uuid",
 				river.NamedArgs{"model_uuid": modelUUID},
@@ -246,11 +259,11 @@ func (j *JobManager) findUpgradeToRootJob(ctx context.Context, modelUUID string)
 	if err != nil {
 		return nil, err
 	}
-	if len(discardedJobs.Jobs) == 0 {
+	if len(finalizedJobs.Jobs) == 0 {
 		return nil, nil
 	}
 
-	return discardedJobs.Jobs[0], nil
+	return finalizedJobs.Jobs[0], nil
 }
 
 func toJobDetail(jobRow *rivertype.JobRow) apiparams.JobDetail {

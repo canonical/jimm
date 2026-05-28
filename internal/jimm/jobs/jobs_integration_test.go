@@ -367,7 +367,7 @@ func TestGetUpgradeToStatusForModel_InvalidSupervisorOutput(t *testing.T) {
 	c.Assert(status, qt.IsNil)
 }
 
-func TestGetUpgradeToStatusForModel_UsesLatestDiscardedRoot(t *testing.T) {
+func TestGetUpgradeToStatusForModel_UsesLatestFinalizedRoot(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
@@ -398,4 +398,18 @@ func TestGetUpgradeToStatusForModel_UsesLatestDiscardedRoot(t *testing.T) {
 	c.Assert(status.Root.State, qt.Equals, string(rivertype.JobStateDiscarded))
 	c.Assert(status.Root.Errors, qt.HasLen, 1)
 	c.Assert(status.Root.Errors[0].Error, qt.Equals, "discarded upgrade root for discard-second")
+
+	_, err = client.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		Username:             "complete-third",
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{Metadata: metadata, MaxAttempts: 1})
+	c.Assert(err, qt.IsNil)
+	waitForJobs(c, client, 1, defaultTestTimeout)
+
+	status, err = jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(status, qt.IsNotNil)
+	c.Assert(status.Root.State, qt.Equals, string(rivertype.JobStateCompleted))
+	c.Assert(status.Root.Errors, qt.HasLen, 0)
 }
