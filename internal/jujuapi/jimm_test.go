@@ -160,6 +160,273 @@ func TestListControllers_AdminIncludesPendingBootstraps(t *testing.T) {
 	}})
 }
 
+func TestShowController(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := c.Context()
+	testCases := []struct {
+		about         string
+		admin         bool
+		controller    string
+		jujuManager   func(*qt.C) jujuapi.JujuManager
+		jobManager    func(*qt.C) jujuapi.JobManager
+		expectedInfo  apiparams.ControllerInfo
+		expectedError string
+	}{
+		{
+			about:      "non-admin user with add-model access can view controller",
+			admin:      false,
+			controller: "test-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, false)
+							c.Assert(name, qt.Equals, "test-controller")
+							return &dbmodel.Controller{
+								Name:      "test-controller",
+								UUID:      "982b16d9-a945-4762-b684-fd4fd885aa11",
+								CloudName: "aws",
+							}, nil
+						},
+					},
+				}
+			},
+			expectedInfo: apiparams.ControllerInfo{
+				Name:     "test-controller",
+				UUID:     "982b16d9-a945-4762-b684-fd4fd885aa11",
+				CloudTag: names.NewCloudTag("aws").String(),
+				Status:   jujuparams.EntityStatus{Status: "available"},
+			},
+		},
+		{
+			about:      "non-admin user without add-model access is unauthorized",
+			admin:      false,
+			controller: "test-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, false)
+							return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
+						},
+					},
+				}
+			},
+			expectedError: "unauthorized",
+		},
+		{
+			about:      "non-admin user cannot see bootstrapping controller",
+			admin:      false,
+			controller: "bootstrapping-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, false)
+							return nil, errors.Codef(errors.CodeNotFound, "controller not found")
+						},
+					},
+				}
+			},
+			expectedError: "controller not found",
+		},
+		{
+			about:      "returns persisted controller info",
+			admin:      true,
+			controller: "test-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, true)
+							c.Assert(name, qt.Equals, "test-controller")
+							return &dbmodel.Controller{
+								Name:      "test-controller",
+								UUID:      "982b16d9-a945-4762-b684-fd4fd885aa11",
+								CloudName: "aws",
+							}, nil
+						},
+					},
+				}
+			},
+			jobManager: func(c *qt.C) jujuapi.JobManager {
+				return &mocks.JobManager{}
+			},
+			expectedInfo: apiparams.ControllerInfo{
+				Name:     "test-controller",
+				UUID:     "982b16d9-a945-4762-b684-fd4fd885aa11",
+				CloudTag: names.NewCloudTag("aws").String(),
+				Status:   jujuparams.EntityStatus{Status: "available"},
+			},
+		},
+		{
+			about:      "returns bootstrapping controller with job status",
+			admin:      true,
+			controller: "bootstrapping-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, true)
+							return nil, errors.Codef(errors.CodeNotFound, "controller not found")
+						},
+						GetControllerBootstrap_: func(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error) {
+							c.Assert(name, qt.Equals, "bootstrapping-controller")
+							return &dbmodel.ControllerBootstrap{
+								Name:        "bootstrapping-controller",
+								CloudName:   "aws",
+								CloudRegion: "eu-west-1",
+							}, nil
+						},
+					},
+				}
+			},
+			jobManager: func(c *qt.C) jujuapi.JobManager {
+				return &mocks.JobManager{
+					GetActiveBootstrapStatusForController_: func(ctx context.Context, controllerName string) (*apiparams.BootstrapJobStatus, error) {
+						c.Assert(controllerName, qt.Equals, "bootstrapping-controller")
+						return &apiparams.BootstrapJobStatus{
+							Bootstrap: apiparams.JobDetail{
+								State:       "running",
+								Attempt:     1,
+								MaxAttempts: 3,
+							},
+						}, nil
+					},
+				}
+			},
+			expectedInfo: apiparams.ControllerInfo{
+				Name:        "bootstrapping-controller",
+				CloudTag:    names.NewCloudTag("aws").String(),
+				CloudRegion: "eu-west-1",
+				Status:      jujuparams.EntityStatus{Status: "bootstrapping"},
+				BootstrapJobStatus: &apiparams.BootstrapJobStatus{
+					Bootstrap: apiparams.JobDetail{
+						State:       "running",
+						Attempt:     1,
+						MaxAttempts: 3,
+					},
+				},
+			},
+		},
+		{
+			about:      "propagates bootstrap lookup error",
+			admin:      true,
+			controller: "bootstrapping-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, true)
+							return nil, errors.Codef(errors.CodeNotFound, "controller not found")
+						},
+						GetControllerBootstrap_: func(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error) {
+							return nil, errors.New("bootstrap query failed")
+						},
+					},
+				}
+			},
+			jobManager: func(c *qt.C) jujuapi.JobManager {
+				return &mocks.JobManager{}
+			},
+			expectedError: "bootstrap query failed",
+		},
+		{
+			about:      "returns bootstrapping controller without status when no active job exists",
+			admin:      true,
+			controller: "bootstrapping-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, true)
+							return nil, errors.Codef(errors.CodeNotFound, "controller not found")
+						},
+						GetControllerBootstrap_: func(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error) {
+							return &dbmodel.ControllerBootstrap{
+								Name:        "bootstrapping-controller",
+								CloudName:   "aws",
+								CloudRegion: "eu-west-1",
+							}, nil
+						},
+					},
+				}
+			},
+			jobManager: func(c *qt.C) jujuapi.JobManager {
+				return &mocks.JobManager{
+					GetActiveBootstrapStatusForController_: func(ctx context.Context, controllerName string) (*apiparams.BootstrapJobStatus, error) {
+						c.Assert(controllerName, qt.Equals, "bootstrapping-controller")
+						return nil, nil
+					},
+				}
+			},
+			expectedInfo: apiparams.ControllerInfo{
+				Name:        "bootstrapping-controller",
+				CloudTag:    names.NewCloudTag("aws").String(),
+				CloudRegion: "eu-west-1",
+				Status:      jujuparams.EntityStatus{Status: "bootstrapping"},
+			},
+		},
+		{
+			about:      "propagates bootstrap job status error",
+			admin:      true,
+			controller: "bootstrapping-controller",
+			jujuManager: func(c *qt.C) jujuapi.JujuManager {
+				return &mocks.JujuManager{
+					ControllerService: mocks.ControllerService{
+						ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+							c.Assert(user.JimmAdmin, qt.Equals, true)
+							return nil, errors.Codef(errors.CodeNotFound, "controller not found")
+						},
+						GetControllerBootstrap_: func(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error) {
+							return &dbmodel.ControllerBootstrap{
+								Name: "bootstrapping-controller",
+							}, nil
+						},
+					},
+				}
+			},
+			jobManager: func(c *qt.C) jujuapi.JobManager {
+				return &mocks.JobManager{
+					GetActiveBootstrapStatusForController_: func(ctx context.Context, controllerName string) (*apiparams.BootstrapJobStatus, error) {
+						c.Assert(controllerName, qt.Equals, "bootstrapping-controller")
+						return nil, errors.New("job query failed")
+					},
+				}
+			},
+			expectedError: "job query failed",
+		},
+	}
+
+	for _, test := range testCases {
+		c.Run(test.about, func(c *qt.C) {
+			jimm := &jimmtest.JIMM{
+				JujuManager_: func() jujuapi.JujuManager {
+					return test.jujuManager(c)
+				},
+				JobManager_: func() jujuapi.JobManager {
+					if test.jobManager == nil {
+						return &mocks.JobManager{}
+					}
+					return test.jobManager(c)
+				},
+			}
+
+			root := newTestControllerRoot(jimm, "alice@canonical.com", test.admin)
+			info, err := root.ShowController(ctx, apiparams.ShowControllerRequest{ControllerName: test.controller})
+
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+				return
+			}
+
+			c.Assert(err, qt.IsNil)
+			c.Assert(info, qt.DeepEquals, test.expectedInfo)
+		})
+	}
+}
+
 func TestRemoveController_UnauthorizedUser(t *testing.T) {
 	c := qt.New(t)
 
@@ -186,8 +453,9 @@ func TestRemoveController_Success(t *testing.T) {
 		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ControllerService: mocks.ControllerService{
-					ControllerInfo_: func(ctx context.Context, name string) (*dbmodel.Controller, error) {
+					ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
 						infoCalled = true
+						c.Check(user.JimmAdmin, qt.Equals, true)
 						return &dbmodel.Controller{
 							Name:          testControllerName,
 							UUID:          "982b16d9-a945-4762-b684-fd4fd885aa11",
@@ -547,7 +815,8 @@ func TestStartDestroyControllerJob(t *testing.T) {
 		JujuManager_: func() jujuapi.JujuManager {
 			return &mocks.JujuManager{
 				ControllerService: mocks.ControllerService{
-					ControllerInfo_: func(ctx context.Context, name string) (*dbmodel.Controller, error) {
+					ControllerInfo_: func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
+						c.Check(user.JimmAdmin, qt.Equals, true)
 						return ctrlInfo, nil
 					},
 				},

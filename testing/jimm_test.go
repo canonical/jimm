@@ -190,6 +190,63 @@ func TestListControllersUnauthorized(t *testing.T) {
 	c.Check(cis, qt.DeepEquals, []apiparams.ControllerInfo{})
 }
 
+func TestShowController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	controllerName, conf := s.GetOneControllerConfig(c)
+	expectedController := apiparams.ControllerInfo{
+		Name:          controllerName,
+		UUID:          conf.UUID,
+		APIAddresses:  conf.ToAPIInfo().Addrs,
+		CACertificate: conf.ToAPIInfo().CACert,
+		CloudTag:      names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
+		CloudRegion:   jimmtest.TestE2ECloudRegionName,
+		Status: jujuparams.EntityStatus{
+			Status: "available",
+		},
+	}
+
+	adminConn := s.Open(c, nil, "alice@canonical.com", nil)
+	defer adminConn.Close()
+	adminClient := api.NewClient(adminConn)
+
+	ci, err := adminClient.ShowController(controllerName)
+	c.Assert(err, qt.IsNil)
+	assertControllerInfos(c, []apiparams.ControllerInfo{*ci}, []apiparams.ControllerInfo{expectedController}, s.GetControllersConfig(c))
+
+	bobConn := s.Open(c, nil, "bob@canonical.com", nil)
+	defer bobConn.Close()
+	bobClient := api.NewClient(bobConn)
+
+	ci, err = bobClient.ShowController(controllerName)
+	c.Assert(err, qt.IsNil)
+	assertControllerInfos(c, []apiparams.ControllerInfo{*ci}, []apiparams.ControllerInfo{expectedController}, s.GetControllersConfig(c))
+
+	bootstrap := &dbmodel.ControllerBootstrap{
+		Name:        "bootstrapping-controller",
+		CloudName:   jimmtest.TestE2ECloudName,
+		CloudRegion: jimmtest.TestE2ECloudRegionName,
+	}
+	err = s.JIMM.Database.AddControllerBootstrap(c.Context(), bootstrap)
+	c.Assert(err, qt.IsNil)
+
+	ci, err = adminClient.ShowController(bootstrap.Name)
+	c.Assert(err, qt.IsNil)
+	c.Check(*ci, qt.DeepEquals, apiparams.ControllerInfo{
+		Name:        bootstrap.Name,
+		CloudTag:    names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
+		CloudRegion: jimmtest.TestE2ECloudRegionName,
+		Status: jujuparams.EntityStatus{
+			Status: "bootstrapping",
+		},
+	})
+
+	ci, err = bobClient.ShowController(bootstrap.Name)
+	c.Check(jujuparams.IsCodeNotFound(err), qt.Equals, true)
+	c.Check(*ci, qt.DeepEquals, apiparams.ControllerInfo{})
+}
+
 func TestAddControllerPublicAddressWithoutPort(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)

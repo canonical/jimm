@@ -15,6 +15,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/errors"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 type testDeps struct {
@@ -81,6 +82,58 @@ func TestGetJobInfo_QueryError(t *testing.T) {
 	_, err := deps.jobManager.GetJobInfo(ctx, jobID)
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(err, qt.ErrorMatches, "query error")
+}
+
+func TestGetActiveBootstrapStatusForController_Success(t *testing.T) {
+	c := qt.New(t)
+	deps := setupDeps(c)
+
+	ctx := context.Background()
+	controllerName := "controller-name"
+	attemptedAt := time.Now().Add(-time.Minute)
+	finalizedAt := time.Now()
+
+	deps.jobQuerier.EXPECT().ListJobs(gomock.Any(), gomock.Any()).Return(&river.JobListResult{Jobs: []*rivertype.JobRow{{
+		ID:          123,
+		State:       rivertype.JobStateRunning,
+		Attempt:     2,
+		MaxAttempts: 5,
+		AttemptedAt: &attemptedAt,
+		FinalizedAt: &finalizedAt,
+		Errors: []rivertype.AttemptError{{
+			Error:   "test error",
+			At:      finalizedAt,
+			Attempt: 1,
+		}},
+	}}}, nil)
+
+	status, err := deps.jobManager.GetActiveBootstrapStatusForController(ctx, controllerName)
+	c.Assert(err, qt.IsNil)
+	c.Assert(status, qt.DeepEquals, &apiparams.BootstrapJobStatus{
+		Bootstrap: apiparams.JobDetail{
+			State:       string(rivertype.JobStateRunning),
+			Attempt:     2,
+			MaxAttempts: 5,
+			AttemptedAt: &attemptedAt,
+			FinalizedAt: &finalizedAt,
+			Errors: []apiparams.JobAttemptError{{
+				Attempt: 1,
+				At:      finalizedAt,
+				Error:   "test error",
+			}},
+		},
+	})
+}
+
+func TestGetActiveBootstrapStatusForController_NoJob(t *testing.T) {
+	c := qt.New(t)
+	deps := setupDeps(c)
+
+	deps.jobQuerier.EXPECT().ListJobs(gomock.Any(), gomock.Any()).Return(&river.JobListResult{}, nil)
+
+	status, err := deps.jobManager.GetActiveBootstrapStatusForController(context.Background(), "controller-name")
+	c.Assert(err, qt.IsNil)
+	c.Assert(status, qt.IsNil)
 }
 
 func TestNewJobManager_NilQuerier(t *testing.T) {

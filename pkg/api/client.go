@@ -365,6 +365,14 @@ func (c *Client) ModelControllerInfo(modelQualifier string) (*params.ModelContro
 	return &resp, err
 }
 
+// ShowController returns information about a controller or a pending bootstrap reservation.
+func (c *Client) ShowController(controllerName string) (*params.ControllerInfo, error) {
+	req := params.ShowControllerRequest{ControllerName: controllerName}
+	var resp params.ControllerInfo
+	err := c.caller.APICall("JIMM", 4, "", "ShowController", req, &resp)
+	return &resp, err
+}
+
 func cloudFromParams(cloudName string, p jujuparams.Cloud) jujucloud.Cloud {
 	authTypes := make([]jujucloud.AuthType, len(p.AuthTypes))
 	for i, authType := range p.AuthTypes {

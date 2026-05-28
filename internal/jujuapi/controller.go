@@ -64,7 +64,8 @@ func init() {
 // ControllerService defines the methods used to manage controllers.
 type ControllerService interface {
 	AddController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
-	ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error)
+	GetControllerBootstrap(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error)
+	ControllerInfo(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion(ctx context.Context) (version.Number, error)
 	ListControllerBootstraps(ctx context.Context) ([]dbmodel.ControllerBootstrap, error)
 	ListControllers(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)

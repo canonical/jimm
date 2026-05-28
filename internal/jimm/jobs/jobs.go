@@ -18,7 +18,7 @@ import (
 const defaultListJobsCount = 100
 const maxListJobsCount = 10_000
 
-var activeUpgradeToJobStates = []rivertype.JobState{
+var activeJobStates = []rivertype.JobState{
 	rivertype.JobStateAvailable,
 	rivertype.JobStatePending,
 	rivertype.JobStateRunning,
@@ -74,6 +74,31 @@ func (j *JobManager) GetJobInfo(ctx context.Context, jobID int64) (JobInfo, erro
 		MaxAttempts:    jobRow.MaxAttempts,
 		FinishedAt:     jobRow.FinalizedAt,
 		Errors:         jobErrors,
+	}, nil
+}
+
+// GetActiveBootstrapStatusForController returns the status of the active bootstrap
+// job for the specified controller, if one exists.
+func (j *JobManager) GetActiveBootstrapStatusForController(ctx context.Context, controllerName string) (*apiparams.BootstrapJobStatus, error) {
+	jobListResult, err := j.jobQuerier.ListJobs(
+		ctx,
+		river.NewJobListParams().
+			Kinds(rivertypes.BootstrapJobKind).
+			First(1).
+			States(activeJobStates...).
+			Where(
+				"metadata->>'controller-name' = @controller_name",
+				river.NamedArgs{"controller_name": controllerName},
+			),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(jobListResult.Jobs) == 0 {
+		return nil, nil
+	}
+	return &apiparams.BootstrapJobStatus{
+		Bootstrap: toJobDetail(jobListResult.Jobs[0]),
 	}, nil
 }
 
@@ -231,7 +256,7 @@ func (j *JobManager) findUpgradeToRootJob(ctx context.Context, modelUUID string)
 		river.NewJobListParams().
 			Kinds(rivertypes.UpgradeToJobKind).
 			First(1).
-			States(activeUpgradeToJobStates...).
+			States(activeJobStates...).
 			Where(
 				"metadata->>'model-uuid' = @model_uuid",
 				river.NamedArgs{"model_uuid": modelUUID},

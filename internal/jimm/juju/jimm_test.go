@@ -74,14 +74,60 @@ func TestControllerInfo(t *testing.T) {
 	j := newTestJujuManager(c, nil)
 
 	env := jimmtest.ParseEnvironment(c, testControllersEnv)
-	env.PopulateDB(c, j.Database)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
-	ctl, err := j.ControllerInfo(ctx, "test1")
-	c.Assert(err, qt.IsNil)
-	c.Assert(ctl.Name, qt.Equals, "test1")
+	alice := env.User("alice@canonical.com").DBObject(c, j.Database)
+	bob := env.User("bob@canonical.com").DBObject(c, j.Database)
+	notAllowed := env.User("notallowedanycontrollers@canonical.com").DBObject(c, j.Database)
 
-	_, err = j.ControllerInfo(ctx, "does-not-exist")
-	c.Assert(err, qt.ErrorMatches, "controller not found")
+	adminUser := openfga.NewUser(&alice, j.OpenFGAClient)
+	bobUser := openfga.NewUser(&bob, j.OpenFGAClient)
+	notAllowedUser := openfga.NewUser(&notAllowed, j.OpenFGAClient)
+
+	tests := []struct {
+		about         string
+		user          *openfga.User
+		controller    string
+		expectedName  string
+		expectedError string
+	}{
+		{
+			about:        "jimm admin can access controller",
+			user:         adminUser,
+			controller:   "test1",
+			expectedName: "test1",
+		},
+		{
+			about:        "user with add-model access can access controller",
+			user:         bobUser,
+			controller:   "test1",
+			expectedName: "test1",
+		},
+		{
+			about:         "user without add-model access is unauthorized",
+			user:          notAllowedUser,
+			controller:    "test1",
+			expectedError: "unauthorized",
+		},
+		{
+			about:         "non-existent controller returns not found",
+			user:          bobUser,
+			controller:    "does-not-exist",
+			expectedError: "controller not found",
+		},
+	}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			ctl, err := j.ControllerInfo(ctx, test.user, test.controller)
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Assert(ctl.Name, qt.Equals, test.expectedName)
+		})
+	}
 }
 
 func TestListControllers(t *testing.T) {

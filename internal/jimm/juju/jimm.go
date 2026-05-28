@@ -55,15 +55,32 @@ func (j *JujuManager) forEachController(ctx context.Context, controllers []dbmod
 }
 
 // ControllerInfo returns info about a controller connected to JIMM.
-func (j *JujuManager) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
-
+func (j *JujuManager) ControllerInfo(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
 	ctl := dbmodel.Controller{
 		Name: name,
 	}
 	if err := j.Database.GetController(ctx, &ctl); err != nil {
 		return nil, err
 	}
+
+	canAddModel, err := user.IsAllowedAddModelToController(ctx, ctl.ResourceTag())
+	if err != nil {
+		zapctx.Error(ctx, "error checking user permissions for controller", zap.String("controller", ctl.Name), zap.Error(err))
+		return nil, errors.New("error checking user permissions for controller")
+	}
+	if !canAddModel {
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
+	}
 	return &ctl, nil
+}
+
+// GetControllerBootstrap returns the pending bootstrap reservation for a controller.
+func (j *JujuManager) GetControllerBootstrap(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error) {
+	bootstrap := dbmodel.ControllerBootstrap{Name: name}
+	if err := j.Database.GetControllerBootstrap(ctx, &bootstrap); err != nil {
+		return nil, err
+	}
+	return &bootstrap, nil
 }
 
 // ListControllerBootstraps returns the currently pending controller bootstraps.

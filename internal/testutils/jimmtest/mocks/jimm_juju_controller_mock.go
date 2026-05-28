@@ -19,7 +19,8 @@ type ControllerService struct {
 	AddController_                     func(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, creds juju.ControllerCreds) error
 	ControllerDetailsForModel_         func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	ControllerDetailsForIncomingModel_ func(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
-	ControllerInfo_                    func(ctx context.Context, name string) (*dbmodel.Controller, error)
+	GetControllerBootstrap_            func(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error)
+	ControllerInfo_                    func(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error)
 	EarliestControllerVersion_         func(ctx context.Context) (version.Number, error)
 	ListControllerBootstraps_          func(ctx context.Context) ([]dbmodel.ControllerBootstrap, error)
 	ListControllers_                   func(ctx context.Context, user *openfga.User) ([]dbmodel.Controller, error)
@@ -49,11 +50,18 @@ func (j *ControllerService) ControllerDetailsForIncomingModel(ctx context.Contex
 	return j.ControllerDetailsForIncomingModel_(ctx, modelUUID)
 }
 
-func (j *ControllerService) ControllerInfo(ctx context.Context, name string) (*dbmodel.Controller, error) {
+func (j *ControllerService) ControllerInfo(ctx context.Context, user *openfga.User, name string) (*dbmodel.Controller, error) {
 	if j.ControllerInfo_ == nil {
 		return nil, errors.New("not implemented")
 	}
-	return j.ControllerInfo_(ctx, name)
+	return j.ControllerInfo_(ctx, user, name)
+}
+
+func (j *ControllerService) GetControllerBootstrap(ctx context.Context, name string) (*dbmodel.ControllerBootstrap, error) {
+	if j.GetControllerBootstrap_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return j.GetControllerBootstrap_(ctx, name)
 }
 
 func (j *ControllerService) EarliestControllerVersion(ctx context.Context) (version.Number, error) {

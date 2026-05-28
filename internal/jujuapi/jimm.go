@@ -77,6 +77,7 @@ func init() {
 		upgradeToMethod := rpc.Method(r.UpgradeTo)
 		listUserCloudsMethod := rpc.Method(r.ListUserClouds)
 		modelControllerInfoMethod := rpc.Method(r.ModelControllerInfo)
+		showControllerMethod := rpc.Method(r.ShowController)
 		jobInfoMethod := rpc.Method(r.JobInfo)
 		listJobsMethod := rpc.Method(r.ListJobs)
 		supportedVersionMethd := rpc.Method(r.SupportedJujuVersions)
@@ -99,6 +100,7 @@ func init() {
 		r.AddMethod("JIMM", 4, "RemoveController", removeControllerMethod)
 		r.AddMethod("JIMM", 4, "RevokeAuditLogAccess", revokeAuditLogAccessMethod)
 		r.AddMethod("JIMM", 4, "SetControllerDeprecated", setControllerDeprecatedMethod)
+		r.AddMethod("JIMM", 4, "ShowController", showControllerMethod)
 		r.AddMethod("JIMM", 4, "UpdateMigratedModel", updateMigratedModelMethod)
 
 		// JIMM ReBAC RPC
@@ -313,7 +315,7 @@ func (r *controllerRoot) RemoveController(ctx context.Context, req apiparams.Rem
 		return apiparams.ControllerInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.Name)
+	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, r.user, req.Name)
 	if err != nil {
 		return apiparams.ControllerInfo{}, err
 	}
@@ -330,7 +332,7 @@ func (r *controllerRoot) SetControllerDeprecated(ctx context.Context, req apipar
 	if err := r.jimm.JujuManager().SetControllerDeprecated(ctx, r.user, req.Name, req.Deprecated); err != nil {
 		return apiparams.ControllerInfo{}, err
 	}
-	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.Name)
+	ctl, err := r.jimm.JujuManager().ControllerInfo(ctx, r.user, req.Name)
 	if err != nil {
 		return apiparams.ControllerInfo{}, err
 	}
@@ -743,7 +745,7 @@ func (r *controllerRoot) StartDestroyController(ctx context.Context, req apipara
 		return apiparams.StartBootstrapResponse{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	ctrl, err := r.jimm.JujuManager().ControllerInfo(ctx, req.ControllerName)
+	ctrl, err := r.jimm.JujuManager().ControllerInfo(ctx, r.user, req.ControllerName)
 	if err != nil {
 		return apiparams.StartBootstrapResponse{}, fmt.Errorf("failed to fetch controller info: %w", err)
 	}
@@ -866,6 +868,36 @@ func (r *controllerRoot) ModelControllerInfo(ctx context.Context, req apiparams.
 	response.UpgradeToJobStatus = upgradeToStatus
 
 	return *response, nil
+}
+
+// ShowController returns information about a controller or an in-progress bootstrap reservation.
+func (r *controllerRoot) ShowController(ctx context.Context, req apiparams.ShowControllerRequest) (apiparams.ControllerInfo, error) {
+	controller, err := r.jimm.JujuManager().ControllerInfo(ctx, r.user, req.ControllerName)
+	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
+		return apiparams.ControllerInfo{}, err
+	}
+	if err == nil {
+		return controller.ToAPIControllerInfo(), nil
+	}
+	// If the user is not a JIMM admin, return the not found error.
+	// Only JIMM admins can see controllers undergoing bootstrap.
+	if !r.user.JimmAdmin {
+		return apiparams.ControllerInfo{}, err
+	}
+
+	bootstrap, err := r.jimm.JujuManager().GetControllerBootstrap(ctx, req.ControllerName)
+	if err != nil {
+		return apiparams.ControllerInfo{}, err
+	}
+
+	response := bootstrap.ToAPIControllerInfo()
+	status, err := r.jimm.JobManager().GetActiveBootstrapStatusForController(ctx, req.ControllerName)
+	if err != nil {
+		return apiparams.ControllerInfo{}, err
+	}
+	response.BootstrapJobStatus = status
+
+	return response, nil
 }
 
 // JobInfo returns information about a job given its ID.
