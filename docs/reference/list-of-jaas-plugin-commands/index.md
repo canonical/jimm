@@ -1454,6 +1454,36 @@ Sets controller deprecated status.
 Sets the deprecated status of a controller.
 
 
+(command-jaas-show-controller)=
+# jaas show-controller
+
+## Summary
+Displays information about a controller
+
+## Usage
+```juju jaas show-controller [options] <controller name>```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--format` | yaml | Specify output format (json&#x7c;yaml) |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju jaas show-controller my-controller
+    juju jaas show-controller my-controller --format json
+
+
+## Details
+
+Displays information about a controller known to JIMM.
+
+The output includes the controller name, UUID, addresses, cloud placement,
+agent version, status, and any active bootstrap status tracked by JIMM.
+
+
 (command-jaas-show-controller-profile)=
 # jaas show-controller-profile
 

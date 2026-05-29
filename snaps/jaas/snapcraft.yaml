@@ -87,3 +87,4 @@ parts:
       ln -sf jaas bin/juju-remove-controller-profile
       ln -sf jaas bin/juju-show-controller-profile
       ln -sf jaas bin/juju-update-controller-profile
+      ln -sf jaas bin/juju-show-controller      

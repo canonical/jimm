@@ -59,6 +59,7 @@ func NewSuperCommand() *jujucmd.SuperCommand {
 	jaasCmd.Register(cmd.NewRenameRoleCommand())
 	jaasCmd.Register(cmd.NewRevokeAuditLogAccessCommand())
 	jaasCmd.Register(cmd.NewSetControllerDeprecatedCommand())
+	jaasCmd.Register(cmd.NewShowControllerCommand())
 	jaasCmd.Register(cmd.NewShowControllerProfileCommand())
 	jaasCmd.Register(cmd.NewShowModelCommand())
 	jaasCmd.Register(cmd.NewUnregisterControllerCommand())

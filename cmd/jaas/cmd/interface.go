@@ -35,6 +35,7 @@ type JIMMAPI interface {
 	RemoveController(req *params.RemoveControllerRequest) (params.ControllerInfo, error)
 	RemoveControllerProfile(req *params.RemoveControllerProfileRequest) error
 	SetControllerDeprecated(req *params.SetControllerDeprecatedRequest) (params.ControllerInfo, error)
+	ShowController(controllerName string) (*params.ControllerInfo, error)
 
 	// Migration operations
 	ListMigrationTargets(req *params.ListMigrationTargetsRequest) ([]params.ControllerInfo, error)
