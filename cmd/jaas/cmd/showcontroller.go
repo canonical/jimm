@@ -16,8 +16,7 @@ const (
 	showControllerCommandDoc = `
 Displays information about a controller known to JIMM.
 
-The output includes the controller name, UUID, addresses, cloud placement,
-agent version, status, and any active bootstrap status tracked by JIMM.
+For controllers with an active bootstrap status, some fields will be empty/missing.
 `
 	showControllerCommandExample = `
     juju jaas show-controller my-controller

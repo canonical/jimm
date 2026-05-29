@@ -479,6 +479,8 @@ Lists all controllers known to JIMM.
 
 Displays controller information for all controllers known to JIMM.
 
+For JAAS admins, this will also display controllers that are in the process of being bootstrapped.
+
 
 (command-jaas-destroy-controller)=
 # jaas destroy-controller
@@ -1480,8 +1482,7 @@ Displays information about a controller
 
 Displays information about a controller known to JIMM.
 
-The output includes the controller name, UUID, addresses, cloud placement,
-agent version, status, and any active bootstrap status tracked by JIMM.
+For controllers with an active bootstrap status, some fields will be empty/missing.
 
 
 (command-jaas-show-controller-profile)=

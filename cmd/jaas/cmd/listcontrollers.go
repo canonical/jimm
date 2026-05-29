@@ -13,6 +13,8 @@ import (
 const (
 	listControllersCommandDoc = `
 Displays controller information for all controllers known to JIMM.
+
+For JAAS admins, this will also display controllers that are in the process of being bootstrapped.
 `
 	listControllersCommandExample = `
     juju controllers
