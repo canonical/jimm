@@ -19,7 +19,6 @@ type JIMMAPI interface {
 	StopBootstrap(req *params.StopBootstrapRequest) error
 	StartBootstrap(req *params.BootstrapParams) (*params.StartBootstrapResponse, error)
 	StartDestroyController(req *params.DestroyControllerRequest) (*params.StartBootstrapResponse, error)
-	ListJobs(req *params.ListJobsRequest) (*params.ListJobsResponse, error)
 
 	// Cloud operations
 	ListUserClouds(req *params.ListUserCloudsRequest) (map[names.CloudTag]jujucloud.Cloud, error)

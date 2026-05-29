@@ -433,23 +433,3 @@ func cloudFromParams(cloudName string, p jujuparams.Cloud) jujucloud.Cloud {
 		IsControllerCloud: p.IsControllerCloud,
 	}
 }
-
-// JobInfo retrieves information about a job with the given ID.
-func (c *Client) JobInfo(req *params.JobInfoRequest) (*params.JobInfoResponse, error) {
-	var resp params.JobInfoResponse
-	err := c.caller.APICall("JIMM", 4, "", "JobInfo", req, &resp)
-	if err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// ListJobs returns a list of jobs based on the provided parameters.
-func (c *Client) ListJobs(req *params.ListJobsRequest) (*params.ListJobsResponse, error) {
-	var resp params.ListJobsResponse
-	err := c.caller.APICall("JIMM", 4, "", "ListJobs", req, &resp)
-	if err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}

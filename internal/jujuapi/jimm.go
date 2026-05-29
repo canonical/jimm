@@ -81,8 +81,6 @@ func init() {
 		listModelsMethod := rpc.Method(r.ListModelControllerInfo)
 		modelControllerInfoMethod := rpc.Method(r.ModelControllerInfo)
 		showControllerMethod := rpc.Method(r.ShowController)
-		jobInfoMethod := rpc.Method(r.JobInfo)
-		listJobsMethod := rpc.Method(r.ListJobs)
 		supportedVersionMethd := rpc.Method(r.SupportedJujuVersions)
 
 		// JIMM Generic RPC
@@ -138,9 +136,6 @@ func init() {
 		// JIMM Upgrades
 		r.AddMethod("JIMM", 4, "UpgradeController", upgradeControllerMethod)
 		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
-		// Job management
-		r.AddMethod("JIMM", 4, "JobInfo", jobInfoMethod)
-		r.AddMethod("JIMM", 4, "ListJobs", listJobsMethod)
 		// Versions
 		r.AddMethod("JIMM", 4, "SupportedJujuVersions", supportedVersionMethd)
 		// JIMM Controller Profiles
@@ -1000,34 +995,6 @@ func (r *controllerRoot) ShowController(ctx context.Context, req apiparams.ShowC
 	response.BootstrapJobStatus = status
 
 	return response, nil
-}
-
-// JobInfo returns information about a job given its ID.
-func (r *controllerRoot) JobInfo(ctx context.Context, req apiparams.JobInfoRequest) (apiparams.JobInfoResponse, error) {
-	if !r.user.JimmAdmin {
-		return apiparams.JobInfoResponse{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
-
-	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
-	if err != nil {
-		return apiparams.JobInfoResponse{}, errors.Codef(errors.CodeBadRequest, "invalid job ID: %s", req.JobID)
-	}
-
-	jobInfo, err := r.jimm.JobManager().GetJobInfo(ctx, jobID)
-	if err != nil {
-		return apiparams.JobInfoResponse{}, fmt.Errorf("failed to get job info: %v", err)
-	}
-
-	return toJobInfoParams(jobInfo), nil
-}
-
-// ListJobs returns the list of all jobs matching the given filter.
-func (r *controllerRoot) ListJobs(ctx context.Context, req apiparams.ListJobsRequest) (apiparams.ListJobsResponse, error) {
-	if !r.user.JimmAdmin {
-		return apiparams.ListJobsResponse{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
-
-	return r.jimm.JobManager().ListJobs(ctx, req)
 }
 
 // SupportedJujuVersions returns the list of Juju versions supported by JIMM for bootstrapping new controllers and upgrading existing ones.

@@ -24,7 +24,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
-	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
@@ -349,9 +348,7 @@ type UpgradeManager interface {
 
 // JobManager provides methods to manage long-running jobs such as bootstrapping and upgrading.
 type JobManager interface {
-	GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error)
 	GetActiveBootstrapStatusForController(ctx context.Context, controllerName string) (*params.BootstrapJobStatus, error)
 	GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*params.UpgradeToJobStatus, error)
 	ListUpgradeToJobsForModels(ctx context.Context, modelUUIDs []string) (map[string]string, error)
-	ListJobs(ctx context.Context, params params.ListJobsRequest) (params.ListJobsResponse, error)
 }

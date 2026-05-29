@@ -1465,17 +1465,3 @@ func TestPurgeLogs_NotAdmin(t *testing.T) {
 	})
 	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
 }
-
-func TestJobInfo(t *testing.T) {
-	c := qt.New(t)
-	s := jimmtest.SetupJimmWithControllers(c)
-
-	conn := s.Open(c, nil, "alice@canonical.com", nil)
-	defer conn.Close()
-
-	client := api.NewClient(conn)
-
-	req := apiparams.JobInfoRequest{JobID: "123"}
-	_, err := client.JobInfo(&req)
-	c.Assert(err, qt.ErrorMatches, `failed to get job info: not found`)
-}

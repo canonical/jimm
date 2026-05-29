@@ -818,45 +818,6 @@ func (c *MockJIMMAPIListGroupsCall) DoAndReturn(f func(*params.ListGroupsRequest
 	return c
 }
 
-// ListJobs mocks base method.
-func (m *MockJIMMAPI) ListJobs(req *params.ListJobsRequest) (*params.ListJobsResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListJobs", req)
-	ret0, _ := ret[0].(*params.ListJobsResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListJobs indicates an expected call of ListJobs.
-func (mr *MockJIMMAPIMockRecorder) ListJobs(req any) *MockJIMMAPIListJobsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJobs", reflect.TypeOf((*MockJIMMAPI)(nil).ListJobs), req)
-	return &MockJIMMAPIListJobsCall{Call: call}
-}
-
-// MockJIMMAPIListJobsCall wrap *gomock.Call
-type MockJIMMAPIListJobsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockJIMMAPIListJobsCall) Return(arg0 *params.ListJobsResponse, arg1 error) *MockJIMMAPIListJobsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockJIMMAPIListJobsCall) Do(f func(*params.ListJobsRequest) (*params.ListJobsResponse, error)) *MockJIMMAPIListJobsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJIMMAPIListJobsCall) DoAndReturn(f func(*params.ListJobsRequest) (*params.ListJobsResponse, error)) *MockJIMMAPIListJobsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ListMigrationTargets mocks base method.
 func (m *MockJIMMAPI) ListMigrationTargets(req *params.ListMigrationTargetsRequest) ([]params.ControllerInfo, error) {
 	m.ctrl.T.Helper()
