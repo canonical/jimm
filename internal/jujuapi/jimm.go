@@ -900,29 +900,29 @@ func (r *controllerRoot) ListModelControllerInfo(ctx context.Context) (apiparams
 }
 
 // ShowController returns information about a controller or an in-progress bootstrap reservation.
-func (r *controllerRoot) ShowController(ctx context.Context, req apiparams.ShowControllerRequest) (apiparams.ControllerInfo, error) {
+func (r *controllerRoot) ShowController(ctx context.Context, req apiparams.ShowControllerRequest) (apiparams.ControllerDetails, error) {
 	controller, err := r.jimm.JujuManager().ControllerInfo(ctx, r.user, req.ControllerName)
 	if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
-		return apiparams.ControllerInfo{}, err
+		return apiparams.ControllerDetails{}, err
 	}
 	if err == nil {
-		return controller.ToAPIControllerInfo(), nil
+		return controller.ToAPIShowControllerInfo(), nil
 	}
 	// If the user is not a JIMM admin, return the not found error.
 	// Only JIMM admins can see controllers undergoing bootstrap.
 	if !r.user.JimmAdmin {
-		return apiparams.ControllerInfo{}, err
+		return apiparams.ControllerDetails{}, err
 	}
 
 	bootstrap, err := r.jimm.JujuManager().GetControllerBootstrap(ctx, req.ControllerName)
 	if err != nil {
-		return apiparams.ControllerInfo{}, err
+		return apiparams.ControllerDetails{}, err
 	}
 
-	response := bootstrap.ToAPIControllerInfo()
+	response := bootstrap.ToAPIControllerDetails()
 	status, err := r.jimm.JobManager().GetActiveBootstrapStatusForController(ctx, req.ControllerName)
 	if err != nil {
-		return apiparams.ControllerInfo{}, err
+		return apiparams.ControllerDetails{}, err
 	}
 	response.BootstrapJobStatus = status
 

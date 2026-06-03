@@ -41,7 +41,7 @@ func TestShowControllerOutput(t *testing.T) {
 
 	attemptedAt := time.Date(2026, time.May, 29, 10, 45, 0, 0, time.UTC)
 	errAt := attemptedAt.Add(-2 * time.Minute)
-	controllerInfo := &apiparams.ControllerInfo{
+	controllerInfo := &apiparams.ControllerDetails{
 		Name:          "test-controller",
 		UUID:          "87654321-4321-4321-4321-cba987654321",
 		PublicAddress: "test-controller.example.com:443",
@@ -81,15 +81,15 @@ func TestShowControllerOutput(t *testing.T) {
 	tests := []struct {
 		name   string
 		args   []string
-		want   apiparams.ControllerInfo
-		decode func(string) (apiparams.ControllerInfo, error)
+		want   apiparams.ControllerDetails
+		decode func(string) (apiparams.ControllerDetails, error)
 	}{
 		{
 			name: "json",
 			args: []string{"test-controller", "--format", "json"},
 			want: expectedJSON,
-			decode: func(output string) (apiparams.ControllerInfo, error) {
-				var actual apiparams.ControllerInfo
+			decode: func(output string) (apiparams.ControllerDetails, error) {
+				var actual apiparams.ControllerDetails
 				err := json.Unmarshal([]byte(strings.TrimSpace(output)), &actual)
 				return actual, err
 			},
@@ -98,8 +98,8 @@ func TestShowControllerOutput(t *testing.T) {
 			name: "yaml",
 			args: []string{"test-controller", "--format", "yaml"},
 			want: expectedYAML,
-			decode: func(output string) (apiparams.ControllerInfo, error) {
-				var actual apiparams.ControllerInfo
+			decode: func(output string) (apiparams.ControllerDetails, error) {
+				var actual apiparams.ControllerDetails
 				err := yaml.Unmarshal([]byte(output), &actual)
 				return actual, err
 			},

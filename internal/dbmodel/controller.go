@@ -132,6 +132,23 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 	return ci
 }
 
+// ToAPIShowControllerInfo converts a controller entry to a JIMM API
+// ShowControllerInfo.
+func (c Controller) ToAPIShowControllerInfo() apiparams.ControllerDetails {
+	info := c.ToAPIControllerInfo()
+	return apiparams.ControllerDetails{
+		Name:          info.Name,
+		UUID:          info.UUID,
+		PublicAddress: info.PublicAddress,
+		APIAddresses:  info.APIAddresses,
+		CACertificate: info.CACertificate,
+		CloudTag:      info.CloudTag,
+		CloudRegion:   info.CloudRegion,
+		AgentVersion:  info.AgentVersion,
+		Status:        info.Status,
+	}
+}
+
 const (
 	// CloudRegionControllerPriorityDeployed is the priority given to the
 	// controller when deploying to a cloud region to which the controller
