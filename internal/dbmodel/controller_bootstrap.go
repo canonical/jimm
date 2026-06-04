@@ -24,8 +24,8 @@ type ControllerBootstrap struct {
 	JobID       sql.NullInt64 `gorm:"column:job_id;uniqueIndex"`
 }
 
-// ToAPIControllerInfo converts a pending bootstrap entry to controller info for list/show APIs.
-func (c ControllerBootstrap) ToAPIControllerInfo() apiparams.ControllerInfo {
+// ToControllerInfo converts a pending bootstrap entry to controller info for list-style APIs.
+func (c ControllerBootstrap) ToControllerInfo() apiparams.ControllerInfo {
 	ci := apiparams.ControllerInfo{
 		Name:        c.Name,
 		CloudRegion: c.CloudRegion,
@@ -37,4 +37,20 @@ func (c ControllerBootstrap) ToAPIControllerInfo() apiparams.ControllerInfo {
 		ci.CloudTag = names.NewCloudTag(c.CloudName).String()
 	}
 	return ci
+}
+
+// ToControllerDetails converts a pending bootstrap entry to controller info for show APIs.
+func (c ControllerBootstrap) ToControllerDetails() apiparams.ControllerDetails {
+	info := c.ToControllerInfo()
+	return apiparams.ControllerDetails{
+		Name:          info.Name,
+		UUID:          info.UUID,
+		PublicAddress: info.PublicAddress,
+		APIAddresses:  info.APIAddresses,
+		CACertificate: info.CACertificate,
+		CloudTag:      info.CloudTag,
+		CloudRegion:   info.CloudRegion,
+		AgentVersion:  info.AgentVersion,
+		Status:        info.Status,
+	}
 }

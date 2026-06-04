@@ -98,9 +98,9 @@ func (c *Controller) SetTag(t names.ControllerTag) {
 	c.UUID = t.Id()
 }
 
-// ToAPIControllerInfo converts a controller entry to a JIMM API
+// ToControllerInfo converts a controller entry to a JIMM API
 // ControllerInfo.
-func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
+func (c Controller) ToControllerInfo() apiparams.ControllerInfo {
 	var ci apiparams.ControllerInfo
 	ci.Name = c.Name
 	ci.UUID = c.UUID
@@ -130,6 +130,22 @@ func (c Controller) ToAPIControllerInfo() apiparams.ControllerInfo {
 		}
 	}
 	return ci
+}
+
+// ToControllerDetails returns a ControllerDetails struct for this controller.
+func (c Controller) ToControllerDetails() apiparams.ControllerDetails {
+	info := c.ToControllerInfo()
+	return apiparams.ControllerDetails{
+		Name:          info.Name,
+		UUID:          info.UUID,
+		PublicAddress: info.PublicAddress,
+		APIAddresses:  info.APIAddresses,
+		CACertificate: info.CACertificate,
+		CloudTag:      info.CloudTag,
+		CloudRegion:   info.CloudRegion,
+		AgentVersion:  info.AgentVersion,
+		Status:        info.Status,
+	}
 }
 
 const (

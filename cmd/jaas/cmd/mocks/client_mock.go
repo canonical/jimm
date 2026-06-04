@@ -1630,10 +1630,10 @@ func (c *MockJIMMAPISetControllerDeprecatedCall) DoAndReturn(f func(*params.SetC
 }
 
 // ShowController mocks base method.
-func (m *MockJIMMAPI) ShowController(controllerName string) (*params.ControllerInfo, error) {
+func (m *MockJIMMAPI) ShowController(controllerName string) (*params.ControllerDetails, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ShowController", controllerName)
-	ret0, _ := ret[0].(*params.ControllerInfo)
+	ret0, _ := ret[0].(*params.ControllerDetails)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1651,19 +1651,19 @@ type MockJIMMAPIShowControllerCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockJIMMAPIShowControllerCall) Return(arg0 *params.ControllerInfo, arg1 error) *MockJIMMAPIShowControllerCall {
+func (c *MockJIMMAPIShowControllerCall) Return(arg0 *params.ControllerDetails, arg1 error) *MockJIMMAPIShowControllerCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockJIMMAPIShowControllerCall) Do(f func(string) (*params.ControllerInfo, error)) *MockJIMMAPIShowControllerCall {
+func (c *MockJIMMAPIShowControllerCall) Do(f func(string) (*params.ControllerDetails, error)) *MockJIMMAPIShowControllerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockJIMMAPIShowControllerCall) DoAndReturn(f func(string) (*params.ControllerInfo, error)) *MockJIMMAPIShowControllerCall {
+func (c *MockJIMMAPIShowControllerCall) DoAndReturn(f func(string) (*params.ControllerDetails, error)) *MockJIMMAPIShowControllerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

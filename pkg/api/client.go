@@ -374,9 +374,9 @@ func (c *Client) ListModels() ([]params.ModelControllerInfoListItem, error) {
 }
 
 // ShowController returns information about a controller or a pending bootstrap reservation.
-func (c *Client) ShowController(controllerName string) (*params.ControllerInfo, error) {
+func (c *Client) ShowController(controllerName string) (*params.ControllerDetails, error) {
 	req := params.ShowControllerRequest{ControllerName: controllerName}
-	var resp params.ControllerInfo
+	var resp params.ControllerDetails
 	err := c.caller.APICall("JIMM", 4, "", "ShowController", req, &resp)
 	return &resp, err
 }

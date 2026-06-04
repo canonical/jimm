@@ -170,7 +170,7 @@ func TestShowController(t *testing.T) {
 		controller    string
 		jujuManager   func(*qt.C) jujuapi.JujuManager
 		jobManager    func(*qt.C) jujuapi.JobManager
-		expectedInfo  apiparams.ControllerInfo
+		expectedInfo  apiparams.ControllerDetails
 		expectedError string
 	}{
 		{
@@ -192,7 +192,7 @@ func TestShowController(t *testing.T) {
 					},
 				}
 			},
-			expectedInfo: apiparams.ControllerInfo{
+			expectedInfo: apiparams.ControllerDetails{
 				Name:     "test-controller",
 				UUID:     "982b16d9-a945-4762-b684-fd4fd885aa11",
 				CloudTag: names.NewCloudTag("aws").String(),
@@ -253,7 +253,7 @@ func TestShowController(t *testing.T) {
 			jobManager: func(c *qt.C) jujuapi.JobManager {
 				return &mocks.JobManager{}
 			},
-			expectedInfo: apiparams.ControllerInfo{
+			expectedInfo: apiparams.ControllerDetails{
 				Name:     "test-controller",
 				UUID:     "982b16d9-a945-4762-b684-fd4fd885aa11",
 				CloudTag: names.NewCloudTag("aws").String(),
@@ -296,7 +296,7 @@ func TestShowController(t *testing.T) {
 					},
 				}
 			},
-			expectedInfo: apiparams.ControllerInfo{
+			expectedInfo: apiparams.ControllerDetails{
 				Name:        "bootstrapping-controller",
 				CloudTag:    names.NewCloudTag("aws").String(),
 				CloudRegion: "eu-west-1",
@@ -361,7 +361,7 @@ func TestShowController(t *testing.T) {
 					},
 				}
 			},
-			expectedInfo: apiparams.ControllerInfo{
+			expectedInfo: apiparams.ControllerDetails{
 				Name:        "bootstrapping-controller",
 				CloudTag:    names.NewCloudTag("aws").String(),
 				CloudRegion: "eu-west-1",

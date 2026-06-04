@@ -69,6 +69,20 @@ func assertControllerInfos(c *qt.C, actual []apiparams.ControllerInfo, expected 
 	), expected)
 
 	// Verify all configured addresses are present in the response
+	checkControllerInfoAddresses(actual, confs, c)
+}
+
+// assertControllerDetail verifies that the controller detail match expectations, including API addresses.
+func assertControllerDetail(c *qt.C, actual apiparams.ControllerDetails, expected apiparams.ControllerDetails, confs *jimmtest.ControllersConfig) {
+	c.Check(actual, qt.CmpEquals(
+		cmpopts.IgnoreFields(apiparams.ControllerDetails{}, "AgentVersion", "APIAddresses"),
+	), expected)
+
+	// Verify all configured addresses are present in the response
+	checkControllerDetailAddresses(actual, confs, c)
+}
+
+func checkControllerInfoAddresses(actual []apiparams.ControllerInfo, confs *jimmtest.ControllersConfig, c *qt.C) {
 	for _, ci := range actual {
 		for name, conf := range confs.Controllers {
 			if conf.UUID == ci.UUID {
@@ -80,6 +94,22 @@ func assertControllerInfos(c *qt.C, actual []apiparams.ControllerInfo, expected 
 						name, expectedAddr, ci.APIAddresses))
 				}
 			}
+		}
+	}
+}
+
+func checkControllerDetailAddresses(actual apiparams.ControllerDetails, confs *jimmtest.ControllersConfig, c *qt.C) {
+	for name, conf := range confs.Controllers {
+		if conf.UUID != actual.UUID {
+			continue
+		}
+
+		expectedAddrs := conf.ToAPIInfo().Addrs
+		for _, expectedAddr := range expectedAddrs {
+			found := slices.Contains(actual.APIAddresses, expectedAddr)
+			c.Assert(found, qt.Equals, true, qt.Commentf(
+				"controller %q: expected address %q not found in APIAddresses %v",
+				name, expectedAddr, actual.APIAddresses))
 		}
 	}
 }
@@ -195,7 +225,7 @@ func TestShowController(t *testing.T) {
 	s := jimmtest.SetupJimmWithControllers(c)
 
 	controllerName, conf := s.GetOneControllerConfig(c)
-	expectedController := apiparams.ControllerInfo{
+	expectedController := apiparams.ControllerDetails{
 		Name:          controllerName,
 		UUID:          conf.UUID,
 		APIAddresses:  conf.ToAPIInfo().Addrs,
@@ -213,7 +243,7 @@ func TestShowController(t *testing.T) {
 
 	ci, err := adminClient.ShowController(controllerName)
 	c.Assert(err, qt.IsNil)
-	assertControllerInfos(c, []apiparams.ControllerInfo{*ci}, []apiparams.ControllerInfo{expectedController}, s.GetControllersConfig(c))
+	assertControllerDetail(c, *ci, expectedController, s.GetControllersConfig(c))
 
 	bobConn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer bobConn.Close()
@@ -221,7 +251,7 @@ func TestShowController(t *testing.T) {
 
 	ci, err = bobClient.ShowController(controllerName)
 	c.Assert(err, qt.IsNil)
-	assertControllerInfos(c, []apiparams.ControllerInfo{*ci}, []apiparams.ControllerInfo{expectedController}, s.GetControllersConfig(c))
+	assertControllerDetail(c, *ci, expectedController, s.GetControllersConfig(c))
 
 	bootstrap := &dbmodel.ControllerBootstrap{
 		Name:        "bootstrapping-controller",
@@ -233,7 +263,7 @@ func TestShowController(t *testing.T) {
 
 	ci, err = adminClient.ShowController(bootstrap.Name)
 	c.Assert(err, qt.IsNil)
-	c.Check(*ci, qt.DeepEquals, apiparams.ControllerInfo{
+	c.Check(*ci, qt.DeepEquals, apiparams.ControllerDetails{
 		Name:        bootstrap.Name,
 		CloudTag:    names.NewCloudTag(jimmtest.TestE2ECloudName).String(),
 		CloudRegion: jimmtest.TestE2ECloudRegionName,
@@ -244,7 +274,7 @@ func TestShowController(t *testing.T) {
 
 	ci, err = bobClient.ShowController(bootstrap.Name)
 	c.Check(jujuparams.IsCodeNotFound(err), qt.Equals, true)
-	c.Check(*ci, qt.DeepEquals, apiparams.ControllerInfo{})
+	c.Check(*ci, qt.DeepEquals, apiparams.ControllerDetails{})
 }
 
 func TestAddControllerPublicAddressWithoutPort(t *testing.T) {
