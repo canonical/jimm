@@ -25,16 +25,45 @@ import (
 // requests according to the deployed OpenFGA instance configuration.
 const BATCH_SIZE_OPENFGA = 100
 
-// AddRelation checks user permission and add given relations tuples.
-// At the moment user is required be admin.
-func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
-
-	if !user.JimmAdmin {
-		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
+func (j *PermissionManager) authorizeRelationTargetAdmin(ctx context.Context, user *openfga.User, tuple openfga.Tuple) error {
+	if user.JimmAdmin {
+		return nil
 	}
+
+	switch tuple.Target.Kind {
+	case openfga.ControllerType, openfga.ModelType, openfga.ApplicationOfferType, openfga.CloudType:
+		allowed, err := j.authSvc.CheckRelation(ctx, openfga.Tuple{
+			Object:   ofganames.ConvertTag(user.ResourceTag()),
+			Relation: ofganames.AdministratorRelation,
+			Target:   tuple.Target,
+		}, false)
+		if err != nil {
+			return errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
+		}
+		if allowed {
+			return nil
+		}
+	case openfga.GroupType, openfga.RoleType:
+		// Membership changes for groups and roles are restricted to JIMM admins.
+	default:
+		// Unsupported relation-management targets are rejected for non-admins.
+	}
+
+	return errors.Codef(errors.CodeUnauthorized, "unauthorized")
+}
+
+// AddRelation checks user permission and adds the given relation tuples.
+// JIMM admins can update any relation, while resource administrators can update
+// relations on supported resource targets.
+func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
 	parsedTuples, err := j.parseTuples(ctx, tuples)
 	if err != nil {
 		return err
+	}
+	for _, tuple := range parsedTuples {
+		if err := j.authorizeRelationTargetAdmin(ctx, user, tuple); err != nil {
+			return err
+		}
 	}
 	for i := 0; i < len(parsedTuples); i += BATCH_SIZE_OPENFGA {
 		end := min(i+BATCH_SIZE_OPENFGA, len(parsedTuples))
@@ -49,16 +78,18 @@ func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User,
 	return nil
 }
 
-// RemoveRelation checks user permission and remove given relations tuples.
-// At the moment user is required be admin.
+// RemoveRelation checks user permission and removes the given relation tuples.
+// JIMM admins can update any relation, while resource administrators can update
+// relations on supported resource targets.
 func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.User, tuples []apiparams.RelationshipTuple) error {
-
-	if !user.JimmAdmin {
-		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
 	parsedTuples, err := j.parseTuples(ctx, tuples)
 	if err != nil {
 		return err
+	}
+	for _, tuple := range parsedTuples {
+		if err := j.authorizeRelationTargetAdmin(ctx, user, tuple); err != nil {
+			return err
+		}
 	}
 	for i := 0; i < len(parsedTuples); i += BATCH_SIZE_OPENFGA {
 		end := min(i+BATCH_SIZE_OPENFGA, len(parsedTuples))
@@ -73,8 +104,9 @@ func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 	return nil
 }
 
-// CheckRelation checks user permission and return true if the given tuple exists.
-// At the moment user is required be admin or checking its own relations.
+// CheckRelation checks user permission and returns true if the given tuple exists.
+// JIMM admins can inspect any relation, while non-admins can inspect their own
+// relations or relations on supported resources they administer.
 func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, trace bool) (_ bool, err error) {
 
 	allowed := false
@@ -83,9 +115,11 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 		return false, err
 	}
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == user.Name
-	// Admins can check any relation, non-admins can only check their own.
-	if !user.JimmAdmin && !userCheckingSelf {
-		return allowed, errors.Codef(errors.CodeUnauthorized, "unauthorized")
+	// Admins can check any relation, and non-admins can check their own or relations on resources they administer.
+	if !userCheckingSelf {
+		if err := j.authorizeRelationTargetAdmin(ctx, user, *parsedTuple); err != nil {
+			return allowed, err
+		}
 	}
 
 	allowed, err = j.authSvc.CheckRelation(ctx, *parsedTuple, trace)
