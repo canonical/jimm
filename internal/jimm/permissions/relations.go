@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/canonical/ofga"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -25,17 +26,17 @@ import (
 // requests according to the deployed OpenFGA instance configuration.
 const BATCH_SIZE_OPENFGA = 100
 
-func (j *PermissionManager) authorizeRelationTargetAdmin(ctx context.Context, user *openfga.User, tuple openfga.Tuple) error {
+func (j *PermissionManager) authorizeRelationTargetAdmin(ctx context.Context, user *openfga.User, target *ofga.Entity) error {
 	if user.JimmAdmin {
 		return nil
 	}
 
-	switch tuple.Target.Kind {
+	switch target.Kind {
 	case openfga.ControllerType, openfga.ModelType, openfga.ApplicationOfferType, openfga.CloudType:
 		allowed, err := j.authSvc.CheckRelation(ctx, openfga.Tuple{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: ofganames.AdministratorRelation,
-			Target:   tuple.Target,
+			Target:   target,
 		}, false)
 		if err != nil {
 			return errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
@@ -61,7 +62,7 @@ func (j *PermissionManager) AddRelation(ctx context.Context, user *openfga.User,
 		return err
 	}
 	for _, tuple := range parsedTuples {
-		if err := j.authorizeRelationTargetAdmin(ctx, user, tuple); err != nil {
+		if err := j.authorizeRelationTargetAdmin(ctx, user, tuple.Target); err != nil {
 			return err
 		}
 	}
@@ -87,7 +88,7 @@ func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 		return err
 	}
 	for _, tuple := range parsedTuples {
-		if err := j.authorizeRelationTargetAdmin(ctx, user, tuple); err != nil {
+		if err := j.authorizeRelationTargetAdmin(ctx, user, tuple.Target); err != nil {
 			return err
 		}
 	}
@@ -117,7 +118,7 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 	userCheckingSelf := parsedTuple.Object.Kind == openfga.UserType && parsedTuple.Object.ID == user.Name
 	// Admins can check any relation, and non-admins can check their own or relations on resources they administer.
 	if !userCheckingSelf {
-		if err := j.authorizeRelationTargetAdmin(ctx, user, *parsedTuple); err != nil {
+		if err := j.authorizeRelationTargetAdmin(ctx, user, parsedTuple.Target); err != nil {
 			return allowed, err
 		}
 	}
