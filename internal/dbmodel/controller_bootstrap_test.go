@@ -20,7 +20,7 @@ func TestControllerBootstrapToAPIControllerInfo(t *testing.T) {
 		Name:        "test-controller",
 		CloudName:   "test-cloud",
 		CloudRegion: "test-region",
-	}.ToAPIControllerInfo()
+	}.ToControllerInfo()
 
 	c.Check(ci, qt.DeepEquals, apiparams.ControllerInfo{
 		Name:        "test-controller",

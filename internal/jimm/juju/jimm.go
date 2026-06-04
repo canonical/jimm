@@ -231,7 +231,7 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 		return jujuparams.MigrationTargetInfo{}, 0, errors.New("missing target controller credentials")
 	}
 	// Should we verify controller can access the cloud where the model is currently hosted?
-	apiControllerInfo := dbController.ToAPIControllerInfo()
+	apiControllerInfo := dbController.ToControllerInfo()
 	targetInfo := jujuparams.MigrationTargetInfo{
 		ControllerAlias: dbController.Name, // This value will be returned to us on successful migration.
 		ControllerTag:   dbController.ResourceTag().String(),

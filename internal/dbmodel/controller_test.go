@@ -166,7 +166,7 @@ func TestToAPIControllerInfo(t *testing.T) {
 	}}
 	ctl.AgentVersion = "1.2.3"
 
-	ci := ctl.ToAPIControllerInfo()
+	ci := ctl.ToControllerInfo()
 	c.Check(ci, qt.DeepEquals, apiparams.ControllerInfo{
 		Name:          "test-controller",
 		UUID:          "00000000-0000-0000-0000-0000-0000000000001",
