@@ -270,6 +270,24 @@ func start(ctx context.Context, s *service.Service) error {
 		HostKey:                  []byte(hostKeyRaw),
 		MaxConcurrentConnections: maxConcurrentConnections,
 	}, jimmsvc.JIMM().SSHManager)
+	if err != nil {
+		return err
+	}
+
+	err = river.MigrateRiver(ctx, jimmsvc.JIMM().Database)
+	if err != nil {
+		return err
+	}
+	riverClient, err := river.StartWorkers(
+		ctx,
+		jimmsvc.JIMM().Database,
+		jimmsvc.JIMM().OpenFGAClient,
+		jimmsvc.JIMM().UpgradeManager,
+		jimmsvc.JIMM().BootstrapManager,
+	)
+	if err != nil {
+		return err
+	}
 
 	s.OnShutdown(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -295,22 +313,14 @@ func start(ctx context.Context, s *service.Service) error {
 			zapctx.Error(ctx, "failed to shutdown SSH server gracefully", zap.Error(err))
 		}
 
+		zapctx.Warn(ctx, "River client shutdown triggered")
+		if err := riverClient.StopAndCancel(ctx); err != nil {
+			zapctx.Error(ctx, "failed to shutdown River client", zap.Error(err))
+		}
+
 		jimmsvc.Cleanup()
 	})
-	err = river.MigrateRiver(ctx, jimmsvc.JIMM().Database)
-	if err != nil {
-		return err
-	}
-	err = river.StartWorkers(
-		ctx,
-		jimmsvc.JIMM().Database,
-		jimmsvc.JIMM().OpenFGAClient,
-		jimmsvc.JIMM().UpgradeManager,
-		jimmsvc.JIMM().BootstrapManager,
-	)
-	if err != nil {
-		return err
-	}
+
 	zapctx.Info(ctx, "Registered all River workers")
 	s.Go(httpsrv.ListenAndServe)
 	zapctx.Info(ctx, "Started JIMM HTTP server")

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/version/v2"
@@ -175,9 +176,15 @@ func TestUpgradeToWorker_MigrationFails(t *testing.T) {
 
 	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateDiscarded)
-	// Ensure we capture the last error only from the migrate job, and that it is surfaced to the upgrade to job.
+	// The supervisor should surface a wrapped error mentioning the stage
 	upgradeToJobFinalError := row.Errors[len(row.Errors)-1].Error
-	c.Assert(upgradeToJobFinalError, qt.Equals, "unexpected-error-3")
+	c.Assert(upgradeToJobFinalError, qt.Equals, "migration failed: unexpected-error-3")
+
+	migrationJobs, err := riverClient.JobList(ctx, river.NewJobListParams().Kinds(migrationWorkerArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationJobs.Jobs, qt.HasLen, 1)
+	migrationJobFinalError := migrationJobs.Jobs[0].Errors[len(migrationJobs.Jobs[0].Errors)-1].Error
+	c.Assert(migrationJobFinalError, qt.Equals, "unexpected-error-3")
 }
 
 func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
@@ -223,9 +230,15 @@ func TestUpgradeToWorker_UpgradeFails(t *testing.T) {
 
 	row := waitForFinalisedJob(c, ctx, sub, insRes.Job.ID)
 	c.Assert(row.State, qt.Equals, rivertype.JobStateDiscarded)
-	// Ensure we capture the last error only from the migrate job, and that it is surfaced to the upgrade to job.
+	// The supervisor should surface a wrapped error mentioning the stage
 	upgradeToJobFinalError := row.Errors[len(row.Errors)-1].Error
-	c.Assert(upgradeToJobFinalError, qt.Equals, "unexpected-error-3")
+	c.Assert(upgradeToJobFinalError, qt.Equals, "upgrade failed: unexpected-error-3")
+
+	upgradeJobs, err := riverClient.JobList(ctx, river.NewJobListParams().Kinds(upgradeWorkerArgs{}.Kind()).First(10))
+	c.Assert(err, qt.IsNil)
+	c.Assert(upgradeJobs.Jobs, qt.HasLen, 1)
+	upgradeJobFinalError := upgradeJobs.Jobs[0].Errors[len(upgradeJobs.Jobs[0].Errors)-1].Error
+	c.Assert(upgradeJobFinalError, qt.Equals, "unexpected-error-3")
 }
 
 // This test is particularly valuable because it ensures we're checking the jobs finalised state AND event kind.
@@ -560,6 +573,51 @@ func TestUpgradeToWorker_EnsureCancellingSupervisorCancelsSpawnedMigrateJob(t *t
 	// Check the nested migrate job has finalised successfully because the context
 	// was cancelled for the root job.
 	c.Assert(listRes.Jobs[0].FinalizedAt, qt.IsNotNil)
+}
+
+func TestUpgradeToWorker_StopAndCancelDoesNotLeaveSupervisorRunning(t *testing.T) {
+	c := qt.New(t)
+	ctx := c.Context()
+
+	awaitStarted := make(chan struct{})
+
+	testDeps := setupIntegrationTest(
+		c,
+		setupWorkerParams{
+			migrateRetryCount: 1,
+			upgradeRetryCount: 1,
+			awaitFunc: func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error {
+				close(awaitStarted)
+				<-ctx.Done()
+				return ctx.Err()
+			},
+		},
+	)
+
+	riverClient := testDeps.riverClient
+	username := testDeps.identity
+
+	insRes, err := riverClient.Insert(ctx, rivertypes.UpgradeToArgs{
+		ModelUUID:            "model-uuid",
+		TargetVersion:        version.MustParse("2.0.0"),
+		Username:             username,
+		TargetControllerName: "target-controller",
+	}, nil)
+	c.Assert(err, qt.IsNil)
+
+	<-awaitStarted
+	waitForJobState(c, ctx, riverClient, insRes.Job.ID, rivertype.JobStateRunning, rivertypes.UpgradeToJobKind)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	c.Assert(riverClient.StopAndCancel(shutdownCtx), qt.IsNil)
+
+	rootJob, err := riverClient.JobGet(ctx, insRes.Job.ID)
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootJob.State, qt.Not(qt.Equals), rivertype.JobStateRunning)
+
+	output := getUpgradeToSupervisorOutput(c, ctx, riverClient, insRes.Job.ID)
+	c.Assert(output.MigrationJobID, qt.Not(qt.IsNil))
 }
 
 // The aim of this test is to ensure that only 1 migrate job is inserted, even after a crash.

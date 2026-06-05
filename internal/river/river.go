@@ -4,6 +4,7 @@ package river
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
@@ -48,13 +49,14 @@ type Store interface {
 
 // StartWorkers sets up and starts the river workers.
 // Start() is a non-blocking call; it starts a background goroutine to process jobs, and maintainance tasks.
+// The started River client is returned so callers can wait for shutdown to complete.
 func StartWorkers(
 	ctx context.Context,
 	db *db.Database,
 	openfgaClient *openfga.OFGAClient,
 	upgradeManager UpgradeManager,
 	bootstrapManager BootstrapManager,
-) error {
+) (*river.Client[*sql.Tx], error) {
 	workerParams := workerParams{
 		migrateRetryCount: defaultMigrateRetries,
 		upgradeRetryCount: defaultUpgradeRetries,
@@ -66,12 +68,12 @@ func StartWorkers(
 	}
 	workers, err := newWorkers(workerParams)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sqlDb, err := db.SqlDB()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	riverClient, err := river.NewClient(riverdatabasesql.New(sqlDb), &river.Config{
@@ -79,12 +81,16 @@ func StartWorkers(
 			river.QueueDefault: {MaxWorkers: defaultQueueMaxWorkers},
 		},
 		Workers:      workers,
+		RetryPolicy:  newUpgradeFlowRetryPolicy(),
 		ErrorHandler: &errorHandler{},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return riverClient.Start(ctx)
+	if err := riverClient.Start(ctx); err != nil {
+		return nil, err
+	}
+	return riverClient, nil
 }
 
 type workerParams struct {

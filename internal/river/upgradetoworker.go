@@ -19,6 +19,25 @@ import (
 // awaitCompletionFunc is a function that waits for a job to finalise.
 type awaitCompletionFunc func(ctx context.Context, result *rivertype.JobInsertResult, eventCh <-chan *river.Event) error
 
+type childStageError struct {
+	stage string
+	err   error
+}
+
+// Error implements the error interface.
+func (e childStageError) Error() string {
+	return e.stage + " failed: " + e.err.Error()
+}
+
+// wrapChildStageFailure wraps an error from a child job stage,
+// annotating it with the stage that failed.
+func wrapChildStageFailure(stage string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return childStageError{stage: stage, err: err}
+}
+
 func newUpgradeToWorker(migrateRetries int, upgradeRetries int, awaitFunc awaitCompletionFunc) *upgradeToWorker {
 	return &upgradeToWorker{
 		migrateRetries:  migrateRetries,
@@ -91,7 +110,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.Up
 	}
 
 	if err := w.awaitCompletion(ctx, migrateInsertResponse, eventCh); err != nil {
-		return err
+		return wrapChildStageFailure("migration", err)
 	}
 
 	upgradeInsertResponse, err := client.Insert(
@@ -114,7 +133,7 @@ func (w *upgradeToWorker) Work(ctx context.Context, job *river.Job[rivertypes.Up
 	}
 
 	if err := w.awaitCompletion(ctx, upgradeInsertResponse, eventCh); err != nil {
-		return err
+		return wrapChildStageFailure("upgrade", err)
 	}
 
 	// All done.

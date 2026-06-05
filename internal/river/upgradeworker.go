@@ -31,8 +31,10 @@ type upgradeWorkerArgs struct {
 	TargetVersion version.Number `json:"target-version"`
 }
 
+const upgradeWorkerJobKind = "upgrade-model"
+
 // Kind returns the kind of the job.
-func (upgradeWorkerArgs) Kind() string { return "upgrade-model" }
+func (upgradeWorkerArgs) Kind() string { return upgradeWorkerJobKind }
 
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
 //

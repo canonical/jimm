@@ -42,8 +42,10 @@ type migrationWorkerArgs struct {
 	TargetControllerName string `json:"target_controller_name"`
 }
 
+const migrationWorkerJobKind = "migrate-model"
+
 // Kind implements the [river.JobArgs] interface.
-func (migrationWorkerArgs) Kind() string { return "migrate-model" }
+func (migrationWorkerArgs) Kind() string { return migrationWorkerJobKind }
 
 // InsertOpts implements the [river.JobArgsWithInsertOpts] interface.
 //

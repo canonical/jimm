@@ -24,7 +24,7 @@ and upgrades the models to the controller's version.
 `
 	upgradeToExample = `
     juju upgrade-to myController 2cb433a6-04eb-4ec4-9567-90426d20a004
-	juju upgrade-to myController 2cb433a6-04eb-4ec4-9567-90426d20a004 83cf3d62-ab16-4cb2-8e2f-df111fca1a32
+    juju upgrade-to myController 2cb433a6-04eb-4ec4-9567-90426d20a004 83cf3d62-ab16-4cb2-8e2f-df111fca1a32
 `
 )
 
