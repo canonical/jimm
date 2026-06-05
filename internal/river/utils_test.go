@@ -41,9 +41,7 @@ func setupTestDB(c *qt.C) (*db.Database, *sql.DB) {
 }
 
 type setupWorkerParams struct {
-	migrateRetryCount int
-	upgradeRetryCount int
-	awaitFunc         awaitCompletionFunc
+	upgradeToNextRetry upgradeToRetryFunc
 }
 
 type testDeps struct {
@@ -57,7 +55,7 @@ type testDeps struct {
 
 func setupIntegrationTest(
 	c *qt.C,
-	p setupWorkerParams,
+	params setupWorkerParams,
 ) testDeps {
 	ctrl := gomock.NewController(c)
 	c.Cleanup(ctrl.Finish)
@@ -67,21 +65,24 @@ func setupIntegrationTest(
 	upgradeManager := NewMockUpgradeManager(ctrl)
 	bootstrapManager := NewMockBootstrapManager(ctrl)
 
-	// Prepare identity needed by migrationWorker.
+	// Prepare identity needed by the upgrade-to migration stage.
 	u, err := dbmodel.NewIdentity("ash@catchum.com")
 	c.Assert(err, qt.IsNil)
 	err = database.GetIdentity(c.Context(), u)
 	c.Assert(err, qt.IsNil)
 
+	upgradeToNextRetry := params.upgradeToNextRetry
+	if upgradeToNextRetry == nil {
+		upgradeToNextRetry = testUpgradeToNextRetry
+	}
+
 	openfgaClient := &openfga.OFGAClient{}
 	workerParams := workerParams{
-		migrateRetryCount: p.migrateRetryCount,
-		upgradeRetryCount: p.upgradeRetryCount,
-		awaitFunc:         p.awaitFunc,
-		openfgaClient:     openfgaClient,
-		store:             database,
-		upgradeManager:    upgradeManager,
-		bootstrapManager:  bootstrapManager,
+		openfgaClient:    openfgaClient,
+		store:            database,
+		upgradeManager:   upgradeManager,
+		bootstrapManager: bootstrapManager,
+		upgradeToRetry:   upgradeToNextRetry,
 	}
 	workers, err := newWorkers(workerParams)
 	c.Assert(err, qt.IsNil)
@@ -113,6 +114,10 @@ func setupIntegrationTest(
 }
 
 type testRetryPolicy struct{}
+
+func testUpgradeToNextRetry(*river.Job[rivertypes.UpgradeToArgs]) time.Time {
+	return time.Now().Add(1 * time.Millisecond)
+}
 
 // NextRetry implements the [river.ClientRetryPolicy] interface.
 // It ensures retries happen quickly during tests.
@@ -157,11 +162,11 @@ func waitForJobState(c *qt.C, ctx context.Context, riverClient *river.Client[*sq
 	}
 }
 
-func getUpgradeToSupervisorOutput(c *qt.C, ctx context.Context, riverClient *river.Client[*sql.Tx], jobID int64) rivertypes.UpgradeToSupervisorOutput {
+func getUpgradeToJobOutput(c *qt.C, ctx context.Context, riverClient *river.Client[*sql.Tx], jobID int64) rivertypes.UpgradeToOutput {
 	job, err := riverClient.JobGet(ctx, jobID)
 	c.Assert(err, qt.IsNil)
 
-	var output rivertypes.UpgradeToSupervisorOutput
+	var output rivertypes.UpgradeToOutput
 	if len(job.Output()) == 0 {
 		return output
 	}

@@ -115,7 +115,7 @@ func (j *JobManager) GetActiveBootstrapStatusForController(ctx context.Context, 
 }
 
 // GetUpgradeToStatusForModel returns the status of the current or most recent
-// finalized upgrade-to supervisor job for the specified model.
+// finalized upgrade-to job for the specified model.
 func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
 	rootJob, err := j.findUpgradeToRootJob(ctx, modelUUID)
 	if err != nil {
@@ -125,38 +125,18 @@ func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID s
 		return nil, nil
 	}
 
-	status := &apiparams.UpgradeToJobStatus{
-		Root: toJobDetail(rootJob),
-	}
-
-	if len(rootJob.Output()) == 0 {
-		return status, nil
-	}
-
-	var output rivertypes.UpgradeToSupervisorOutput
-	if err := json.Unmarshal(rootJob.Output(), &output); err != nil {
-		return nil, fmt.Errorf("failed to decode upgrade-to supervisor output: %w", err)
-	}
-
-	if output.MigrationJobID != nil {
-		migrationJob, err := j.jobQuerier.GetJobInfo(ctx, *output.MigrationJobID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get migration job info: %w", err)
+	var output rivertypes.UpgradeToOutput
+	rawOutput := rootJob.Output()
+	if len(rawOutput) != 0 {
+		if err := json.Unmarshal(rawOutput, &output); err != nil {
+			return nil, fmt.Errorf("failed to decode upgrade-to output: %w", err)
 		}
-		migration := toJobDetail(migrationJob)
-		status.Migration = &migration
 	}
 
-	if output.UpgradeJobID != nil {
-		upgradeJob, err := j.jobQuerier.GetJobInfo(ctx, *output.UpgradeJobID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get upgrade job info: %w", err)
-		}
-		upgrade := toJobDetail(upgradeJob)
-		status.Upgrade = &upgrade
-	}
-
-	return status, nil
+	return &apiparams.UpgradeToJobStatus{
+		Detail: toJobDetail(rootJob),
+		Info:   output.Info,
+	}, nil
 }
 
 // ListUpgradeToJobsForModels returns a lightweight per-model status for the most

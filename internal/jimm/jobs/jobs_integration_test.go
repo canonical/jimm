@@ -299,19 +299,13 @@ func TestListJobs_FilterByKind(t *testing.T) {
 	c.Assert(failureCount, qt.Equals, 2, qt.Commentf("Expected 2 failure jobs, got %d", failureCount))
 }
 
-func TestGetUpgradeToStatusForModel_HydratesChildJobs(t *testing.T) {
+func TestGetUpgradeToStatusForModel_UsesOutputInfo(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
 	jobManager, client := setupJobsIntegrationTest(c)
 	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
-
-	migrationRes, err := client.Insert(ctx, successJobArgs{Name: "migration"}, nil)
-	c.Assert(err, qt.IsNil)
-	upgradeRes, err := client.Insert(ctx, failureJobArgs{Name: "upgrade"}, nil)
-	c.Assert(err, qt.IsNil)
-
-	waitForJobs(c, client, 2, defaultTestTimeout)
+	info := "Upgrading model to version 4.0.0"
 
 	metadata, err := json.Marshal(rivertypes.JobModelUUIDMetadata{ModelUUID: modelUUID})
 	c.Assert(err, qt.IsNil)
@@ -322,28 +316,21 @@ func TestGetUpgradeToStatusForModel_HydratesChildJobs(t *testing.T) {
 	}, &river.InsertOpts{Metadata: metadata, Queue: "inactive"})
 	c.Assert(err, qt.IsNil)
 
-	_, err = client.JobUpdate(ctx, rootRes.Job.ID, &river.JobUpdateParams{Output: rivertypes.UpgradeToSupervisorOutput{
-		ModelUUID:            modelUUID,
-		TargetControllerName: "target-controller",
-		MigrationJobID:       &migrationRes.Job.ID,
-		UpgradeJobID:         &upgradeRes.Job.ID,
-		UpdatedAt:            time.Now().UTC(),
-	}})
+	_, err = client.JobUpdate(ctx, rootRes.Job.ID, &river.JobUpdateParams{
+		Output: rivertypes.UpgradeToOutput{Info: info},
+	})
 	c.Assert(err, qt.IsNil)
 
 	status, err := jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(status, qt.IsNotNil)
-	c.Assert(status.Root.State, qt.Equals, string(rootRes.Job.State))
-	c.Assert(status.Migration, qt.IsNotNil)
-	c.Assert(status.Migration.State, qt.Equals, string(rivertype.JobStateCompleted))
-	c.Assert(status.Upgrade, qt.IsNotNil)
-	c.Assert(status.Upgrade.State, qt.Equals, string(rivertype.JobStateCancelled))
-	c.Assert(status.Upgrade.Errors, qt.HasLen, 1)
-	c.Assert(status.Upgrade.Errors[0].Error, qt.Not(qt.Equals), "")
+	c.Assert(status.Detail.State, qt.Equals, string(rootRes.Job.State))
+	c.Assert(status.Detail.Attempt, qt.Equals, rootRes.Job.Attempt)
+	c.Assert(status.Detail.MaxAttempts, qt.Equals, rootRes.Job.MaxAttempts)
+	c.Assert(status.Info, qt.Equals, info)
 }
 
-func TestGetUpgradeToStatusForModel_InvalidSupervisorOutput(t *testing.T) {
+func TestGetUpgradeToStatusForModel_InvalidOutput(t *testing.T) {
 	c := qt.New(t)
 	ctx := c.Context()
 
@@ -359,11 +346,15 @@ func TestGetUpgradeToStatusForModel_InvalidSupervisorOutput(t *testing.T) {
 	}, &river.InsertOpts{Metadata: metadata, Queue: "inactive"})
 	c.Assert(err, qt.IsNil)
 
-	_, err = client.JobUpdate(ctx, rootRes.Job.ID, &river.JobUpdateParams{Output: "not-a-supervisor-output-object"})
+	_, err = client.JobUpdate(ctx, rootRes.Job.ID, &river.JobUpdateParams{
+		Output: map[string]any{
+			"info": map[string]any{"detail": "wrong-shape"},
+		},
+	})
 	c.Assert(err, qt.IsNil)
 
 	status, err := jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
-	c.Assert(err, qt.ErrorMatches, "failed to decode upgrade-to supervisor output: .*")
+	c.Assert(err, qt.ErrorMatches, "failed to decode upgrade-to output: .*")
 	c.Assert(status, qt.IsNil)
 }
 
@@ -395,9 +386,9 @@ func TestGetUpgradeToStatusForModel_UsesLatestFinalizedRoot(t *testing.T) {
 	status, err := jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(status, qt.IsNotNil)
-	c.Assert(status.Root.State, qt.Equals, string(rivertype.JobStateDiscarded))
-	c.Assert(status.Root.Errors, qt.HasLen, 1)
-	c.Assert(status.Root.Errors[0].Error, qt.Equals, "discarded upgrade root for discard-second")
+	c.Assert(status.Detail.State, qt.Equals, string(rivertype.JobStateDiscarded))
+	c.Assert(status.Detail.Errors, qt.HasLen, 1)
+	c.Assert(status.Detail.Errors[0].Error, qt.Equals, "discarded upgrade root for discard-second")
 
 	_, err = client.Insert(ctx, rivertypes.UpgradeToArgs{
 		ModelUUID:            modelUUID,
@@ -410,8 +401,8 @@ func TestGetUpgradeToStatusForModel_UsesLatestFinalizedRoot(t *testing.T) {
 	status, err = jobManager.GetUpgradeToStatusForModel(ctx, modelUUID)
 	c.Assert(err, qt.IsNil)
 	c.Assert(status, qt.IsNotNil)
-	c.Assert(status.Root.State, qt.Equals, string(rivertype.JobStateCompleted))
-	c.Assert(status.Root.Errors, qt.HasLen, 0)
+	c.Assert(status.Detail.State, qt.Equals, string(rivertype.JobStateCompleted))
+	c.Assert(status.Detail.Errors, qt.HasLen, 0)
 }
 
 func TestListUpgradeToJobsForModels_MultipleModels(t *testing.T) {
