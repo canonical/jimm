@@ -19,6 +19,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
+const localCharmTestUser = "bob@canonical.com"
+
 func TestLocalCharmDeploy(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
@@ -27,7 +29,7 @@ func TestLocalCharmDeploy(t *testing.T) {
 	conn := s.Open(c, &api.Info{
 		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
-	}, s.AdminUser.Name, nil)
+	}, localCharmTestUser, nil)
 
 	client, err := charms.NewLocalCharmClient(conn)
 	c.Assert(err, qt.IsNil)
@@ -50,7 +52,7 @@ func TestResourceEndpoint(t *testing.T) {
 	conn := s.Open(c, &api.Info{
 		ModelTag:  model.ResourceTag(),
 		SkipLogin: false,
-	}, s.AdminUser.Name, nil)
+	}, localCharmTestUser, nil)
 
 	charmClient, err := charms.NewLocalCharmClient(conn)
 	c.Assert(err, qt.IsNil)

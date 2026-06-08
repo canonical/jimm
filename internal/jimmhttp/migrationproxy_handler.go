@@ -90,9 +90,10 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
+	// Mint a superuser token since the user is already authorized as a JIMM admin.
 	mt := names.NewModelTag(modelUUID)
 	ct := names.NewControllerTag(controllerDetails.ControllerUUID)
-	jwt, err := hph.loginTokenProvider.NewLoginToken(ctx, mt, ct, user)
+	jwt, err := hph.loginTokenProvider.NewSuperuserLoginToken(ctx, mt, ct, user)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate login token")
 		return

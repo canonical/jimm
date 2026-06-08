@@ -46,6 +46,18 @@ func (f *Factory) NewLoginToken(ctx context.Context, modelTag names.ModelTag, co
 	return generator.MakeLoginToken(ctx, user)
 }
 
+// NewSuperuserLoginToken creates a login token for the provided user with controller superuser and model admin permissions.
+//
+// NB: Avoid using method and prefer NewLoginToken to mint a token with the user's real perwmissions.
+//
+// This is only used as a fallback for avoiding a bug in Juju 3.6.23 and below where Juju does not check the model admin
+// permission for a JWT.
+func (f *Factory) NewSuperuserLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error) {
+	generator := f.NewLoginGenerator()
+	generator.SetTags(modelTag, controllerTag)
+	return generator.makeSuperuserToken(ctx, user)
+}
+
 // NewSSHGenerator returns a new token generator for Juju SSH connections.
 // The SSHToken generator is not stateful and can be re-used across
 // multiple connections.

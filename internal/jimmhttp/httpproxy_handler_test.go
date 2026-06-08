@@ -57,7 +57,7 @@ func TestHTTPProxyHandler(t *testing.T) {
 			}, nil
 		},
 	}
-	loginTokens := loginTokenProvider{NewLoginToken_: func(ctx context.Context, gotMT names.ModelTag, gotCT names.ControllerTag, gotU *openfga.User) ([]byte, error) {
+	loginTokens := loginTokenProvider{NewSuperuserLoginToken_: func(ctx context.Context, gotMT names.ModelTag, gotCT names.ControllerTag, gotU *openfga.User) ([]byte, error) {
 		callCount++
 		gotModelTag = gotMT
 		gotControllerTag = gotCT
@@ -124,9 +124,9 @@ func TestHTTPProxyHandler(t *testing.T) {
 }
 
 type loginTokenProvider struct {
-	NewLoginToken_ func(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error)
+	NewSuperuserLoginToken_ func(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error)
 }
 
-func (p loginTokenProvider) NewLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error) {
-	return p.NewLoginToken_(ctx, modelTag, controllerTag, user)
+func (p loginTokenProvider) NewSuperuserLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error) {
+	return p.NewSuperuserLoginToken_(ctx, modelTag, controllerTag, user)
 }
