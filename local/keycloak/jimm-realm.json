@@ -32,6 +32,19 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "jimm_test",
+      "email": "jimm_test@canonical.com",
+      "emailVerified": true,
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
     }
   ],
   "clients": [
@@ -70,6 +83,7 @@
         "*"
       ],
       "attributes": {
+        "login_theme": "base",
         "oauth2.device.authorization.grant.enabled": "true"
       }
     }

@@ -14,6 +14,8 @@ The Keycloak admin account is not part of the realm import. It is created by the
 
 `jimm-test` is treated as a JIMM admin because `docker-compose.common.yaml` sets `JIMM_ADMINS=jimm-test@canonical.com`.
 
+There is also a test-only user, `jimm_test` / `password`, kept in the realm for unsafe-email login coverage in the e2e test suite.
+
 ## Log in as the Keycloak admin user
 
 1. Start the local environment with `make dev-env` or `docker compose up -d keycloak`.

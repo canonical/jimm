@@ -351,10 +351,10 @@ func runBrowserLogin(db *db.Database, sessionStore sessions.Store, username, pas
 	}
 
 	if string(b) != dashboardResponse {
-		return cookieString, s, errors.New("dashboard response not equal")
+		return cookieString, s, errors.New("unexpected response body: " + string(b))
 	}
 	if loginResp.StatusCode != http.StatusOK {
-		return cookieString, s, errors.New("status code not ok")
+		return cookieString, s, errors.New("status code not ok: " + strconv.Itoa(loginResp.StatusCode))
 	}
 
 	loginResp.Body.Close()
