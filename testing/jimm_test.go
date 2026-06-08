@@ -5,6 +5,7 @@ package testing
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"testing"
@@ -18,12 +19,15 @@ import (
 	"github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	"github.com/canonical/jimm/v3/internal/rivertypes"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
@@ -1296,6 +1300,103 @@ func TestModelControllerInfo(t *testing.T) {
 		ModelUUID:      model.UUID.String,
 		ControllerName: model.Controller.Name,
 		ControllerUUID: model.Controller.UUID,
+	})
+}
+
+type upgradeToStatusTestWorker struct {
+	river.WorkerDefaults[rivertypes.UpgradeToArgs]
+}
+
+func (w *upgradeToStatusTestWorker) Work(ctx context.Context, job *river.Job[rivertypes.UpgradeToArgs]) error {
+	return nil
+}
+
+func insertInactiveUpgradeToJob(c *qt.C, s jimmtest.JimmWithControllers, modelUUID string, info string) *apiparams.UpgradeToJobStatus {
+	sqlDB, err := s.JIMM.Database.SqlDB()
+	c.Assert(err, qt.IsNil)
+
+	workers := river.NewWorkers()
+	err = river.AddWorkerSafely(workers, &upgradeToStatusTestWorker{})
+	c.Assert(err, qt.IsNil)
+
+	riverClient, err := river.NewClient(riverdatabasesql.New(sqlDB), &river.Config{
+		TestOnly: true,
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 1},
+		},
+		Workers: workers,
+	})
+	c.Assert(err, qt.IsNil)
+	c.Assert(riverClient.Start(c.Context()), qt.IsNil)
+	c.Cleanup(func() {
+		c.Check(riverClient.Stop(context.Background()), qt.IsNil)
+	})
+
+	metadata, err := json.Marshal(rivertypes.JobModelUUIDMetadata{ModelUUID: modelUUID})
+	c.Assert(err, qt.IsNil)
+
+	rootRes, err := riverClient.Insert(c.Context(), rivertypes.UpgradeToArgs{
+		ModelUUID:            modelUUID,
+		Username:             "alice@canonical.com",
+		TargetControllerName: "target-controller",
+	}, &river.InsertOpts{Metadata: metadata, Queue: "inactive"})
+	c.Assert(err, qt.IsNil)
+
+	_, err = riverClient.JobUpdate(c.Context(), rootRes.Job.ID, &river.JobUpdateParams{
+		Output: rivertypes.UpgradeToOutput{Info: info},
+	})
+	c.Assert(err, qt.IsNil)
+
+	job, err := riverClient.JobGet(c.Context(), rootRes.Job.ID)
+	c.Assert(err, qt.IsNil)
+
+	return &apiparams.UpgradeToJobStatus{
+		Detail: apiparams.JobDetail{
+			State:       string(job.State),
+			Attempt:     job.Attempt,
+			MaxAttempts: job.MaxAttempts,
+			AttemptedAt: job.AttemptedAt,
+			FinalizedAt: job.FinalizedAt,
+		},
+		Info: info,
+	}
+}
+
+func TestModelControllerInfo_HydratesUpgradeToStatus(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+
+	expectedUpgradeToStatus := insertInactiveUpgradeToJob(
+		c,
+		s,
+		model.UUID.String,
+		"Upgrading model to version 4.0.0",
+	)
+
+	conn := s.Open(c, nil, "alice@canonical.com", nil)
+	defer conn.Close()
+
+	client := api.NewClient(conn)
+
+	modelControllerInfo, err := client.ModelControllerInfo(model.UUID.String)
+	c.Assert(err, qt.IsNil)
+	c.Assert(modelControllerInfo, qt.DeepEquals, &apiparams.ModelControllerInfo{
+		ModelName:          model.Name,
+		ModelUUID:          model.UUID.String,
+		ControllerName:     model.Controller.Name,
+		ControllerUUID:     model.Controller.UUID,
+		UpgradeToJobStatus: expectedUpgradeToStatus,
+	})
+
+	modelControllerInfo, err = client.ModelControllerInfo(fmt.Sprintf("%s/%s", model.OwnerIdentityName, model.Name))
+	c.Assert(err, qt.IsNil)
+	c.Assert(modelControllerInfo, qt.DeepEquals, &apiparams.ModelControllerInfo{
+		ModelName:          model.Name,
+		ModelUUID:          model.UUID.String,
+		ControllerName:     model.Controller.Name,
+		ControllerUUID:     model.Controller.UUID,
+		UpgradeToJobStatus: expectedUpgradeToStatus,
 	})
 }
 
