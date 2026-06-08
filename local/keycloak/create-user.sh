@@ -14,21 +14,20 @@ email="${3:-"${username}@canonical.com"}"
 access_token=$(curl -k \
     -X POST \
     http://localhost:8082/realms/master/protocol/openid-connect/token \
-    --user admin-cli:DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh \
     -H 'content-type: application/x-www-form-urlencoded' \
-    -d "username=jimm&password=jimm&grant_type=password" \
+    -d "client_id=admin-cli" \
+    -d "username=jimm" \
+    -d "password=jimm" \
+    -d "grant_type=password" \
     2>/dev/null \
     | jq --raw-output '.access_token')
-
-echo "Access token for admin-cli client:"
-echo "$access_token"
 
 curl -k \
     -X POST \
     http://localhost:8082/admin/realms/jimm/users \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $access_token" \
-    --data "{ \"username\": \"$username\", \"email\": \"$email\", \"emailVerified\":true, \"enabled\": true, \"realmRoles\": [ \"user\", \"offline_access\" ] }" \
+    --data "{ \"username\": \"$username\", \"email\": \"$email\", \"emailVerified\":true, \"enabled\": true }" \
     2>/dev/null
 
 user_id="$(curl -k \
