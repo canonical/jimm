@@ -117,16 +117,16 @@ func (j *JobManager) GetActiveBootstrapStatusForController(ctx context.Context, 
 // GetUpgradeToStatusForModel returns the status of the current or most recent
 // finalized upgrade-to job for the specified model.
 func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*apiparams.UpgradeToJobStatus, error) {
-	rootJob, err := j.findUpgradeToRootJob(ctx, modelUUID)
+	job, err := j.findUpgradeToJob(ctx, modelUUID)
 	if err != nil {
 		return nil, err
 	}
-	if rootJob == nil {
+	if job == nil {
 		return nil, nil
 	}
 
 	var output rivertypes.UpgradeToOutput
-	rawOutput := rootJob.Output()
+	rawOutput := job.Output()
 	if len(rawOutput) != 0 {
 		if err := json.Unmarshal(rawOutput, &output); err != nil {
 			return nil, fmt.Errorf("failed to decode upgrade-to output: %w", err)
@@ -134,7 +134,7 @@ func (j *JobManager) GetUpgradeToStatusForModel(ctx context.Context, modelUUID s
 	}
 
 	return &apiparams.UpgradeToJobStatus{
-		Detail: toJobDetail(rootJob),
+		Detail: toJobDetail(job),
 		Info:   output.Info,
 	}, nil
 }
@@ -332,14 +332,14 @@ func convertJobStates(statuses []apiparams.JobStatus) ([]rivertype.JobState, err
 	return riverStates, nil
 }
 
-// findUpgradeToRootJob finds the current active or most recently finalized
+// findUpgradeToJob finds the current active or most recently finalized
 // upgrade-to supervisor job for the specified model.
 //
 // This uses two queries so an in-flight supervisor job is preferred over any
 // older finalized job. If no active job exists, it falls back to the most
 // recently finalized supervisor so callers can still see the last terminal
 // upgrade-to status.
-func (j *JobManager) findUpgradeToRootJob(ctx context.Context, modelUUID string) (*rivertype.JobRow, error) {
+func (j *JobManager) findUpgradeToJob(ctx context.Context, modelUUID string) (*rivertype.JobRow, error) {
 	activeJobs, err := j.jobQuerier.ListJobs(
 		ctx,
 		river.NewJobListParams().
