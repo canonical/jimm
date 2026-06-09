@@ -12,11 +12,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"net/http"
 	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -242,7 +242,7 @@ func (as *AuthenticationService) identityClaims(ctx context.Context, idToken *oi
 		return IdentityClaims{}, errors.New("id token is nil")
 	}
 
-	var rawClaims map[string]json.RawMessage
+	var rawClaims map[string]any
 	if err := idToken.Claims(&rawClaims); err != nil {
 		return IdentityClaims{}, fmt.Errorf("failed to extract claims: %v", err)
 	}
@@ -252,9 +252,13 @@ func (as *AuthenticationService) identityClaims(ctx context.Context, idToken *oi
 		return IdentityClaims{}, errors.New("missing email claim")
 	}
 
-	var claims IdentityClaims
-	if err := json.Unmarshal(emailClaim, &claims.Email); err != nil {
-		return IdentityClaims{}, fmt.Errorf("failed to parse email claim: %v", err)
+	emailClaimStr, ok := emailClaim.(string)
+	if !ok {
+		return IdentityClaims{}, fmt.Errorf("email claim is not a string: got %T", emailClaim)
+	}
+
+	var claims = IdentityClaims{
+		Email: emailClaimStr,
 	}
 
 	if as.groupClaimKey == "" {
@@ -267,11 +271,59 @@ func (as *AuthenticationService) identityClaims(ctx context.Context, idToken *oi
 		return claims, nil
 	}
 
-	if err := json.Unmarshal(groupClaim, &claims.Groups); err != nil {
-		return IdentityClaims{}, fmt.Errorf("failed to parse group claim %q: %v", as.groupClaimKey, err)
+	// As the groups claim could be configured in many waysat the IdP
+	// we support multiple formats for the groups claim, which are all
+	// normalised into a slice of strings for the returned claims.
+	switch groups := groupClaim.(type) {
+	case string:
+		claims.Groups = splitGroupClaimString(groups)
+	case []string:
+		claims.Groups = groups
+	case []any:
+		for i, group := range groups {
+			groupStr, ok := group.(string)
+			if !ok {
+				return IdentityClaims{}, fmt.Errorf("invalid group claim entry type at index %d: got %T", i, group)
+			}
+			claims.Groups = append(claims.Groups, groupStr)
+		}
+	default:
+		return IdentityClaims{}, fmt.Errorf("invalid group claim type: got %T", groupClaim)
 	}
 
 	return claims, nil
+}
+
+// splitGroupClaimString normalises a string claim into groups.
+//
+// Supported formats:
+// - single value: "team-a"
+// - comma delimited: "team-a, team-b"
+// - whitespace delimited: "team-a team-b"
+func splitGroupClaimString(value string) []string {
+	trimmedValue := strings.TrimSpace(value)
+	if trimmedValue == "" {
+		return nil
+	}
+
+	if strings.Contains(trimmedValue, ",") {
+		rawGroups := strings.Split(trimmedValue, ",")
+		normalizedGroups := make([]string, 0, len(rawGroups))
+		for _, group := range rawGroups {
+			group = strings.TrimSpace(group)
+			if group == "" {
+				continue
+			}
+			normalizedGroups = append(normalizedGroups, group)
+		}
+		return normalizedGroups
+	}
+
+	if strings.ContainsAny(trimmedValue, " \t\n\r") {
+		return strings.Fields(trimmedValue)
+	}
+
+	return []string{trimmedValue}
 }
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
