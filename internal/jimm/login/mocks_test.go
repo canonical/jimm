@@ -14,6 +14,7 @@ import (
 	http "net/http"
 	reflect "reflect"
 
+	auth "github.com/canonical/jimm/v3/internal/auth"
 	oidc "github.com/coreos/go-oidc/v3/oidc"
 	jwt "github.com/lestrrat-go/jwx/v2/jwt"
 	gomock "go.uber.org/mock/gomock"
@@ -161,41 +162,41 @@ func (c *MockOAuthAuthenticatorDeviceAccessTokenCall) DoAndReturn(f func(context
 	return c
 }
 
-// Email mocks base method.
-func (m *MockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
+// IdentityClaims mocks base method.
+func (m *MockOAuthAuthenticator) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Email", idToken)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "IdentityClaims", ctx, idToken)
+	ret0, _ := ret[0].(auth.IdentityClaims)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Email indicates an expected call of Email.
-func (mr *MockOAuthAuthenticatorMockRecorder) Email(idToken any) *MockOAuthAuthenticatorEmailCall {
+// IdentityClaims indicates an expected call of IdentityClaims.
+func (mr *MockOAuthAuthenticatorMockRecorder) IdentityClaims(ctx, idToken any) *MockOAuthAuthenticatorIdentityClaimsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Email", reflect.TypeOf((*MockOAuthAuthenticator)(nil).Email), idToken)
-	return &MockOAuthAuthenticatorEmailCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdentityClaims", reflect.TypeOf((*MockOAuthAuthenticator)(nil).IdentityClaims), ctx, idToken)
+	return &MockOAuthAuthenticatorIdentityClaimsCall{Call: call}
 }
 
-// MockOAuthAuthenticatorEmailCall wrap *gomock.Call
-type MockOAuthAuthenticatorEmailCall struct {
+// MockOAuthAuthenticatorIdentityClaimsCall wrap *gomock.Call
+type MockOAuthAuthenticatorIdentityClaimsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockOAuthAuthenticatorEmailCall) Return(arg0 string, arg1 error) *MockOAuthAuthenticatorEmailCall {
+func (c *MockOAuthAuthenticatorIdentityClaimsCall) Return(arg0 auth.IdentityClaims, arg1 error) *MockOAuthAuthenticatorIdentityClaimsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockOAuthAuthenticatorEmailCall) Do(f func(*oidc.IDToken) (string, error)) *MockOAuthAuthenticatorEmailCall {
+func (c *MockOAuthAuthenticatorIdentityClaimsCall) Do(f func(context.Context, *oidc.IDToken) (auth.IdentityClaims, error)) *MockOAuthAuthenticatorIdentityClaimsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockOAuthAuthenticatorEmailCall) DoAndReturn(f func(*oidc.IDToken) (string, error)) *MockOAuthAuthenticatorEmailCall {
+func (c *MockOAuthAuthenticatorIdentityClaimsCall) DoAndReturn(f func(context.Context, *oidc.IDToken) (auth.IdentityClaims, error)) *MockOAuthAuthenticatorIdentityClaimsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -239,41 +240,41 @@ func (c *MockOAuthAuthenticatorExtractAndVerifyIDTokenCall) DoAndReturn(f func(c
 	return c
 }
 
-// MintSessionToken mocks base method.
-func (m *MockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
+// MintSessionTokenWithGroups mocks base method.
+func (m *MockOAuthAuthenticator) MintSessionTokenWithGroups(email string, groups []string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MintSessionToken", email)
+	ret := m.ctrl.Call(m, "MintSessionTokenWithGroups", email, groups)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// MintSessionToken indicates an expected call of MintSessionToken.
-func (mr *MockOAuthAuthenticatorMockRecorder) MintSessionToken(email any) *MockOAuthAuthenticatorMintSessionTokenCall {
+// MintSessionTokenWithGroups indicates an expected call of MintSessionTokenWithGroups.
+func (mr *MockOAuthAuthenticatorMockRecorder) MintSessionTokenWithGroups(email, groups any) *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MintSessionToken", reflect.TypeOf((*MockOAuthAuthenticator)(nil).MintSessionToken), email)
-	return &MockOAuthAuthenticatorMintSessionTokenCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MintSessionTokenWithGroups", reflect.TypeOf((*MockOAuthAuthenticator)(nil).MintSessionTokenWithGroups), email, groups)
+	return &MockOAuthAuthenticatorMintSessionTokenWithGroupsCall{Call: call}
 }
 
-// MockOAuthAuthenticatorMintSessionTokenCall wrap *gomock.Call
-type MockOAuthAuthenticatorMintSessionTokenCall struct {
+// MockOAuthAuthenticatorMintSessionTokenWithGroupsCall wrap *gomock.Call
+type MockOAuthAuthenticatorMintSessionTokenWithGroupsCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockOAuthAuthenticatorMintSessionTokenCall) Return(arg0 string, arg1 error) *MockOAuthAuthenticatorMintSessionTokenCall {
+func (c *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall) Return(arg0 string, arg1 error) *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockOAuthAuthenticatorMintSessionTokenCall) Do(f func(string) (string, error)) *MockOAuthAuthenticatorMintSessionTokenCall {
+func (c *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall) Do(f func(string, []string) (string, error)) *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockOAuthAuthenticatorMintSessionTokenCall) DoAndReturn(f func(string) (string, error)) *MockOAuthAuthenticatorMintSessionTokenCall {
+func (c *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall) DoAndReturn(f func(string, []string) (string, error)) *MockOAuthAuthenticatorMintSessionTokenWithGroupsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

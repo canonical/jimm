@@ -30,6 +30,13 @@ const (
 	keycloakAdminUsername    = "jimm"
 	keycloakAdminPassword    = "jimm"
 	keycloakAdminCLIClientID = "admin-cli"
+	keycloakAdminCLIUsername = "admin-cli"
+	//nolint:gosec // Thinks credentials exposed. Only used for test.
+	keycloakAdminCLISecret = "DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh"
+
+	// OIDCGroupsTestGroupName is the group used by real Keycloak-backed tests
+	// that verify OIDC group claim extraction.
+	OIDCGroupsTestGroupName = "oidc-groups-test"
 )
 
 // KeycloakUser represents a basic user created in Keycloak.
@@ -70,6 +77,39 @@ func CreateRandomKeycloakUser() (*KeycloakUser, error) {
 		Username: username,
 		Password: password,
 	}, nil
+}
+
+// CreateRandomKeycloakUserInGroup creates a random Keycloak user and ensures it
+// belongs to the supplied group.
+func CreateRandomKeycloakUserInGroup(groupName string) (*KeycloakUser, error) {
+	user, err := CreateRandomKeycloakUser()
+	if err != nil {
+		return nil, err
+	}
+	if err := AddKeycloakUserToGroup(user.Username, groupName); err != nil {
+		return nil, fmt.Errorf("failed to add keycloak user %q to group %q: %w", user.Username, groupName, err)
+	}
+	return user, nil
+}
+
+// AddKeycloakUserToGroup ensures the given Keycloak user belongs to the named group.
+func AddKeycloakUserToGroup(username, groupName string) error {
+	adminCLIToken, err := getAdminCLIAccessToken()
+	if err != nil {
+		return fmt.Errorf("failed to authenticate admin CLI user: %w", err)
+	}
+
+	userID, err := getKeycloakUserId(adminCLIToken, username)
+	if err != nil {
+		return err
+	}
+
+	groupID, err := ensureKeycloakGroup(adminCLIToken, groupName)
+	if err != nil {
+		return err
+	}
+
+	return addKeycloakUserToGroup(adminCLIToken, userID, groupID)
 }
 
 // getAdminCLIAccessToken authenticates with the `admin-cli` client and returns
@@ -177,6 +217,108 @@ func getKeycloakUserId(adminCLIToken, username string) (string, error) {
 	}
 }
 
+func getKeycloakGroupsMap(adminCLIToken string) (map[string]string, error) {
+	httpClient := http.Client{}
+	u := url.URL{
+		Scheme: "http",
+		Host:   keycloakHost,
+		Path:   keycloakJIMMRealmPath + "/groups",
+	}
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+adminCLIToken)
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get groups from keycloak: %w", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read keycloak response for list of groups (status-code: %d): %w", resp.StatusCode, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get groups from keycloak (status-code: %d): %q", resp.StatusCode, string(body))
+	}
+
+	var raw []struct {
+		Id   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse keycloak response for list of groups: %q: %w", string(body), err)
+	}
+
+	result := map[string]string{}
+	for _, entry := range raw {
+		result[entry.Name] = entry.Id
+	}
+	return result, nil
+}
+
+func ensureKeycloakGroup(adminCLIToken, groupName string) (string, error) {
+	groups, err := getKeycloakGroupsMap(adminCLIToken)
+	if err != nil {
+		return "", err
+	}
+	if id, ok := groups[groupName]; ok {
+		return id, nil
+	}
+
+	if err := createKeycloakGroup(adminCLIToken, groupName); err != nil {
+		return "", err
+	}
+
+	groups, err = getKeycloakGroupsMap(adminCLIToken)
+	if err != nil {
+		return "", err
+	}
+	if id, ok := groups[groupName]; ok {
+		return id, nil
+	}
+	return "", fmt.Errorf("keycloak group not found after creation: %q", groupName)
+}
+
+func createKeycloakGroup(adminCLIToken, groupName string) error {
+	httpClient := http.Client{}
+	u := url.URL{
+		Scheme: "http",
+		Host:   keycloakHost,
+		Path:   keycloakJIMMRealmPath + "/groups",
+	}
+
+	reqBodyJSON, err := json.Marshal(map[string]any{"name": groupName})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewReader(reqBodyJSON))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+adminCLIToken)
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to add group to keycloak: %w", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read keycloak response to add group (status-code: %d): %w", resp.StatusCode, err)
+	}
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("failed to add group to keycloak (status-code: %d): %q", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 // addKeycloakUser adds a user (username/email pair) to Keycloak.
 func addKeycloakUser(adminCLIToken, email, username string) error {
 	httpClient := http.Client{}
@@ -260,6 +402,37 @@ func setKeycloakUserPassword(adminCLIToken, id, password string) error {
 	}
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("failed to set keycloak user password (status-code: %d): %q", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+func addKeycloakUserToGroup(adminCLIToken, userID, groupID string) error {
+	httpClient := http.Client{}
+	u := url.URL{
+		Scheme: "http",
+		Host:   keycloakHost,
+		Path:   fmt.Sprintf("%s/users/%s/groups/%s", keycloakJIMMRealmPath, userID, groupID),
+	}
+
+	req, err := http.NewRequest(http.MethodPut, u.String(), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Add("Authorization", "Bearer "+adminCLIToken)
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to add keycloak user to group: %w", err)
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read keycloak response to add user to group (status-code: %d): %w", resp.StatusCode, err)
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("failed to add keycloak user to group (status-code: %d): %q", resp.StatusCode, string(body))
 	}
 	return nil
 }

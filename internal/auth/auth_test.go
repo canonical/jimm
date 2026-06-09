@@ -28,7 +28,13 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
+const testGroupClaimKey = "groups"
+
 func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database, sessions.Store, func()) {
+	return setupTestAuthSvcWithGroupClaimKey(ctx, c, expiry, "")
+}
+
+func setupTestAuthSvcWithGroupClaimKey(ctx context.Context, c *qt.C, expiry time.Duration, groupClaimKey string) (*auth.AuthenticationService, *db.Database, sessions.Store, func()) {
 	db := &db.Database{
 		DB: testdb.PostgresDB(c, time.Now),
 	}
@@ -45,7 +51,8 @@ func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth
 		IssuerURL:           "http://localhost:8082/realms/jimm",
 		ClientID:            "jimm-device",
 		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:              []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:              []string{oidc.ScopeOpenID, "profile", "email", "microprofile-jwt"},
+		GroupClaimKey:       groupClaimKey,
 		SessionTokenExpiry:  expiry,
 		RedirectURL:         "http://localhost:8080/auth/callback",
 		Store:               db,
@@ -76,7 +83,7 @@ func TestAuthCodeURL(t *testing.T) {
 	c.Assert(
 		url,
 		qt.Matches,
-		regexp.MustCompile(`http:\/\/localhost:8082\/realms\/jimm\/protocol\/openid-connect\/auth\?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid\+profile\+email&state=.*`),
+		regexp.MustCompile(`http:\/\/localhost:8082\/realms\/jimm\/protocol\/openid-connect\/auth\?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid\+profile\+email\+microprofile-jwt&state=.*`),
 	)
 	c.Assert(len(state), qt.Not(qt.Equals), 0)
 }
@@ -92,12 +99,12 @@ func TestAuthCodeURL(t *testing.T) {
 func TestDevice(t *testing.T) {
 	c := qt.New(t)
 
-	u, err := jimmtest.CreateRandomKeycloakUser()
+	u, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
 	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
 
-	authSvc, db, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, db, _, cleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, testGroupClaimKey)
 	defer cleanup()
 
 	res, err := authSvc.Device(ctx)
@@ -165,13 +172,21 @@ func TestDevice(t *testing.T) {
 	// Test subject set
 	c.Assert(idToken.Subject, qt.Equals, u.Id)
 
-	// Retrieve the email
-	email, err := authSvc.Email(idToken)
+	claims, err := authSvc.IdentityClaims(ctx, idToken)
 	c.Assert(err, qt.IsNil)
-	c.Assert(email, qt.Equals, u.Email)
+	c.Assert(claims.Email, qt.Equals, u.Email)
+	c.Assert(claims.Groups, qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
+
+	missingClaimAuthSvc, _, _, missingCleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, "missing-groups")
+	defer missingCleanup()
+
+	missingClaims, err := missingClaimAuthSvc.IdentityClaims(ctx, idToken)
+	c.Assert(err, qt.IsNil)
+	c.Assert(missingClaims.Email, qt.Equals, u.Email)
+	c.Assert(missingClaims.Groups, qt.IsNil)
 
 	// Update the identity
-	err = authSvc.UpdateIdentity(ctx, email, token)
+	err = authSvc.UpdateIdentity(ctx, claims.Email, token)
 	c.Assert(err, qt.IsNil)
 
 	updatedUser, err := dbmodel.NewIdentity(u.Email)
@@ -198,6 +213,27 @@ func TestSessionTokens(t *testing.T) {
 	jwtToken, err := authSvc.VerifySessionToken(token)
 	c.Assert(err, qt.IsNil)
 	c.Assert(jwtToken.Subject(), qt.Equals, "jimm-test@canonical.com")
+}
+
+func TestSessionTokensWithGroups(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
+
+	groups := []string{"devops", "platform"}
+	token, err := authSvc.MintSessionTokenWithGroups("jimm-test@canonical.com", groups)
+	c.Assert(err, qt.IsNil)
+
+	jwtToken, err := authSvc.VerifySessionToken(token)
+	c.Assert(err, qt.IsNil)
+	c.Assert(jwtToken.Subject(), qt.Equals, "jimm-test@canonical.com")
+
+	groupsClaim, err := auth.SessionGroupsFromToken(jwtToken)
+	c.Assert(err, qt.IsNil)
+	c.Assert(groupsClaim, qt.DeepEquals, groups)
 }
 
 func TestSessionTokenRejectsExpiredToken(t *testing.T) {
@@ -313,6 +349,61 @@ func TestCreateBrowserSession(t *testing.T) {
 	session, err := sessionStore.Get(req, auth.SessionName)
 	c.Assert(err, qt.IsNil)
 	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, "jimm-test@canonical.com")
+}
+
+func TestBrowserLoginStoresExtractedGroups(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	_, db, sessionStore, cleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, testGroupClaimKey)
+	defer cleanup()
+
+	user, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
+	c.Assert(err, qt.IsNil)
+
+	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore, user.Username, user.Password)
+	c.Assert(err, qt.IsNil)
+
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, qt.IsNil)
+
+	cookies := jimmtest.ParseCookies(cookie)
+	req.AddCookie(cookies[0])
+
+	session, err := sessionStore.Get(req, auth.SessionName)
+	c.Assert(err, qt.IsNil)
+	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, user.Email)
+	c.Assert(session.Values[auth.SessionGroupsKey], qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
+}
+
+func TestCreateBrowserSessionWithGroups(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	authSvc, _, sessionStore, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
+
+	rec := httptest.NewRecorder()
+	req, err := http.NewRequest("GET", "", nil)
+	c.Assert(err, qt.IsNil)
+
+	groups := []string{"devops", "platform"}
+	err = authSvc.CreateBrowserSessionWithGroups(ctx, rec, req, "jimm-test@canonical.com", groups)
+	c.Assert(err, qt.IsNil)
+
+	cookies := rec.Header().Get("Set-Cookie")
+	parsedCookies := jimmtest.ParseCookies(cookies)
+	assertSetCookiesIsCorrect(c, parsedCookies)
+
+	req.AddCookie(&http.Cookie{
+		Name:  auth.SessionName,
+		Value: parsedCookies[0].Value,
+	})
+
+	session, err := sessionStore.Get(req, auth.SessionName)
+	c.Assert(err, qt.IsNil)
+	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, "jimm-test@canonical.com")
+	c.Assert(session.Values[auth.SessionGroupsKey], qt.DeepEquals, groups)
 }
 
 func TestAuthenticateBrowserSessionAndLogout(t *testing.T) {

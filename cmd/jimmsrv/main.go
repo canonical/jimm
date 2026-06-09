@@ -118,6 +118,8 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.New("no oauth client scopes present")
 	}
 
+	groupClaimKey := os.Getenv("JIMM_OAUTH_GROUP_CLAIM_KEY")
+
 	insecureSecretStorage := false
 	if key, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok && key != "" {
 		insecureSecretStorage, err = strconv.ParseBool(key)
@@ -232,6 +234,7 @@ func start(ctx context.Context, s *service.Service) error {
 			ClientID:             clientID,
 			ClientSecret:         clientSecret,
 			Scopes:               scopesParsed,
+			GroupClaimKey:        groupClaimKey,
 			SessionTokenExpiry:   sessionTokenExpiryDuration,
 			SessionCookieMaxAge:  sessionCookieMaxAgeInt,
 			JWTSessionKey:        sessionSecretKey,

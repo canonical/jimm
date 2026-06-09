@@ -18,6 +18,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -71,17 +72,17 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 
 	mockAuthenticator.EXPECT().DeviceAccessToken(gomock.Any(), gomock.Any()).Return(&oauth2.Token{}, nil).AnyTimes()
 	mockAuthenticator.EXPECT().ExtractAndVerifyIDToken(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	mockAuthenticator.EXPECT().Email(gomock.Any()).DoAndReturn(func(_ *oidc.IDToken) (string, error) {
+	mockAuthenticator.EXPECT().IdentityClaims(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *oidc.IDToken) (auth.IdentityClaims, error) {
 		emailPrefix := "user-foo"
 		select {
 		case candidate := <-s.deviceFlowChan:
 			emailPrefix = candidate
 		default:
 		}
-		return fmt.Sprintf("%s@canonical.com", emailPrefix), nil
+		return auth.IdentityClaims{Email: fmt.Sprintf("%s@canonical.com", emailPrefix)}, nil
 	}).AnyTimes()
 	mockAuthenticator.EXPECT().UpdateIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	mockAuthenticator.EXPECT().MintSessionToken(gomock.Any()).DoAndReturn(func(email string) (string, error) {
+	mockAuthenticator.EXPECT().MintSessionTokenWithGroups(gomock.Any(), gomock.Any()).DoAndReturn(func(email string, groups []string) (string, error) {
 		token, err := jwt.NewBuilder().
 			Subject(email).
 			Build()

@@ -27,6 +27,7 @@ import (
 	"github.com/juju/juju/utils/proxy"
 	"github.com/juju/names/v5"
 
+	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api/params"
@@ -56,6 +57,8 @@ func TestLoginToController(t *testing.T) {
 // We only test happy path here due to having tested edge cases and failure cases
 // within the auth service itself such as invalid cookies, expired access tokens and
 // missing/expired/revoked refresh tokens.
+//
+// The seeded user is NOT in any preconfigured groups.
 func TestBrowserLoginWithSafeEmail(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
@@ -67,6 +70,7 @@ func TestBrowserLoginWithSafeEmail(t *testing.T) {
 		jimmtest.HardcodedSafePassword,
 		"user-jimm-test@canonical.com",
 		"jimm-test",
+		nil,
 	)
 }
 
@@ -81,10 +85,31 @@ func TestBrowserLoginWithUnsafeEmail(t *testing.T) {
 		jimmtest.HardcodedUnsafePassword,
 		"user-jimm-test43cc8c@canonical.com",
 		"jimm-test43cc8c",
+		nil,
 	)
 }
 
-func testBrowserLogin(c *qt.C, s jimmtest.JimmWithControllers, username, password, expectedEmail, expectedDisplayName string) {
+// TestBrowserLoginWithGroups tests that groups are properly propagated through
+// the browser login flow and set in the session cookie. The user is created programmatically.
+func TestBrowserLoginWithGroups(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
+
+	user, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
+	c.Assert(err, qt.IsNil)
+
+	testBrowserLogin(
+		c,
+		s,
+		user.Username,
+		user.Password,
+		"user-"+user.Email,
+		strings.Split(user.Email, "@")[0],
+		[]string{jimmtest.OIDCGroupsTestGroupName},
+	)
+}
+
+func testBrowserLogin(c *qt.C, s jimmtest.JimmWithControllers, username, password, expectedEmail, expectedDisplayName string, expectedGroups []string) {
 	// The setup runs a browser login with callback, ultimately retrieving
 	// a logged in user by cookie.
 	sqldb, err := s.JIMM.Database.DB.DB()
@@ -105,6 +130,16 @@ func testBrowserLogin(c *qt.C, s jimmtest.JimmWithControllers, username, passwor
 
 	cookies := jimmtest.ParseCookies(cookie)
 	c.Assert(cookies, qt.HasLen, 1)
+
+	if expectedGroups != nil {
+		req, err := http.NewRequest("GET", "", nil)
+		c.Assert(err, qt.IsNil)
+		req.AddCookie(cookies[0])
+
+		session, err := sessionStore.Get(req, auth.SessionName)
+		c.Assert(err, qt.IsNil)
+		c.Assert(session.Values[auth.SessionGroupsKey], qt.DeepEquals, expectedGroups)
+	}
 
 	jar, err := cookiejar.New(nil)
 	c.Assert(err, qt.IsNil)
@@ -170,7 +205,7 @@ func TestDeviceLogin(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// Create a user in keycloak
-	user, err := jimmtest.CreateRandomKeycloakUser()
+	user, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
 	c.Assert(err, qt.IsNil)
 
 	// We create a http client to keep the same cookies across all requests
@@ -226,6 +261,13 @@ func TestDeviceLogin(t *testing.T) {
 	// Ensure it is base64 and decodable
 	decodedToken, err := base64.StdEncoding.DecodeString(sessionTokenResp.SessionToken)
 	c.Assert(err, qt.IsNil)
+
+	verifiedToken, err := s.JIMM.OAuthAuthenticator.VerifySessionToken(sessionTokenResp.SessionToken)
+	c.Assert(err, qt.IsNil)
+
+	groups, err := auth.SessionGroupsFromToken(verifiedToken)
+	c.Assert(err, qt.IsNil)
+	c.Assert(groups, qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
 
 	// Step 4, use this session token to "login".
 

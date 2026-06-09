@@ -53,13 +53,14 @@ type BrowserOAuthAuthenticator interface {
 	AuthCodeURL() (string, string, error)
 	Exchange(ctx context.Context, code string) (*oauth2.Token, error)
 	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
-	Email(idToken *oidc.IDToken) (string, error)
+	IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error)
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
-	CreateBrowserSession(
+	CreateBrowserSessionWithGroups(
 		ctx context.Context,
 		w http.ResponseWriter,
 		r *http.Request,
 		email string,
+		groups []string,
 	) error
 	Logout(ctx context.Context, w http.ResponseWriter, req *http.Request) error
 	AuthenticateBrowserSession(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error)
@@ -152,22 +153,23 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, err := authSvc.Email(idToken)
+	claims, err := authSvc.IdentityClaims(ctx, idToken)
 	if err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract email from id token")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract identity claims from id token")
 		return
 	}
 
-	if err := authSvc.UpdateIdentity(ctx, email, token); err != nil {
+	if err := authSvc.UpdateIdentity(ctx, claims.Email, token); err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to update identity")
 		return
 	}
 
-	if err := oah.authenticator.CreateBrowserSession(
+	if err := oah.authenticator.CreateBrowserSessionWithGroups(
 		ctx,
 		w,
 		r,
-		email,
+		claims.Email,
+		claims.Groups,
 	); err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to setup session")
 	}

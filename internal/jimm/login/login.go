@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -51,12 +52,12 @@ type OAuthAuthenticator interface {
 	// and performs signature verification of the token.
 	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
 
-	// Email retrieves the users email from an id token via the email claim
-	Email(idToken *oidc.IDToken) (string, error)
+	// IdentityClaims retrieves the user's identity claims from a verified ID token.
+	IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error)
 
 	// MintSessionToken mints a session token to be used when logging into JIMM
-	// via an access token. The token only contains the user's email for authentication.
-	MintSessionToken(email string) (string, error)
+	// via an access token. The token contains the user's email and internal groups claim.
+	MintSessionTokenWithGroups(email string, groups []string) (string, error)
 
 	// VerifySessionToken symmetrically verifies the validty of the signature on the
 	// access token JWT, returning the parsed token.
@@ -134,16 +135,16 @@ func (j *LoginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthRes
 		return "", err
 	}
 
-	email, err := j.oAuthAuthenticator.Email(idToken)
+	claims, err := j.oAuthAuthenticator.IdentityClaims(ctx, idToken)
 	if err != nil {
 		return "", err
 	}
 
-	if err := j.oAuthAuthenticator.UpdateIdentity(ctx, email, token); err != nil {
+	if err := j.oAuthAuthenticator.UpdateIdentity(ctx, claims.Email, token); err != nil {
 		return "", err
 	}
 
-	encToken, err := j.oAuthAuthenticator.MintSessionToken(email)
+	encToken, err := j.oAuthAuthenticator.MintSessionTokenWithGroups(claims.Email, claims.Groups)
 	if err != nil {
 		return "", err
 	}

@@ -86,6 +86,10 @@ type OAuthAuthenticatorParams struct {
 	// Scopes holds the scopes that you wish to retrieve.
 	Scopes []string
 
+	// GroupClaimKey is the provider-specific claim name that contains the user's
+	// group identifiers.
+	GroupClaimKey string
+
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
 	SessionTokenExpiry time.Duration
@@ -517,6 +521,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 			ClientID:            p.OAuthAuthenticatorParams.ClientID,
 			ClientSecret:        p.OAuthAuthenticatorParams.ClientSecret,
 			Scopes:              p.OAuthAuthenticatorParams.Scopes,
+			GroupClaimKey:       p.OAuthAuthenticatorParams.GroupClaimKey,
 			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
 			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
 			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,

@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"net/http"
@@ -42,8 +43,15 @@ const (
 	// session.
 	SessionIdentityKey = "identity-id"
 
+	// SessionGroupsKey is the key for the groups value stored within the session.
+	SessionGroupsKey = "identity-groups"
+
 	// StateKey is the key for the OAuth callback state stored within a user's cookie.
 	StateKey = "jimm-oauth-state"
+
+	// SessionTokenGroupsClaimKey is the stable internal claim used by JIMM when
+	// minting session tokens that carry group identifiers.
+	SessionTokenGroupsClaimKey = "groups"
 
 	// migrationTokenExpiry is the expiry time for migration tokens.
 	migrationTokenExpiry = 3 * time.Hour
@@ -108,6 +116,9 @@ type AuthenticationService struct {
 	jwtSessionKey string
 	// The key algorithm to use for verifying/signing JWTs.
 	signingAlg jwa.KeyAlgorithm
+	// groupClaimKey is the provider-specific claim name that contains the user's
+	// group identifiers.
+	groupClaimKey string
 
 	db IdentityStore
 
@@ -137,6 +148,10 @@ type AuthenticationServiceParams struct {
 
 	// Scopes holds the scopes that you wish to retrieve.
 	Scopes []string
+
+	// GroupClaimKey is the provider-specific claim name that contains group
+	// identifiers.
+	GroupClaimKey string
 
 	// SessionTokenExpiry holds the expiry time of minted JIMM session tokens (JWTs).
 	SessionTokenExpiry time.Duration
@@ -168,10 +183,15 @@ type AuthenticationServiceParams struct {
 	AuthStyle AuthStyle
 }
 
+// IdentityClaims are the user identity values extracted from a verified ID token.
+type IdentityClaims struct {
+	Email  string
+	Groups []string
+}
+
 // NewAuthenticationService returns a new authentication service for handling
 // authentication within JIMM.
 func NewAuthenticationService(ctx context.Context, params AuthenticationServiceParams) (*AuthenticationService, error) {
-
 	provider, err := oidc.NewProvider(ctx, params.IssuerURL)
 	if err != nil {
 		return nil, errors.Codef(errors.CodeServerConfiguration, "failed to create oidc provider: %v", err)
@@ -189,6 +209,7 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 		sessionTokenExpiry:  params.SessionTokenExpiry,
 		jwtSessionKey:       params.JWTSessionKey,
 		signingAlg:          jwa.HS256,
+		groupClaimKey:       params.GroupClaimKey,
 		db:                  params.Store,
 		sessionStore:        params.SessionStore,
 		sessionCookieMaxAge: params.SessionCookieMaxAge,
@@ -208,6 +229,49 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 	}
 
 	return authSvc, nil
+}
+
+// identityClaims extracts the fixed email claim and, when configured, a
+// provider-specific groups claim from the verified ID token.
+//
+// The email claim is always expected under the standard "email" key, while the
+// groups claim key is configurable, so the token payload is decoded once and
+// then split into fixed and dynamic lookups.
+func (as *AuthenticationService) identityClaims(ctx context.Context, idToken *oidc.IDToken) (IdentityClaims, error) {
+	if idToken == nil {
+		return IdentityClaims{}, errors.New("id token is nil")
+	}
+
+	var rawClaims map[string]json.RawMessage
+	if err := idToken.Claims(&rawClaims); err != nil {
+		return IdentityClaims{}, fmt.Errorf("failed to extract claims: %v", err)
+	}
+
+	emailClaim, ok := rawClaims["email"]
+	if !ok {
+		return IdentityClaims{}, errors.New("missing email claim")
+	}
+
+	var claims IdentityClaims
+	if err := json.Unmarshal(emailClaim, &claims.Email); err != nil {
+		return IdentityClaims{}, fmt.Errorf("failed to parse email claim: %v", err)
+	}
+
+	if as.groupClaimKey == "" {
+		return claims, nil
+	}
+
+	groupClaim, ok := rawClaims[as.groupClaimKey]
+	if !ok {
+		zapctx.Warn(ctx, "configured group claim missing from id token", zap.String("claim-key", as.groupClaimKey))
+		return claims, nil
+	}
+
+	if err := json.Unmarshal(groupClaim, &claims.Groups); err != nil {
+		return IdentityClaims{}, fmt.Errorf("failed to parse group claim %q: %v", as.groupClaimKey, err)
+	}
+
+	return claims, nil
 }
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
@@ -318,30 +382,37 @@ func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oa
 
 // Email retrieves the users email from an id token via the email claim
 func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
-
-	var claims struct {
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"` // TODO(ale8k): Add verification logic
+	claims, err := as.identityClaims(context.Background(), idToken)
+	if err != nil {
+		return "", err
 	}
-	if idToken == nil {
-		return "", errors.New("id token is nil")
-	}
-
-	if err := idToken.Claims(&claims); err != nil {
-		return "", fmt.Errorf("failed to extract claims: %v", err)
-	}
-
 	return claims.Email, nil
+}
+
+// IdentityClaims extracts the email and configured groups claim from a
+// verified ID token.
+func (as *AuthenticationService) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (IdentityClaims, error) {
+	return as.identityClaims(ctx, idToken)
 }
 
 // MintSessionToken mints a session token to be used when logging into JIMM
 // via an access token. The token only contains the user's email for authentication.
 func (as *AuthenticationService) MintSessionToken(email string) (string, error) {
+	return as.MintSessionTokenWithGroups(email, nil)
+}
 
-	token, err := jwt.NewBuilder().
+// MintSessionTokenWithGroups mints a session token that carries the user's
+// email and the internal groups claim for later authorization use.
+func (as *AuthenticationService) MintSessionTokenWithGroups(email string, groups []string) (string, error) {
+
+	builder := jwt.NewBuilder().
 		Subject(email).
-		Expiration(time.Now().Add(as.sessionTokenExpiry)).
-		Build()
+		Expiration(time.Now().Add(as.sessionTokenExpiry))
+	if len(groups) > 0 {
+		builder = builder.Claim(SessionTokenGroupsClaimKey, groups)
+	}
+
+	token, err := builder.Build()
 	if err != nil {
 		return "", fmt.Errorf("failed to build access token: %v", err)
 	}
@@ -420,6 +491,36 @@ func (as *AuthenticationService) VerifySessionToken(token string) (_ jwt.Token, 
 	return parsedToken, nil
 }
 
+// SessionGroupsFromToken extracts the stable internal groups claim from a
+// verified JIMM session token.
+func SessionGroupsFromToken(token jwt.Token) ([]string, error) {
+	if token == nil {
+		return nil, errors.New("token is nil")
+	}
+
+	rawGroups, ok := token.Get(SessionTokenGroupsClaimKey)
+	if !ok {
+		return nil, nil
+	}
+
+	switch groups := rawGroups.(type) {
+	case []string:
+		return groups, nil
+	case []any:
+		normalizedGroups := make([]string, len(groups))
+		for i, group := range groups {
+			groupStr, ok := group.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid %q claim entry type %T", SessionTokenGroupsClaimKey, group)
+			}
+			normalizedGroups[i] = groupStr
+		}
+		return normalizedGroups, nil
+	default:
+		return nil, fmt.Errorf("invalid %q claim type %T", SessionTokenGroupsClaimKey, rawGroups)
+	}
+}
+
 // UpdateIdentity updates the database with the display name and access token set for the user.
 // And, if present, a refresh token.
 func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error {
@@ -496,6 +597,18 @@ func (as *AuthenticationService) CreateBrowserSession(
 	r *http.Request,
 	email string,
 ) error {
+	return as.CreateBrowserSessionWithGroups(ctx, w, r, email, nil)
+}
+
+// CreateBrowserSessionWithGroups creates a browser session that stores the
+// authenticated identity and the extracted group identifiers.
+func (as *AuthenticationService) CreateBrowserSessionWithGroups(
+	ctx context.Context,
+	w http.ResponseWriter,
+	r *http.Request,
+	email string,
+	groups []string,
+) error {
 
 	session, err := as.sessionStore.Get(r, SessionName)
 	if err != nil {
@@ -507,6 +620,7 @@ func (as *AuthenticationService) CreateBrowserSession(
 	session = sessionCrossOriginSafe(session, as.secureCookies)
 
 	session.Values[SessionIdentityKey] = email
+	session.Values[SessionGroupsKey] = groups
 	if err = session.Save(r, w); err != nil {
 		return err
 	}

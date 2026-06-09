@@ -150,9 +150,9 @@ func (m *mockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oa
 	return &oidc.IDToken{Subject: m.polledUsername}, nil
 }
 
-// Email returns the subject from an ID token.
-func (m *mockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
-	return idToken.Subject, nil
+// IdentityClaims returns the subject from an ID token as the mock email claim.
+func (m *mockOAuthAuthenticator) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error) {
+	return auth.IdentityClaims{Email: idToken.Subject}, nil
 }
 
 // UpdateIdentity is a no-op mock.
@@ -160,8 +160,8 @@ func (m *mockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email strin
 	return nil
 }
 
-// MintSessionToken creates an unsigned session token with the email provided.
-func (m *mockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
+// MintSessionTokenWithGroups creates an unsigned session token with the email provided.
+func (m *mockOAuthAuthenticator) MintSessionTokenWithGroups(email string, groups []string) (string, error) {
 	return newSessionToken(m.c, email, ""), nil
 }
 
@@ -225,7 +225,8 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email", "microprofile-jwt"},
+		GroupClaimKey:      "groups",
 		SessionTokenExpiry: time.Hour,
 		// Now we know the port the test server is running on
 		RedirectURL:         redirectURL,
