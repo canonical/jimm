@@ -200,9 +200,9 @@ func TestDevice(t *testing.T) {
 	c.Assert(updatedUser.RefreshToken, qt.Not(qt.Equals), "")
 }
 
-// TestSessionTokens tests both the minting and validation of JIMM
-// session tokens.
-func TestSessionTokens(t *testing.T) {
+// TestSessionTokensWithoutGroups tests both the minting and validation of JIMM
+// session tokens when no groups are present.
+func TestSessionTokensWithoutGroups(t *testing.T) {
 	c := qt.New(t)
 
 	ctx := context.Background()
@@ -210,7 +210,7 @@ func TestSessionTokens(t *testing.T) {
 	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
 	defer cleanup()
 
-	token, err := authSvc.MintSessionToken("jimm-test@canonical.com")
+	token, err := authSvc.MintSessionTokenWithGroups("jimm-test@canonical.com", nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
@@ -249,7 +249,7 @@ func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, noDuration)
 	defer cleanup()
 
-	token, err := authSvc.MintSessionToken("jimm-test@canonical.com")
+	token, err := authSvc.MintSessionTokenWithGroups("jimm-test@canonical.com", nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
@@ -280,7 +280,7 @@ func TestSessionTokenValidatesEmail(t *testing.T) {
 	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
 	defer cleanup()
 
-	token, err := authSvc.MintSessionToken("")
+	token, err := authSvc.MintSessionTokenWithGroups("", nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(token) > 0, qt.IsTrue)
 
@@ -327,7 +327,7 @@ func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {
 	assertHasCookie("Max-Age", parsedCookies)
 }
 
-func TestCreateBrowserSession(t *testing.T) {
+func TestCreateBrowserSessionWithNoGroups(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
@@ -338,7 +338,7 @@ func TestCreateBrowserSession(t *testing.T) {
 	req, err := http.NewRequest("GET", "", nil)
 	c.Assert(err, qt.IsNil)
 
-	err = authSvc.CreateBrowserSession(ctx, rec, req, "jimm-test@canonical.com")
+	err = authSvc.CreateBrowserSessionWithGroups(ctx, rec, req, "jimm-test@canonical.com", nil)
 	c.Assert(err, qt.IsNil)
 
 	cookies := rec.Header().Get("Set-Cookie")
@@ -353,6 +353,7 @@ func TestCreateBrowserSession(t *testing.T) {
 	session, err := sessionStore.Get(req, auth.SessionName)
 	c.Assert(err, qt.IsNil)
 	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, "jimm-test@canonical.com")
+	c.Assert(session.Values[auth.SessionGroupsKey], qt.IsNil)
 }
 
 func TestBrowserLoginStoresExtractedGroups(t *testing.T) {

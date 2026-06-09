@@ -447,12 +447,6 @@ func (as *AuthenticationService) IdentityClaims(ctx context.Context, idToken *oi
 	return as.identityClaims(ctx, idToken)
 }
 
-// MintSessionToken mints a session token to be used when logging into JIMM
-// via an access token. The token only contains the user's email for authentication.
-func (as *AuthenticationService) MintSessionToken(email string) (string, error) {
-	return as.MintSessionTokenWithGroups(email, nil)
-}
-
 // MintSessionTokenWithGroups mints a session token that carries the user's
 // email and the internal groups claim for later authorization use.
 func (as *AuthenticationService) MintSessionTokenWithGroups(email string, groups []string) (string, error) {
@@ -482,8 +476,8 @@ func (as *AuthenticationService) MintSessionTokenWithGroups(email string, groups
 // on the user's behalf and migrate the model.
 //
 // Currently the token provides the same level of access as the user, but keeping
-// this as a separate method from `MintSessionToken` allows for future changes to
-// the migration token without affecting the session token.
+// this as a separate method from `MintSessionTokenWithGroups` allows for future
+// changes to the migration token without affecting the session token.
 func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username string) (string, error) {
 
 	token, err := jwt.NewBuilder().
@@ -638,17 +632,6 @@ func sessionCrossOriginSafe(session *sessions.Session, secure bool) *sessions.Se
 	session.Options.HttpOnly = true                  // Don't allow Javascript to modify cookie
 	session.Options.SameSite = http.SameSiteNoneMode // Allow cross-origin requests via Javascript
 	return session
-}
-
-// CreateBrowserSession creates a session and updates the cookie for a browser
-// login callback.
-func (as *AuthenticationService) CreateBrowserSession(
-	ctx context.Context,
-	w http.ResponseWriter,
-	r *http.Request,
-	email string,
-) error {
-	return as.CreateBrowserSessionWithGroups(ctx, w, r, email, nil)
 }
 
 // CreateBrowserSessionWithGroups creates a browser session that stores the

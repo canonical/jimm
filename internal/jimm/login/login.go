@@ -55,7 +55,7 @@ type OAuthAuthenticator interface {
 	// IdentityClaims retrieves the user's identity claims from a verified ID token.
 	IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error)
 
-	// MintSessionToken mints a session token to be used when logging into JIMM
+	// MintSessionTokenWithGroups mints a session token to be used when logging into JIMM
 	// via an access token. The token contains the user's email and internal groups claim.
 	MintSessionTokenWithGroups(email string, groups []string) (string, error)
 
