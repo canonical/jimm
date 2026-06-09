@@ -45,6 +45,28 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "id": "jimm-group-user-id",
+      "username": "jimm-group-user",
+      "email": "jimm-group-user@canonical.com",
+      "emailVerified": true,
+      "enabled": true,
+      "groups": [
+        "/canonical"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "canonical"
     }
   ],
   "clients": [
@@ -74,6 +96,13 @@
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "group"
+      ],
       "redirectUris": [
         "http://127.0.0.1/*",
         "https://jimm.localhost/*",
@@ -86,6 +115,71 @@
         "login_theme": "base",
         "oauth2.device.authorization.grant.enabled": "true"
       }
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "profile",
+      "description": "OpenID Connect built-in scope: profile",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": []
+    },
+    {
+      "name": "email",
+      "description": "OpenID Connect built-in scope: email",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "name": "group",
+      "description": "The organisational group a user belongs to.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "introspection.token.claim": "true",
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "full.path": "false",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     }
   ]
 }

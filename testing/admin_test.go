@@ -89,22 +89,19 @@ func TestBrowserLoginWithUnsafeEmail(t *testing.T) {
 	)
 }
 
-// TestBrowserLoginWithGroups tests that groups are properly propagated through
-// the browser login flow and set in the session cookie. The user is created programmatically.
-func TestBrowserLoginWithGroups(t *testing.T) {
+// TestBrowserLoginWithSeededGroups tests that groups are properly propagated
+// through the browser login flow and set in the session cookie.
+func TestBrowserLoginWithSeededGroups(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
-
-	user, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
-	c.Assert(err, qt.IsNil)
 
 	testBrowserLogin(
 		c,
 		s,
-		user.Username,
-		user.Password,
-		"user-"+user.Email,
-		strings.Split(user.Email, "@")[0],
+		jimmtest.HardcodedGroupUsername,
+		jimmtest.HardcodedGroupPassword,
+		"user-"+jimmtest.HardcodedGroupEmail,
+		strings.Split(jimmtest.HardcodedGroupEmail, "@")[0],
 		[]string{jimmtest.OIDCGroupsTestGroupName},
 	)
 }
@@ -192,7 +189,7 @@ func TestBrowserLoginNoCookie(t *testing.T) {
 //
 // Within the test are clear comments explaining what is happening when and why.
 // Please refer to these comments for further details.
-func TestDeviceLogin(t *testing.T) {
+func TestDeviceLoginWithSeededGroups(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithRealAuthN())
 
@@ -202,10 +199,6 @@ func TestDeviceLogin(t *testing.T) {
 	defer conn.Close()
 
 	err := s.JIMM.Database.Migrate(context.Background())
-	c.Assert(err, qt.IsNil)
-
-	// Create a user in keycloak
-	user, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
 	c.Assert(err, qt.IsNil)
 
 	// We create a http client to keep the same cookies across all requests
@@ -250,7 +243,7 @@ func TestDeviceLogin(t *testing.T) {
 	loginForm := string(b)
 
 	// Step 2.1, handle the login form (see this func for more details)
-	handleLoginForm(c, loginForm, client, user.Username, user.Password)
+	handleLoginForm(c, loginForm, client, jimmtest.HardcodedGroupUsername, jimmtest.HardcodedGroupPassword)
 
 	// Step 3, after the user has entered the user code, the polling for an access
 	// token will complete. The polling can begin before OR after the user has entered the
@@ -283,11 +276,11 @@ func TestDeviceLogin(t *testing.T) {
 	// Test token base64 encoded passes authentication
 	err = conn.APICall("Admin", 4, "", "LoginWithSessionToken", params.LoginWithSessionTokenRequest(sessionTokenResp), &loginResult)
 	c.Assert(err, qt.IsNil)
-	c.Assert(loginResult.UserInfo.Identity, qt.Equals, "user-"+user.Email)
-	c.Assert(loginResult.UserInfo.DisplayName, qt.Equals, strings.Split(user.Email, "@")[0])
+	c.Assert(loginResult.UserInfo.Identity, qt.Equals, "user-"+jimmtest.HardcodedGroupEmail)
+	c.Assert(loginResult.UserInfo.DisplayName, qt.Equals, strings.Split(jimmtest.HardcodedGroupEmail, "@")[0])
 
 	// Finally, ensure db did indeed update the access token for this user
-	updatedUser, err := dbmodel.NewIdentity(user.Email)
+	updatedUser, err := dbmodel.NewIdentity(jimmtest.HardcodedGroupEmail)
 	c.Assert(err, qt.IsNil)
 
 	c.Assert(s.JIMM.Database.GetIdentity(context.Background(), updatedUser), qt.IsNil)
@@ -305,39 +298,45 @@ func handleLoginForm(c *qt.C, loginForm string, client *http.Client, username, p
 	// Step 2.2, now we'll be redirected to a sign-in page and must sign in.
 	re := regexp.MustCompile(`action="(.*?)" method=`)
 	match := re.FindStringSubmatch(loginForm)
-	loginFormUrl := match[1]
+	c.Assert(match, qt.HasLen, 2)
+	loginFormURL := match[1]
 
 	// The username and password are hardcoded witih jimm-realm.json in our local
 	// keycloak configuration for the jimm realm.
 	v := url.Values{}
 	v.Add("username", username)
 	v.Add("password", password)
-	loginResp, err := client.PostForm(loginFormUrl, v)
+	loginResp, err := client.PostForm(loginFormURL, v)
 	c.Assert(err, qt.IsNil)
 
 	loginRespBody := loginResp.Body
 	defer loginRespBody.Close()
 
-	// Step 2.3, the user will now be redirected to a consent screen
-	// and is expected to click "yes". We simulate this by posting the form programatically.
+	// Step 2.3, Keycloak may either show a consent form or complete directly.
 	loginRespB, err := io.ReadAll(loginRespBody)
 	c.Assert(err, qt.IsNil)
 	loginRespS := string(loginRespB)
 
 	re = regexp.MustCompile(`action="(.*?)" method=`)
 	match = re.FindStringSubmatch(loginRespS)
-	consentFormUri := match[1]
+	b := loginRespB
+	if len(match) == 2 {
+		consentFormURL := match[1]
+		if !strings.HasPrefix(consentFormURL, "http://") && !strings.HasPrefix(consentFormURL, "https://") {
+			consentFormURL = "http://localhost:8082" + consentFormURL
+		}
 
-	// We post the "yes" value to accept it.
-	v = url.Values{}
-	v.Add("accept", "Yes")
-	consentResp, err := client.PostForm("http://localhost:8082"+consentFormUri, v)
-	c.Assert(err, qt.IsNil)
-	defer consentResp.Body.Close()
+		// We post the "yes" value to accept it.
+		v = url.Values{}
+		v.Add("accept", "Yes")
+		consentResp, err := client.PostForm(consentFormURL, v)
+		c.Assert(err, qt.IsNil)
+		defer consentResp.Body.Close()
 
-	// Read the response to ensure it is OK and has been accepted.
-	b, err := io.ReadAll(consentResp.Body)
-	c.Assert(err, qt.IsNil)
+		// Read the response to ensure it is OK and has been accepted.
+		b, err = io.ReadAll(consentResp.Body)
+		c.Assert(err, qt.IsNil)
+	}
 
 	re = regexp.MustCompile(`Device Login Successful`)
 	c.Assert(re.MatchString(string(b)), qt.Equals, true)

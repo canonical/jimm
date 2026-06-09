@@ -567,7 +567,6 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		TokenURL:     as.oauthConfig.Endpoint.TokenURL,
-		Scopes:       as.oauthConfig.Scopes,
 		AuthStyle:    oauth2.AuthStyle(as.oauthConfig.Endpoint.AuthStyle),
 	}
 

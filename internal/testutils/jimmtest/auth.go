@@ -225,7 +225,7 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:             []string{oidc.ScopeOpenID, "profile", "email", "microprofile-jwt"},
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email", "group"},
 		GroupClaimKey:      "groups",
 		SessionTokenExpiry: time.Hour,
 		// Now we know the port the test server is running on

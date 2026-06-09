@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func setupTestAuthSvcWithGroupClaimKey(ctx context.Context, c *qt.C, expiry time
 		IssuerURL:           "http://localhost:8082/realms/jimm",
 		ClientID:            "jimm-device",
 		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:              []string{oidc.ScopeOpenID, "profile", "email", "microprofile-jwt"},
+		Scopes:              []string{oidc.ScopeOpenID, "profile", "email", "group"},
 		GroupClaimKey:       groupClaimKey,
 		SessionTokenExpiry:  expiry,
 		RedirectURL:         "http://localhost:8080/auth/callback",
@@ -83,7 +84,7 @@ func TestAuthCodeURL(t *testing.T) {
 	c.Assert(
 		url,
 		qt.Matches,
-		regexp.MustCompile(`http:\/\/localhost:8082\/realms\/jimm\/protocol\/openid-connect\/auth\?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid\+profile\+email\+microprofile-jwt&state=.*`),
+		regexp.MustCompile(`http:\/\/localhost:8082\/realms\/jimm\/protocol\/openid-connect\/auth\?client_id=jimm-device&redirect_uri=http%3A%2F%2Flocalhost%3A8080%2Fauth%2Fcallback&response_type=code&scope=openid\+profile\+email\+group&state=.*`),
 	)
 	c.Assert(len(state), qt.Not(qt.Equals), 0)
 }
@@ -98,9 +99,6 @@ func TestAuthCodeURL(t *testing.T) {
 // can manually POST the forms throughout the flow.
 func TestDevice(t *testing.T) {
 	c := qt.New(t)
-
-	u, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
-	c.Assert(err, qt.IsNil)
 
 	ctx := context.Background()
 
@@ -130,31 +128,37 @@ func TestDevice(t *testing.T) {
 
 	re := regexp.MustCompile(`action="(.*?)" method=`)
 	match := re.FindStringSubmatch(string(b))
-	loginFormUrl := match[1]
+	c.Assert(match, qt.HasLen, 2)
+	loginFormURL := match[1]
 
 	v := url.Values{}
-	v.Add("username", u.Username)
-	v.Add("password", u.Password)
-	loginResp, err := client.PostForm(loginFormUrl, v)
+	v.Add("username", jimmtest.HardcodedGroupUsername)
+	v.Add("password", jimmtest.HardcodedGroupPassword)
+	loginResp, err := client.PostForm(loginFormURL, v)
 	c.Assert(err, qt.IsNil)
 	defer loginResp.Body.Close()
 
-	// Post consent
+	// Post consent when Keycloak presents a consent page.
 	b, err = io.ReadAll(loginResp.Body)
 	c.Assert(err, qt.IsNil)
 
 	re = regexp.MustCompile(`action="(.*?)" method=`)
 	match = re.FindStringSubmatch(string(b))
-	consentFormUri := match[1]
-	v = url.Values{}
-	v.Add("accept", "Yes")
-	consentResp, err := client.PostForm("http://localhost:8082"+consentFormUri, v)
-	c.Assert(err, qt.IsNil)
-	defer consentResp.Body.Close()
+	if len(match) == 2 {
+		consentFormURL := match[1]
+		if !strings.HasPrefix(consentFormURL, "http://") && !strings.HasPrefix(consentFormURL, "https://") {
+			consentFormURL = "http://localhost:8082" + consentFormURL
+		}
+		v = url.Values{}
+		v.Add("accept", "Yes")
+		consentResp, err := client.PostForm(consentFormURL, v)
+		c.Assert(err, qt.IsNil)
+		defer consentResp.Body.Close()
 
-	// Read consent resp
-	b, err = io.ReadAll(consentResp.Body)
-	c.Assert(err, qt.IsNil)
+		// Read consent response when present.
+		b, err = io.ReadAll(consentResp.Body)
+		c.Assert(err, qt.IsNil)
+	}
 
 	re = regexp.MustCompile(`Device Login Successful`)
 	c.Assert(re.MatchString(string(b)), qt.IsTrue)
@@ -170,11 +174,11 @@ func TestDevice(t *testing.T) {
 	c.Assert(idToken, qt.IsNotNil)
 
 	// Test subject set
-	c.Assert(idToken.Subject, qt.Equals, u.Id)
+	c.Assert(idToken.Subject, qt.Equals, jimmtest.HardcodedGroupUserID)
 
 	claims, err := authSvc.IdentityClaims(ctx, idToken)
 	c.Assert(err, qt.IsNil)
-	c.Assert(claims.Email, qt.Equals, u.Email)
+	c.Assert(claims.Email, qt.Equals, jimmtest.HardcodedGroupEmail)
 	c.Assert(claims.Groups, qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
 
 	missingClaimAuthSvc, _, _, missingCleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, "missing-groups")
@@ -182,14 +186,14 @@ func TestDevice(t *testing.T) {
 
 	missingClaims, err := missingClaimAuthSvc.IdentityClaims(ctx, idToken)
 	c.Assert(err, qt.IsNil)
-	c.Assert(missingClaims.Email, qt.Equals, u.Email)
+	c.Assert(missingClaims.Email, qt.Equals, jimmtest.HardcodedGroupEmail)
 	c.Assert(missingClaims.Groups, qt.IsNil)
 
 	// Update the identity
 	err = authSvc.UpdateIdentity(ctx, claims.Email, token)
 	c.Assert(err, qt.IsNil)
 
-	updatedUser, err := dbmodel.NewIdentity(u.Email)
+	updatedUser, err := dbmodel.NewIdentity(jimmtest.HardcodedGroupEmail)
 	c.Assert(err, qt.IsNil)
 	c.Assert(db.GetIdentity(ctx, updatedUser), qt.IsNil)
 	c.Assert(updatedUser.AccessToken, qt.Not(qt.Equals), "")
@@ -358,10 +362,12 @@ func TestBrowserLoginStoresExtractedGroups(t *testing.T) {
 	_, db, sessionStore, cleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, testGroupClaimKey)
 	defer cleanup()
 
-	user, err := jimmtest.CreateRandomKeycloakUserInGroup(jimmtest.OIDCGroupsTestGroupName)
-	c.Assert(err, qt.IsNil)
-
-	cookie, err := jimmtest.RunBrowserLogin(db, sessionStore, user.Username, user.Password)
+	cookie, err := jimmtest.RunBrowserLogin(
+		db,
+		sessionStore,
+		jimmtest.HardcodedGroupUsername,
+		jimmtest.HardcodedGroupPassword,
+	)
 	c.Assert(err, qt.IsNil)
 
 	req, err := http.NewRequest("GET", "", nil)
@@ -372,7 +378,7 @@ func TestBrowserLoginStoresExtractedGroups(t *testing.T) {
 
 	session, err := sessionStore.Get(req, auth.SessionName)
 	c.Assert(err, qt.IsNil)
-	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, user.Email)
+	c.Assert(session.Values[auth.SessionIdentityKey], qt.Equals, jimmtest.HardcodedGroupEmail)
 	c.Assert(session.Values[auth.SessionGroupsKey], qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
 }
 
