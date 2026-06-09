@@ -1002,12 +1002,10 @@ type JobDetail struct {
 	Errors      []JobAttemptError `json:"errors,omitempty" yaml:"errors,omitempty"`
 }
 
-// UpgradeToJobStatus holds the status of an upgrade job, including details about the
-// root job and migration and upgrade child-jobs.
+// UpgradeToJobStatus holds the status of an upgrade job.
 type UpgradeToJobStatus struct {
-	Root      JobDetail  `json:"root" yaml:"root"`
-	Migration *JobDetail `json:"migration,omitempty" yaml:"migration,omitempty"`
-	Upgrade   *JobDetail `json:"upgrade,omitempty" yaml:"upgrade,omitempty"`
+	Detail JobDetail `json:"detail" yaml:"detail"`
+	Info   string    `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
 // BootstrapJobStatus holds the status of a bootstrap job.

@@ -1095,7 +1095,7 @@ func TestModelControllerInfo_HydratesUpgradeToStatus(t *testing.T) {
 
 	ctx := c.Context()
 	status := &apiparams.UpgradeToJobStatus{
-		Root: apiparams.JobDetail{
+		Detail: apiparams.JobDetail{
 			State:       "running",
 			Attempt:     1,
 			MaxAttempts: 3,

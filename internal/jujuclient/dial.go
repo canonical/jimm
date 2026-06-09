@@ -97,6 +97,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	if conn == nil {
 		return nil, errors.Codef(errors.CodeConnectionFailed, "%w", err)
 	}
+
 	client := rpc.NewClient(conn)
 
 	if user == nil {
@@ -106,6 +107,7 @@ func (d *Dialer) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag nam
 	var loginRequest *jujuparams.LoginRequest
 	loginRequest, err = d.createLoginRequest(ctx, ctl, modelTag, user)
 	if err != nil {
+		client.Close()
 		return nil, err
 	}
 

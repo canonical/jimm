@@ -4,6 +4,7 @@ package river
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
@@ -22,8 +23,6 @@ import (
 
 const (
 	defaultQueueMaxWorkers = 5
-	defaultMigrateRetries  = 3
-	defaultUpgradeRetries  = 3
 )
 
 // UpgradeManager defines the methods for the domain logic of upgrades.
@@ -48,30 +47,28 @@ type Store interface {
 
 // StartWorkers sets up and starts the river workers.
 // Start() is a non-blocking call; it starts a background goroutine to process jobs, and maintainance tasks.
+// The started River client is returned so callers can wait for shutdown to complete.
 func StartWorkers(
 	ctx context.Context,
 	db *db.Database,
 	openfgaClient *openfga.OFGAClient,
 	upgradeManager UpgradeManager,
 	bootstrapManager BootstrapManager,
-) error {
+) (*river.Client[*sql.Tx], error) {
 	workerParams := workerParams{
-		migrateRetryCount: defaultMigrateRetries,
-		upgradeRetryCount: defaultUpgradeRetries,
-		awaitFunc:         waitForJobToFinalise,
-		openfgaClient:     openfgaClient,
-		store:             db,
-		upgradeManager:    upgradeManager,
-		bootstrapManager:  bootstrapManager,
+		openfgaClient:    openfgaClient,
+		store:            db,
+		upgradeManager:   upgradeManager,
+		bootstrapManager: bootstrapManager,
 	}
 	workers, err := newWorkers(workerParams)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	sqlDb, err := db.SqlDB()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	riverClient, err := river.NewClient(riverdatabasesql.New(sqlDb), &river.Config{
@@ -82,41 +79,29 @@ func StartWorkers(
 		ErrorHandler: &errorHandler{},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return riverClient.Start(ctx)
+	if err := riverClient.Start(ctx); err != nil {
+		return nil, err
+	}
+	return riverClient, nil
 }
 
 type workerParams struct {
-	migrateRetryCount int
-	upgradeRetryCount int
-	awaitFunc         awaitCompletionFunc
-	openfgaClient     *openfga.OFGAClient
-	store             *db.Database
-	upgradeManager    UpgradeManager
-	bootstrapManager  BootstrapManager
+	openfgaClient    *openfga.OFGAClient
+	store            *db.Database
+	upgradeManager   UpgradeManager
+	bootstrapManager BootstrapManager
+	upgradeToRetry   upgradeToRetryFunc
 }
 
 func newWorkers(wp workerParams) (*river.Workers, error) {
 	workers := river.NewWorkers()
 
-	migrationWorker, err := newMigrationWorker(wp.openfgaClient, wp.store, wp.upgradeManager)
+	upgradeToWorker, err := newUpgradeToWorker(wp.openfgaClient, wp.store, wp.upgradeManager, wp.upgradeToRetry)
 	if err != nil {
 		return nil, err
 	}
-	if err := river.AddWorkerSafely(workers, migrationWorker); err != nil {
-		return nil, err
-	}
-
-	upgradeWorker, err := newUpgradeWorker(wp.upgradeManager)
-	if err != nil {
-		return nil, err
-	}
-	if err := river.AddWorkerSafely(workers, upgradeWorker); err != nil {
-		return nil, err
-	}
-
-	upgradeToWorker := newUpgradeToWorker(wp.migrateRetryCount, wp.upgradeRetryCount, wp.awaitFunc)
 	if err := river.AddWorkerSafely(workers, upgradeToWorker); err != nil {
 		return nil, err
 	}

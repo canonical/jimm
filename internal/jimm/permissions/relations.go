@@ -100,7 +100,7 @@ func (j *PermissionManager) RemoveRelation(ctx context.Context, user *openfga.Us
 		if err != nil {
 			return errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
 		}
-		j.logUserUpdates(ctx, user, batch, true)
+		j.logUserUpdates(ctx, user, batch, false)
 	}
 	return nil
 }

@@ -62,11 +62,13 @@ Note that you can export an environment variable `CONTROLLER_NAME` and re-run st
 controllers that will be controlled by JIMM.
 
 1. `juju unregister jimm-dev`                     - Unregister any other local JIMM you have.
-2. `juju login jimm.localhost -c jimm-dev`        - Login to local JIMM with username "jimm-test" password "password".
+2. `juju login jimm.localhost -c jimm-dev`        - Login to local JIMM with `jimm-test` / `password` for the default admin user or `jimm-user` / `password` for the default non-admin user.
 3. `./local/jimm/setup-controller.sh`             - Performs controller setup.
    > If LXD is not initialized, run `lxd init --auto` first.
 4. `./local/jimm/add-controller.sh`               - A local script to do many of the manual steps for us. See script for more details.
 5. `juju add-model test`                          - Adds a model to qa-lxd via JIMM.
+
+For Keycloak admin console access, use `jimm` / `jimm` at `http://keycloak.localhost:8082/admin/master/console/`.
 
 # Helpful tidbits!
 

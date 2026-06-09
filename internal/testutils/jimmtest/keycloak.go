@@ -29,9 +29,7 @@ const (
 	keycloakJIMMRealmPath    = "/admin/realms/jimm"
 	keycloakAdminUsername    = "jimm"
 	keycloakAdminPassword    = "jimm"
-	keycloakAdminCLIUsername = "admin-cli"
-	//nolint:gosec // Thinks credentials exposed. Only used for test.
-	keycloakAdminCLISecret = "DOLcuE5Cd7IxuR7JE4hpAUxaLF7RlAWh"
+	keycloakAdminCLIClientID = "admin-cli"
 )
 
 // KeycloakUser represents a basic user created in Keycloak.
@@ -81,10 +79,10 @@ func getAdminCLIAccessToken() (string, error) {
 	u := url.URL{
 		Scheme: "http",
 		Host:   keycloakHost,
-		User:   url.UserPassword(keycloakAdminCLIUsername, keycloakAdminCLISecret),
 		Path:   "/realms/master/protocol/openid-connect/token",
 	}
 	reqBody := url.Values{}
+	reqBody.Set("client_id", keycloakAdminCLIClientID)
 	reqBody.Set("username", keycloakAdminUsername)
 	reqBody.Set("password", keycloakAdminPassword)
 	reqBody.Set("grant_type", "password")
@@ -193,7 +191,6 @@ func addKeycloakUser(adminCLIToken, email, username string) error {
 		"email":         email,
 		"emailVerified": true,
 		"enabled":       true,
-		"realmRoles":    []string{"user", "offline_access"},
 	}
 
 	reqBodyJSON, err := json.Marshal(reqBody)
