@@ -162,45 +162,6 @@ func (c *MockOAuthAuthenticatorDeviceAccessTokenCall) DoAndReturn(f func(context
 	return c
 }
 
-// IdentityClaims mocks base method.
-func (m *MockOAuthAuthenticator) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IdentityClaims", ctx, idToken)
-	ret0, _ := ret[0].(auth.IdentityClaims)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IdentityClaims indicates an expected call of IdentityClaims.
-func (mr *MockOAuthAuthenticatorMockRecorder) IdentityClaims(ctx, idToken any) *MockOAuthAuthenticatorIdentityClaimsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdentityClaims", reflect.TypeOf((*MockOAuthAuthenticator)(nil).IdentityClaims), ctx, idToken)
-	return &MockOAuthAuthenticatorIdentityClaimsCall{Call: call}
-}
-
-// MockOAuthAuthenticatorIdentityClaimsCall wrap *gomock.Call
-type MockOAuthAuthenticatorIdentityClaimsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockOAuthAuthenticatorIdentityClaimsCall) Return(arg0 auth.IdentityClaims, arg1 error) *MockOAuthAuthenticatorIdentityClaimsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockOAuthAuthenticatorIdentityClaimsCall) Do(f func(context.Context, *oidc.IDToken) (auth.IdentityClaims, error)) *MockOAuthAuthenticatorIdentityClaimsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockOAuthAuthenticatorIdentityClaimsCall) DoAndReturn(f func(context.Context, *oidc.IDToken) (auth.IdentityClaims, error)) *MockOAuthAuthenticatorIdentityClaimsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ExtractAndVerifyIDToken mocks base method.
 func (m *MockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
 	m.ctrl.T.Helper()
@@ -236,6 +197,45 @@ func (c *MockOAuthAuthenticatorExtractAndVerifyIDTokenCall) Do(f func(context.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockOAuthAuthenticatorExtractAndVerifyIDTokenCall) DoAndReturn(f func(context.Context, *oauth2.Token) (*oidc.IDToken, error)) *MockOAuthAuthenticatorExtractAndVerifyIDTokenCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// IdentityClaims mocks base method.
+func (m *MockOAuthAuthenticator) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IdentityClaims", ctx, idToken)
+	ret0, _ := ret[0].(auth.IdentityClaims)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IdentityClaims indicates an expected call of IdentityClaims.
+func (mr *MockOAuthAuthenticatorMockRecorder) IdentityClaims(ctx, idToken any) *MockOAuthAuthenticatorIdentityClaimsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IdentityClaims", reflect.TypeOf((*MockOAuthAuthenticator)(nil).IdentityClaims), ctx, idToken)
+	return &MockOAuthAuthenticatorIdentityClaimsCall{Call: call}
+}
+
+// MockOAuthAuthenticatorIdentityClaimsCall wrap *gomock.Call
+type MockOAuthAuthenticatorIdentityClaimsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockOAuthAuthenticatorIdentityClaimsCall) Return(arg0 auth.IdentityClaims, arg1 error) *MockOAuthAuthenticatorIdentityClaimsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockOAuthAuthenticatorIdentityClaimsCall) Do(f func(context.Context, *oidc.IDToken) (auth.IdentityClaims, error)) *MockOAuthAuthenticatorIdentityClaimsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockOAuthAuthenticatorIdentityClaimsCall) DoAndReturn(f func(context.Context, *oidc.IDToken) (auth.IdentityClaims, error)) *MockOAuthAuthenticatorIdentityClaimsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
