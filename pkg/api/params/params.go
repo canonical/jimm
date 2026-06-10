@@ -987,28 +987,44 @@ type ShowControllerRequest struct {
 
 // JobAttemptError represents an error that occurred during a job attempt.
 type JobAttemptError struct {
-	Attempt int       `json:"attempt" yaml:"attempt"`
-	At      time.Time `json:"at" yaml:"at"`
-	Error   string    `json:"error" yaml:"error"`
+	// Attempt is the attempt number on which the error occurred (maps to
+	// Attempt on a job row).
+	Attempt int `json:"attempt" yaml:"attempt"`
+	// At is the time at which the error occurred.
+	At time.Time `json:"at" yaml:"at"`
+	// Error contains the stringified error of an error returned from a job
+	Error string `json:"error" yaml:"error"`
 }
 
 // JobDetail represents the details of a job, including its state, attempts, and errors.
 type JobDetail struct {
-	State       string            `json:"state" yaml:"state"`
-	Attempt     int               `json:"attempt" yaml:"attempt"`
-	MaxAttempts int               `json:"max_attempts" yaml:"max_attempts"`
-	AttemptedAt *time.Time        `json:"attempted_at,omitempty" yaml:"attempted_at,omitempty"`
-	FinalizedAt *time.Time        `json:"finalized_at,omitempty" yaml:"finalized_at,omitempty"`
-	Errors      []JobAttemptError `json:"errors,omitempty" yaml:"errors,omitempty"`
+	// State is the current state of the job, such as "available", "cancelled", "completed", "discarded", etc.
+	State string `json:"state" yaml:"state"`
+	// Attempt is the current attempt number for this job.
+	Attempt int `json:"attempt" yaml:"attempt"`
+	// MaxAttempts is the maximum number of attempts for this job.
+	MaxAttempts int `json:"max_attempts" yaml:"max_attempts"`
+	// AttemptedAt is the time that the job was last worked.
+	AttemptedAt *time.Time `json:"attempted_at,omitempty" yaml:"attempted_at,omitempty"`
+	// FinalizedAt is the time at which the job was "finalized", meaning it was
+	// either completed successfully or errored for the last time such that
+	// it'll no longer be retried.
+	FinalizedAt *time.Time `json:"finalized_at,omitempty" yaml:"finalized_at,omitempty"`
+	// Errors is a set of errors that occurred when the job was worked, one for
+	// each attempt. Ordered from earliest error to the latest error.
+	Errors []JobAttemptError `json:"errors,omitempty" yaml:"errors,omitempty"`
 }
 
 // UpgradeToJobStatus holds the status of an upgrade job.
 type UpgradeToJobStatus struct {
+	// Detail holds the details of the job, such as its state, attempts, and errors.
 	Detail JobDetail `json:"detail" yaml:"detail"`
-	Info   string    `json:"info,omitempty" yaml:"info,omitempty"`
+	// Info holds a human-readable string with information about the job status.
+	Info string `json:"info,omitempty" yaml:"info,omitempty"`
 }
 
 // BootstrapJobStatus holds the status of a bootstrap job.
 type BootstrapJobStatus struct {
+	// Bootstrap holds the details of the bootstrap job, such as its state, attempts, and errors.
 	Bootstrap JobDetail `json:"bootstrap" yaml:"bootstrap"`
 }

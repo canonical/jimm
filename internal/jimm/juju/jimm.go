@@ -414,10 +414,6 @@ func WithOwnerAndModelName(ownerName, modelName string) ModelControllerInfoQuali
 // - WithModelUUID(uuid) to specify by model UUID
 // - WithOwnerAndModelName(owner, name) to specify by owner and model name
 func (j *JujuManager) ModelControllerInfo(ctx context.Context, user *openfga.User, qualifier ModelControllerInfoQualifier) (*apiparams.ModelControllerInfo, error) {
-	if !user.JimmAdmin {
-		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
-
 	var model dbmodel.Model
 	qualifier(&model)
 
@@ -428,6 +424,13 @@ func (j *JujuManager) ModelControllerInfo(ctx context.Context, user *openfga.Use
 	err := j.Database.GetModel(ctx, &model)
 	if err != nil {
 		return nil, err
+	}
+
+	if ok, err := user.IsModelAdmin(ctx, model.ResourceTag()); err != nil {
+		zapctx.Error(ctx, "error checking user permissions for model", zap.String("model", model.Name), zap.String("owner", model.OwnerIdentityName), zap.Error(err))
+		return nil, errors.New("error checking user permissions for model")
+	} else if !ok {
+		return nil, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
 	return &apiparams.ModelControllerInfo{

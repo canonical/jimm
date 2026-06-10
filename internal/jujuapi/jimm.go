@@ -848,10 +848,6 @@ func (r *controllerRoot) ListUserClouds(ctx context.Context, req apiparams.ListU
 // The model can be specified either by model UUID,
 // or by the combination of ownerName and modelName parameters.
 func (r *controllerRoot) ModelControllerInfo(ctx context.Context, req apiparams.ModelControllerInfoRequest) (apiparams.ModelControllerInfo, error) {
-	if !r.user.JimmAdmin {
-		return apiparams.ModelControllerInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
-
 	var qualifier juju.ModelControllerInfoQualifier
 
 	tokens := strings.SplitN(req.ModelQualifier, "/", 2)

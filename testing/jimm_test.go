@@ -1279,7 +1279,7 @@ func TestModelControllerInfo(t *testing.T) {
 	s := jimmtest.SetupJimmWithControllers(c)
 	model := s.CreateModelForBob(c)
 
-	conn := s.Open(c, nil, "alice@canonical.com", nil)
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
@@ -1301,6 +1301,14 @@ func TestModelControllerInfo(t *testing.T) {
 		ControllerName: model.Controller.Name,
 		ControllerUUID: model.Controller.UUID,
 	})
+
+	// Non-admin charlie without model admin should be unauthorized.
+	charlieConn := s.Open(c, nil, "charlie@canonical.com", nil)
+	defer charlieConn.Close()
+
+	charlieClient := api.NewClient(charlieConn)
+	_, err = charlieClient.ModelControllerInfo(model.UUID.String)
+	c.Assert(err, qt.ErrorMatches, "unauthorized.*")
 }
 
 type upgradeToStatusTestWorker struct {
@@ -1374,7 +1382,7 @@ func TestModelControllerInfo_HydratesUpgradeToStatus(t *testing.T) {
 		"Upgrading model to version 4.0.0",
 	)
 
-	conn := s.Open(c, nil, "alice@canonical.com", nil)
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
 
 	client := api.NewClient(conn)
