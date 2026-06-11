@@ -119,7 +119,7 @@ func start(ctx context.Context, s *service.Service) error {
 	clientCredentialScopesParsed := strings.Fields(clientCredentialScopes)
 	zapctx.Info(ctx, "oauth client credential scopes", zap.Any("scopes", clientCredentialScopesParsed))
 
-	groupClaimKey := os.Getenv("JIMM_OIDC_GROUP_CLAIM_KEY")
+	groupClaimKey := os.Getenv("JIMM_OAUTH_GROUP_CLAIM_KEY")
 
 	insecureSecretStorage := false
 	if key, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok && key != "" {
