@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -71,8 +70,7 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 	}, nil).AnyTimes()
 
 	mockAuthenticator.EXPECT().DeviceAccessToken(gomock.Any(), gomock.Any()).Return(&oauth2.Token{}, nil).AnyTimes()
-	mockAuthenticator.EXPECT().ExtractAndVerifyIDToken(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	mockAuthenticator.EXPECT().IdentityClaims(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *oidc.IDToken) (auth.IdentityClaims, error) {
+	mockAuthenticator.EXPECT().VerifyAndExtractIdentityClaims(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *oauth2.Token) (auth.IdentityClaims, error) {
 		emailPrefix := "user-foo"
 		select {
 		case candidate := <-s.deviceFlowChan:
@@ -96,11 +94,11 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 		return base64.StdEncoding.EncodeToString(serializedToken), nil
 	}).AnyTimes()
 
-	mockAuthenticator.EXPECT().VerifyClientCredentials(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, clientID string, clientSecret string) error {
+	mockAuthenticator.EXPECT().VerifyClientCredentials(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, clientID string, clientSecret string) ([]string, error) {
 		if clientID == "my-svc-acc" && clientSecret == "foo-secret" {
-			return nil
+			return []string{}, nil
 		}
-		return fmt.Errorf("invalid client credentials")
+		return nil, fmt.Errorf("invalid client credentials")
 	}).AnyTimes()
 
 	mockAuthenticator.EXPECT().VerifySessionToken(gomock.Any()).DoAndReturn(func(token string) (jwt.Token, error) {

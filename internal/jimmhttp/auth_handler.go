@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -52,8 +51,7 @@ type OAuthHandlerParams struct {
 type BrowserOAuthAuthenticator interface {
 	AuthCodeURL() (string, string, error)
 	Exchange(ctx context.Context, code string) (*oauth2.Token, error)
-	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
-	IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error)
+	VerifyAndExtractIdentityClaims(ctx context.Context, oauth2Token *oauth2.Token) (auth.IdentityClaims, error)
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 	CreateBrowserSessionWithGroups(
 		ctx context.Context,
@@ -147,15 +145,9 @@ func (oah *OAuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
+	claims, err := authSvc.VerifyAndExtractIdentityClaims(ctx, token)
 	if err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract and verify id token")
-		return
-	}
-
-	claims, err := authSvc.IdentityClaims(ctx, idToken)
-	if err != nil {
-		writeError(ctx, w, http.StatusInternalServerError, err, "failed to extract identity claims from id token")
+		writeError(ctx, w, http.StatusInternalServerError, err, "failed to verify and extract identity claims")
 		return
 	}
 

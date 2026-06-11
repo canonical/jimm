@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -48,12 +47,9 @@ type OAuthAuthenticator interface {
 	// See Device(...) godoc for more info pertaining to the flow.
 	DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error)
 
-	// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
-	// and performs signature verification of the token.
-	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
-
-	// IdentityClaims retrieves the user's identity claims from a verified ID token.
-	IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error)
+	// VerifyAndExtractIdentityClaims verifies the ID token in oauth2Token and
+	// extracts email from the verified ID token and groups from the access token.
+	VerifyAndExtractIdentityClaims(ctx context.Context, oauth2Token *oauth2.Token) (auth.IdentityClaims, error)
 
 	// MintSessionTokenWithGroups mints a session token to be used when logging into JIMM
 	// via an access token. The token contains the user's email and internal groups claim.
@@ -72,8 +68,9 @@ type OAuthAuthenticator interface {
 	// And, if present, a refresh token.
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 
-	// VerifyClientCredentials verifies the provided client ID and client secret.
-	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
+	// VerifyClientCredentials verifies the provided client ID and client secret,
+	// returning the groups claim extracted from the access token.
+	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) ([]string, error)
 
 	// AuthenticateBrowserSession updates the session for a browser, additionally
 	// retrieving new access tokens upon expiry. If this cannot be done, the cookie
@@ -130,12 +127,7 @@ func (j *LoginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthRes
 		return "", err
 	}
 
-	idToken, err := j.oAuthAuthenticator.ExtractAndVerifyIDToken(ctx, token)
-	if err != nil {
-		return "", err
-	}
-
-	claims, err := j.oAuthAuthenticator.IdentityClaims(ctx, idToken)
+	claims, err := j.oAuthAuthenticator.VerifyAndExtractIdentityClaims(ctx, token)
 	if err != nil {
 		return "", err
 	}
@@ -163,7 +155,7 @@ func (j *LoginManager) LoginClientCredentials(ctx context.Context, clientID stri
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 
-	err = j.oAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
+	_, err = j.oAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
 	if err != nil {
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
