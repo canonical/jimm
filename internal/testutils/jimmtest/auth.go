@@ -137,22 +137,15 @@ func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, er
 	return parsedToken, nil
 }
 
-// ExtractAndVerifyIDToken returns an ID token where the subject is equal to the username obtained during the device flow.
-// The auth token must match the one returned during the device flow.
-// If the polled username is empty it indicates an error that the device flow was not run prior to calling this function.
-func (m *mockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
+// VerifyAndExtractIdentityClaims returns the mocked identity claims from an oauth2 token.
+func (m *mockOAuthAuthenticator) VerifyAndExtractIdentityClaims(ctx context.Context, oauth2Token *oauth2.Token) (auth.IdentityClaims, error) {
 	if m.polledUsername == "" {
-		return &oidc.IDToken{}, errors.New("unknown user for mock auth login")
+		return auth.IdentityClaims{}, errors.New("unknown user for mock auth login")
 	}
 	if m.mockAccessToken != oauth2Token.AccessToken {
-		return &oidc.IDToken{}, errors.New("access token does not match the generated access token")
+		return auth.IdentityClaims{}, errors.New("access token does not match the generated access token")
 	}
-	return &oidc.IDToken{Subject: m.polledUsername}, nil
-}
-
-// IdentityClaims returns the subject from an ID token as the mock email claim.
-func (m *mockOAuthAuthenticator) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (auth.IdentityClaims, error) {
-	return auth.IdentityClaims{Email: idToken.Subject}, nil
+	return auth.IdentityClaims{Subject: m.polledUsername, Email: m.polledUsername}, nil
 }
 
 // UpdateIdentity is a no-op mock.
@@ -170,9 +163,9 @@ func (m *mockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context,
 	return ctx, errors.New("authentication failed")
 }
 
-// VerifyClientCredentials always returns a nil error.
-func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error {
-	return nil
+// VerifyClientCredentials always returns an empty group set and nil error.
+func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) ([]string, error) {
+	return []string{}, nil
 }
 
 // newSessionToken returns a serialised JWT that can be used in tests.

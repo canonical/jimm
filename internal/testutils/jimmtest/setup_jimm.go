@@ -406,7 +406,7 @@ func (s *JIMMEnv) EnableDeviceFlow(username string) {
 
 type mockMigrationTokenGenerator struct{}
 
-func (m mockMigrationTokenGenerator) NewMigrationToken(ctx context.Context, username string) (string, error) {
+func (m mockMigrationTokenGenerator) NewMigrationToken(ctx context.Context, username string, groups []string) (string, error) {
 	// Simulate a token generation by returning a simple string.
 	// In a real implementation, this would be a JWT or similar token.
 	return "test-migration-token", nil
