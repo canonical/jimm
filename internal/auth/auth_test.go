@@ -29,7 +29,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
-const testGroupClaimKey = "groups"
+const (
+	testGroupScope    = "group"
+	testGroupClaimKey = "groups"
+)
 
 func setupTestAuthSvc(ctx context.Context, c *qt.C, expiry time.Duration) (*auth.AuthenticationService, *db.Database, sessions.Store, func()) {
 	return setupTestAuthSvcWithGroupClaimKey(ctx, c, expiry, "")
@@ -49,18 +52,19 @@ func setupTestAuthSvcWithGroupClaimKey(ctx context.Context, c *qt.C, expiry time
 
 	// #nosec G101 Fake test credentials and keys.
 	authSvc, err := auth.NewAuthenticationService(ctx, auth.AuthenticationServiceParams{
-		IssuerURL:           "http://localhost:8082/realms/jimm",
-		ClientID:            "jimm-device",
-		ClientSecret:        "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:              []string{oidc.ScopeOpenID, "profile", "email", "group"},
-		GroupClaimKey:       groupClaimKey,
-		SessionTokenExpiry:  expiry,
-		RedirectURL:         "http://localhost:8080/auth/callback",
-		Store:               db,
-		SessionStore:        sessionStore,
-		SessionCookieMaxAge: 60,
-		JWTSessionKey:       "secret-key",
-		SecureCookies:       false,
+		IssuerURL:              "http://localhost:8082/realms/jimm",
+		ClientID:               "jimm-device",
+		ClientSecret:           "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
+		Scopes:                 []string{oidc.ScopeOpenID, "profile", "email", "group"},
+		GroupClaimKey:          groupClaimKey,
+		SessionTokenExpiry:     expiry,
+		RedirectURL:            "http://localhost:8080/auth/callback",
+		Store:                  db,
+		SessionStore:           sessionStore,
+		SessionCookieMaxAge:    60,
+		JWTSessionKey:          "secret-key",
+		SecureCookies:          false,
+		ClientCredentialScopes: []string{testGroupScope},
 	})
 	c.Assert(err, qt.IsNil)
 	cleanup := func() {
@@ -76,7 +80,7 @@ func TestAuthCodeURL(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	authSvc, _, _, cleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, testGroupClaimKey)
 	defer cleanup()
 
 	url, state, err := authSvc.AuthCodeURL()
@@ -168,24 +172,18 @@ func TestDevice(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(token, qt.IsNotNil)
 
-	// Extract and verify id token
-	idToken, err := authSvc.ExtractAndVerifyIDToken(ctx, token)
+	claims, err := authSvc.VerifyAndExtractIdentityClaims(ctx, token)
 	c.Assert(err, qt.IsNil)
-	c.Assert(idToken, qt.IsNotNil)
-
-	// Test subject set
-	c.Assert(idToken.Subject, qt.Equals, jimmtest.HardcodedGroupUserID)
-
-	claims, err := authSvc.IdentityClaims(ctx, idToken)
-	c.Assert(err, qt.IsNil)
+	c.Assert(claims.Subject, qt.Equals, jimmtest.HardcodedGroupUserID)
 	c.Assert(claims.Email, qt.Equals, jimmtest.HardcodedGroupEmail)
 	c.Assert(claims.Groups, qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
 
 	missingClaimAuthSvc, _, _, missingCleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, "missing-groups")
 	defer missingCleanup()
 
-	missingClaims, err := missingClaimAuthSvc.IdentityClaims(ctx, idToken)
+	missingClaims, err := missingClaimAuthSvc.VerifyAndExtractIdentityClaims(ctx, token)
 	c.Assert(err, qt.IsNil)
+	c.Assert(missingClaims.Subject, qt.Equals, jimmtest.HardcodedGroupUserID)
 	c.Assert(missingClaims.Email, qt.Equals, jimmtest.HardcodedGroupEmail)
 	c.Assert(missingClaims.Groups, qt.IsNil)
 
@@ -303,11 +301,32 @@ func TestVerifyClientCredentials(t *testing.T) {
 	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
 	defer cleanup()
 
-	err := authSvc.VerifyClientCredentials(ctx, validClientID, validClientSecret)
+	groups, err := authSvc.VerifyClientCredentials(ctx, validClientID, validClientSecret)
 	c.Assert(err, qt.IsNil)
+	// The local Keycloak service-account token currently does not include the
+	// groups claim, even when the group scope is requested.
+	c.Assert(groups, qt.IsNil)
 
-	err = authSvc.VerifyClientCredentials(ctx, "invalid-client-id", validClientSecret)
+	_, err = authSvc.VerifyClientCredentials(ctx, "invalid-client-id", validClientSecret)
 	c.Assert(err, qt.ErrorMatches, "invalid client credentials.*")
+}
+
+func TestVerifyClientCredentialsInGroups(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	const (
+		validClientID = "test-client-id-with-groups"
+		//nolint:gosec // Thinks hardcoded credentials.
+		validClientSecret = "d6JVj6NDXYx56muG6ZmjWMLcJnIYQjD0"
+	)
+
+	authSvc, _, _, cleanup := setupTestAuthSvcWithGroupClaimKey(ctx, c, time.Hour, testGroupClaimKey)
+	defer cleanup()
+
+	groups, err := authSvc.VerifyClientCredentials(ctx, validClientID, validClientSecret)
+	c.Assert(err, qt.IsNil)
+	c.Assert(groups, qt.DeepEquals, []string{"canonical"})
 }
 
 func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {
@@ -611,16 +630,19 @@ func TestNewMigrationToken(t *testing.T) {
 	defer cleanup()
 
 	// Generate a migration token for a user
-	migrationToken, err := authSvc.NewMigrationToken(ctx, "alice@canonical.com")
+	migrationToken, err := authSvc.NewMigrationToken(ctx, "alice@canonical.com", []string{"team-a"})
 	c.Assert(err, qt.IsNil)
 	c.Assert(migrationToken, qt.Not(qt.Equals), "")
 
 	jwtToken, err := authSvc.VerifySessionToken(migrationToken)
 	c.Assert(err, qt.IsNil)
 	c.Assert(jwtToken.Subject(), qt.Equals, "alice@canonical.com")
+	migrationGroups, err := auth.SessionGroupsFromToken(jwtToken)
+	c.Assert(err, qt.IsNil)
+	c.Assert(migrationGroups, qt.DeepEquals, []string{"team-a"})
 
 	// Generate a migration token for a service account
-	migrationToken, err = authSvc.NewMigrationToken(ctx, "cde78135-f1b1-436f-8461-58461fa95914@serviceaccount")
+	migrationToken, err = authSvc.NewMigrationToken(ctx, "cde78135-f1b1-436f-8461-58461fa95914@serviceaccount", nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(migrationToken, qt.Not(qt.Equals), "")
 

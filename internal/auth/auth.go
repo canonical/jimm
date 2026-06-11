@@ -100,6 +100,8 @@ func SessionIdentityFromContext(ctx context.Context) string {
 // AuthenticationService handles authentication within JIMM.
 type AuthenticationService struct {
 	oauthConfig oauth2.Config
+	// clientCredentialScopes holds scopes used only for client-credentials flow.
+	clientCredentialScopes []string
 	// provider holds a OIDC provider wrapper for the OAuth2.0 /x/oauth package,
 	// enabling UserInfo calls, wellknown retrieval and jwks verification.
 	provider *oidc.Provider
@@ -146,8 +148,11 @@ type AuthenticationServiceParams struct {
 	// /auth and /token requests.
 	ClientSecret string
 
-	// Scopes holds the scopes that you wish to retrieve.
+	// Scopes holds scopes requested for browser/device OAuth flows.
 	Scopes []string
+
+	// ClientCredentialScopes holds scopes requested for client-credentials flow.
+	ClientCredentialScopes []string
 
 	// GroupClaimKey is the provider-specific claim name that contains group
 	// identifiers.
@@ -183,10 +188,11 @@ type AuthenticationServiceParams struct {
 	AuthStyle AuthStyle
 }
 
-// IdentityClaims are the user identity values extracted from a verified ID token.
+// IdentityClaims are the user identity values extracted from verified OIDC tokens.
 type IdentityClaims struct {
-	Email  string
-	Groups []string
+	Subject string
+	Email   string
+	Groups  []string
 }
 
 // NewAuthenticationService returns a new authentication service for handling
@@ -206,14 +212,15 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 			Scopes:       params.Scopes,
 			RedirectURL:  params.RedirectURL,
 		},
-		sessionTokenExpiry:  params.SessionTokenExpiry,
-		jwtSessionKey:       params.JWTSessionKey,
-		signingAlg:          jwa.HS256,
-		groupClaimKey:       params.GroupClaimKey,
-		db:                  params.Store,
-		sessionStore:        params.SessionStore,
-		sessionCookieMaxAge: params.SessionCookieMaxAge,
-		secureCookies:       params.SecureCookies,
+		clientCredentialScopes: params.ClientCredentialScopes,
+		sessionTokenExpiry:     params.SessionTokenExpiry,
+		jwtSessionKey:          params.JWTSessionKey,
+		signingAlg:             jwa.HS256,
+		groupClaimKey:          params.GroupClaimKey,
+		db:                     params.Store,
+		sessionStore:           params.SessionStore,
+		sessionCookieMaxAge:    params.SessionCookieMaxAge,
+		secureCookies:          params.SecureCookies,
 	}
 
 	// If the auth style is specifically defined, then use that to avoid
@@ -229,69 +236,6 @@ func NewAuthenticationService(ctx context.Context, params AuthenticationServiceP
 	}
 
 	return authSvc, nil
-}
-
-// identityClaims extracts the fixed email claim and, when configured, a
-// provider-specific groups claim from the verified ID token.
-//
-// The email claim is always expected under the standard "email" key, while the
-// groups claim key is configurable, so the token payload is decoded once and
-// then split into fixed and dynamic lookups.
-func (as *AuthenticationService) identityClaims(ctx context.Context, idToken *oidc.IDToken) (IdentityClaims, error) {
-	if idToken == nil {
-		return IdentityClaims{}, errors.New("id token is nil")
-	}
-
-	var rawClaims map[string]any
-	if err := idToken.Claims(&rawClaims); err != nil {
-		return IdentityClaims{}, fmt.Errorf("failed to extract claims: %v", err)
-	}
-
-	emailClaim, ok := rawClaims["email"]
-	if !ok {
-		return IdentityClaims{}, errors.New("missing email claim")
-	}
-
-	emailClaimStr, ok := emailClaim.(string)
-	if !ok {
-		return IdentityClaims{}, fmt.Errorf("email claim is not a string: got %T", emailClaim)
-	}
-
-	var claims = IdentityClaims{
-		Email: emailClaimStr,
-	}
-
-	if as.groupClaimKey == "" {
-		return claims, nil
-	}
-
-	groupClaim, ok := rawClaims[as.groupClaimKey]
-	if !ok {
-		zapctx.Warn(ctx, "configured group claim missing from id token", zap.String("claim-key", as.groupClaimKey))
-		return claims, nil
-	}
-
-	// As the groups claim could be configured in many waysat the IdP
-	// we support multiple formats for the groups claim, which are all
-	// normalised into a slice of strings for the returned claims.
-	switch groups := groupClaim.(type) {
-	case string:
-		claims.Groups = splitGroupClaimString(groups)
-	case []string:
-		claims.Groups = groups
-	case []any:
-		for i, group := range groups {
-			groupStr, ok := group.(string)
-			if !ok {
-				return IdentityClaims{}, fmt.Errorf("invalid group claim entry type at index %d: got %T", i, group)
-			}
-			claims.Groups = append(claims.Groups, groupStr)
-		}
-	default:
-		return IdentityClaims{}, fmt.Errorf("invalid group claim type: got %T", groupClaim)
-	}
-
-	return claims, nil
 }
 
 // splitGroupClaimString normalises a string claim into groups.
@@ -324,6 +268,50 @@ func splitGroupClaimString(value string) []string {
 	}
 
 	return []string{trimmedValue}
+}
+
+// extractGroupsFromAccessToken extracts the configured groups claim from an access token.
+// The access token is parsed as a JWT without signature verification because it
+// originates from the provider token endpoint and we only need claim extraction.
+func (as *AuthenticationService) extractGroupsFromAccessToken(ctx context.Context, accessToken *oauth2.Token) ([]string, error) {
+	if accessToken == nil || accessToken.AccessToken == "" {
+		return nil, errors.New("access token is empty")
+	}
+
+	if as.groupClaimKey == "" {
+		return nil, nil
+	}
+
+	parsedToken, err := jwt.ParseInsecure([]byte(accessToken.AccessToken))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse access token: %v", err)
+	}
+
+	groupClaim, ok := parsedToken.Get(as.groupClaimKey)
+	if !ok {
+		zapctx.Warn(ctx, "configured group claim missing from access token", zap.String("claim-key", as.groupClaimKey))
+		return nil, nil
+	}
+
+	// Normalize the group claim into a slice of strings
+	switch groups := groupClaim.(type) {
+	case string:
+		return splitGroupClaimString(groups), nil
+	case []string:
+		return groups, nil
+	case []any:
+		var normalizedGroups []string
+		for i, group := range groups {
+			groupStr, ok := group.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid group claim entry type at index %d: got %T", i, group)
+			}
+			normalizedGroups = append(normalizedGroups, groupStr)
+		}
+		return normalizedGroups, nil
+	default:
+		return nil, fmt.Errorf("invalid group claim type: got %T", groupClaim)
+	}
 }
 
 // AuthCodeURL returns a URL that will be used to redirect a browser to the identity provider.
@@ -410,41 +398,79 @@ func (as *AuthenticationService) DeviceAccessToken(ctx context.Context, res *oau
 	return t, nil
 }
 
-// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
-// and performs signature verification of the token.
-func (as *AuthenticationService) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
-
+// VerifyAndExtractIdentityClaims verifies the ID token inside oauth2Token and
+// returns identity claims where email comes from the verified ID token and
+// groups come from the access token.
+func (as *AuthenticationService) VerifyAndExtractIdentityClaims(ctx context.Context, oauth2Token *oauth2.Token) (IdentityClaims, error) {
 	// Extract the ID Token from oauth2 token.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return nil, errors.New("failed to extract id token")
+		return IdentityClaims{}, errors.New("failed to extract id token")
 	}
 
 	verifier := as.provider.Verifier(&oidc.Config{
 		ClientID: as.oauthConfig.ClientID,
 	})
 
-	token, err := verifier.Verify(ctx, rawIDToken)
+	idToken, err := verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify id token: %v", err)
+		return IdentityClaims{}, fmt.Errorf("failed to verify id token: %v", err)
 	}
 
-	return token, nil
-}
-
-// Email retrieves the users email from an id token via the email claim
-func (as *AuthenticationService) Email(idToken *oidc.IDToken) (string, error) {
-	claims, err := as.identityClaims(context.Background(), idToken)
+	claims, err := as.extractClaims(ctx, idToken, oauth2Token)
 	if err != nil {
-		return "", err
+		return IdentityClaims{}, err
 	}
-	return claims.Email, nil
+
+	return claims, nil
 }
 
-// IdentityClaims extracts the email and configured groups claim from a
-// verified ID token.
-func (as *AuthenticationService) IdentityClaims(ctx context.Context, idToken *oidc.IDToken) (IdentityClaims, error) {
-	return as.identityClaims(ctx, idToken)
+// extractClaims extracts the email from a verified ID token and the configured
+// groups claim from the access token.
+func (as *AuthenticationService) extractClaims(ctx context.Context, idToken *oidc.IDToken, accessToken *oauth2.Token) (IdentityClaims, error) {
+	if idToken == nil {
+		return IdentityClaims{}, errors.New("id token is nil")
+	}
+
+	emailClaimStr, err := as.extractEmailClaim(idToken)
+	if err != nil {
+		return IdentityClaims{}, err
+	}
+
+	claims := IdentityClaims{Subject: idToken.Subject, Email: emailClaimStr}
+
+	// Extract groups from the access token
+	groups, err := as.extractGroupsFromAccessToken(ctx, accessToken)
+	if err != nil {
+		return IdentityClaims{}, fmt.Errorf("failed to extract groups from access token: %v", err)
+	}
+	claims.Groups = groups
+
+	return claims, nil
+}
+
+// extractEmailClaim extracts the email claim from the verified ID token.
+func (as *AuthenticationService) extractEmailClaim(idToken *oidc.IDToken) (string, error) {
+	if idToken == nil {
+		return "", errors.New("id token is nil")
+	}
+
+	var rawClaims map[string]any
+	if err := idToken.Claims(&rawClaims); err != nil {
+		return "", fmt.Errorf("failed to extract claims: %v", err)
+	}
+
+	emailClaim, ok := rawClaims["email"]
+	if !ok {
+		return "", errors.New("missing email claim")
+	}
+
+	emailClaimStr, ok := emailClaim.(string)
+	if !ok {
+		return "", fmt.Errorf("email claim is not a string: got %T", emailClaim)
+	}
+
+	return emailClaimStr, nil
 }
 
 // MintSessionTokenWithGroups mints a session token that carries the user's
@@ -475,15 +501,19 @@ func (as *AuthenticationService) MintSessionTokenWithGroups(email string, groups
 // migrating a model to JAAS. The token is used by a Juju controller to login
 // on the user's behalf and migrate the model.
 //
-// Currently the token provides the same level of access as the user, but keeping
-// this as a separate method from `MintSessionTokenWithGroups` allows for future
-// changes to the migration token without affecting the session token.
-func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username string) (string, error) {
+// The token carries the user's groups so that the controller can verify group
+// membership. It keeps the same structure as session tokens for consistency.
+func (as *AuthenticationService) NewMigrationToken(ctx context.Context, username string, groups []string) (string, error) {
 
-	token, err := jwt.NewBuilder().
+	builder := jwt.NewBuilder().
 		Subject(username).
-		Expiration(time.Now().Add(migrationTokenExpiry)).
-		Build()
+		Expiration(time.Now().Add(migrationTokenExpiry))
+
+	if len(groups) > 0 {
+		builder = builder.Claim(SessionTokenGroupsClaimKey, groups)
+	}
+
+	token, err := builder.Build()
 	if err != nil {
 		return "", fmt.Errorf("failed to mint migration token: %v", err)
 	}
@@ -599,28 +629,32 @@ func (as *AuthenticationService) UpdateIdentity(ctx context.Context, email strin
 	return nil
 }
 
-// VerifyClientCredentials verifies the provided client ID and client secret.
-func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) (err error) {
-	defer func() {
-		if err != nil {
-			servermon.AuthenticationFailCount.WithLabelValues("VerifyClientCredentials").Inc()
-		} else {
-			servermon.AuthenticationSuccessCount.WithLabelValues("VerifyClientCredentials").Inc()
-		}
-	}()
-
+// VerifyClientCredentials verifies the provided client ID and client secret,
+// and extracts the groups claim from the returned access token.
+func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) ([]string, error) {
 	cfg := clientcredentials.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		TokenURL:     as.oauthConfig.Endpoint.TokenURL,
 		AuthStyle:    oauth2.AuthStyle(as.oauthConfig.Endpoint.AuthStyle),
+		Scopes:       as.clientCredentialScopes,
 	}
 
-	_, err = cfg.Token(ctx)
+	accessToken, err := cfg.Token(ctx)
 	if err != nil {
-		return errors.Codef(errors.CodeUnauthorized, "invalid client credentials: %v", err)
+		servermon.AuthenticationFailCount.WithLabelValues("VerifyClientCredentials").Inc()
+		return nil, errors.Codef(errors.CodeUnauthorized, "invalid client credentials: %v", err)
 	}
-	return nil
+
+	// Extract groups from the access token
+	groups, err := as.extractGroupsFromAccessToken(ctx, accessToken)
+	if err != nil {
+		servermon.AuthenticationFailCount.WithLabelValues("VerifyClientCredentials").Inc()
+		return nil, fmt.Errorf("failed to extract groups from access token: %v", err)
+	}
+
+	servermon.AuthenticationSuccessCount.WithLabelValues("VerifyClientCredentials").Inc()
+	return groups, nil
 }
 
 // sessionCrossOriginSafe sets parameters on the session that allow its use in cross-origin requests.
