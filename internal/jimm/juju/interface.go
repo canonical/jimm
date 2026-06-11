@@ -209,7 +209,8 @@ type PermissionManager interface {
 // MigrationTokenGenerator is an interface for generating migration tokens
 // that are used to authenticate Juju controllers with JIMM during model migrations.
 type MigrationTokenGenerator interface {
-	// NewToken generates a new migration token with the specified user and model tag.
+	// NewToken generates a new migration token with the specified user, groups, and model tag.
 	// The token allows a client to authenticate with JIMM as the specified user.
-	NewMigrationToken(ctx context.Context, username string) (string, error)
+	// Groups are included in the token so that the controller can verify group membership.
+	NewMigrationToken(ctx context.Context, username string, groups []string) (string, error)
 }
