@@ -62,6 +62,15 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "username": "service-account-test-client-id-with-groups",
+      "enabled": true,
+      "serviceAccountClientId": "test-client-id-with-groups",
+      "groups": [
+        "/canonical"
+      ]
     }
   ],
   "groups": [
@@ -81,7 +90,26 @@
       "serviceAccountsEnabled": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "fullScopeAllowed": true
+      "fullScopeAllowed": true,
+      "optionalClientScopes": [
+        "group"
+      ]
+    },
+    {
+      "clientId": "test-client-id-with-groups",
+      "name": "JIMM test service account with groups",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "d6JVj6NDXYx56muG6ZmjWMLcJnIYQjD0",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": true,
+      "optionalClientScopes": [
+        "group"
+      ]
     },
     {
       "clientId": "jimm-device",
@@ -172,7 +200,7 @@
             "introspection.token.claim": "true",
             "multivalued": "true",
             "userinfo.token.claim": "true",
-            "id.token.claim": "true",
+            "id.token.claim": "false",
             "access.token.claim": "true",
             "claim.name": "groups",
             "full.path": "false",
