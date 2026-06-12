@@ -20,6 +20,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/gorilla/sessions"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 
 	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
@@ -238,6 +239,20 @@ func TestSessionTokensWithGroups(t *testing.T) {
 	c.Assert(groupsClaim, qt.DeepEquals, groups)
 }
 
+func TestSessionGroupsFromTokenRejectsInvalidClaimType(t *testing.T) {
+	c := qt.New(t)
+
+	token, err := jwt.NewBuilder().
+		Subject("jimm-test@canonical.com").
+		Claim(auth.SessionTokenGroupsClaimKey, "devops").
+		Build()
+	c.Assert(err, qt.IsNil)
+
+	groups, err := auth.SessionGroupsFromToken(token)
+	c.Assert(err, qt.ErrorMatches, `invalid "groups" claim type string`)
+	c.Assert(groups, qt.IsNil)
+}
+
 func TestSessionTokenRejectsExpiredToken(t *testing.T) {
 	c := qt.New(t)
 
@@ -326,7 +341,7 @@ func TestVerifyClientCredentialsInGroups(t *testing.T) {
 
 	groups, err := authSvc.VerifyClientCredentials(ctx, validClientID, validClientSecret)
 	c.Assert(err, qt.IsNil)
-	c.Assert(groups, qt.DeepEquals, []string{"canonical"})
+	c.Assert(groups, qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
 }
 
 func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {

@@ -8,25 +8,27 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
+var OIDCGroupsTestGroupName = "canonical"
+
 func TestSplitGroupClaimStringSingleValue(t *testing.T) {
 	c := qt.New(t)
 
-	groups := splitGroupClaimString("canonical")
-	c.Assert(groups, qt.DeepEquals, []string{"canonical"})
+	groups := splitGroupClaimString(OIDCGroupsTestGroupName)
+	c.Assert(groups, qt.DeepEquals, []string{OIDCGroupsTestGroupName})
 }
 
 func TestSplitGroupClaimStringCommaDelimited(t *testing.T) {
 	c := qt.New(t)
 
-	groups := splitGroupClaimString("canonical,platform, devops")
-	c.Assert(groups, qt.DeepEquals, []string{"canonical", "platform", "devops"})
+	groups := splitGroupClaimString(OIDCGroupsTestGroupName + ",platform, devops")
+	c.Assert(groups, qt.DeepEquals, []string{OIDCGroupsTestGroupName, "platform", "devops"})
 }
 
 func TestSplitGroupClaimStringWhitespaceDelimited(t *testing.T) {
 	c := qt.New(t)
 
-	groups := splitGroupClaimString("canonical platform\tdevops")
-	c.Assert(groups, qt.DeepEquals, []string{"canonical", "platform", "devops"})
+	groups := splitGroupClaimString(OIDCGroupsTestGroupName + " platform\tdevops")
+	c.Assert(groups, qt.DeepEquals, []string{OIDCGroupsTestGroupName, "platform", "devops"})
 }
 
 func TestSplitGroupClaimStringEmpty(t *testing.T) {

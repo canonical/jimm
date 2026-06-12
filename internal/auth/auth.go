@@ -579,22 +579,11 @@ func SessionGroupsFromToken(token jwt.Token) ([]string, error) {
 		return nil, nil
 	}
 
-	switch groups := rawGroups.(type) {
-	case []string:
-		return groups, nil
-	case []any:
-		normalizedGroups := make([]string, len(groups))
-		for i, group := range groups {
-			groupStr, ok := group.(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid %q claim entry type %T", SessionTokenGroupsClaimKey, group)
-			}
-			normalizedGroups[i] = groupStr
-		}
-		return normalizedGroups, nil
-	default:
-		return nil, fmt.Errorf("invalid %q claim type %T", SessionTokenGroupsClaimKey, rawGroups)
+	if parsedGroups, ok := rawGroups.([]string); ok {
+		return parsedGroups, nil
 	}
+
+	return nil, fmt.Errorf("invalid %q claim type %T", SessionTokenGroupsClaimKey, rawGroups)
 }
 
 // UpdateIdentity updates the database with the display name and access token set for the user.
