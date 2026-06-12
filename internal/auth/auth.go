@@ -250,24 +250,8 @@ func splitGroupClaimString(value string) []string {
 		return nil
 	}
 
-	if strings.Contains(trimmedValue, ",") {
-		rawGroups := strings.Split(trimmedValue, ",")
-		normalizedGroups := make([]string, 0, len(rawGroups))
-		for _, group := range rawGroups {
-			group = strings.TrimSpace(group)
-			if group == "" {
-				continue
-			}
-			normalizedGroups = append(normalizedGroups, group)
-		}
-		return normalizedGroups
-	}
-
-	if strings.ContainsAny(trimmedValue, " \t\n\r") {
-		return strings.Fields(trimmedValue)
-	}
-
-	return []string{trimmedValue}
+	normalised := strings.ReplaceAll(trimmedValue, ",", " ")
+	return strings.Fields(normalised)
 }
 
 // extractGroupsFromAccessToken extracts the configured groups claim from an access token.
