@@ -563,8 +563,16 @@ func SessionGroupsFromToken(token jwt.Token) ([]string, error) {
 		return nil, nil
 	}
 
-	if parsedGroups, ok := rawGroups.([]string); ok {
-		return parsedGroups, nil
+	if parsedGroups, ok := rawGroups.([]any); ok {
+		var groups []string
+		for i, group := range parsedGroups {
+			groupStr, ok := group.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid group claim entry type at index %d: got %T", i, group)
+			}
+			groups = append(groups, groupStr)
+		}
+		return groups, nil
 	}
 
 	return nil, fmt.Errorf("invalid %q claim type %T", SessionTokenGroupsClaimKey, rawGroups)
