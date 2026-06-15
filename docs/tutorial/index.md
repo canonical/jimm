@@ -82,7 +82,7 @@ You are now all set and ready to start deploying JAAS.
 JIMM uses OAuth 2.0, a provider agnostic way of handling authentication. In this tutorial we will combine it with the Canonical Identical Platform, which uses Ory Hydra to provide an OAuth server and Kratos for user management, respectively. To speed things up, we will deploy all these components through the ready-to-use Terraform plan:
 ```text
 git clone https://github.com/canonical/iam-bundle-integration.git && cd iam-bundle-integration
-git checkout v1.0.0
+git checkout v1.1.1
 ```
 
 And use Terraform to deploy the Canonical Identity Platform.
