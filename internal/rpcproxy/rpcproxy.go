@@ -24,7 +24,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
-	"github.com/canonical/jimm/v3/internal/utils"
 )
 
 const (
@@ -107,57 +106,11 @@ type ProxyHelpers struct {
 // tokenGen is used to authenticate the user and generate JWT token.
 // connectController provides the function to return a connection to the desired controller endpoint.
 func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
-
-	if helpers.ConnectController == nil {
-		return errors.New("missing controller connect function")
+	session, err := newProxySession(helpers)
+	if err != nil {
+		return err
 	}
-	if helpers.AuditLog == nil {
-		return errors.New("missing audit log function")
-	}
-	if helpers.LoginService == nil {
-		return errors.New("missing login service function")
-	}
-	if helpers.RedirectInfo == nil {
-		return errors.New("missing redirect info function")
-	}
-	errChan := make(chan error, 2)
-	msgInFlight := inflightMsgs{messages: make(map[uint64]*message)}
-	client := writeLockConn{conn: helpers.ConnClient}
-	// Note that the clProxy start method will create the connection to the desired controller only
-	// after the first message has been received so that any errors can be properly sent back to the client.
-	clProxy := clientProxy{
-		modelProxy: modelProxy{
-			src:                     &client,
-			msgs:                    &msgInFlight,
-			tokenGen:                helpers.TokenGen,
-			auditLog:                helpers.AuditLog,
-			conversationId:          utils.NewConversationID(),
-			loginService:            helpers.LoginService,
-			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
-			redirectInfo:            helpers.RedirectInfo,
-		},
-		errChan:              errChan,
-		createControllerConn: helpers.ConnectController,
-	}
-	clProxy.wg.Go(func() {
-		errChan <- clProxy.start(ctx)
-	})
-	var err error
-	select {
-	case err = <-errChan:
-		if err != nil {
-			zapctx.Debug(ctx, "Proxy error", zap.Error(err))
-		}
-	case <-ctx.Done():
-		err = errors.New("Context cancelled")
-		zapctx.Debug(ctx, "Context cancelled")
-	}
-	// Close the client connection to ensure everything is cleaned up.
-	// Normally the client would do this but we also do it here in case the
-	// connection to the controller fails and we want to trigger cleanup.
-	helpers.ConnClient.Close()
-	clProxy.wg.Wait()
-	return err
+	return session.run(ctx)
 }
 
 // writeLockConn provides a websocket connection that is safe for concurrent writes.
@@ -198,71 +151,10 @@ func (c *writeLockConn) sendMessage(responseObject any, request *message) {
 	}
 }
 
-// inflightMsgs holds only request messages that are
-// still pending a response from a Juju controller.
-type inflightMsgs struct {
-	controllerUUID string
-
-	mu           sync.Mutex
-	loginMessage *message
-	messages     map[uint64]*message
-}
-
-func (msgs *inflightMsgs) addLoginMessage(msg *message) {
-	msgs.mu.Lock()
-	defer msgs.mu.Unlock()
-
-	msgs.loginMessage = msg
-}
-
-func (msgs *inflightMsgs) getLoginMessage() *message {
-	msgs.mu.Lock()
-	defer msgs.mu.Unlock()
-
-	return msgs.loginMessage
-}
-
-func (msgs *inflightMsgs) addMessage(msg *message) {
-	msgs.mu.Lock()
-	defer msgs.mu.Unlock()
-
-	msg.start = time.Now()
-	msgs.messages[msg.RequestID] = msg
-}
-
-// removeMessage deletes the request message that corresponds
-// to the responses message ID.
-func (msgs *inflightMsgs) removeMessage(msgID uint64) {
-	msgs.mu.Lock()
-	req, ok := msgs.messages[msgID]
-	if ok {
-		delete(msgs.messages, msgID)
-	}
-	msgs.mu.Unlock()
-
-	if ok {
-		servermon.JujuCallDurationHistogram.WithLabelValues(
-			req.Type,
-			req.Request,
-			msgs.controllerUUID,
-		).Observe(time.Since(req.start).Seconds())
-	}
-}
-
-func (msgs *inflightMsgs) getMessage(key uint64) *message {
-	msgs.mu.Lock()
-	defer msgs.mu.Unlock()
-	msg, ok := msgs.messages[key]
-	if !ok {
-		return nil
-	}
-	return msg
-}
-
 type modelProxy struct {
 	src                     *writeLockConn
 	dst                     *writeLockConn
-	msgs                    *inflightMsgs
+	inflight                *inflightTracker
 	anonymousLogin          bool // anonymousLogin is true if the client is not authenticated.
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
@@ -296,7 +188,7 @@ func (p *modelProxy) sendError(ctx context.Context, socket *writeLockConn, req *
 		}
 	}
 	// An error message is a response back to the client.
-	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.msgs.controllerUUID)
+	servermon.JujuCallErrorCount.WithLabelValues(req.Type, req.Request, p.inflight.controllerID())
 	if err := p.auditLogMessage(msg, true); err != nil {
 		zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
 	}
@@ -413,14 +305,14 @@ func (p *clientProxy) start(ctx context.Context) error {
 				continue
 			} else if toController != nil {
 				msg = toController
-				p.msgs.addLoginMessage(toController)
+				p.inflight.rememberLogin(toController)
 			}
 		}
-		p.msgs.addMessage(msg)
+		p.inflight.track(msg)
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
 			p.sendError(ctx, p.src, msg, err)
-			p.msgs.removeMessage(msg.RequestID)
+			p.inflight.finish(msg.RequestID)
 			continue
 		}
 	}
@@ -429,38 +321,45 @@ func (p *clientProxy) start(ctx context.Context) error {
 // makeControllerConnection dials a controller and starts a go routine for
 // proxying requests from the controller to the client.
 func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
-
 	var createConnErr error
 	// Create the controller connection once.
 	p.connectController.Do(func() {
-		connWithMetadata, err := p.createControllerConn(ctx)
-		if err != nil {
-			createConnErr = err
-			return
-		}
-
-		p.msgs.controllerUUID = connWithMetadata.ControllerUUID
-		p.modelName = connWithMetadata.ModelName
-		p.modelUUID = connWithMetadata.ModelUUID
-		p.modelMigrationMode = connWithMetadata.MigrationMode
-		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
-		controllerToClient := controllerProxy{
-			modelProxy: modelProxy{
-				src:                p.dst,
-				dst:                p.src,
-				msgs:               p.msgs,
-				auditLog:           p.auditLog,
-				tokenGen:           p.tokenGen,
-				modelName:          p.modelName,
-				conversationId:     p.conversationId,
-				modelMigrationMode: p.modelMigrationMode,
-			},
-		}
-		p.wg.Go(func() {
-			p.errChan <- controllerToClient.start(ctx)
-		})
+		createConnErr = p.attachController(ctx)
 	})
 	return createConnErr
+}
+
+func (p *clientProxy) attachController(ctx context.Context) error {
+	connWithMetadata, err := p.createControllerConn(ctx)
+	if err != nil {
+		return err
+	}
+
+	p.inflight.setControllerUUID(connWithMetadata.ControllerUUID)
+	p.modelName = connWithMetadata.ModelName
+	p.modelUUID = connWithMetadata.ModelUUID
+	p.modelMigrationMode = connWithMetadata.MigrationMode
+	p.dst = &writeLockConn{conn: connWithMetadata.Conn}
+	p.startControllerProxy(ctx)
+	return nil
+}
+
+func (p *clientProxy) startControllerProxy(ctx context.Context) {
+	controllerToClient := controllerProxy{
+		modelProxy: modelProxy{
+			src:                p.dst,
+			dst:                p.src,
+			inflight:           p.inflight,
+			auditLog:           p.auditLog,
+			tokenGen:           p.tokenGen,
+			modelName:          p.modelName,
+			conversationId:     p.conversationId,
+			modelMigrationMode: p.modelMigrationMode,
+		},
+	}
+	p.wg.Go(func() {
+		p.errChan <- controllerToClient.start(ctx)
+	})
 }
 
 // controllerProxy proxies messages from controller->client with the caveat that

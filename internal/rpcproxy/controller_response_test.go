@@ -87,9 +87,12 @@ func TestControllerResponseHandlerRedoLoginReplaysOriginalRequest(t *testing.T) 
 	}
 	writes := &captureWebsocketConnection{}
 	tokenGen := &recordingTokenGenerator{}
+	tracker := newInflightTracker()
+	tracker.rememberLogin(loginMsg)
+	tracker.track(originalMsg)
 	proxy := &controllerProxy{modelProxy: modelProxy{
 		src:      &writeLockConn{conn: writes},
-		msgs:     &inflightMsgs{loginMessage: loginMsg, messages: map[uint64]*message{2: originalMsg}},
+		inflight: tracker,
 		tokenGen: tokenGen,
 	}}
 	handler := newControllerResponseHandler(proxy)

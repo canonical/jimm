@@ -36,7 +36,7 @@ func (h controllerResponseHandler) handle(ctx context.Context, msg *message) err
 		h.handleError(ctx, msg, err)
 		return fmt.Errorf("error modifying controller response: %w", err)
 	}
-	h.proxy.msgs.removeMessage(msg.RequestID)
+	h.proxy.inflight.finish(msg.RequestID)
 	if err := h.proxy.auditLogMessage(msg, true); err != nil {
 		zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
 	}
@@ -83,7 +83,7 @@ func (h controllerResponseHandler) processControllerErrors(ctx context.Context, 
 			return false
 		}
 		// Write back to the controller.
-		msg := h.proxy.msgs.getMessage(msg.RequestID)
+		msg := h.proxy.inflight.request(msg.RequestID)
 		if msg != nil {
 			if err := h.proxy.src.writeJson(msg); err != nil {
 				zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
@@ -96,7 +96,7 @@ func (h controllerResponseHandler) processControllerErrors(ctx context.Context, 
 
 func (h controllerResponseHandler) handleError(ctx context.Context, msg *message, err error) {
 	h.proxy.sendError(ctx, h.proxy.dst, msg, err)
-	h.proxy.msgs.removeMessage(msg.RequestID)
+	h.proxy.inflight.finish(msg.RequestID)
 }
 
 // checkPermissionsRequired returns a nil map if no permissions are required.
@@ -151,7 +151,7 @@ func (h controllerResponseHandler) redoLogin(ctx context.Context, permissions ma
 	if h.proxy.anonymousLogin {
 		return errors.Codef(errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
 	}
-	loginMsg := h.proxy.msgs.getLoginMessage()
+	loginMsg := h.proxy.inflight.login()
 	if loginMsg == nil {
 		return errors.Codef(errors.CodeUnauthorized, "Haven't received login yet")
 	}
