@@ -7,14 +7,12 @@ package rpcproxy
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -27,7 +25,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
 	"github.com/canonical/jimm/v3/internal/utils"
-	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 const (
@@ -370,6 +367,7 @@ type clientProxy struct {
 
 // start begins the client->controller proxier.
 func (p *clientProxy) start(ctx context.Context) error {
+	loginDispatcher := newAdminLoginDispatcher(p)
 	defer func() {
 		if p.dst != nil {
 			p.dst.conn.Close()
@@ -402,7 +400,7 @@ func (p *clientProxy) start(ctx context.Context) error {
 		// All requests should be proxied as transparently as possible through to the controller
 		// except for auth related requests like Login because JIMM is auth gateway.
 		if msg.Type == "Admin" {
-			toClient, toController, err := p.handleAdminFacade(ctx, msg)
+			toClient, toController, err := loginDispatcher.handle(ctx, msg)
 			if err != nil {
 				p.sendError(ctx, p.src, msg, err)
 				continue
@@ -473,6 +471,7 @@ type controllerProxy struct {
 
 // start implements the controller->client proxier.
 func (p *controllerProxy) start(ctx context.Context) error {
+	responseHandler := newControllerResponseHandler(p)
 	for {
 		msg := new(message)
 		if err := p.src.readJson(msg); err != nil {
@@ -483,177 +482,10 @@ func (p *controllerProxy) start(ctx context.Context) error {
 			return nil
 		}
 
-		returnMsgToClient := p.processControllerErrors(ctx, msg)
-		if !returnMsgToClient {
-			continue
-		}
-
-		if err := modifyControllerResponse(msg); err != nil {
-			zapctx.Error(ctx, "Failed to modify message", zap.Error(err))
-			p.handleError(ctx, msg, err)
-			// An error when modifying the message is a show stopper.
-			return fmt.Errorf("error modifying controller response: %w", err)
-		}
-		p.msgs.removeMessage(msg.RequestID)
-		if err := p.auditLogMessage(msg, true); err != nil {
-			zapctx.Error(context.Background(), "failed to audit log message", zap.Error(err))
-		}
-		if err := p.dst.writeJson(msg); err != nil {
-			zapctx.Error(ctx, "controllerProxy error writing to dst", zap.Error(err))
-			return fmt.Errorf("error writing message to client: %w", err)
+		if err := responseHandler.handle(ctx, msg); err != nil {
+			return err
 		}
 	}
-}
-
-// processControllerErrors checks for errors in the message from the controller
-// and decides how to handle them. It returns true if the message should be
-// returned to the client, false if it should not.
-func (p *controllerProxy) processControllerErrors(ctx context.Context, msg *message) bool {
-
-	// Check if the model is migrating. When it has completed its migration, we will receive
-	// an unauthorized error from the controller and we want to mask that error and inform
-	// clients to try again as JIMM will eventually update the model's controller.
-	// See internal/jimm/juju/model_poller.go.
-	modelMigrating := p.modelMigrationMode == dbmodel.MigrationModeMigrateInternal || p.modelMigrationMode == dbmodel.MigrationModeExporting
-	if modelMigrating && msg.ErrorCode == string(errors.CodeUnauthorized) {
-		msg.ErrorCode = string(errors.CodeModelMigrating)
-		msg.Error = "model is finishing migration, please retry later"
-		return true
-	}
-
-	// Next we check for permission required errors where the Juju controller is informing us
-	// that the user needs more permissions to perform the requested operation.
-	// If so, we attempt to redo the login with the required permissions (if the user has them)
-	// and then resend the original login request.
-	//
-	// It's ideally unlikely we'll hit this code path often because JIMM sets a broad scope
-	// of permissions on the initial login request.
-	permissionsRequired, err := checkPermissionsRequired(ctx, msg)
-	if err != nil {
-		zapctx.Error(ctx, "failed to determine if more permissions required", zap.Error(err))
-		p.handleError(ctx, msg, err)
-		return false
-	}
-	if permissionsRequired != nil {
-		zapctx.Error(ctx, "Access Required error")
-		if err := p.redoLogin(ctx, permissionsRequired); err != nil {
-			zapctx.Error(ctx, "Failed to redo login", zap.Error(err))
-			p.handleError(ctx, msg, err)
-			return false
-		}
-		// Write back to the controller.
-		msg := p.msgs.getMessage(msg.RequestID)
-		if msg != nil {
-			if err := p.src.writeJson(msg); err != nil {
-				zapctx.Error(context.Background(), "failed to write back to controller", zap.Error(err))
-			}
-		}
-		return false
-	}
-	return true
-}
-
-func (p *controllerProxy) handleError(ctx context.Context, msg *message, err error) {
-	p.sendError(ctx, p.dst, msg, err)
-	p.msgs.removeMessage(msg.RequestID)
-}
-
-// checkPermissionsRequired returns a nil map if no permissions are required.
-func checkPermissionsRequired(ctx context.Context, msg *message) (map[string]any, error) {
-	// Instantiate later because we won't always need the map.
-	var permissionMap map[string]any
-
-	// Check for errors that may be a result of a normal request.
-	if msg.ErrorCode == accessRequiredErrorCode {
-		permissionMap = msg.ErrorInfo
-		return permissionMap, nil
-	}
-
-	// if the message response is empty, this is clearly not a permission
-	// check required error and we return an empty map of required
-	// permissions
-	if msg.Response == nil || string(msg.Response) == "" {
-		return permissionMap, nil
-	}
-
-	var er jujuparams.ErrorResults
-	err := json.Unmarshal(msg.Response, &er)
-	if err != nil {
-		zapctx.Error(ctx, "failed to read response error", zap.Error(err))
-		return permissionMap, nil
-	}
-
-	// Check for errors that may be a result of a bulk request.
-	for _, e := range er.Results {
-		if e.Error != nil && e.Error.Code == accessRequiredErrorCode {
-			zapctx.Debug(ctx, "received error", zap.Any("error", e.Error))
-			for k, v := range e.Error.Info {
-				accessLevel, ok := v.(string)
-				if !ok {
-					return nil, errors.New("unknown permission level")
-				}
-				if permissionMap == nil {
-					permissionMap = make(map[string]any)
-				}
-				permissionMap[k] = accessLevel
-			}
-		}
-	}
-	return permissionMap, nil
-}
-
-// redoLogin sends a new login request to the controller after checking for
-// the provided permissions. This is sometimes necessary if Juju requires
-// extra permission checks for an operation. If the client performed anonymous
-// login, an error is always returned since we cannot authorize an anonymous user.
-func (p *controllerProxy) redoLogin(ctx context.Context, permissions map[string]any) error {
-
-	if p.anonymousLogin {
-		return errors.Codef(errors.CodeUnauthorized, "Anonymous login does not support re-authentication")
-	}
-	loginMsg := p.msgs.getLoginMessage()
-	if loginMsg == nil {
-		return errors.Codef(errors.CodeUnauthorized, "Haven't received login yet")
-	}
-	err := addJWT(ctx, loginMsg, permissions, p.tokenGen)
-	if err != nil {
-		return err
-	}
-	zapctx.Info(ctx, "Performing new login", zap.Any("message", loginMsg))
-	if err := p.src.writeJson(loginMsg); err != nil {
-		return err
-	}
-	return nil
-}
-
-// addJWT adds a JWT token to the the provided message.
-func addJWT(ctx context.Context, msg *message, permissions map[string]any, tokenGen TokenGenerator) error {
-
-	// First we unmarshal the existing LoginRequest.
-	if msg == nil {
-		return errors.New("nil messsage")
-	}
-	var lr jujuparams.LoginRequest
-	if err := json.Unmarshal(msg.Params, &lr); err != nil {
-		return err
-	}
-
-	jwt, err := tokenGen.MakeToken(ctx, permissions)
-	if err != nil {
-		return err
-	}
-
-	jwtString := base64.StdEncoding.EncodeToString(jwt)
-	// Add the JWT as base64 encoded string.
-	lr.Token = jwtString
-	// Marshal it again to JSON.
-	data, err := json.Marshal(lr)
-	if err != nil {
-		return err
-	}
-	// And add it to the message.
-	msg.Params = data
-	return nil
 }
 
 func createErrResponse(err error, req *message) *message {
@@ -663,177 +495,4 @@ func createErrResponse(err error, req *message) *message {
 	errMsg.Error = err.Error()
 	errMsg.ErrorCode = string(errors.ErrorCode(err))
 	return errMsg
-}
-
-func modifyControllerResponse(msg *message) error {
-	var response map[string]any
-	err := json.Unmarshal(msg.Response, &response)
-	if err != nil {
-		return err
-	}
-	// Delete servers block so that juju clients don't get redirected.
-	delete(response, "servers")
-	newResp, err := json.Marshal(response)
-	if err != nil {
-		return err
-	}
-	msg.Response = newResp
-	return nil
-}
-
-// handleAdminFacade processes the admin facade call and returns:
-// a message to be returned to the source
-// a message to be sent to the destination
-// an error
-func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clientResponse *message, controllerMessage *message, err error) {
-	errorFnc := func(err error) (*message, *message, error) {
-		return nil, nil, err
-	}
-	controllerLoginMessageFnc := func(user *openfga.User) (*message, *message, error) {
-		jwt, err := p.tokenGen.MakeLoginToken(ctx, user)
-		if err != nil {
-			return errorFnc(err)
-		}
-		data, err := json.Marshal(jujuparams.LoginRequest{
-			AuthTag: names.NewUserTag(user.Name).String(),
-			Token:   base64.StdEncoding.EncodeToString(jwt),
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		m := *msg
-		m.Type = "Admin"
-		m.Request = "Login"
-		m.Version = 3
-		m.Params = data
-		return nil, &m, nil
-	}
-	switch msg.Request {
-	case "LoginDevice":
-		deviceResponse, err := p.loginService.LoginDevice(ctx)
-		if err != nil {
-			return errorFnc(err)
-		}
-		p.deviceOAuthResponse = deviceResponse
-
-		data, err := json.Marshal(apiparams.LoginDeviceResponse{
-			VerificationURI: deviceResponse.VerificationURI,
-			UserCode:        deviceResponse.UserCode,
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		msg.Response = data
-		return msg, nil, nil
-	case "GetDeviceSessionToken":
-		sessionToken, err := p.loginService.GetDeviceSessionToken(ctx, p.deviceOAuthResponse)
-		if err != nil {
-			return errorFnc(err)
-		}
-		// #nosec G117 session token is sensitive but the data object is not logged.
-		data, err := json.Marshal(apiparams.GetDeviceSessionTokenResponse{
-			SessionToken: sessionToken,
-		})
-		if err != nil {
-			return errorFnc(err)
-		}
-		msg.Response = data
-		return msg, nil, nil
-	case "LoginWithSessionToken":
-		var request apiparams.LoginWithSessionTokenRequest
-		err := json.Unmarshal(msg.Params, &request)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		user, err := p.loginService.LoginWithSessionToken(ctx, request.SessionToken)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		return controllerLoginMessageFnc(user)
-	case "LoginWithClientCredentials":
-		var request apiparams.LoginWithClientCredentialsRequest
-		err := json.Unmarshal(msg.Params, &request)
-		if err != nil {
-			return errorFnc(err)
-		}
-		user, err := p.loginService.LoginClientCredentials(ctx, request.ClientID, request.ClientSecret)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		return controllerLoginMessageFnc(user)
-	case "LoginWithSessionCookie":
-		user, err := p.loginService.LoginWithSessionCookie(ctx, p.authenticatedIdentityID)
-		if err != nil {
-			return errorFnc(err)
-		}
-
-		return controllerLoginMessageFnc(user)
-	case "Login":
-		controllerMessage, err := p.handleLegacyLogin(ctx, msg)
-		return nil, controllerMessage, err
-	default:
-		return nil, nil, nil
-	}
-}
-
-// handleLegacyLogin handles old style username+password/macaroon login
-// requests and decides what to do based on the client's auth tag.
-//
-// If the request is an "anonymous login" request (i.e., the auth tag is
-// api.AnonymousUsername), it sets the anonymousLogin flag to true and returns
-// the message verbatim to the controller, allowing it to handle the login.
-// This supports login from a Juju controller during model migration.
-//
-// If the auth tag is a non-user entity e.g. a machine/unit then we return
-// a redirect to the backing Juju controller. This is also used for model migrations
-// but specifically for directing agents to speak to the backing Juju controller.
-//
-// Legacy login requests from users (i.e., those with a user tag) are not supported
-// in JIMM and will return an error.
-func (p *clientProxy) handleLegacyLogin(ctx context.Context, msg *message) (*message, error) {
-	var request jujuparams.LoginRequest
-	err := json.Unmarshal(msg.Params, &request)
-	if err != nil {
-		return nil, err
-	}
-	tag, err := names.ParseTag(request.AuthTag)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user tag: %v", err)
-	}
-	switch tag := tag.(type) {
-	case names.UserTag:
-		if tag.Id() == api.AnonymousUsername {
-			p.anonymousLogin = true
-			// return the client's login message verbatim to the controller.
-			return msg, nil
-		}
-		return nil, errors.Codef(errors.CodeNotSupported, "JIMM does not support login from old clients")
-	case names.ModelTag, names.MachineTag, names.UnitTag:
-		zapctx.Debug(ctx, "Legacy login request from agent", zap.String("tag", tag.String()))
-
-		redirectInfo, err := p.redirectInfo.GetRedirectInfo(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get redirect info: %w", err)
-		}
-
-		// This is a legacy login request from an agent.
-		// We return a redirect to the backing Juju controller.
-		info := jujuparams.RedirectErrorInfo{
-			Servers: redirectInfo.Addresses,
-			CACert:  redirectInfo.CACert,
-		}.AsMap()
-		errRedirect := &errors.Error{
-			Code:    errors.CodeRedirect,
-			Message: "redirection to alternative server required",
-			Info:    info,
-		}
-
-		zapctx.Debug(ctx, "Redirecting agent to controller", zap.Any("servers", redirectInfo.Addresses))
-		return nil, errRedirect
-	default:
-		return nil, fmt.Errorf("unsupported login request for tag %s", tag)
-	}
 }
