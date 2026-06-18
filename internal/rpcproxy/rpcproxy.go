@@ -28,7 +28,6 @@ import (
 
 const (
 	accessRequiredErrorCode = "access required"
-	unauthorizedErrorCode   = "unauthorized"
 )
 
 // ControllerDetails holds information about the controller
