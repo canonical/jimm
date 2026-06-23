@@ -303,7 +303,7 @@ juju jaas show-model $MODEL_UUID --format yaml
 ```  
 
 
-> See more: {external+juju:ref}`Juju | juju show-model <command-show-model>`, {ref}`command-jaas-upgrade-to` 
+> See more: {external+juju:ref}`Juju | juju show-model <command-juju-show-model>`, {ref}`command-jaas-upgrade-to` 
 
 ### How the upgrade works
 

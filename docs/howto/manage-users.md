@@ -41,7 +41,7 @@ At this point the user can start doing whatever the permissions you've granted t
 ## Control user access
 
 ```{note}
-This permissions mechanism supplements the Juju way of granting a user access to controllers, clouds, models, and offers, and can be used in addition to it. See more: [Juju | Manage a user's access level](https://canonical-juju.readthedocs-hosted.com/en/3.6/user/howto/manage-users/) or [Terraform Provider Juju | Manage a user's access level](https://canonical-terraform-provider-juju.readthedocs-hosted.com/latest/howto/manage-users/).
+This permissions mechanism supplements the Juju way of granting a user access to controllers, clouds, models, and offers, and can be used in addition to it. See more: [Juju | Manage a user's access level](https://canonical-juju.readthedocs-hosted.com/latest/howto/manage-users/) or [Terraform Provider Juju | Manage a user's access level](https://canonical-terraform-provider-juju.readthedocs-hosted.com/latest/howto/manage-users/).
 ```
 
 To control user access to another entity -- be it a role or a group, or a resource such as a controller, a cloud, a model, or an application offer -- add a permission between the user and the entity.
