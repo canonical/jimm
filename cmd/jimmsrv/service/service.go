@@ -83,8 +83,15 @@ type OAuthAuthenticatorParams struct {
 	// /auth and /token requests.
 	ClientSecret string
 
-	// Scopes holds the scopes that you wish to retrieve.
+	// Scopes holds the scopes requested for browser and device OAuth flows.
 	Scopes []string
+
+	// ClientCredentialScopes holds scopes requested for client-credentials flow.
+	ClientCredentialScopes []string
+
+	// GroupClaimKey is the provider-specific claim name that contains the user's
+	// group identifiers.
+	GroupClaimKey string
 
 	// SessionTokenExpiry holds the expiry duration for issued JWTs
 	// for user (CLI) to JIMM authentication.
@@ -513,18 +520,20 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	authSvc, err := auth.NewAuthenticationService(
 		ctx,
 		auth.AuthenticationServiceParams{
-			IssuerURL:           p.OAuthAuthenticatorParams.IssuerURL,
-			ClientID:            p.OAuthAuthenticatorParams.ClientID,
-			ClientSecret:        p.OAuthAuthenticatorParams.ClientSecret,
-			Scopes:              p.OAuthAuthenticatorParams.Scopes,
-			SessionTokenExpiry:  p.OAuthAuthenticatorParams.SessionTokenExpiry,
-			SessionCookieMaxAge: p.OAuthAuthenticatorParams.SessionCookieMaxAge,
-			JWTSessionKey:       p.OAuthAuthenticatorParams.JWTSessionKey,
-			SecureCookies:       p.OAuthAuthenticatorParams.SecureSessionCookies,
-			AuthStyle:           auth.AuthStyle(p.OAuthAuthenticatorParams.AuthStyle),
-			Store:               db,
-			SessionStore:        sessionStore,
-			RedirectURL:         redirectUrl,
+			IssuerURL:              p.OAuthAuthenticatorParams.IssuerURL,
+			ClientID:               p.OAuthAuthenticatorParams.ClientID,
+			ClientSecret:           p.OAuthAuthenticatorParams.ClientSecret,
+			Scopes:                 p.OAuthAuthenticatorParams.Scopes,
+			ClientCredentialScopes: p.OAuthAuthenticatorParams.ClientCredentialScopes,
+			GroupClaimKey:          p.OAuthAuthenticatorParams.GroupClaimKey,
+			SessionTokenExpiry:     p.OAuthAuthenticatorParams.SessionTokenExpiry,
+			SessionCookieMaxAge:    p.OAuthAuthenticatorParams.SessionCookieMaxAge,
+			JWTSessionKey:          p.OAuthAuthenticatorParams.JWTSessionKey,
+			SecureCookies:          p.OAuthAuthenticatorParams.SecureSessionCookies,
+			AuthStyle:              auth.AuthStyle(p.OAuthAuthenticatorParams.AuthStyle),
+			Store:                  db,
+			SessionStore:           sessionStore,
+			RedirectURL:            redirectUrl,
 		},
 	)
 	if err != nil {

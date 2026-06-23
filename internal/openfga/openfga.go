@@ -17,7 +17,7 @@ import (
 
 var (
 	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.RoleTagKind}
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.IdPGroupTagKind, jimmnames.RoleTagKind}
 )
 
 // Tuple represents a relation between an object and a target.
@@ -45,6 +45,8 @@ var (
 	ModelType Kind = names.ModelTagKind
 	// GroupType represents a group object.
 	GroupType Kind = jimmnames.GroupTagKind
+	// IdPGroupType represents an IDP-owned group object.
+	IdPGroupType Kind = jimmnames.IdPGroupTagKind
 	// RoleType represents a role object.
 	RoleType Kind = jimmnames.RoleTagKind
 	// ApplicationOfferType represents an application offer object.
@@ -231,7 +233,7 @@ func (o *OFGAClient) ReadRelatedObjects(ctx context.Context, tuple Tuple, pageSi
 // CheckRelation verifies that a user (or object) is allowed to access the target object by the specified relation.
 //
 // It will return a bool of simply true or false, denoting authorisation, and an error.
-func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool) (_ bool, err error) {
+func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool, contextualTuples ...Tuple) (_ bool, err error) {
 	const op = "openfga.CheckRelation"
 
 	durationObserver := servermon.DurationObserver(servermon.OpenFGACallDurationHistogram, op)
@@ -239,9 +241,9 @@ func (o *OFGAClient) CheckRelation(ctx context.Context, tuple Tuple, trace bool)
 	defer servermon.ErrorCounter(servermon.OpenFGACallErrorCount, &err, op)
 
 	if trace {
-		return o.cofgaClient.CheckRelationWithTracing(ctx, tuple)
+		return o.cofgaClient.CheckRelationWithTracing(ctx, tuple, contextualTuples...)
 	}
-	return o.cofgaClient.CheckRelation(ctx, tuple)
+	return o.cofgaClient.CheckRelation(ctx, tuple, contextualTuples...)
 }
 
 // removeTuples iteratively reads through all the tuples with the parameters as supplied by tuple and deletes them.

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -18,6 +17,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -70,18 +70,17 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 	}, nil).AnyTimes()
 
 	mockAuthenticator.EXPECT().DeviceAccessToken(gomock.Any(), gomock.Any()).Return(&oauth2.Token{}, nil).AnyTimes()
-	mockAuthenticator.EXPECT().ExtractAndVerifyIDToken(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
-	mockAuthenticator.EXPECT().Email(gomock.Any()).DoAndReturn(func(_ *oidc.IDToken) (string, error) {
+	mockAuthenticator.EXPECT().VerifyAndExtractIdentityClaims(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _ *oauth2.Token) (auth.IdentityClaims, error) {
 		emailPrefix := "user-foo"
 		select {
 		case candidate := <-s.deviceFlowChan:
 			emailPrefix = candidate
 		default:
 		}
-		return fmt.Sprintf("%s@canonical.com", emailPrefix), nil
+		return auth.IdentityClaims{Email: fmt.Sprintf("%s@canonical.com", emailPrefix)}, nil
 	}).AnyTimes()
 	mockAuthenticator.EXPECT().UpdateIdentity(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	mockAuthenticator.EXPECT().MintSessionToken(gomock.Any()).DoAndReturn(func(email string) (string, error) {
+	mockAuthenticator.EXPECT().MintSessionTokenWithGroups(gomock.Any(), gomock.Any()).DoAndReturn(func(email string, groups []string) (string, error) {
 		token, err := jwt.NewBuilder().
 			Subject(email).
 			Build()
@@ -95,11 +94,11 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 		return base64.StdEncoding.EncodeToString(serializedToken), nil
 	}).AnyTimes()
 
-	mockAuthenticator.EXPECT().VerifyClientCredentials(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, clientID string, clientSecret string) error {
+	mockAuthenticator.EXPECT().VerifyClientCredentials(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, clientID string, clientSecret string) ([]string, error) {
 		if clientID == "my-svc-acc" && clientSecret == "foo-secret" {
-			return nil
+			return []string{}, nil
 		}
-		return fmt.Errorf("invalid client credentials")
+		return nil, fmt.Errorf("invalid client credentials")
 	}).AnyTimes()
 
 	mockAuthenticator.EXPECT().VerifySessionToken(gomock.Any()).DoAndReturn(func(token string) (jwt.Token, error) {
@@ -168,9 +167,11 @@ func (s *loginManagerSuite) TestLoginClientCredentials(c *qt.C) {
 func (s *loginManagerSuite) TestLoginWithSessionToken(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
+	groups := []string{"engineering", "platform"}
 
 	token, err := jwt.NewBuilder().
 		Subject("alice@canonical.com").
+		Claim(auth.SessionTokenGroupsClaimKey, groups).
 		Build()
 	c.Assert(err, qt.IsNil)
 	serialisedToken, err := jwt.NewSerializer().Serialize(token)
@@ -183,6 +184,7 @@ func (s *loginManagerSuite) TestLoginWithSessionToken(c *qt.C) {
 	user, err := s.manager.LoginWithSessionToken(ctx, b64Token)
 	c.Assert(err, qt.IsNil)
 	c.Assert(user.Name, qt.Equals, "alice@canonical.com")
+	c.Assert(user.IDPGroupIDs, qt.DeepEquals, groups)
 }
 
 func (s *loginManagerSuite) TestLoginWithSessionCookie(c *qt.C) {

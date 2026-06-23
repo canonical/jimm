@@ -41,7 +41,9 @@ services:
       JIMM_OAUTH_ISSUER_URL: "http://keycloak.localhost:8082/realms/jimm" # Scheme required
       JIMM_OAUTH_CLIENT_ID: "jimm-device"
       JIMM_OAUTH_CLIENT_SECRET: "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4"
-      JIMM_OAUTH_SCOPES: "openid profile email" # Space separated list of scopes
+      JIMM_OAUTH_SCOPES: "openid profile email group" # Space separated list of scopes
+      JIMM_OAUTH_CLIENT_CREDENTIAL_SCOPES: "group" # Space separated list for client-credentials flow
+      JIMM_OAUTH_GROUP_CLAIM_KEY: "groups"
       JIMM_DASHBOARD_FINAL_REDIRECT_URL: "https://juju-dashboard.localhost"
       CORS_ALLOWED_ORIGINS: "https://juju-dashboard.localhost"
       JIMM_ACCESS_TOKEN_EXPIRY_DURATION: 100h

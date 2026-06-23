@@ -653,6 +653,40 @@ func TestListObjectsWithContextualTuples(t *testing.T) {
 	), qt.Equals, true)
 }
 
+func TestCheckRelationWithContextualTuples(t *testing.T) {
+	c := qt.New(t)
+	s := SetupTest(c)
+	ctx := context.TODO()
+
+	groupID := uuid.NewString()
+	modelID := uuid.NewString()
+
+	err := s.ofgaClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(groupID), ofganames.MemberRelation),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag(modelID)),
+	})
+	c.Assert(err, qt.IsNil)
+
+	check := openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag(modelID)),
+	}
+
+	allowed, err := s.ofgaClient.CheckRelation(ctx, check, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsFalse)
+
+	allowed, err = s.ofgaClient.CheckRelation(ctx, check, false, openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+	})
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsTrue)
+}
+
 func TestListObjectsWithPeristedTuples(t *testing.T) {
 	c := qt.New(t)
 	s := SetupTest(c)

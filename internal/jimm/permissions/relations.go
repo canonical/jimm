@@ -48,9 +48,10 @@ var resourceAdminRelations = map[ofga.Relation]bool{
 // restricting grantees to these kinds independently prevents a non-admin from
 // writing a structural tuple.
 var grantableObjectKinds = map[openfga.Kind]bool{
-	openfga.UserType:  true,
-	openfga.GroupType: true,
-	openfga.RoleType:  true,
+	openfga.UserType:     true,
+	openfga.GroupType:    true,
+	openfga.IdPGroupType: true,
+	openfga.RoleType:     true,
 }
 
 // authorizeRelationTargetAdmin authorizes a non-JIMM-admin to manage the given
@@ -81,11 +82,15 @@ func (j *PermissionManager) authorizeRelationTargetAdmin(ctx context.Context, us
 
 	switch tuple.Target.Kind {
 	case openfga.ControllerType, openfga.ModelType, openfga.ApplicationOfferType, openfga.CloudType:
+		contextualTuples, err := user.ContextualTuples()
+		if err != nil {
+			return err
+		}
 		allowed, err := j.authSvc.CheckRelation(ctx, openfga.Tuple{
 			Object:   ofganames.ConvertTag(user.ResourceTag()),
 			Relation: ofganames.AdministratorRelation,
 			Target:   tuple.Target,
-		}, false)
+		}, false, contextualTuples...)
 		if err != nil {
 			return errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
 		}
@@ -171,7 +176,11 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 		}
 	}
 
-	allowed, err = j.authSvc.CheckRelation(ctx, *parsedTuple, trace)
+	contextualTuples, err := user.ContextualTuples()
+	if err != nil {
+		return allowed, err
+	}
+	allowed, err = j.authSvc.CheckRelation(ctx, *parsedTuple, trace, contextualTuples...)
 	if err != nil {
 		return allowed, errors.Codef(errors.CodeOpenFGARequestFailed, "%w", err)
 	}

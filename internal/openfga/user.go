@@ -15,7 +15,10 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
+
+const maxContextualTuples = 20
 
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
@@ -30,8 +33,35 @@ func NewUser(u *dbmodel.Identity, client *OFGAClient) *User {
 // to check user's access rights to various resources.
 type User struct {
 	*dbmodel.Identity
-	client    *OFGAClient
-	JimmAdmin bool
+	client      *OFGAClient
+	JimmAdmin   bool
+	IDPGroupIDs []string
+}
+
+// SetIDPGroups stores the opaque IDP group identifiers associated with the user.
+func (u *User) SetIDPGroups(groups []string) {
+	u.IDPGroupIDs = append([]string(nil), groups...)
+}
+
+// ContextualTuples returns the ephemeral OpenFGA tuples representing the user's
+// IDP group memberships.
+func (u *User) ContextualTuples() ([]Tuple, error) {
+	if len(u.IDPGroupIDs) > maxContextualTuples {
+		return nil, errors.Codef(errors.CodeUnauthorized, "too many IDP groups in session: got %d, maximum is %d", len(u.IDPGroupIDs), maxContextualTuples)
+	}
+
+	contextualTuples := make([]Tuple, 0, len(u.IDPGroupIDs))
+	for _, group := range u.IDPGroupIDs {
+		if !jimmnames.IsValidIdPGroupId(group) {
+			return nil, errors.Codef(errors.CodeUnauthorized, "invalid IDP group identifier in session: %q", group)
+		}
+		contextualTuples = append(contextualTuples, Tuple{
+			Object:   ofganames.ConvertTag(u.ResourceTag()),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(group)),
+		})
+	}
+	return contextualTuples, nil
 }
 
 // IsAllowedAddModelToController returns true if the user is allowed to add a model on the
@@ -267,7 +297,11 @@ func (u *User) UnsetApplicationOfferAccess(ctx context.Context, resource names.A
 
 // ListModels returns a slice of model UUIDs that this user has the relation <relation> to.
 func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ModelType, nil)
+	contextualTuples, err := u.ContextualTuples()
+	if err != nil {
+		return nil, err
+	}
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ModelType, contextualTuples)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +314,11 @@ func (u *User) ListModels(ctx context.Context, relation ofga.Relation) ([]string
 
 // ListApplicationOffers returns a slice of application offer UUIDs that a user has the relation <relation> to.
 func (u *User) ListApplicationOffers(ctx context.Context, relation ofga.Relation) ([]string, error) {
-	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ApplicationOfferType, nil)
+	contextualTuples, err := u.ContextualTuples()
+	if err != nil {
+		return nil, err
+	}
+	entities, err := u.client.ListObjects(ctx, ofganames.ConvertTag(u.ResourceTag()), relation, ApplicationOfferType, contextualTuples)
 	if err != nil {
 		return nil, err
 	}
@@ -315,6 +353,11 @@ func (u *User) CheckPermission(ctx context.Context, resourceTag string, permissi
 		relation = ofganames.CanAddModelRelation
 	}
 
+	contextualTuples, err := u.ContextualTuples()
+	if err != nil {
+		return err
+	}
+
 	allowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
@@ -323,6 +366,7 @@ func (u *User) CheckPermission(ctx context.Context, resourceTag string, permissi
 			Target:   ofganames.ConvertGenericTag(resource),
 		},
 		true,
+		contextualTuples...,
 	)
 	if err != nil {
 		return err
@@ -343,6 +387,11 @@ type administratorT interface {
 }
 
 func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, resource T, relation Relation) (bool, error) {
+	contextualTuples, err := u.ContextualTuples()
+	if err != nil {
+		return false, err
+	}
+
 	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
@@ -351,6 +400,7 @@ func checkRelation[T ofganames.ResourceTagger](ctx context.Context, u *User, res
 			Target:   ofganames.ConvertTag(resource),
 		},
 		true,
+		contextualTuples...,
 	)
 	if err != nil {
 		return false, err
@@ -366,6 +416,11 @@ func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation Re
 	var tag *ofganames.Tag
 	var err error
 	tag = ofganames.ConvertGenericTag(resource)
+	contextualTuples, err := u.ContextualTuples()
+	if err != nil {
+		return false, err
+	}
+
 	isAllowed, err := u.client.CheckRelation(
 		ctx,
 		Tuple{
@@ -374,6 +429,7 @@ func CheckRelation(ctx context.Context, u *User, resource names.Tag, relation Re
 			Target:   tag,
 		},
 		true,
+		contextualTuples...,
 	)
 	if err != nil {
 		return false, err

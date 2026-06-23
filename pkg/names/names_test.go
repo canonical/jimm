@@ -32,7 +32,21 @@ func TestParseTag(t *testing.T) {
 			expectedValid: true,
 		},
 		{
+			tagString:     "idpgroup-engineering",
+			expectedTag:   names.NewIdPGroupTag("engineering"),
+			expectedValid: true,
+		},
+		{
+			tagString:     "idpgroup-4a8f49a8-df10-4a6d-a98f-f4df1d5a16ba#member",
+			expectedTag:   names.NewIdPGroupTag("4a8f49a8-df10-4a6d-a98f-f4df1d5a16ba#member"),
+			expectedValid: true,
+		},
+		{
 			tagString:     "group1",
+			expectedValid: false,
+		},
+		{
+			tagString:     "idpgroup-",
 			expectedValid: false,
 		},
 	}

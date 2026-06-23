@@ -112,6 +112,8 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 			return "", fmt.Errorf("failed to fetch group information: %s: %w", group.UUID, err)
 		}
 		return tagToString(jimmnames.GroupTagKind, group.Name), nil
+	case jimmnames.IdPGroupTagKind:
+		return tagToString(jimmnames.IdPGroupTagKind, tag.ID), nil
 	case jimmnames.RoleTagKind:
 		role := dbmodel.RoleEntry{
 			UUID: tag.ID,
@@ -201,6 +203,26 @@ func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Enti
 	}
 
 	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
+}
+
+func (t *tagResolver) idpGroupTag(ctx context.Context) (*ofga.Entity, error) {
+	idpGroupID := t.trailer
+	if idpGroupID == "" {
+		idpGroupID = t.resourceUUID
+	}
+	zapctx.Debug(
+		ctx,
+		"Resolving JIMM tags to Juju tags for tag kind: idpgroup",
+		zap.String("idp-group-id", idpGroupID),
+	)
+	if !jimmnames.IsValidIdPGroupId(idpGroupID) {
+		return nil, errors.New("invalid idp group")
+	}
+	return &ofga.Entity{
+		ID:       idpGroupID,
+		Kind:     ofga.Kind(jimmnames.IdPGroupTagKind),
+		Relation: t.relation,
+	}, nil
 }
 
 func (t *tagResolver) controllerTag(ctx context.Context, jimmUUID string, db *db.Database) (*ofga.Entity, error) {
@@ -326,6 +348,8 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 		return resolver.userTag(ctx)
 	case jimmnames.GroupTagKind:
 		return resolver.groupTag(ctx, db)
+	case jimmnames.IdPGroupTagKind:
+		return resolver.idpGroupTag(ctx)
 	case jimmnames.RoleTagKind:
 		return resolver.roleTag(ctx, db)
 	case names.ControllerTagKind:

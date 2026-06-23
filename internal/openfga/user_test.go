@@ -52,6 +52,61 @@ func TestIsAdministrator(t *testing.T) {
 	c.Assert(allowed, qt.Equals, true)
 }
 
+func TestUserContextualTuples(c *testing.T) {
+	assert := qt.New(c)
+	identity, err := dbmodel.NewIdentity("eve")
+	assert.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(identity, nil)
+	groups := []string{"engineering", "platform"}
+	user.SetIDPGroups(groups)
+	groups[0] = "mutated"
+
+	tuples, err := user.ContextualTuples()
+	assert.Assert(err, qt.IsNil)
+	assert.Assert(tuples, qt.DeepEquals, []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve")),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag("engineering")),
+	}, {
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve")),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag("platform")),
+	}})
+}
+
+func TestUserContextualTuplesRejectsTooManyGroups(c *testing.T) {
+	assert := qt.New(c)
+	identity, err := dbmodel.NewIdentity("eve")
+	assert.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(identity, nil)
+	user.SetIDPGroups([]string{
+		"group-01", "group-02", "group-03", "group-04", "group-05",
+		"group-06", "group-07", "group-08", "group-09", "group-10",
+		"group-11", "group-12", "group-13", "group-14", "group-15",
+		"group-16", "group-17", "group-18", "group-19", "group-20",
+		"group-21",
+	})
+
+	tuples, err := user.ContextualTuples()
+	assert.Assert(tuples, qt.IsNil)
+	assert.Assert(err, qt.ErrorMatches, "too many IDP groups in session: got 21, maximum is 20")
+}
+
+func TestUserContextualTuplesRejectsInvalidGroup(c *testing.T) {
+	assert := qt.New(c)
+	identity, err := dbmodel.NewIdentity("eve")
+	assert.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(identity, nil)
+	user.SetIDPGroups([]string{""})
+
+	tuples, err := user.ContextualTuples()
+	assert.Assert(tuples, qt.IsNil)
+	assert.Assert(err, qt.ErrorMatches, `invalid IDP group identifier in session: ""`)
+}
+
 func TestModelAccess(t *testing.T) {
 	c := qt.New(t)
 	s := SetupTest(c)

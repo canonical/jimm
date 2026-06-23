@@ -137,22 +137,15 @@ func (m *mockOAuthAuthenticator) VerifySessionToken(token string) (jwt.Token, er
 	return parsedToken, nil
 }
 
-// ExtractAndVerifyIDToken returns an ID token where the subject is equal to the username obtained during the device flow.
-// The auth token must match the one returned during the device flow.
-// If the polled username is empty it indicates an error that the device flow was not run prior to calling this function.
-func (m *mockOAuthAuthenticator) ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error) {
+// VerifyAndExtractIdentityClaims returns the mocked identity claims from an oauth2 token.
+func (m *mockOAuthAuthenticator) VerifyAndExtractIdentityClaims(ctx context.Context, oauth2Token *oauth2.Token) (auth.IdentityClaims, error) {
 	if m.polledUsername == "" {
-		return &oidc.IDToken{}, errors.New("unknown user for mock auth login")
+		return auth.IdentityClaims{}, errors.New("unknown user for mock auth login")
 	}
 	if m.mockAccessToken != oauth2Token.AccessToken {
-		return &oidc.IDToken{}, errors.New("access token does not match the generated access token")
+		return auth.IdentityClaims{}, errors.New("access token does not match the generated access token")
 	}
-	return &oidc.IDToken{Subject: m.polledUsername}, nil
-}
-
-// Email returns the subject from an ID token.
-func (m *mockOAuthAuthenticator) Email(idToken *oidc.IDToken) (string, error) {
-	return idToken.Subject, nil
+	return auth.IdentityClaims{Subject: m.polledUsername, Email: m.polledUsername}, nil
 }
 
 // UpdateIdentity is a no-op mock.
@@ -160,8 +153,8 @@ func (m *mockOAuthAuthenticator) UpdateIdentity(ctx context.Context, email strin
 	return nil
 }
 
-// MintSessionToken creates an unsigned session token with the email provided.
-func (m *mockOAuthAuthenticator) MintSessionToken(email string) (string, error) {
+// MintSessionTokenWithGroups creates an unsigned session token with the email provided.
+func (m *mockOAuthAuthenticator) MintSessionTokenWithGroups(email string, groups []string) (string, error) {
 	return newSessionToken(m.c, email, ""), nil
 }
 
@@ -170,9 +163,9 @@ func (m *mockOAuthAuthenticator) AuthenticateBrowserSession(ctx context.Context,
 	return ctx, errors.New("authentication failed")
 }
 
-// VerifyClientCredentials always returns a nil error.
-func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error {
-	return nil
+// VerifyClientCredentials always returns an empty group set and nil error.
+func (m *mockOAuthAuthenticator) VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) ([]string, error) {
+	return []string{}, nil
 }
 
 // newSessionToken returns a serialised JWT that can be used in tests.
@@ -225,7 +218,8 @@ func SetupTestDashboardCallbackHandler(browserURL string, db *db.Database, sessi
 		IssuerURL:          "http://localhost:8082/realms/jimm",
 		ClientID:           "jimm-device",
 		ClientSecret:       "SwjDofnbDzJDm9iyfUhEp67FfUFMY8L4",
-		Scopes:             []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:             []string{oidc.ScopeOpenID, "profile", "email", "group"},
+		GroupClaimKey:      "groups",
 		SessionTokenExpiry: time.Hour,
 		// Now we know the port the test server is running on
 		RedirectURL:         redirectURL,

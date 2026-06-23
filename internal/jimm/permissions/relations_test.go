@@ -178,6 +178,74 @@ func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
 	}
 }
 
+func (s *permissionManagerSuite) TestCheckRelationUsesUserIDPGroupsAsContextualTuples(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	userIdentity, err := dbmodel.NewIdentity(fmt.Sprintf("subject-%s", petname.Generate(2, "-")))
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.db.DB.Create(userIdentity).Error, qt.IsNil)
+	user := openfga.NewUser(userIdentity, s.ofgaClient)
+	user.SetIDPGroups([]string{"engineering-team"})
+
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
+		Object:       "idpgroup-engineering-team#member",
+		Relation:     names.ReaderRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}})
+	c.Assert(err, qt.IsNil)
+
+	checkTuple := apiparams.RelationshipTuple{
+		Object:       userIdentity.Tag().String(),
+		Relation:     names.ReaderRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}
+
+	allowed, err := s.manager.CheckRelation(ctx, openfga.NewUser(userIdentity, s.ofgaClient), checkTuple, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsFalse)
+
+	allowed, err = s.manager.CheckRelation(ctx, user, checkTuple, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsTrue)
+}
+
+func (s *permissionManagerSuite) TestResourceAdminCheckUsesUserIDPGroupsAsContextualTuples(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	grantorIdentity, err := dbmodel.NewIdentity(fmt.Sprintf("grantor-%s", petname.Generate(2, "-")))
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.db.DB.Create(grantorIdentity).Error, qt.IsNil)
+	grantor := openfga.NewUser(grantorIdentity, s.ofgaClient)
+	grantor.SetIDPGroups([]string{"model-admins"})
+
+	subjectIdentity, err := dbmodel.NewIdentity(fmt.Sprintf("subject-%s", petname.Generate(2, "-")))
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.db.DB.Create(subjectIdentity).Error, qt.IsNil)
+
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
+		Object:       "idpgroup-model-admins#member",
+		Relation:     names.AdministratorRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}})
+	c.Assert(err, qt.IsNil)
+
+	tuples := []apiparams.RelationshipTuple{{
+		Object:       subjectIdentity.Tag().String(),
+		Relation:     names.ReaderRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}}
+
+	err = s.manager.AddRelation(ctx, openfga.NewUser(grantorIdentity, s.ofgaClient), tuples)
+	c.Assert(err, qt.ErrorMatches, "unauthorized")
+
+	err = s.manager.AddRelation(ctx, grantor, tuples)
+	c.Assert(err, qt.IsNil)
+}
+
 func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
@@ -470,6 +538,17 @@ func (s *permissionManagerSuite) TestRelationManagementAsResourceAdministrator(c
 			},
 			tuple: apiparams.RelationshipTuple{
 				Object:       subjectIdentity.Tag().String(),
+				Relation:     names.ReaderRelation.String(),
+				TargetObject: model.ResourceTag().String(),
+			},
+		},
+		{
+			description: "model administrator can manage IDP group relations",
+			grantAdmin: func() error {
+				return grantor.SetModelAccess(ctx, model.ResourceTag(), names.AdministratorRelation)
+			},
+			tuple: apiparams.RelationshipTuple{
+				Object:       "idpgroup-engineering-team#member",
 				Relation:     names.ReaderRelation.String(),
 				TargetObject: model.ResourceTag().String(),
 			},

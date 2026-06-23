@@ -5,35 +5,39 @@ type user
 
 type role
  relations
-   define assignee: [user, user:*, group#member]
+   define assignee: [user, user:*, group#member, idpgroup#member]
 
 type group
   relations
     define member: [user, user:*, group#member]
 
+type idpgroup
+  relations
+    define member: [user, user:*]
+
 type controller
   relations
     define controller: [controller]
-    define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
-    define audit_log_viewer: [user, user:*, group#member, role#assignee] or administrator
-    define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
+    define administrator: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator from controller
+    define audit_log_viewer: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator
+    define can_addmodel: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator
 
 type model
   relations
     define controller: [controller]
-    define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
-    define reader: [user, user:*, group#member, role#assignee] or writer
-    define writer: [user, user:*, group#member, role#assignee] or administrator
+    define administrator: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator from controller
+    define reader: [user, user:*, group#member, idpgroup#member, role#assignee] or writer
+    define writer: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator
 
 type applicationoffer
   relations
     define model: [model]
-    define administrator: [user, user:*, group#member, role#assignee] or administrator from model
-    define consumer: [user, user:*, group#member, role#assignee] or administrator
-    define reader: [user, user:*, group#member, role#assignee] or consumer
+    define administrator: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator from model
+    define consumer: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator
+    define reader: [user, user:*, group#member, idpgroup#member, role#assignee] or consumer
 
 type cloud
   relations
     define controller: [controller]
-    define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
-    define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
+    define administrator: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator from controller
+    define can_addmodel: [user, user:*, group#member, idpgroup#member, role#assignee] or administrator

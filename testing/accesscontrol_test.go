@@ -261,6 +261,7 @@ func createTuple(object, relation, target string) openfga.Tuple {
 // group -> applicationoffer (name)
 // group -> applicationoffer (uuid)
 // group#member -> group
+// idpgroup#member -> model
 func TestAddRelation(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
@@ -479,6 +480,17 @@ func TestAddRelation(t *testing.T) {
 			),
 			err:         false,
 			changesType: "group",
+		},
+		// Test IDP group -> model by UUID.
+		{
+			input: tuple{"idpgroup-4a8f49a8-df10-4a6d-a98f-f4df1d5a16ba#member", "reader", "model-" + model.UUID.String},
+			want: createTuple(
+				"idpgroup:4a8f49a8-df10-4a6d-a98f-f4df1d5a16ba#member",
+				"reader",
+				"model:"+model.UUID.String,
+			),
+			err:         false,
+			changesType: "model",
 		},
 	}
 

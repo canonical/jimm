@@ -1888,6 +1888,13 @@ func (s *permissionManagerSuite) TestParseAndValidateTag(c *qt.C) {
 	c.Assert(tag.ID, qt.Equals, "")
 	c.Assert(tag.Kind.String(), qt.Equals, names.ModelTagKind)
 
+	idpGroupTag := "idpgroup-engineering-team#member"
+	tag, err = s.manager.ParseAndValidateTag(ctx, idpGroupTag)
+	c.Assert(err, qt.IsNil)
+	c.Assert(tag.ID, qt.Equals, "engineering-team")
+	c.Assert(tag.Kind.String(), qt.Equals, jimmnames.IdPGroupTagKind)
+	c.Assert(tag.Relation.String(), qt.Equals, "member")
+
 	// JIMM tag not valid
 	_, err = s.manager.ParseAndValidateTag(ctx, "")
 	c.Assert(err, qt.ErrorMatches, "unknown tag kind")
@@ -1919,6 +1926,10 @@ func (s *permissionManagerSuite) TestResolveTags(c *qt.C) {
 		desc:     "map group UUID with relation",
 		input:    "group-" + group.UUID + "#member",
 		expected: ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
+	}, {
+		desc:     "map IDP group ID with relation",
+		input:    "idpgroup-engineering-team#member",
+		expected: ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("engineering-team"), ofganames.MemberRelation),
 	}, {
 		desc:     "map role UUID",
 		input:    "role-" + role.UUID,
@@ -2051,6 +2062,9 @@ func (s *permissionManagerSuite) TestToJAASTag(c *qt.C) {
 		tag:             ofganames.ConvertTag(group.ResourceTag()),
 		expectedJAASTag: "group-" + group.Name,
 	}, {
+		tag:             ofganames.ConvertTag(jimmnames.NewIdPGroupTag("engineering-team")),
+		expectedJAASTag: "idpgroup-engineering-team",
+	}, {
 		tag:             ofganames.ConvertTag(controller.ResourceTag()),
 		expectedJAASTag: "controller-" + controller.Name,
 	}, {
@@ -2100,6 +2114,9 @@ func (s *permissionManagerSuite) TestToJAASTagNoUUIDResolution(c *qt.C) {
 	}, {
 		tag:             ofganames.ConvertTag(group.ResourceTag()),
 		expectedJAASTag: "group-" + group.UUID,
+	}, {
+		tag:             ofganames.ConvertTag(jimmnames.NewIdPGroupTag("engineering-team")),
+		expectedJAASTag: "idpgroup-engineering-team",
 	}, {
 		tag:             ofganames.ConvertTag(controller.ResourceTag()),
 		expectedJAASTag: "controller-" + controller.UUID,
@@ -2213,4 +2230,25 @@ func (s *permissionManagerSuite) TestOpenFGACleanup(c *qt.C) {
 		c.Assert(err, qt.IsNil)
 		c.Assert(ok, qt.IsFalse)
 	}
+}
+
+func (s *permissionManagerSuite) TestOpenFGACleanupPreservesIdPGroupTuples(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	tuple := openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("engineering-team"), ofganames.MemberRelation),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(model.ResourceTag()),
+	}
+	err := s.ofgaClient.AddRelation(ctx, tuple)
+	c.Assert(err, qt.IsNil)
+
+	err = s.manager.OpenFGACleanup(ctx)
+	c.Assert(err, qt.IsNil)
+
+	ok, err := s.ofgaClient.CheckRelation(ctx, tuple, false)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsTrue)
 }

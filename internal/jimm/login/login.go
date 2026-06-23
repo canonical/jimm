@@ -7,13 +7,13 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -47,16 +47,13 @@ type OAuthAuthenticator interface {
 	// See Device(...) godoc for more info pertaining to the flow.
 	DeviceAccessToken(ctx context.Context, res *oauth2.DeviceAuthResponse) (*oauth2.Token, error)
 
-	// ExtractAndVerifyIDToken extracts the id token from the extras claims of an oauth2 token
-	// and performs signature verification of the token.
-	ExtractAndVerifyIDToken(ctx context.Context, oauth2Token *oauth2.Token) (*oidc.IDToken, error)
+	// VerifyAndExtractIdentityClaims verifies the ID token in oauth2Token and
+	// extracts email from the verified ID token and groups from the access token.
+	VerifyAndExtractIdentityClaims(ctx context.Context, oauth2Token *oauth2.Token) (auth.IdentityClaims, error)
 
-	// Email retrieves the users email from an id token via the email claim
-	Email(idToken *oidc.IDToken) (string, error)
-
-	// MintSessionToken mints a session token to be used when logging into JIMM
-	// via an access token. The token only contains the user's email for authentication.
-	MintSessionToken(email string) (string, error)
+	// MintSessionTokenWithGroups mints a session token to be used when logging into JIMM
+	// via an access token. The token contains the user's email and internal groups claim.
+	MintSessionTokenWithGroups(email string, groups []string) (string, error)
 
 	// VerifySessionToken symmetrically verifies the validty of the signature on the
 	// access token JWT, returning the parsed token.
@@ -71,8 +68,9 @@ type OAuthAuthenticator interface {
 	// And, if present, a refresh token.
 	UpdateIdentity(ctx context.Context, email string, token *oauth2.Token) error
 
-	// VerifyClientCredentials verifies the provided client ID and client secret.
-	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) error
+	// VerifyClientCredentials verifies the provided client ID and client secret,
+	// returning the groups claim extracted from the access token.
+	VerifyClientCredentials(ctx context.Context, clientID string, clientSecret string) ([]string, error)
 
 	// AuthenticateBrowserSession updates the session for a browser, additionally
 	// retrieving new access tokens upon expiry. If this cannot be done, the cookie
@@ -129,21 +127,16 @@ func (j *LoginManager) GetDeviceSessionToken(ctx context.Context, deviceOAuthRes
 		return "", err
 	}
 
-	idToken, err := j.oAuthAuthenticator.ExtractAndVerifyIDToken(ctx, token)
+	claims, err := j.oAuthAuthenticator.VerifyAndExtractIdentityClaims(ctx, token)
 	if err != nil {
 		return "", err
 	}
 
-	email, err := j.oAuthAuthenticator.Email(idToken)
-	if err != nil {
+	if err := j.oAuthAuthenticator.UpdateIdentity(ctx, claims.Email, token); err != nil {
 		return "", err
 	}
 
-	if err := j.oAuthAuthenticator.UpdateIdentity(ctx, email, token); err != nil {
-		return "", err
-	}
-
-	encToken, err := j.oAuthAuthenticator.MintSessionToken(email)
+	encToken, err := j.oAuthAuthenticator.MintSessionTokenWithGroups(claims.Email, claims.Groups)
 	if err != nil {
 		return "", err
 	}
@@ -162,7 +155,7 @@ func (j *LoginManager) LoginClientCredentials(ctx context.Context, clientID stri
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 
-	err = j.oAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
+	groups, err := j.oAuthAuthenticator.VerifyClientCredentials(ctx, clientID, clientSecret)
 	if err != nil {
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
@@ -172,6 +165,7 @@ func (j *LoginManager) LoginClientCredentials(ctx context.Context, clientID stri
 		logger.LogFailedLogin(ctx, clientIdWithDomain)
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
+	user.SetIDPGroups(groups)
 	logger.LogSuccessfulLogin(ctx, clientIdWithDomain)
 	return user, nil
 }
@@ -188,12 +182,19 @@ func (j *LoginManager) LoginWithSessionToken(ctx context.Context, sessionToken s
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
 
+	groups, err := auth.SessionGroupsFromToken(jwtToken)
+	if err != nil {
+		logger.LogFailedLogin(ctx, jwtToken.Subject())
+		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
+	}
+
 	email := jwtToken.Subject()
 	user, err := j.UserLogin(ctx, email)
 	if err != nil {
 		logger.LogFailedLogin(ctx, email)
 		return nil, errors.Codef(errors.CodeFatalLoginError, "%w", err)
 	}
+	user.SetIDPGroups(groups)
 	logger.LogSuccessfulLogin(ctx, email)
 	return user, nil
 }
@@ -214,6 +215,7 @@ func (j *LoginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 		logger.LogFailedLogin(ctx, identityID)
 		return nil, err
 	}
+	user.SetIDPGroups(auth.SessionGroupsFromContext(ctx))
 	logger.LogSuccessfulLogin(ctx, identityID)
 	return user, nil
 }
@@ -223,7 +225,6 @@ func (j *LoginManager) LoginWithSessionCookie(ctx context.Context, identityID st
 // It will create a new identity if one does not exist.
 // The identity's last login time is updated.
 func (j *LoginManager) UserLogin(ctx context.Context, identifier string) (*openfga.User, error) {
-
 	ofgaUser, err := j.GetOrCreateIdentity(ctx, identifier)
 	if err != nil {
 		return nil, errors.Codef(errors.CodeUnauthorized, "%w", err)
@@ -236,7 +237,6 @@ func (j *LoginManager) UserLogin(ctx context.Context, identifier string) (*openf
 }
 
 func (j *LoginManager) GetOrCreateIdentity(ctx context.Context, identifier string) (*openfga.User, error) {
-
 	identity, err := dbmodel.NewIdentity(identifier)
 	if err != nil {
 		return nil, err

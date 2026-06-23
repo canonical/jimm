@@ -56,6 +56,7 @@ type Tag = cofga.Entity
 type ResourceTagger interface {
 	names.UserTag |
 		jimmnames.GroupTag |
+		jimmnames.IdPGroupTag |
 		names.ControllerTag |
 		names.ModelTag |
 		names.ApplicationOfferTag |
@@ -105,6 +106,7 @@ func BlankKindTag(kind string) (*Tag, error) {
 	switch kind {
 	case names.UserTagKind,
 		jimmnames.GroupTagKind,
+		jimmnames.IdPGroupTagKind,
 		jimmnames.RoleTagKind,
 		names.ControllerTagKind,
 		names.ModelTagKind,

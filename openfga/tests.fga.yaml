@@ -140,6 +140,12 @@ tuples:
     - user: group:mo-group-3#member
       relation: writer
       object: model:mo-model-1
+    - user: user:mo-user-6
+      relation: member
+      object: idpgroup:mo-idpgroup-1
+    - user: idpgroup:mo-idpgroup-1#member
+      relation: reader
+      object: model:mo-model-1
     
     # Cloud (cl)
     - user: user:cl-user-1
@@ -414,6 +420,12 @@ tests:
             writer:
               - model:mo-model-1
               - model:mo-model-2
+            reader:
+              - model:mo-model-1
+              - model:mo-model-2
+        - user: user:mo-user-6
+          type: model
+          assertions:
             reader:
               - model:mo-model-1
               - model:mo-model-2

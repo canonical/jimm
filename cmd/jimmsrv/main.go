@@ -109,14 +109,17 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	scopes := os.Getenv("JIMM_OAUTH_SCOPES")
-	scopesParsed := strings.Split(scopes, " ")
-	for i, scope := range scopesParsed {
-		scopesParsed[i] = strings.TrimSpace(scope)
-	}
+	scopesParsed := strings.Fields(scopes)
 	zapctx.Info(ctx, "oauth scopes", zap.Any("scopes", scopesParsed))
 	if len(scopesParsed) == 0 {
 		return errors.New("no oauth client scopes present")
 	}
+
+	clientCredentialScopes := os.Getenv("JIMM_OAUTH_CLIENT_CREDENTIAL_SCOPES")
+	clientCredentialScopesParsed := strings.Fields(clientCredentialScopes)
+	zapctx.Info(ctx, "oauth client credential scopes", zap.Any("scopes", clientCredentialScopesParsed))
+
+	groupClaimKey := os.Getenv("JIMM_OAUTH_GROUP_CLAIM_KEY")
 
 	insecureSecretStorage := false
 	if key, ok := os.LookupEnv("INSECURE_SECRET_STORAGE"); ok && key != "" {
@@ -228,15 +231,17 @@ func start(ctx context.Context, s *service.Service) error {
 		JWKSPrivateKeyPath:            jwksPrivateKeyPath,
 		InsecureSecretStorage:         insecureSecretStorage,
 		OAuthAuthenticatorParams: jimmsvc.OAuthAuthenticatorParams{
-			IssuerURL:            issuerURL,
-			ClientID:             clientID,
-			ClientSecret:         clientSecret,
-			Scopes:               scopesParsed,
-			SessionTokenExpiry:   sessionTokenExpiryDuration,
-			SessionCookieMaxAge:  sessionCookieMaxAgeInt,
-			JWTSessionKey:        sessionSecretKey,
-			SecureSessionCookies: secureSessionCookies,
-			AuthStyle:            os.Getenv("JIMM_OAUTH_AUTH_STYLE"),
+			IssuerURL:              issuerURL,
+			ClientID:               clientID,
+			ClientSecret:           clientSecret,
+			Scopes:                 scopesParsed,
+			ClientCredentialScopes: clientCredentialScopesParsed,
+			GroupClaimKey:          groupClaimKey,
+			SessionTokenExpiry:     sessionTokenExpiryDuration,
+			SessionCookieMaxAge:    sessionCookieMaxAgeInt,
+			JWTSessionKey:          sessionSecretKey,
+			SecureSessionCookies:   secureSessionCookies,
+			AuthStyle:              os.Getenv("JIMM_OAUTH_AUTH_STYLE"),
 		},
 		DashboardFinalRedirectURL: os.Getenv("JIMM_DASHBOARD_FINAL_REDIRECT_URL"),
 		CookieSessionKey:          []byte(sessionSecretKey),

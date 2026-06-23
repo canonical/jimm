@@ -45,8 +45,12 @@ func (s streamControllerProxier) Authenticate(ctx context.Context, w http.Respon
 	if err != nil {
 		return ctx, errors.Codef(errors.CodeUnauthorized, "%w", err)
 	}
-	email := jwtToken.Subject()
-	ctx = auth.ContextWithSessionIdentity(ctx, email)
+	groups, err := auth.SessionGroupsFromToken(jwtToken)
+	if err != nil {
+		return ctx, errors.Codef(errors.CodeUnauthorized, "%w", err)
+	}
+	ctx = auth.ContextWithSessionIdentity(ctx, jwtToken.Subject())
+	ctx = auth.ContextWithSessionGroups(ctx, groups)
 	return ctx, nil
 }
 
@@ -76,6 +80,7 @@ func (s streamControllerProxier) ServeWS(ctx context.Context, clientConn *websoc
 		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	}
+	user.SetIDPGroups(auth.SessionGroupsFromContext(ctx))
 
 	if !user.JimmAdmin {
 		logger.LogUnauthorizedAccess(

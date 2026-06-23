@@ -40,8 +40,12 @@ func (s streamModelProxier) Authenticate(ctx context.Context, w http.ResponseWri
 	if err != nil {
 		return ctx, errors.Codef(errors.CodeUnauthorized, "%w", err)
 	}
-	email := jwtToken.Subject()
-	ctx = auth.ContextWithSessionIdentity(ctx, email)
+	groups, err := auth.SessionGroupsFromToken(jwtToken)
+	if err != nil {
+		return ctx, errors.Codef(errors.CodeUnauthorized, "%w", err)
+	}
+	ctx = auth.ContextWithSessionIdentity(ctx, jwtToken.Subject())
+	ctx = auth.ContextWithSessionGroups(ctx, groups)
 	return ctx, nil
 }
 
@@ -69,6 +73,7 @@ func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.C
 		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	}
+	user.SetIDPGroups(auth.SessionGroupsFromContext(ctx))
 
 	uuid, finalPath, err := modelInfoFromPath(jimmhttp.PathElementFromContext(ctx))
 	if err != nil {
