@@ -279,88 +279,39 @@ To inspect the reason for failure, consult the output from `juju debug-log` and 
 (upgrade-a-model)=
 ## Upgrade a model
 
-Use the `jaas upgrade-to` command to move one or more models to another JAAS-managed controller and upgrade those models to the target controller's Juju version.
+How you upgrade a model depends on whether you’d be crossing patch versions (e.g., v3.6.23 -> v3.6.24), minor version (e.g., v3.5 -> v3.6) or major versions (v3 -> v4).  
 
-This is useful when you have bootstrapped or registered a newer controller in JAAS and want a model to run on that controller without manually combining the model migration and model upgrade steps.
+- To upgrade a model's patch version, use `juju upgrade-model`.  
 
-```{note}
-This feature is complemtary to Juju [model-upgrades](https://canonical.com/juju/docs/juju-cli/latest/howto/manage-models/#upgrade-a-model) which is preferable when upgrading across patch versions.
-```
+> See more: {external+juju:ref}`upgrade-a-model`  
 
-### Prerequisites
+- To upgrade a model's major or minor version, you must migrate your model to a controller of the target version and upgrade the model to that version. In JAAS you can use `juju jaas upgrade-to` to perform both steps. For example:  
 
-- A running JAAS deployment with the model already hosted on a controller managed by JAAS.
-- A target controller registered with JAAS.
-- The model UUID for each model you want to upgrade.
-- Administrator permissions for JAAS. See more: {ref}`add-a-juju-controller`.
+```  
+# Get the model UUID:  
+MODEL_NAME=my-model  
+MODEL_UUID=$(juju show-model $MODEL_NAME --format yaml | yq .$MODEL_NAME.model-uuid)  
 
-You can get the model UUID with `juju show-model`:
+# Start the migrate + upgrade:  
+MODEL_NAME=my-model  
+MODEL_UUID=$(juju show-model $MODEL_NAME --format yaml | yq .$MODEL_NAME.model-uuid)  
+juju jaas upgrade-to juju-3-6-controller $MODEL_UUID  
 
-```text
-MODEL_NAME=my-model
-MODEL_UUID=$(juju show-model $MODEL_NAME --format yaml | yq .$MODEL_NAME.model-uuid)
-```
-
-You can list the available JAAS-managed controllers with:
-
-```text
-juju jaas list-controllers
-```
-
-### Start an upgrade
-
-Run `jaas upgrade-to` with the target controller name and one or more model UUIDs:
-
-```text
-juju jaas upgrade-to <target-controller-name> <model-uuid> [<model-uuid>...]
-```
-
-For example, to migrate and upgrade a model to the controller named `juju-3-6-controller`:
-
-```text
-MODEL_NAME=my-model
-MODEL_UUID=$(juju show-model $MODEL_NAME --format yaml | yq .$MODEL_NAME.model-uuid)
-juju jaas upgrade-to juju-3-6-controller $MODEL_UUID
-```
-
-To upgrade multiple models in one request, pass more than one UUID:
-
-```text
-juju jaas upgrade-to juju-3-6-controller $MODEL_UUID $SECOND_MODEL_UUID
-```
-
-> See more: {ref}`command-jaas-upgrade-to`
-
-The command starts the upgrade workflow for each model. If the pre-upgrade validation fails, no upgrade is started for the request and the command returns the error.
-
-### Check upgrade status
-
-Use `jaas show-model` to inspect the model and its upgrade status:
-
-```text
-juju jaas show-model $MODEL_UUID
-```
-
-For machine-readable output, use JSON or YAML:
-
-```text
+# Verify that the procedure has succeeded 
+# (output should show the target controller's details):  
 juju jaas show-model $MODEL_UUID --format yaml
-juju jaas show-model $MODEL_UUID --format json
-```
+```  
 
-> See more: {ref}`command-jaas-show-model`
 
-When an upgrade is running, the output includes the model's current controller information and the status of the upgrade workflow. When the upgrade completes, the model's controller information reflects the target controller.
+> See more: {external+juju:ref}`Juju | juju show-model <command-show-model>`, {ref}`command-jaas-upgrade-to` 
 
 ### How the upgrade works
 
 JIMM coordinates the upgrade as a background workflow:
 
-1. JIMM validates the requested model UUIDs and target controller.
-2. JIMM starts one workflow per model that will includes retry logic for each step.
-3. Each workflow migrates the model to the target controller.
-4. After migration, JIMM upgrades the model to the Juju version of the target controller.
-5. JIMM records workflow progress so `jaas show-model` can report the current state.
+1. JIMM starts one workflow per model that will includes retry logic for each step.
+2. Each workflow migrates the model to the target controller and then upgrades it to the Juju version of the target controller.
+3. JIMM records workflow progress so `jaas show-model` can report the current state.
 
 During the migration phase, the model may be temporarily unavailable in the same way as a standard Juju model migration. If the migration or upgrade fails, inspect the status with `jaas show-model` and consult the controller logs with `juju debug-log`.
 
