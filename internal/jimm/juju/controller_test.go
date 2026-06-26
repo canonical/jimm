@@ -1514,11 +1514,17 @@ type result struct {
 type testControllerClient struct {
 	mu                       sync.Mutex
 	initiateMigrationResults []result
+	// onInitiateMigration is an optional callback invoked with the dryRun flag
+	// on each InitiateMigration call, allowing tests to observe how it was called.
+	onInitiateMigration func(dryRun bool)
 }
 
 func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec, dryRun bool) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.onInitiateMigration != nil {
+		c.onInitiateMigration(dryRun)
+	}
 	if len(c.initiateMigrationResults) == 0 {
 		return "", errors.Codef(errors.CodeNotImplemented, "not implemented")
 	}
@@ -1583,4 +1589,149 @@ func TestControllerDetailsForModel(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(controllerDetails.ControllerUUID, qt.Equals, env.Controllers[0].UUID)
 	c.Assert(controllerDetails.PublicAddress, qt.Equals, "test-address.com")
+}
+
+// testDryRunMigrationEnv has two source controllers:
+//   - source-new  (agent-version 3.6.13) – supports dry-run
+//   - source-old  (agent-version 3.6.5)  – too old for dry-run
+//
+// controller-target is the migration destination; its credentials are
+// populated in the in-memory credential store during each test.
+const testDryRunMigrationEnv = `clouds:
+- name: test-cloud
+  type: test
+  regions:
+  - name: test-region-1
+cloud-credentials:
+- name: test-cred
+  cloud: test-cloud
+  owner: alice@canonical.com
+  type: empty
+controllers:
+- name: source-new
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.6.13
+- name: source-old
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 3.6.5
+- name: controller-target
+  uuid: 00000001-0000-0000-0000-000000000003
+  cloud: test-cloud
+  region: test-region-1
+  agent-version: 4.0.0
+models:
+- name: model-on-new
+  uuid: 00000002-0000-0000-0000-000000000001
+  controller: source-new
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-cred
+  owner: alice@canonical.com
+  users:
+  - user: alice@canonical.com
+    access: admin
+- name: model-on-old
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: source-old
+  cloud: test-cloud
+  region: test-region-1
+  cloud-credential: test-cred
+  owner: alice@canonical.com
+  users:
+  - user: alice@canonical.com
+    access: admin
+`
+
+func TestDryRunInternalMigration(t *testing.T) {
+	c := qt.New(t)
+
+	modelOnNew := "00000002-0000-0000-0000-000000000001"
+	modelOnOld := "00000002-0000-0000-0000-000000000002"
+	targetController := "controller-target"
+
+	tests := []struct {
+		about                    string
+		modelUUID                string
+		initiateMigrationResults []result
+		expectedError            string
+		// dryRunReceived is set to true by the mock when InitiateMigration is called.
+		expectDryRun bool
+	}{{
+		about:        "dry run succeeds",
+		modelUUID:    modelOnNew,
+		expectDryRun: true,
+		initiateMigrationResults: []result{{
+			result: "", // dry-run returns an empty migration ID
+		}},
+	}, {
+		about:        "dry run precheck fails",
+		modelUUID:    modelOnNew,
+		expectDryRun: true,
+		initiateMigrationResults: []result{{
+			err: errors.New("charm not compatible with target"),
+		}},
+		expectedError: "migration precheck failed: charm not compatible with target",
+	}, {
+		about:         "source controller version too old",
+		modelUUID:     modelOnOld,
+		expectDryRun:  false,
+		expectedError: `controller "source-old" \(version 3\.6\.5\) does not support migration dry runs; upgrade to 3\.6\.13 or later before running upgrade-to`,
+	}, {
+		about:         "model not found",
+		modelUUID:     "00000002-0000-0000-0000-000000000099",
+		expectDryRun:  false,
+		expectedError: "model not found",
+	}, {
+		about:         "target controller not found",
+		modelUUID:     modelOnNew,
+		expectDryRun:  false,
+		expectedError: `not found`,
+	}}
+
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			store := jimmtest.NewInMemoryCredentialStore()
+			// Only put target credentials when they should be found.
+			if test.about != "target controller not found" {
+				err := store.PutControllerCredentials(context.Background(), targetController, "admin", "test-secret")
+				c.Assert(err, qt.IsNil)
+			}
+
+			j := newTestJujuManager(c, &parameters{
+				CredentialStore: store,
+			})
+
+			env := jimmtest.ParseEnvironment(c, testDryRunMigrationEnv)
+			env.PopulateDB(c, j.Database)
+
+			var dryRunCalled bool
+			c.Patch(juju.NewControllerClient, func(api base.APICallCloser) juju.ControllerClient {
+				return &testControllerClient{
+					initiateMigrationResults: test.initiateMigrationResults,
+					onInitiateMigration: func(dryRun bool) {
+						if dryRun {
+							dryRunCalled = true
+						}
+					},
+				}
+			})
+
+			u, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+			user := openfga.NewUser(u, nil)
+
+			err = j.DryRunInternalMigration(context.Background(), user, test.modelUUID, targetController)
+
+			if test.expectedError != "" {
+				c.Assert(err, qt.ErrorMatches, test.expectedError)
+			} else {
+				c.Assert(err, qt.IsNil)
+			}
+			c.Assert(dryRunCalled, qt.Equals, test.expectDryRun)
+		})
+	}
 }

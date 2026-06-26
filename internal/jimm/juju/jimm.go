@@ -255,6 +255,34 @@ func fillMigrationTarget(db *db.Database, credStore credentials.CredentialStore,
 	return targetInfo, dbController.ID, nil
 }
 
+// resolveModel looks up a model by UUID or "owner/name" string and returns
+// the fully-populated dbmodel.Model (including its Controller association).
+func (j *JujuManager) resolveModel(ctx context.Context, modelNameOrUUID string) (dbmodel.Model, error) {
+	model := dbmodel.Model{}
+	_, err := uuid.Parse(modelNameOrUUID)
+	if err != nil {
+		s := strings.Split(modelNameOrUUID, "/")
+		if len(s) != 2 {
+			return model, errors.New("invalid model target")
+		}
+		owner, name := s[0], s[1]
+		if !names.IsValidUser(owner) {
+			return model, errors.New("invalid user name")
+		}
+		if !names.IsValidModelName(name) {
+			return model, errors.New("invalid model name")
+		}
+		model.Name = name
+		model.OwnerIdentityName = owner
+	} else {
+		model.UUID = sql.NullString{String: modelNameOrUUID, Valid: true}
+	}
+	if err := j.Database.GetModel(ctx, &model); err != nil {
+		return model, err
+	}
+	return model, nil
+}
+
 // InitiateInternalMigration initiates a model migration between two controllers within JIMM.
 func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error) {
 
@@ -263,36 +291,11 @@ func (j *JujuManager) InitiateInternalMigration(ctx context.Context, user *openf
 		return jujuparams.InitiateMigrationResult{}, err
 	}
 
-	model := dbmodel.Model{}
-	// Check if the user is providing a model UUID or name
-	_, err = uuid.Parse(modelNameOrUUID)
-	if err != nil {
-		s := strings.Split(modelNameOrUUID, "/")
-		if len(s) != 2 {
-			return jujuparams.InitiateMigrationResult{}, errors.New("invalid model target")
-		}
-
-		owner, name := s[0], s[1]
-		if !names.IsValidUser(owner) {
-			return jujuparams.InitiateMigrationResult{}, errors.New("invalid user name")
-		}
-		if !names.IsValidModelName(name) {
-			return jujuparams.InitiateMigrationResult{}, errors.New("invalid model name")
-		}
-
-		model.Name = name
-		model.OwnerIdentityName = owner
-	} else {
-		model.UUID = sql.NullString{
-			String: modelNameOrUUID,
-			Valid:  true,
-		}
-	}
-
-	err = j.Database.GetModel(ctx, &model)
+	model, err := j.resolveModel(ctx, modelNameOrUUID)
 	if err != nil {
 		return jujuparams.InitiateMigrationResult{}, err
 	}
+
 	spec := jujuparams.MigrationSpec{ModelTag: model.ResourceTag().String(), TargetInfo: migrationTarget}
 	result, err := initiateInternalMigration(ctx, j, user, spec)
 	if err != nil {

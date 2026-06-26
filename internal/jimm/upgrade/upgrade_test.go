@@ -94,6 +94,11 @@ func TestUpgradeTo_Success(t *testing.T) {
 			},
 		}, nil)
 
+	// Dry-run precheck expectation.
+	s.jujuManager.EXPECT().
+		DryRunInternalMigration(gomock.Any(), gomock.Any(), modelUUID, targetController).
+		Return(nil)
+
 	// Migration expectations.
 	s.enqueuer.EXPECT().EnqueueUpgradeTo(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, uta rivertypes.UpgradeToArgs, metadata rivertypes.JobModelUUIDMetadata) (*rivertype.JobInsertResult, error) {
 		c.Check(uta.ModelUUID, qt.Equals, modelUUID)
@@ -110,6 +115,72 @@ func TestUpgradeTo_Success(t *testing.T) {
 	jobID, err := upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetController)
 	c.Assert(err, qt.IsNil)
 	c.Assert(jobID, qt.Equals, int64(1))
+}
+
+func TestUpgradeTo_DryRunFails(t *testing.T) {
+	s := setupTest(t)
+	c := qt.New(t)
+
+	ctx := c.Context()
+	user := &openfga.User{
+		Identity: &dbmodel.Identity{
+			Name: "alice@canonical.com",
+		},
+	}
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+	targetController := "controller-foo"
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.jujuManager, s.store, s.dialer, s.enqueuer)
+	c.Assert(err, qt.IsNil)
+
+	s.jujuManager.EXPECT().
+		ListMigrationTargets(gomock.Any(), gomock.Any(), names.NewModelTag(modelUUID)).
+		Return([]dbmodel.Controller{
+			{
+				Name:         targetController,
+				AgentVersion: "4.1.0",
+			},
+		}, nil)
+
+	s.jujuManager.EXPECT().
+		DryRunInternalMigration(gomock.Any(), gomock.Any(), modelUUID, targetController).
+		Return(errors.New("charm not compatible with target version"))
+
+	_, err = upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetController)
+	c.Assert(err, qt.ErrorMatches, ".*migration precheck failed.*charm not compatible with target version.*")
+}
+
+func TestUpgradeTo_DryRunControllerTooOld(t *testing.T) {
+	s := setupTest(t)
+	c := qt.New(t)
+
+	ctx := c.Context()
+	user := &openfga.User{
+		Identity: &dbmodel.Identity{
+			Name: "alice@canonical.com",
+		},
+	}
+	modelUUID := "93608db4-f1cb-4da5-9926-8233981aef0a"
+	targetController := "controller-foo"
+
+	upgradeMgr, err := upgrade.NewUpgradeManager(s.jujuManager, s.store, s.dialer, s.enqueuer)
+	c.Assert(err, qt.IsNil)
+
+	s.jujuManager.EXPECT().
+		ListMigrationTargets(gomock.Any(), gomock.Any(), names.NewModelTag(modelUUID)).
+		Return([]dbmodel.Controller{
+			{
+				Name:         targetController,
+				AgentVersion: "4.1.0",
+			},
+		}, nil)
+
+	s.jujuManager.EXPECT().
+		DryRunInternalMigration(gomock.Any(), gomock.Any(), modelUUID, targetController).
+		Return(errors.New(`controller "source-ctrl" (version 3.6.5) does not support migration dry runs; upgrade to 3.6.13 or later before running upgrade-to`))
+
+	_, err = upgradeMgr.UpgradeTo(ctx, user, modelUUID, targetController)
+	c.Assert(err, qt.ErrorMatches, ".*migration precheck failed.*does not support migration dry runs.*")
 }
 
 func TestUpgradeTo_InvalidTargetController(t *testing.T) {

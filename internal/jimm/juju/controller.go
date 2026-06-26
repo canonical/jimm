@@ -660,6 +660,71 @@ func (j *JujuManager) UpdateMigratedModel(ctx context.Context, user *openfga.Use
 	return nil
 }
 
+// minDryRunMigrateVersion is the minimum Juju controller version that supports
+// the dry-run flag on InitiateMigration (introduced in Juju 3.6.13).
+var minDryRunMigrateVersion = version.Number{Major: 3, Minor: 6, Patch: 13}
+
+// DryRunInternalMigration runs a migration precheck (dry run) against the
+// source controller without actually initiating the migration.
+//
+// If the source controller is older than [minDryRunMigrateVersion], the call
+// returns an error asking the user to upgrade the controller first. Otherwise
+// it calls InitiateMigration with dryRun=true; any precheck failure is
+// returned as an error.
+func (j *JujuManager) DryRunInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetControllerName string) error {
+	migrationTarget, _, err := fillMigrationTarget(j.Database, j.CredentialStore, targetControllerName)
+	if err != nil {
+		return err
+	}
+
+	model, err := j.resolveModel(ctx, modelNameOrUUID)
+	if err != nil {
+		return err
+	}
+
+	// Ensure the source controller supports dry-run migrations.
+	sourceVersion, err := version.Parse(model.Controller.AgentVersion)
+	if err != nil {
+		return fmt.Errorf("failed to parse source controller version %q: %w", model.Controller.AgentVersion, err)
+	}
+	if sourceVersion.Compare(minDryRunMigrateVersion) < 0 {
+		return fmt.Errorf(
+			"controller %q (version %s) does not support migration dry runs; upgrade to %s or later before running upgrade-to",
+			model.Controller.Name, sourceVersion, minDryRunMigrateVersion,
+		)
+	}
+
+	targetControllerTag, err := names.ParseControllerTag(migrationTarget.ControllerTag)
+	if err != nil {
+		return fmt.Errorf("failed to parse target controller tag: %w", err)
+	}
+	targetUserTag, err := names.ParseUserTag(migrationTarget.AuthTag)
+	if err != nil {
+		return fmt.Errorf("failed to parse target auth tag: %w", err)
+	}
+
+	spec := controller.MigrationSpec{
+		ModelUUID:            model.ResourceTag().Id(),
+		TargetControllerUUID: targetControllerTag.Id(),
+		TargetAddrs:          migrationTarget.Addrs,
+		TargetCACert:         migrationTarget.CACert,
+		TargetUser:           targetUserTag.Id(),
+		TargetPassword:       migrationTarget.Password,
+	}
+
+	api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to dial source controller: %w", err)
+	}
+	client := newControllerClient(api)
+	defer client.Close()
+
+	if _, err = client.InitiateMigration(spec, true); err != nil {
+		return fmt.Errorf("migration precheck failed: %w", err)
+	}
+	return nil
+}
+
 // InitiateMigration triggers the migration of the specified model to a controller
 // that is not managed by JIMM.
 func (j *JujuManager) InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error) {

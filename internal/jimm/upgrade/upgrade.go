@@ -38,6 +38,10 @@ type JujuManager interface {
 	ListMigrationTargets(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
+	// DryRunInternalMigration runs a migration precheck (dry run) without actually
+	// initiating the migration. It returns an error if the source controller does not
+	// support dry-run migrations (i.e. version < 3.6.13), or if the precheck fails.
+	DryRunInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) error
 	ModelInfo(ctx context.Context, user *openfga.User, mt names.ModelTag) (jujuclient.ModelInfo, error)
 }
 
@@ -183,6 +187,13 @@ func (u *UpgradeManager) UpgradeTo(ctx context.Context, user *openfga.User, mode
 	targetVersion, err := version.Parse(targetController.AgentVersion)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse target controller version: %w", err)
+	}
+
+	// Run a migration dry run to verify the model can be migrated to the target
+	// controller before committing to the job. This catches precheck failures
+	// (e.g. cross-version constraints, credential issues) early.
+	if err := u.jujuManager.DryRunInternalMigration(ctx, user, modelUUID, targetControllerName); err != nil {
+		return 0, fmt.Errorf("migration precheck failed: %w", err)
 	}
 
 	job, err := u.enqueuer.EnqueueUpgradeTo(ctx, rivertypes.UpgradeToArgs{

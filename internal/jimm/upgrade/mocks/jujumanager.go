@@ -45,6 +45,44 @@ func (m *MockJujuManager) EXPECT() *MockJujuManagerMockRecorder {
 	return m.recorder
 }
 
+// DryRunInternalMigration mocks base method.
+func (m *MockJujuManager) DryRunInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID, targetController string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DryRunInternalMigration", ctx, user, modelNameOrUUID, targetController)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DryRunInternalMigration indicates an expected call of DryRunInternalMigration.
+func (mr *MockJujuManagerMockRecorder) DryRunInternalMigration(ctx, user, modelNameOrUUID, targetController any) *MockJujuManagerDryRunInternalMigrationCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DryRunInternalMigration", reflect.TypeOf((*MockJujuManager)(nil).DryRunInternalMigration), ctx, user, modelNameOrUUID, targetController)
+	return &MockJujuManagerDryRunInternalMigrationCall{Call: call}
+}
+
+// MockJujuManagerDryRunInternalMigrationCall wrap *gomock.Call
+type MockJujuManagerDryRunInternalMigrationCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJujuManagerDryRunInternalMigrationCall) Return(arg0 error) *MockJujuManagerDryRunInternalMigrationCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJujuManagerDryRunInternalMigrationCall) Do(f func(context.Context, *openfga.User, string, string) error) *MockJujuManagerDryRunInternalMigrationCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJujuManagerDryRunInternalMigrationCall) DoAndReturn(f func(context.Context, *openfga.User, string, string) error) *MockJujuManagerDryRunInternalMigrationCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetModel mocks base method.
 func (m *MockJujuManager) GetModel(ctx context.Context, uuid string) (dbmodel.Model, error) {
 	m.ctrl.T.Helper()
