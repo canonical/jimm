@@ -18,6 +18,11 @@ func (c Connection) ControllerConfig(ctx context.Context) (jujucontroller.Config
 	return controller.NewClient(&c).ControllerConfig()
 }
 
+// InitiateMigration begins a model migration to another controller.
+func (c Connection) InitiateMigration(spec controller.MigrationSpec, dryRun bool) (string, error) {
+	return controller.NewClient(&c).InitiateMigration(spec, dryRun)
+}
+
 // CloudSpec retrieves the cloud spec of the model connected to.
 func (c Connection) CloudSpec(ctx context.Context) (cloudspec.CloudSpec, error) {
 	modelCfgClient := modelconfig.NewClient(&c)

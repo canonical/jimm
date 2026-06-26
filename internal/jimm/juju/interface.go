@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/api/base"
+	controllerapi "github.com/juju/juju/api/controller/controller"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/crossmodel"
@@ -196,6 +197,11 @@ type API interface {
 		ignoreAgentVersions bool,
 		dryRun bool,
 	) (version.Number, error)
+
+	// InitiateMigration begins a model migration to another controller.
+	// When dryRun is true the call runs the migration prechecks only and
+	// does not start an actual migration.
+	InitiateMigration(spec controllerapi.MigrationSpec, dryRun bool) (string, error)
 }
 
 // PermissionManager provides a way to manage permissions within JIMM.

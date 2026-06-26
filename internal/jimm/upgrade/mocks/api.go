@@ -18,8 +18,9 @@ import (
 
 	jujuclient "github.com/canonical/jimm/v3/internal/jujuclient"
 	base "github.com/juju/juju/api/base"
+	controller "github.com/juju/juju/api/controller/controller"
 	cloud "github.com/juju/juju/cloud"
-	controller "github.com/juju/juju/controller"
+	controller0 "github.com/juju/juju/controller"
 	crossmodel "github.com/juju/juju/core/crossmodel"
 	migration "github.com/juju/juju/core/migration"
 	cloudspec "github.com/juju/juju/environs/cloudspec"
@@ -708,10 +709,10 @@ func (c *MockAPIConnectStreamCall) DoAndReturn(f func(string, url.Values) (base.
 }
 
 // ControllerConfig mocks base method.
-func (m *MockAPI) ControllerConfig(arg0 context.Context) (controller.Config, error) {
+func (m *MockAPI) ControllerConfig(arg0 context.Context) (controller0.Config, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ControllerConfig", arg0)
-	ret0, _ := ret[0].(controller.Config)
+	ret0, _ := ret[0].(controller0.Config)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -729,19 +730,19 @@ type MockAPIControllerConfigCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAPIControllerConfigCall) Return(arg0 controller.Config, arg1 error) *MockAPIControllerConfigCall {
+func (c *MockAPIControllerConfigCall) Return(arg0 controller0.Config, arg1 error) *MockAPIControllerConfigCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAPIControllerConfigCall) Do(f func(context.Context) (controller.Config, error)) *MockAPIControllerConfigCall {
+func (c *MockAPIControllerConfigCall) Do(f func(context.Context) (controller0.Config, error)) *MockAPIControllerConfigCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAPIControllerConfigCall) DoAndReturn(f func(context.Context) (controller.Config, error)) *MockAPIControllerConfigCall {
+func (c *MockAPIControllerConfigCall) DoAndReturn(f func(context.Context) (controller0.Config, error)) *MockAPIControllerConfigCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1206,6 +1207,45 @@ func (c *MockAPIImportCall) Do(f func([]byte) error) *MockAPIImportCall {
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAPIImportCall) DoAndReturn(f func([]byte) error) *MockAPIImportCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// InitiateMigration mocks base method.
+func (m *MockAPI) InitiateMigration(spec controller.MigrationSpec, dryRun bool) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InitiateMigration", spec, dryRun)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InitiateMigration indicates an expected call of InitiateMigration.
+func (mr *MockAPIMockRecorder) InitiateMigration(spec, dryRun any) *MockAPIInitiateMigrationCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitiateMigration", reflect.TypeOf((*MockAPI)(nil).InitiateMigration), spec, dryRun)
+	return &MockAPIInitiateMigrationCall{Call: call}
+}
+
+// MockAPIInitiateMigrationCall wrap *gomock.Call
+type MockAPIInitiateMigrationCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPIInitiateMigrationCall) Return(arg0 string, arg1 error) *MockAPIInitiateMigrationCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPIInitiateMigrationCall) Do(f func(controller.MigrationSpec, bool) (string, error)) *MockAPIInitiateMigrationCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPIInitiateMigrationCall) DoAndReturn(f func(controller.MigrationSpec, bool) (string, error)) *MockAPIInitiateMigrationCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

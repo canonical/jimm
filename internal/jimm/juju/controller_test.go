@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"sync"
 	"testing"
 
 	"github.com/canonical/ofga"
@@ -14,7 +13,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/uuid"
 	"github.com/juju/juju/api/base"
-	"github.com/juju/juju/api/controller/controller"
+	controllerapi "github.com/juju/juju/api/controller/controller"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/crossmodel"
@@ -1265,12 +1264,12 @@ func TestInitiateMigration(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	tests := []struct {
-		about                    string
-		initiateMigrationResults []result
-		user                     func(*openfga.OFGAClient) *openfga.User
-		spec                     jujuparams.MigrationSpec
-		expectedError            string
-		expectedResult           jujuparams.InitiateMigrationResult
+		about          string
+		migrateFn      func(controllerapi.MigrationSpec, bool) (string, error)
+		user           func(*openfga.OFGAClient) *openfga.User
+		spec           jujuparams.MigrationSpec
+		expectedError  string
+		expectedResult jujuparams.InitiateMigrationResult
 	}{{
 		about: "model migration initiated successfully",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1289,9 +1288,9 @@ func TestInitiateMigration(t *testing.T) {
 				Macaroons:     string(macaroonData),
 			},
 		},
-		initiateMigrationResults: []result{{
-			result: migrationId1,
-		}},
+		migrateFn: func(_ controllerapi.MigrationSpec, _ bool) (string, error) {
+			return migrationId1, nil
+		},
 		expectedResult: jujuparams.InitiateMigrationResult{
 			ModelTag:    mt1.String(),
 			MigrationId: migrationId1,
@@ -1314,8 +1313,7 @@ func TestInitiateMigration(t *testing.T) {
 				Macaroons:     string(macaroonData),
 			},
 		},
-		initiateMigrationResults: []result{{}},
-		expectedError:            "unauthorized",
+		expectedError: "unauthorized",
 	}, {
 		about: "InitiateMigration call fails",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1333,9 +1331,9 @@ func TestInitiateMigration(t *testing.T) {
 				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
-		initiateMigrationResults: []result{{
-			err: errors.New("mocked error"),
-		}},
+		migrateFn: func(_ controllerapi.MigrationSpec, _ bool) (string, error) {
+			return "", errors.New("mocked error")
+		},
 		expectedError: "mocked error",
 	}, {
 		about: "non-admin-user gets unauthorized error",
@@ -1354,8 +1352,7 @@ func TestInitiateMigration(t *testing.T) {
 				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
-		initiateMigrationResults: []result{{}},
-		expectedError:            "unauthorized",
+		expectedError: "unauthorized",
 	}, {
 		about: "invalid model tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1373,8 +1370,7 @@ func TestInitiateMigration(t *testing.T) {
 				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
-		initiateMigrationResults: []result{{}},
-		expectedError:            `"invalid-model-tag" is not a valid tag`,
+		expectedError: `"invalid-model-tag" is not a valid tag`,
 	}, {
 		about: "invalid target controller tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1392,8 +1388,7 @@ func TestInitiateMigration(t *testing.T) {
 				AuthTag:       names.NewUserTag("target-user@canonical.com").String(),
 			},
 		},
-		initiateMigrationResults: []result{{}},
-		expectedError:            `"invalid-controller-tag" is not a valid tag`,
+		expectedError: `"invalid-controller-tag" is not a valid tag`,
 	}, {
 		about: "invalid target user tag",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1411,8 +1406,7 @@ func TestInitiateMigration(t *testing.T) {
 				AuthTag:       "invalid-user-tag",
 			},
 		},
-		initiateMigrationResults: []result{{}},
-		expectedError:            `"invalid-user-tag" is not a valid tag`,
+		expectedError: `"invalid-user-tag" is not a valid tag`,
 	}, {
 		about: "invalid macaroon data",
 		user: func(client *openfga.OFGAClient) *openfga.User {
@@ -1431,22 +1425,20 @@ func TestInitiateMigration(t *testing.T) {
 				Macaroons:     "invalid-macaroon-data",
 			},
 		},
-		initiateMigrationResults: []result{{}},
-		expectedError:            "failed to unmarshal macaroons",
+		expectedError: "failed to unmarshal macaroons",
 	}}
 
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
-			j := newTestJujuManager(c, nil)
+			api := &jimmtest.API{
+				InitiateMigration_: test.migrateFn,
+			}
+			j := newTestJujuManager(c, &parameters{
+				Dialer: &jimmtest.Dialer{API: api},
+			})
 
 			env := jimmtest.ParseEnvironment(c, testInitiateMigrationEnv)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-			c.Patch(juju.NewControllerClient, func(api base.APICallCloser) juju.ControllerClient {
-				return &testControllerClient{
-					initiateMigrationResults: test.initiateMigrationResults,
-				}
-			})
 
 			user := test.user(j.OpenFGAClient)
 
@@ -1474,18 +1466,18 @@ func TestInitiateMigration(t *testing.T) {
 func TestInitiateMigration_InProgress(t *testing.T) {
 	c := qt.New(t)
 
-	j := newTestJujuManager(c, nil)
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				InitiateMigration_: func(spec controllerapi.MigrationSpec, dryRun bool) (string, error) {
+					return "migration-result-id", nil
+				},
+			},
+		},
+	})
 
 	env := jimmtest.ParseEnvironment(c, testInitiateMigrationEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	c.Patch(juju.NewControllerClient, func(api base.APICallCloser) juju.ControllerClient {
-		return &testControllerClient{
-			initiateMigrationResults: []result{{
-				result: "migration-result-id",
-			}},
-		}
-	})
 
 	u, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
@@ -1504,40 +1496,6 @@ func TestInitiateMigration_InProgress(t *testing.T) {
 
 	_, err = j.InitiateMigration(context.Background(), user, migrationSpec)
 	c.Assert(err, qt.ErrorMatches, `failed to update the model's migration mode: model is already in migration mode "exporting"`)
-}
-
-type result struct {
-	err    error
-	result any
-}
-
-type testControllerClient struct {
-	mu                       sync.Mutex
-	initiateMigrationResults []result
-	// onInitiateMigration is an optional callback invoked with the dryRun flag
-	// on each InitiateMigration call, allowing tests to observe how it was called.
-	onInitiateMigration func(dryRun bool)
-}
-
-func (c *testControllerClient) InitiateMigration(spec controller.MigrationSpec, dryRun bool) (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.onInitiateMigration != nil {
-		c.onInitiateMigration(dryRun)
-	}
-	if len(c.initiateMigrationResults) == 0 {
-		return "", errors.Codef(errors.CodeNotImplemented, "not implemented")
-	}
-	var result result
-	result, c.initiateMigrationResults = c.initiateMigrationResults[0], c.initiateMigrationResults[1:]
-	if result.err != nil {
-		return "", result.err
-	}
-	return result.result.(string), nil
-}
-
-func (c *testControllerClient) Close() error {
-	return nil
 }
 
 const testControllerDetailsForModelEnv = `clouds:
@@ -1654,26 +1612,26 @@ func TestDryRunInternalMigration(t *testing.T) {
 	targetController := "controller-target"
 
 	tests := []struct {
-		about                    string
-		modelUUID                string
-		initiateMigrationResults []result
-		expectedError            string
-		// dryRunReceived is set to true by the mock when InitiateMigration is called.
+		about         string
+		modelUUID     string
+		migrateFn     func(controllerapi.MigrationSpec, bool) (string, error)
+		expectedError string
+		// expectDryRun is set to true when InitiateMigration should be called with dryRun=true.
 		expectDryRun bool
 	}{{
 		about:        "dry run succeeds",
 		modelUUID:    modelOnNew,
 		expectDryRun: true,
-		initiateMigrationResults: []result{{
-			result: "", // dry-run returns an empty migration ID
-		}},
+		migrateFn: func(_ controllerapi.MigrationSpec, _ bool) (string, error) {
+			return "", nil
+		},
 	}, {
 		about:        "dry run precheck fails",
 		modelUUID:    modelOnNew,
 		expectDryRun: true,
-		initiateMigrationResults: []result{{
-			err: errors.New("charm not compatible with target"),
-		}},
+		migrateFn: func(_ controllerapi.MigrationSpec, _ bool) (string, error) {
+			return "", errors.New("charm not compatible with target")
+		},
 		expectedError: "migration precheck failed: charm not compatible with target",
 	}, {
 		about:         "source controller version too old",
@@ -1701,24 +1659,22 @@ func TestDryRunInternalMigration(t *testing.T) {
 				c.Assert(err, qt.IsNil)
 			}
 
+			var dryRunCalled bool
+			api := &jimmtest.API{
+				InitiateMigration_: func(spec controllerapi.MigrationSpec, dryRun bool) (string, error) {
+					if dryRun {
+						dryRunCalled = true
+					}
+					return test.migrateFn(spec, dryRun)
+				},
+			}
 			j := newTestJujuManager(c, &parameters{
 				CredentialStore: store,
+				Dialer:          &jimmtest.Dialer{API: api},
 			})
 
 			env := jimmtest.ParseEnvironment(c, testDryRunMigrationEnv)
 			env.PopulateDB(c, j.Database)
-
-			var dryRunCalled bool
-			c.Patch(juju.NewControllerClient, func(api base.APICallCloser) juju.ControllerClient {
-				return &testControllerClient{
-					initiateMigrationResults: test.initiateMigrationResults,
-					onInitiateMigration: func(dryRun bool) {
-						if dryRun {
-							dryRunCalled = true
-						}
-					},
-				}
-			})
 
 			u, err := dbmodel.NewIdentity("alice@canonical.com")
 			c.Assert(err, qt.IsNil)

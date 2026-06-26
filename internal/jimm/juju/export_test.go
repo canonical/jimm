@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	NewControllerClient       = &newControllerClient
 	FillMigrationTarget       = fillMigrationTarget
 	InitiateInternalMigration = &initiateInternalMigration
 	ReleasesCacheTTL          = releasesCacheTTL

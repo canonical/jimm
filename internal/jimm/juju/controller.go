@@ -28,22 +28,6 @@ import (
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
-// ControllerClient defines an interface of the juju controller api client
-// used by JIMM to interact with the Controller facade of Juju controllers.
-type ControllerClient interface {
-	// InitiateMigration attempts to begin the migration of one or
-	// more models to other controllers.
-	InitiateMigration(controller.MigrationSpec, bool) (string, error)
-	// Close closes the connection to the API server.
-	Close() error
-}
-
-var (
-	newControllerClient = func(api base.APICallCloser) ControllerClient {
-		return controller.NewClient(api)
-	}
-)
-
 // convertJujuCloudsToDbClouds converts all of the incoming Juju clouds (from a map) into
 // a slice of dbmodel Clouds.
 func convertJujuCloudsToDbClouds(clouds map[names.CloudTag]jujucloud.Cloud) []dbmodel.Cloud {
@@ -716,10 +700,9 @@ func (j *JujuManager) DryRunInternalMigration(ctx context.Context, user *openfga
 	if err != nil {
 		return fmt.Errorf("failed to dial source controller: %w", err)
 	}
-	client := newControllerClient(api)
-	defer client.Close()
+	defer api.Close()
 
-	if _, err = client.InitiateMigration(spec, true); err != nil {
+	if _, err = api.InitiateMigration(spec, true); err != nil {
 		return fmt.Errorf("migration precheck failed: %w", err)
 	}
 	return nil
@@ -809,11 +792,9 @@ func (j *JujuManager) initiateMigration(ctx context.Context, user *openfga.User,
 		rollbackMigrationMode()
 		return result, fmt.Errorf("failed to dial the controller: %w", err)
 	}
+	defer api.Close()
 
-	client := newControllerClient(api)
-	defer client.Close()
-
-	result.MigrationId, err = client.InitiateMigration(controller.MigrationSpec{
+	result.MigrationId, err = api.InitiateMigration(controller.MigrationSpec{
 		ModelUUID:             mt.Id(),
 		TargetControllerUUID:  targetControllerTag.Id(),
 		TargetControllerAlias: spec.TargetInfo.ControllerAlias,

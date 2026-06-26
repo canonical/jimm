@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/api/base"
+	controllerapi "github.com/juju/juju/api/controller/controller"
 	jujucloud "github.com/juju/juju/cloud"
 	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/juju/core/crossmodel"
@@ -173,6 +174,7 @@ type API struct {
 	CredentialContents_                func(cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error)
 	UpgradeModel_                      func(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error)
 	AbortModelUpgrade_                 func(modelUUID string) error
+	InitiateMigration_                 func(spec controllerapi.MigrationSpec, dryRun bool) (string, error)
 }
 
 func (a *API) Activate(modelUUID string, sourceInfo coremigration.SourceControllerInfo, relatedModels []string) error {
@@ -490,6 +492,13 @@ func (a *API) AbortModelUpgrade(modelUUID string) error {
 		return errors.New("not implemented")
 	}
 	return a.AbortModelUpgrade_(modelUUID)
+}
+
+func (a *API) InitiateMigration(spec controllerapi.MigrationSpec, dryRun bool) (string, error) {
+	if a.InitiateMigration_ == nil {
+		return "", errors.New("not implemented")
+	}
+	return a.InitiateMigration_(spec, dryRun)
 }
 
 var _ juju.API = &API{}
