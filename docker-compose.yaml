@@ -152,7 +152,7 @@ services:
       retries: 30
 
   juju-dashboard:
-    image: ${JUJU_DASHBOARD_IMAGE:-ghcr.io/canonical/juju-dashboard:0.15.1-beta.3}
+    image: ${JUJU_DASHBOARD_IMAGE:-ghcr.io/canonical/juju-dashboard:0.16.0-beta.3}
     container_name: juju-dashboard
     profiles: ["dev"]
     environment:
