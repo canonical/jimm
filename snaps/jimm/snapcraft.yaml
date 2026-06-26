@@ -2,7 +2,7 @@ name: jimm
 summary: Juju Intelligent Model Manager
 description: Multi-cloud controller for managing JAAS models.
 grade: stable
-base: core20
+base: core24
 confinement: strict
 adopt-info: jimmsrv # Version our app via set-version within an override
 

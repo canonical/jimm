@@ -4,7 +4,7 @@ description: Juju plugin for providing JAAS functionality to the Juju CLI.
 version: git
 grade: stable
 base: bare
-build-base: core20
+build-base: core24
 confinement: strict
 
 slots:
