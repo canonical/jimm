@@ -512,9 +512,20 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 	deps.cleanupFuncs = append(deps.cleanupFuncs, cleanupFuncs...)
 
-	redirectUrl := p.PublicDNSName + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
-	if !strings.HasPrefix(redirectUrl, "https://") && !strings.HasPrefix(redirectUrl, "http://") {
-		redirectUrl = "https://" + redirectUrl
+	publicDNSURL := p.PublicDNSName
+	if !strings.HasPrefix(publicDNSURL, "https://") && !strings.HasPrefix(publicDNSURL, "http://") {
+		publicDNSURL = "https://" + publicDNSURL
+	}
+	redirectUrl := publicDNSURL + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint
+
+	// authBasePath is the external sub-path under which JIMM is hosted (e.g.
+	// "/jimm-jimm" when behind an ingress). It is derived from the public DNS
+	// name so that the OAuth state cookie is scoped to the same path the
+	// identity provider redirects back to. It is empty when JIMM is hosted at
+	// the root.
+	var authBasePath string
+	if parsedDNS, err := url.Parse(publicDNSURL); err == nil {
+		authBasePath = strings.TrimSuffix(parsedDNS.Path, "/")
 	}
 
 	authSvc, err := auth.NewAuthenticationService(
@@ -547,6 +558,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		deps.OAuthHandler, err = jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
 			Authenticator:             authSvc,
 			DashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+			BasePath:                  authBasePath,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to setup authentication handler: %w", err)

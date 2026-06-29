@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/juju/zaputil/zapctx"
@@ -34,6 +35,11 @@ type OAuthHandler struct {
 	Router                    *chi.Mux
 	authenticator             BrowserOAuthAuthenticator
 	dashboardFinalRedirectURL string
+	// cookieCallbackPath is the path used to scope the OAuth state cookie so
+	// that the browser sends it back on the callback request. It includes any
+	// external base path under which JIMM is hosted (e.g. when behind an
+	// ingress that prefixes requests with a sub-path).
+	cookieCallbackPath string
 }
 
 // OAuthHandlerParams holds the parameters to configure the OAuthHandler.
@@ -44,6 +50,13 @@ type OAuthHandlerParams struct {
 	// DashboardFinalRedirectURL is the final redirection URL to send users to
 	// upon completing the authorisation code flow.
 	DashboardFinalRedirectURL string
+
+	// BasePath is the external base path under which JIMM is hosted, derived
+	// from JIMM's public DNS name (e.g. "/jimm-jimm" when served behind an
+	// ingress that prefixes requests with a sub-path). It is prepended to the
+	// OAuth state cookie path so the browser sends the cookie back on the
+	// callback request. It may be empty when JIMM is hosted at the root.
+	BasePath string
 }
 
 // BrowserOAuthAuthenticator handles authorisation code authentication within JIMM
@@ -77,7 +90,18 @@ func NewOAuthHandler(p OAuthHandlerParams) (*OAuthHandler, error) {
 		Router:                    chi.NewRouter(),
 		authenticator:             p.Authenticator,
 		dashboardFinalRedirectURL: p.DashboardFinalRedirectURL,
+		cookieCallbackPath:        callbackCookiePath(p.BasePath),
 	}, nil
+}
+
+// callbackCookiePath builds the path used to scope the OAuth state cookie. It
+// prepends the supplied external base path (if any) to the callback endpoint
+// so the browser sends the cookie back when the identity provider redirects to
+// JIMM, even when JIMM is hosted under a sub-path. A trailing slash on the base
+// path is trimmed to avoid producing a double slash.
+func callbackCookiePath(basePath string) string {
+	basePath = strings.TrimSuffix(basePath, "/")
+	return basePath + AuthResourceBasePath + CallbackEndpoint
 }
 
 // Routes returns the grouped routers routes with group specific middlewares.
@@ -105,10 +129,10 @@ func (oah *OAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     auth.StateKey,
 		Value:    state,
-		MaxAge:   900,                                     // 15 min.
-		Path:     AuthResourceBasePath + CallbackEndpoint, // Only send the cookie back on /auth paths.
-		HttpOnly: true,                                    // Restrict access from JS.
-		SameSite: http.SameSiteLaxMode,                    // Allow the cookie to be sent on a redirect from the IdP to JIMM.
+		MaxAge:   900,                    // 15 min.
+		Path:     oah.cookieCallbackPath, // Only send the cookie back on the callback path.
+		HttpOnly: true,                   // Restrict access from JS.
+		SameSite: http.SameSiteLaxMode,   // Allow the cookie to be sent on a redirect from the IdP to JIMM.
 	})
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }

@@ -203,3 +203,68 @@ func TestCallbackFailsExchange(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(b), qt.Equals, http.StatusText(http.StatusForbidden)+` - authorisation code exchange failed: oauth2: "invalid_grant" "Code not valid"`+"\n")
 }
+
+// stubLoginAuthenticator is a minimal BrowserOAuthAuthenticator that only
+// supports the Login flow, allowing the state cookie path to be exercised
+// without a real identity provider.
+type stubLoginAuthenticator struct {
+	jimmhttp.BrowserOAuthAuthenticator
+}
+
+func (stubLoginAuthenticator) AuthCodeURL() (string, string, error) {
+	return "http://localhost/idp/auth?state=teststate", "teststate", nil
+}
+
+// TestLoginStateCookiePath verifies that the OAuth state cookie is scoped to a
+// path that includes the external base path under which JIMM is hosted, so the
+// browser sends the cookie back when the identity provider redirects to the
+// callback endpoint.
+func TestLoginStateCookiePath(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		name         string
+		basePath     string
+		expectedPath string
+	}{{
+		name:         "no base path",
+		basePath:     "",
+		expectedPath: jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint,
+	}, {
+		name:         "with base path",
+		basePath:     "/jimm-jimm",
+		expectedPath: "/jimm-jimm" + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint,
+	}, {
+		name:         "base path with trailing slash",
+		basePath:     "/jimm-jimm/",
+		expectedPath: "/jimm-jimm" + jimmhttp.AuthResourceBasePath + jimmhttp.CallbackEndpoint,
+	}}
+
+	for _, test := range tests {
+		c.Run(test.name, func(c *qt.C) {
+			h, err := jimmhttp.NewOAuthHandler(jimmhttp.OAuthHandlerParams{
+				Authenticator:             stubLoginAuthenticator{},
+				DashboardFinalRedirectURL: "http://localhost/dashboard",
+				BasePath:                  test.basePath,
+			})
+			c.Assert(err, qt.IsNil)
+
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", jimmhttp.AuthResourceBasePath+jimmhttp.LoginEndpoint, nil)
+			h.Login(rr, req)
+
+			res := rr.Result()
+			defer res.Body.Close()
+
+			var stateCookie *http.Cookie
+			for _, cookie := range res.Cookies() {
+				if cookie.Name == auth.StateKey {
+					stateCookie = cookie
+					break
+				}
+			}
+			c.Assert(stateCookie, qt.Not(qt.IsNil))
+			c.Check(stateCookie.Path, qt.Equals, test.expectedPath)
+		})
+	}
+}
