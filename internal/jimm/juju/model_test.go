@@ -1941,19 +1941,83 @@ func TestModelInfoNotFound(t *testing.T) {
 	_, err = j.ModelInfo(context.Background(), user, mt)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	// Check the model is deleted as a consequence of the error
+	// Check the model is retained because it is not marked for deletion.
 	model := env.Models[0].DBObject(c, j.Database)
 	err = j.Database.GetModel(context.Background(), &model)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	c.Assert(err, qt.IsNil)
 
-	// Check the openfga tuple is deleted as a consequence of the error
+	// Check the openfga tuple is retained as a consequence of the error.
 	ok, err = user.IsModelReader(c.Context(), mt)
 	c.Assert(err, qt.IsNil)
-	c.Assert(ok, qt.IsFalse)
+	c.Assert(ok, qt.IsTrue)
 
 	_, err = j.ModelInfo(context.Background(), user, mt)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
+}
+
+var modelInfoErrorTests = []struct {
+	name           string
+	modelInfoError error
+	expectDeleted  bool
+}{{
+	name:           "NotFoundErrorDeletes",
+	modelInfoError: errors.Codef(errors.CodeNotFound, "model not found"),
+	expectDeleted:  true,
+}, {
+	name:           "UnauthorizedErrorDeletes",
+	modelInfoError: errors.Codef(errors.CodeUnauthorized, "unauthorized"),
+	expectDeleted:  true,
+}, {
+	name:           "OtherErrorDoesNotDelete",
+	modelInfoError: errors.New("some other error"),
+	expectDeleted:  false,
+}}
+
+func TestModelInfoErrorDyingModel(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelInfoErrorTests {
+		c.Run(test.name, func(c *qt.C) {
+			j := newTestJujuManager(c, &parameters{
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{
+						ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+							return jujuclient.ModelInfo{}, test.modelInfoError
+						},
+					},
+				},
+			})
+
+			env := jimmtest.ParseEnvironment(c, modelInfoTestEnv)
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			dbUser, err := dbmodel.NewIdentity("alice@canonical.com")
+			c.Assert(err, qt.IsNil)
+
+			user := openfga.NewUser(dbUser, j.OpenFGAClient)
+			mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
+
+			model := env.Models[0].DBObject(c, j.Database)
+			model.Life = state.Dying.String()
+			err = j.Database.UpdateModel(context.Background(), &model)
+			c.Assert(err, qt.IsNil)
+
+			_, err = j.ModelInfo(context.Background(), user, mt)
+			c.Assert(err, qt.ErrorMatches, test.modelInfoError.Error())
+
+			model = env.Models[0].DBObject(c, j.Database)
+			err = j.Database.GetModel(context.Background(), &model)
+			if test.expectDeleted {
+				c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+			} else {
+				c.Assert(err, qt.IsNil)
+			}
+
+			ok, err := user.IsModelReader(c.Context(), mt)
+			c.Assert(err, qt.IsNil)
+			c.Assert(ok, qt.Equals, !test.expectDeleted)
+		})
+	}
 }
 
 func TestModelInfoRedirect(t *testing.T) {
@@ -2043,21 +2107,69 @@ func TestModelStatusNotFound(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(ok, qt.IsTrue)
 
-	_, err = j.ModelStatus(context.Background(), user, mt)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	status, err := j.ModelStatus(context.Background(), user, mt)
+	c.Assert(err, qt.IsNil)
+	c.Check(status, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreFields(base.ModelStatus{}, "Error")), base.ModelStatus{
+		UUID:  mt.Id(),
+		Life:  life.Value(state.Alive.String()),
+		Owner: "alice@canonical.com",
+	})
+	c.Check(status.Error, qt.IsNil)
 
-	// Check the model is deleted as a consequence of the error
+	// Check the model is retained because it is not marked for deletion.
 	model := env.Models[0].DBObject(c, j.Database)
+	err = j.Database.GetModel(context.Background(), &model)
+	c.Assert(err, qt.IsNil)
+
+	// Check the openfga tuple is retained as a consequence of the error.
+	ok, err = user.IsModelReader(c.Context(), mt)
+	c.Assert(err, qt.IsNil)
+	c.Assert(ok, qt.IsTrue)
+
+}
+
+func TestModelStatusNotFoundDyingModelDeletes(t *testing.T) {
+	c := qt.New(t)
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: &jimmtest.API{
+				ModelStatus_: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+					return base.ModelStatus{}, errors.Codef(errors.CodeNotFound, "model not found")
+				},
+			},
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, modelInfoTestEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+	dbUser, err := dbmodel.NewIdentity("alice@canonical.com")
+	c.Assert(err, qt.IsNil)
+
+	user := openfga.NewUser(dbUser, j.OpenFGAClient)
+	mt := names.NewModelTag("00000002-0000-0000-0000-000000000001")
+
+	model := env.Models[0].DBObject(c, j.Database)
+	model.Life = state.Dying.String()
+	err = j.Database.UpdateModel(context.Background(), &model)
+	c.Assert(err, qt.IsNil)
+
+	status, err := j.ModelStatus(context.Background(), user, mt)
+	c.Assert(err, qt.IsNil)
+	c.Check(status, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreFields(base.ModelStatus{}, "Error")), base.ModelStatus{
+		UUID:  mt.Id(),
+		Life:  life.Value(state.Dying.String()),
+		Owner: "alice@canonical.com",
+	})
+	c.Check(status.Error, qt.IsNil)
+
+	model = env.Models[0].DBObject(c, j.Database)
 	err = j.Database.GetModel(context.Background(), &model)
 	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
-	// Check the openfga tuple is deleted as a consequence of the error
-	ok, err = user.IsModelReader(c.Context(), mt)
+	ok, err := user.IsModelReader(c.Context(), mt)
 	c.Assert(err, qt.IsNil)
 	c.Assert(ok, qt.IsFalse)
-
-	_, err = j.ModelStatus(context.Background(), user, mt)
-	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 const modelStatusTestEnv = `clouds:
@@ -2098,6 +2210,8 @@ var modelStatusTests = []struct {
 	name              string
 	env               string
 	modelStatus       func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error)
+	dialError         error
+	mutateDB          func(c *qt.C, j *juju.JujuManager)
 	username          string
 	uuid              string
 	expectModelStatus base.ModelStatus
@@ -2150,6 +2264,55 @@ var modelStatusTests = []struct {
 	username:    "alice@canonical.com",
 	uuid:        "00000002-0000-0000-0000-000000000001",
 	expectError: "test error",
+}, {
+	name:        "ConnectionFailedReturnsError",
+	env:         modelStatusTestEnv,
+	username:    "alice@canonical.com",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	dialError:   errors.Codef(errors.CodeConnectionFailed, "controller offline"),
+	expectError: `controller offline`,
+}, {
+	name:     "APINotFoundReturnsEmptyFallback",
+	env:      modelStatusTestEnv,
+	username: "alice@canonical.com",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	modelStatus: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+		return base.ModelStatus{}, errors.Codef(errors.CodeNotFound, "model not found")
+	},
+	expectModelStatus: base.ModelStatus{
+		UUID:  "00000002-0000-0000-0000-000000000001",
+		Life:  life.Value(state.Alive.String()),
+		Owner: "alice@canonical.com",
+	},
+}, {
+	name:     "APIUnauthorizedReturnsEmptyFallback",
+	env:      modelStatusTestEnv,
+	username: "alice@canonical.com",
+	uuid:     "00000002-0000-0000-0000-000000000001",
+	modelStatus: func(ctx context.Context, modelTag names.ModelTag) (base.ModelStatus, error) {
+		return base.ModelStatus{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
+	},
+	expectModelStatus: base.ModelStatus{
+		UUID:  "00000002-0000-0000-0000-000000000001",
+		Life:  life.Value(state.Alive.String()),
+		Owner: "alice@canonical.com",
+	},
+}, {
+	name:        "ConnectionFailedDyingModelReturnsError",
+	env:         modelStatusTestEnv,
+	username:    "alice@canonical.com",
+	uuid:        "00000002-0000-0000-0000-000000000001",
+	dialError:   errors.Codef(errors.CodeConnectionFailed, "controller offline"),
+	expectError: `controller offline`,
+	mutateDB: func(c *qt.C, j *juju.JujuManager) {
+		model := dbmodel.Model{}
+		model.SetTag(names.NewModelTag("00000002-0000-0000-0000-000000000001"))
+		err := j.Database.GetModel(context.Background(), &model)
+		c.Assert(err, qt.IsNil)
+		model.Life = state.Dying.String()
+		err = j.Database.UpdateModel(context.Background(), &model)
+		c.Assert(err, qt.IsNil)
+	},
 }}
 
 func TestModelStatus(t *testing.T) {
@@ -2161,6 +2324,7 @@ func TestModelStatus(t *testing.T) {
 				API: &jimmtest.API{
 					ModelStatus_: test.modelStatus,
 				},
+				Err: test.dialError,
 			}
 			j := newTestJujuManager(c, &parameters{
 				Dialer: dialer,
@@ -2168,6 +2332,9 @@ func TestModelStatus(t *testing.T) {
 
 			env := jimmtest.ParseEnvironment(c, test.env)
 			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+			if test.mutateDB != nil {
+				test.mutateDB(c, j)
+			}
 
 			dbUser := env.User(test.username).DBObject(c, j.Database)
 			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
@@ -2177,7 +2344,13 @@ func TestModelStatus(t *testing.T) {
 				c.Check(err, qt.ErrorMatches, test.expectError)
 			} else {
 				c.Assert(err, qt.IsNil)
-				c.Check(ms, qt.CmpEquals(cmpopts.EquateEmpty()), test.expectModelStatus)
+				c.Check(ms, qt.CmpEquals(cmpopts.EquateEmpty(), cmpopts.IgnoreFields(base.ModelStatus{}, "Error")), test.expectModelStatus)
+				if test.expectModelStatus.Error != nil {
+					c.Assert(ms.Error, qt.IsNotNil)
+					c.Check(ms.Error, qt.ErrorMatches, test.expectModelStatus.Error.Error())
+				} else {
+					c.Check(ms.Error, qt.IsNil)
+				}
 			}
 
 			c.Check(dialer.IsClosed(), qt.IsTrue)
@@ -2647,6 +2820,7 @@ var destroyModelTests = []struct {
 	expectError     string
 	expectErrorCode errors.Code
 	expectedLife    string
+	expectDeleted   bool
 }{{
 	name:            "NotFound",
 	env:             destroyModelTestEnv,
@@ -2716,6 +2890,15 @@ var destroyModelTests = []struct {
 	uuid:         "00000002-0000-0000-0000-000000000001",
 	expectError:  `api error`,
 	expectedLife: "alive",
+}, {
+	name: "APINotFoundDeletesModel",
+	env:  destroyModelTestEnv,
+	destroyModel: func(ctx context.Context, tag names.ModelTag, destroyStorage, force *bool, maxWait, timeout *time.Duration) error {
+		return errors.Codef(errors.CodeNotFound, "model not found")
+	},
+	username:      "charlie@canonical.com",
+	uuid:          "00000002-0000-0000-0000-000000000001",
+	expectDeleted: true,
 }}
 
 func TestDestroyModel(t *testing.T) {
@@ -2762,6 +2945,16 @@ func TestDestroyModel(t *testing.T) {
 				err = j.Database.GetModel(ctx, &m)
 				c.Assert(err, qt.IsNil)
 				c.Assert(m.Life, qt.Equals, test.expectedLife)
+			}
+			if test.expectDeleted {
+				m := dbmodel.Model{
+					UUID: sql.NullString{
+						String: test.uuid,
+						Valid:  true,
+					},
+				}
+				err = j.Database.GetModel(ctx, &m)
+				c.Assert(err, qt.ErrorMatches, `model not found`)
 			}
 		})
 	}

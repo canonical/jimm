@@ -183,6 +183,11 @@ func TestModelCleanup(t *testing.T) {
 	s := setupModelPollerTest(c)
 	ctx := context.Background()
 
+	model := s.env.Models[1].DBObject(c, s.jujuManager.Database)
+	model.Life = state.Dying.String()
+	err := s.jujuManager.Database.UpdateModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+
 	s.jujuManager.Dialer = &jimmtest.Dialer{
 		API: &jimmtest.API{
 			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
@@ -190,7 +195,7 @@ func TestModelCleanup(t *testing.T) {
 				case s.env.Models[0].UUID:
 					return jujuclient.ModelInfo{}, errors.Codef(errors.CodeNotFound, "not found")
 				case s.env.Models[1].UUID:
-					return jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: model.Id()}}, nil
+					return jujuclient.ModelInfo{}, errors.Codef(errors.CodeNotFound, "not found")
 				case s.env.Models[2].UUID:
 					return jujuclient.ModelInfo{}, fmt.Errorf("unexpected call to ModelInfo_ for model %s", model.Id())
 				default:
@@ -203,12 +208,21 @@ func TestModelCleanup(t *testing.T) {
 		},
 	}
 
-	err := s.jujuManager.PollModels(ctx)
+	err = s.jujuManager.PollModels(ctx)
 	c.Assert(err, qt.IsNil)
 
-	model := dbmodel.Model{
+	model = dbmodel.Model{
 		UUID: sql.NullString{
 			String: s.env.Models[0].UUID,
+			Valid:  true,
+		},
+	}
+	err = s.jujuManager.Database.GetModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+
+	model = dbmodel.Model{
+		UUID: sql.NullString{
+			String: s.env.Models[1].UUID,
 			Valid:  true,
 		},
 	}
@@ -217,7 +231,36 @@ func TestModelCleanup(t *testing.T) {
 
 	model = dbmodel.Model{
 		UUID: sql.NullString{
-			String: s.env.Models[1].UUID,
+			String: s.env.Models[2].UUID,
+			Valid:  true,
+		},
+	}
+	err = s.jujuManager.Database.GetModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestModelCleanupUnauthorizedDoesNotDelete(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
+	ctx := context.Background()
+
+	s.jujuManager.Dialer = &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+				if model.Id() == s.env.Models[0].UUID {
+					return jujuclient.ModelInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
+				}
+				return jujuclient.ModelInfo{ModelInfo: base.ModelInfo{UUID: model.Id()}}, nil
+			},
+		},
+	}
+
+	err := s.jujuManager.PollModels(ctx)
+	c.Assert(err, qt.IsNil)
+
+	model := dbmodel.Model{
+		UUID: sql.NullString{
+			String: s.env.Models[0].UUID,
 			Valid:  true,
 		},
 	}

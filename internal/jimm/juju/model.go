@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/juju/juju/api/base"
+	"github.com/juju/juju/core/life"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
@@ -439,27 +440,56 @@ func (j *JujuManager) mergeModelInfo(ctx context.Context, user *openfga.User, mo
 // CodeNotFound, If the given user does not have admin access to the model
 // then the returned error will have the code CodeUnauthorized.
 func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt names.ModelTag) (base.ModelStatus, error) {
-	ms := base.ModelStatus{}
-	err := j.doModelAdmin(ctx, user, mt, func(m *dbmodel.Model, api API) error {
-		var err error
-		ms, err = api.ModelStatus(ctx, mt)
-		if err != nil {
-			// If the model is not found on the backing controller then
-			// we delete the model from JIMM.
-			if errors.ErrorCode(err) == errors.CodeNotFound {
-				errDelete := j.deleteModel(ctx, mt)
-				if errDelete != nil {
-					return errDelete
-				}
-			}
-			return err
-		}
-		return nil
-	})
+	var m dbmodel.Model
+	m.SetTag(mt)
+	if err := j.Database.GetModel(ctx, &m); err != nil {
+		return base.ModelStatus{}, err
+	}
+
+	hasAccess, err := user.HasModelRelation(ctx, mt, ofganames.AdministratorRelation)
 	if err != nil {
-		return ms, err
+		return base.ModelStatus{}, err
+	}
+	if !hasAccess {
+		return base.ModelStatus{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
+	}
+
+	api, err := j.dial(ctx, &m.Controller, names.ModelTag{}, user)
+	if err != nil {
+		return base.ModelStatus{}, err
+	}
+	defer api.Close()
+
+	ms, err := api.ModelStatus(ctx, mt)
+	if err != nil {
+		if errCleanup := j.maybeCleanupModel(ctx, err, &m); errCleanup != nil {
+			zapctx.Error(ctx, "error attempting model cleanup", zap.Error(errCleanup))
+		}
+		// Some clients like the Juju CLI inspect the model status fields to decide
+		// how to prompt users about volumes/filesystems and other model contents.
+		// When the backing controller returns a NotFound or Unauthorized error
+		// (also implying not found), there is no backing state left for those
+		// clients to inspect, so returning an empty fallback model is the most
+		// useful result we can provide.
+		if code := errors.ErrorCode(err); code == errors.CodeNotFound || code == errors.CodeUnauthorized {
+			return fallbackModelStatus(&m, nil), nil
+		}
+		return base.ModelStatus{}, err
 	}
 	return ms, nil
+}
+
+func fallbackModelStatus(m *dbmodel.Model, err error) base.ModelStatus {
+	modelLife := life.Value(m.Life)
+	if modelLife == "" {
+		modelLife = life.Alive
+	}
+	return base.ModelStatus{
+		UUID:  m.UUID.String,
+		Life:  modelLife,
+		Owner: m.OwnerIdentityName,
+		Error: err,
+	}
 }
 
 // deleteModel deletes the model with the given ModelTag from JIMM's database and
@@ -564,6 +594,12 @@ func (j *JujuManager) DestroyModel(ctx context.Context, user *openfga.User, mt n
 			return err
 		}
 		if err := api.DestroyModel(ctx, mt, destroyStorage, force, maxWait, timeout); err != nil {
+			// If the model is not found on the controller, it has already
+			// been deleted. In that case we can perform an immediate
+			// deletion from JIMM's database and OpenFGA.
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				return j.deleteModel(ctx, mt)
+			}
 			zapctx.Error(ctx, "failed to call DestroyModel juju api", zaputil.Error(err))
 			// this is a manual way of restoring the life state to alive if the JUJU api fails.
 			m.Life = state.Alive.String()

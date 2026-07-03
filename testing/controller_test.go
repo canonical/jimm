@@ -112,6 +112,27 @@ func TestModelStatus(t *testing.T) {
 	doTest(modelmanager.NewClient(conn))
 }
 
+func TestModelStatus_ModelDeletedOnBackingController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	client, model := createAndDestroyBackingModel(c, s)
+
+	statuses, err := client.ModelStatus(model.ResourceTag())
+	c.Assert(err, qt.IsNil)
+	c.Assert(statuses, qt.HasLen, 1)
+	c.Check(statuses[0], qt.DeepEquals, base.ModelStatus{
+		UUID:         model.UUID.String,
+		Life:         life.Value(state.Alive.String()),
+		Owner:        "bob@canonical.com",
+		Applications: []base.Application{},
+		Machines:     []base.Machine{},
+		Volumes:      []base.Volume{},
+		Filesystems:  []base.Filesystem{},
+	})
+	c.Check(statuses[0].Error, qt.IsNil)
+}
+
 func TestIdentityProviderURL(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)

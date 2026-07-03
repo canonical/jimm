@@ -10,6 +10,7 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juju/juju/api"
 	"github.com/juju/juju/api/base"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/core/life"
@@ -20,6 +21,7 @@ import (
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -226,6 +228,74 @@ func TestModelInfo(t *testing.T) {
 	c.Assert(models[3].Result, qt.IsNil)
 	c.Assert(models[3].Error, qt.Not(qt.IsNil))
 	c.Assert(models[3].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+}
+
+// createAndDestroyBackingModel creates a model and then destroys it on the backing controller.
+func createAndDestroyBackingModel(c *qt.C, s jimmtest.JimmWithControllers) (*modelmanager.Client, *dbmodel.Model) {
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
+	c.Cleanup(func() { conn.Close() })
+	client := modelmanager.NewClient(conn)
+
+	model := s.CreateModelForBob(c)
+
+	controllerInfo := s.GetControllerConfig(c, model.Controller.Name)
+	directConn, err := api.Open(controllerInfo.ToAPIInfo(), api.DialOpts{})
+	c.Assert(err, qt.Equals, nil)
+	c.Cleanup(func() { directConn.Close() })
+	directClient := modelmanager.NewClient(directConn)
+
+	err = directClient.DestroyModel(model.ResourceTag(), nil, nil, nil, &zeroDuration)
+	c.Assert(err, qt.Equals, nil)
+
+	timeout := time.After(5 * time.Minute)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			c.Fatalf("timeout waiting for model to disappear from backing controller")
+		case <-ticker.C:
+			results, err := directClient.ModelInfo([]names.ModelTag{model.ResourceTag()})
+			c.Assert(err, qt.Equals, nil)
+			c.Assert(results, qt.HasLen, 1)
+			if results[0].Error != nil {
+				return client, model
+			}
+		}
+	}
+}
+
+func TestModelInfo_DeletesDyingModelMissingFromBackingController(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	client, model := createAndDestroyBackingModel(c, s)
+
+	// Initially the model should still be present after a ModelInfo call
+	// because it was not marked as dying.
+	results, err := client.ModelInfo([]names.ModelTag{model.ResourceTag()})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(results, qt.HasLen, 1)
+	c.Assert(results[0].Result, qt.IsNil)
+	c.Assert(results[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+
+	err = s.JIMM.Database.GetModel(c.Context(), model)
+	c.Assert(err, qt.IsNil)
+
+	// After being marked as dying, the model should dissapear in the next ModelInfo call.
+	model.Life = state.Dying.String()
+	err = s.JIMM.Database.UpdateModel(c.Context(), model)
+	c.Assert(err, qt.Equals, nil)
+
+	results, err = client.ModelInfo([]names.ModelTag{model.ResourceTag()})
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(results, qt.HasLen, 1)
+	c.Assert(results[0].Result, qt.IsNil)
+	c.Assert(results[0].Error.Code, qt.Equals, jujuparams.CodeUnauthorized)
+
+	err = s.JIMM.Database.GetModel(c.Context(), model)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestModelInfoDisableControllerUUIDMasking(t *testing.T) {
@@ -617,6 +687,21 @@ func TestDestroyModel(t *testing.T) {
 	// Make sure it's not an error if you destroy a model that's not there.
 	err = client.DestroyModel(tag, nil, nil, nil, &zeroDuration)
 	c.Assert(err, qt.Equals, nil)
+}
+
+func TestDestroyModel_DoesNotExist(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	client, model := createAndDestroyBackingModel(c, s)
+
+	// If the model does not exist on the backing controller
+	// we expect the DestroyModel call to remove the model from JIMM.
+	err := client.DestroyModel(model.ResourceTag(), nil, nil, nil, &zeroDuration)
+	c.Assert(err, qt.Equals, nil)
+
+	err = s.JIMM.Database.GetModel(c.Context(), model)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestDumpModel(t *testing.T) {
