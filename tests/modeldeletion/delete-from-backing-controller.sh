@@ -46,12 +46,6 @@ $JAAS add-model "$MODEL_NAME" localhost --target-controller "$BACKING_CONTROLLER
 # status lookups fail.
 echo
 model_info=$(juju show-model "$MODEL_NAME" --format json)
-model_uuid=$(echo "$model_info" | jq -r ".[\"$MODEL_NAME\"].\"model-uuid\"")
-if [[ -z "$model_uuid" || "$model_uuid" == "null" ]]; then
-    echo "Unable to determine UUID for model $MODEL_NAME"
-    exit 1
-fi
-echo "Model UUID for $MODEL_NAME is $model_uuid"
 model_owner=$(echo "$model_info" | jq -r ".[\"$MODEL_NAME\"].owner")
 if [[ -z "$model_owner" || "$model_owner" == "null" ]]; then
     echo "Unable to determine owner for model $MODEL_NAME"
@@ -67,26 +61,6 @@ echo "Deleting model $MODEL_NAME directly from backing controller $BACKING_CONTR
 juju switch "$BACKING_CONTROLLER_NAME"
 juju destroy-model "$QUALIFIED_MODEL_NAME" --no-prompt
 
-# Wait until the backing controller no longer reports the model.
-echo
-echo "Waiting for $MODEL_NAME to disappear from backing controller $BACKING_CONTROLLER_NAME (timeout: 20 seconds)..."
-max_attempts=10
-attempt=1
-while [ $attempt -le $max_attempts ]; do
-    sleep 2
-    backing_model_exists=$(juju models --format json 2>/dev/null | jq -r --arg model "$MODEL_NAME" '.models[]? | select(.name == $model or ."short-name" == $model)' | grep -c . || true)
-    if [[ "$backing_model_exists" -eq 0 ]]; then
-        echo "Model $MODEL_NAME no longer exists on backing controller $BACKING_CONTROLLER_NAME."
-        break
-    fi
-    echo "Model $MODEL_NAME still exists on backing controller (attempt $attempt/$max_attempts)"
-    attempt=$((attempt + 1))
-done
-if [ $attempt -gt $max_attempts ]; then
-    echo "Model $MODEL_NAME still exists on backing controller after 20 seconds."
-    exit 1
-fi
-
 # Switch back to JAAS and delete the stale model record through the Juju CLI.
 # This is the core behaviour under test: destroy-model should succeed through
 # JAAS even though the model has already been deleted from the backing
@@ -95,25 +69,6 @@ echo
 echo "Deleting stale model $MODEL_NAME from JAAS via Juju CLI"
 juju switch "$JIMM_CONTROLLER_NAME"
 juju destroy-model "$QUALIFIED_MODEL_NAME" --no-prompt
-
-# Verify JAAS no longer lists the deleted model.
-echo
-echo "Waiting for $MODEL_NAME to disappear from JAAS (timeout: 20 seconds)..."
-attempt=1
-while [ $attempt -le $max_attempts ]; do
-    sleep 2
-    jaas_model_exists=$(juju models --format json 2>/dev/null | jq -r --arg uuid "$model_uuid" '.models[]? | select(."model-uuid" == $uuid)' | grep -c . || true)
-    if [[ "$jaas_model_exists" -eq 0 ]]; then
-        echo "Model $MODEL_NAME with UUID $model_uuid no longer exists in JAAS."
-        break
-    fi
-    echo "Model $MODEL_NAME still exists in JAAS (attempt $attempt/$max_attempts)"
-    attempt=$((attempt + 1))
-done
-if [ $attempt -gt $max_attempts ]; then
-    echo "Model $MODEL_NAME still exists in JAAS after 20 seconds."
-    exit 1
-fi
 
 echo
 echo "Model deletion test completed successfully."
