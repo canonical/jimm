@@ -15,3 +15,15 @@ To grant a (collection of) user(s) access to an application offer, add a `reader
 
 > See more: {ref}`add-a-permission`
 
+(remove-an-offer)=
+## Remove an offer
+
+To remove an offer in a model on a controller managed through JAAS, on your JAAS controller run:
+
+```
+juju remove-offer <offer-url>
+```
+
+```{note}
+If you destroy an offer on a controller managed by JAAS directly against the backing Juju controller, you will still see it in JAAS. This happens because JIMM's database has become out-of-sync with the Juju controller. To reconcile the state, delete the offer against JAAS too.
+```

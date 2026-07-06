@@ -480,13 +480,9 @@ func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt na
 }
 
 func fallbackModelStatus(m *dbmodel.Model, err error) base.ModelStatus {
-	modelLife := life.Value(m.Life)
-	if modelLife == "" {
-		modelLife = life.Alive
-	}
 	return base.ModelStatus{
 		UUID:  m.UUID.String,
-		Life:  modelLife,
+		Life:  life.Value(m.Life),
 		Owner: m.OwnerIdentityName,
 		Error: err,
 	}

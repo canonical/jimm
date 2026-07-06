@@ -321,3 +321,16 @@ During the migration phase, the model may be temporarily unavailable in the same
 To grant a (collection of) user(s) access to a model, add a `reader`, `writer`, or `administrator` permission between the user(s) and the model.
 
 > See more: {ref}`add-a-permission`
+
+(destroy-a-model)=
+## Destroy a model
+
+To destroy a model on a controller managed through JAAS, on your JAAS controller run:
+
+```
+juju destroy-model <model-name>
+```
+
+```{note}
+If you destroy a model on a controller managed by JAAS directly against the backing Juju controller, you may see a model marked as "unavailable" when listing models through JAAS. This happens because JIMM's database has become out-of-sync with the Juju controller. To reconcile the state, delete the model against JAAS too.
+```
