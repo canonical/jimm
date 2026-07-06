@@ -2188,6 +2188,7 @@ controllers:
   region: test-cloud-region
 models:
 - name: model-1
+  life: alive
   uuid: 00000002-0000-0000-0000-000000000001
   controller: controller-1
   cloud: test-cloud
