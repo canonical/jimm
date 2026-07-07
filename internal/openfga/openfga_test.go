@@ -601,6 +601,7 @@ func TestListObjectsWithContextualTuples(t *testing.T) {
 		"10000000-0000-0000-0000-000000000000",
 		"20000000-0000-0000-0000-000000000000",
 		"30000000-0000-0000-0000-000000000000",
+		"40000000-0000-0000-0000-000000000000",
 	}
 
 	expected := make([]openfga.Tag, len(modelUUIDs))
@@ -640,6 +641,17 @@ func TestListObjectsWithContextualTuples(t *testing.T) {
 			Object:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
 			Relation: ofganames.ControllerRelation,
 			Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[2])),
+		},
+		// Reader to model via reader of controller
+		{
+			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+			Relation: ofganames.ReaderRelation,
+			Target:   ofganames.ConvertTag(names.NewControllerTag("11111111-0000-0000-0000-000000000000")),
+		},
+		{
+			Object:   ofganames.ConvertTag(names.NewControllerTag("11111111-0000-0000-0000-000000000000")),
+			Relation: ofganames.ControllerRelation,
+			Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[3])),
 		},
 	})
 	c.Assert(err, qt.Equals, nil)
@@ -696,6 +708,7 @@ func TestListObjectsWithPeristedTuples(t *testing.T) {
 		"10000000-0000-0000-0000-000000000000",
 		"20000000-0000-0000-0000-000000000000",
 		"30000000-0000-0000-0000-000000000000",
+		"40000000-0000-0000-0000-000000000000",
 	}
 
 	expected := make([]openfga.Tag, len(modelUUIDs))
@@ -736,6 +749,17 @@ func TestListObjectsWithPeristedTuples(t *testing.T) {
 				Object:   ofganames.ConvertTag(names.NewControllerTag("00000000-0000-0000-0000-000000000000")),
 				Relation: ofganames.ControllerRelation,
 				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[2])),
+			},
+			// Reader to model via reader of controller
+			{
+				Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
+				Relation: ofganames.ReaderRelation,
+				Target:   ofganames.ConvertTag(names.NewControllerTag("11111111-0000-0000-0000-000000000000")),
+			},
+			{
+				Object:   ofganames.ConvertTag(names.NewControllerTag("11111111-0000-0000-0000-000000000000")),
+				Relation: ofganames.ControllerRelation,
+				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[3])),
 			},
 		}...,
 	), qt.Equals, nil)

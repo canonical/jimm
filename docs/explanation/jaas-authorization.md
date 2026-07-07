@@ -60,6 +60,7 @@ type controller
   relations
     define controller: [controller]
     define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
+    define reader: [user, user:*, group#member, role#assignee] or administrator
     define audit_log_viewer: [user, user:*, group#member, role#assignee] or administrator
     define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
 
@@ -67,7 +68,7 @@ type model
   relations
     define controller: [controller]
     define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
-    define reader: [user, user:*, group#member, role#assignee] or writer
+    define reader: [user, user:*, group#member, role#assignee] or writer or reader from controller
     define writer: [user, user:*, group#member, role#assignee] or administrator
 
 type applicationoffer

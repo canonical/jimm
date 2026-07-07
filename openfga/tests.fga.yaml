@@ -111,6 +111,28 @@ tuples:
     - user: group:co-group-3#member
       relation: can_addmodel
       object: controller:co-controller-2
+    - user: user:co-user-7
+      relation: reader
+      object: controller:co-controller-1
+    - user: user:co-user-8
+      relation: member
+      object: group:co-group-4
+    - user: group:co-group-4#member
+      relation: reader
+      object: controller:co-controller-2
+    - user: group:co-group-4#member
+      relation: reader
+      object: controller:co-controller-1
+    # Models inheriting reader from a controller (co-controller-3).
+    - user: user:co-user-9
+      relation: reader
+      object: controller:co-controller-3
+    - user: controller:co-controller-3
+      relation: controller
+      object: model:co-model-1
+    - user: controller:co-controller-3
+      relation: controller
+      object: model:co-model-2
 
     # Model (mo)
     - user: user:mo-user-1
@@ -307,9 +329,9 @@ tests:
               - role:ro-role-6
             
     # Checks whether:
-    # - all or invididual users, or group members can become administators and audit_log_viewers of a controller
+    # - all or invididual users, or group members can become administators, audit_log_viewers and readers of a controller
     # - controllers can be related to each other with correct inheritance of administrators
-    # - proper hierarchy of relations is upheld: administrator > audit_log_viewer, administrator > can_addmodel
+    # - proper hierarchy of relations is upheld: administrator > audit_log_viewer, administrator > can_addmodel, administrator > reader
     - name: Controller
       list_objects:
          - user: user:co-user-1
@@ -322,6 +344,9 @@ tests:
                - controller:co-controller-1
                - controller:co-controller-2
              can_addmodel:
+               - controller:co-controller-1
+               - controller:co-controller-2
+             reader:
                - controller:co-controller-1
                - controller:co-controller-2
          - user: group:co-group-1#member
@@ -359,6 +384,20 @@ tests:
            assertions:
              can_addmodel:
                - controller:co-controller-2
+         - user: user:co-user-7
+           type: controller
+           assertions:
+             # co-controller-2 is included because user:* is an administrator
+             # of it (and administrators are readers).
+             reader:
+               - controller:co-controller-1
+               - controller:co-controller-2
+         - user: group:co-group-4#member
+           type: controller
+           assertions:
+             reader:
+               - controller:co-controller-1
+               - controller:co-controller-2
 
       check:
         - user: user:co-user-2
@@ -367,6 +406,19 @@ tests:
             audit_log_viewer: true
             administrator: false
             can_addmodel: false
+            reader: false
+        - user: user:co-user-7
+          object: controller:co-controller-1
+          assertions:
+            reader: true
+            administrator: false
+            audit_log_viewer: false
+            can_addmodel: false
+        - user: user:co-user-8
+          object: controller:co-controller-1
+          assertions:
+            reader: true
+            administrator: false
 
     # Ensures:
     # - all or individual users, as well as group members can take part in appropriate relations
@@ -429,6 +481,15 @@ tests:
             reader:
               - model:mo-model-1
               - model:mo-model-2
+        # A controller reader inherits reader on every model of that controller.
+        # mo-model-2 is also included because user:* is an administrator of it.
+        - user: user:co-user-9
+          type: model
+          assertions:
+            reader:
+              - model:co-model-1
+              - model:co-model-2
+              - model:mo-model-2
       check:
         - user: group:mo-group-2#member
           object: model:mo-model-1
@@ -441,6 +502,13 @@ tests:
           assertions:
             writer: false
             reader: true
+            administrator: false
+        # Controller reader gets read-only access to models, not write/admin.
+        - user: user:co-user-9
+          object: model:co-model-1
+          assertions:
+            reader: true
+            writer: false
             administrator: false
     
     # Makes sure that: 
