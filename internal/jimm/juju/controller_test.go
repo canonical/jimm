@@ -462,7 +462,7 @@ cloud-credentials:
 - name: test-credential
   cloud: test-cloud
   owner: alice@canonical.com
-  type: empty
+  auth-type: empty
 controllers:
 - name: test-controller
   uuid: 00000001-0000-0000-0000-000000000001
@@ -575,7 +575,8 @@ func TestImportModel(t *testing.T) {
 				Name: "test-region",
 			},
 			CloudCredential: dbmodel.CloudCredential{
-				Name: "test-credential",
+				Name:     "test-credential",
+				AuthType: "empty",
 			},
 			Life: state.Alive.String(),
 		},
@@ -644,86 +645,18 @@ func TestImportModel(t *testing.T) {
 				Name: "test-region",
 			},
 			CloudCredential: dbmodel.CloudCredential{
-				Name: "test-credential",
+				Name:     "test-credential",
+				AuthType: "empty",
 			},
 			Life: state.Alive.String(),
 		},
 	}, {
-		about:          "model from local user imported",
+		about:          "owner switching not supported",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "alice@canonical.com",
 		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		jimmAdmin:      true,
-		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
-			info := jujuclient.ModelInfo{}
-			info.Name = "test-model"
-			info.Type = "test-type"
-			info.UUID = "00000002-0000-0000-0000-000000000001"
-			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
-			info.DefaultSeries = "test-series"
-			info.Cloud = "test-cloud"
-			info.CloudRegion = "test-region"
-			info.CloudCredential = "test-cloud/local-user/test-credential"
-			info.Owner = "local-user"
-			info.Life = life.Alive
-			info.Status = base.Status{
-				Status: status.Status("available"),
-				Info:   "test-info",
-				Since:  &now,
-			}
-			info.Users = []base.UserInfo{{
-				UserName: "local-user",
-				Access:   string(jujuparams.ModelAdminAccess),
-			}, {
-				UserName: "another-user",
-				Access:   string(jujuparams.ModelReadAccess),
-			}}
-			info.Machines = []base.Machine{{
-				Id:          "test-machine",
-				DisplayName: "Test machine",
-				Status:      "test-status",
-				Message:     "test-message",
-			}}
-			info.AgentVersion = newVersion("2.1.0")
-			return info, nil
-		},
-		expectedModel: dbmodel.Model{
-			Name: "test-model",
-			UUID: sql.NullString{
-				String: "00000002-0000-0000-0000-000000000001",
-				Valid:  true,
-			},
-			Owner: dbmodel.Identity{
-				Name:        "alice@canonical.com",
-				DisplayName: "Alice",
-			},
-			Controller: dbmodel.Controller{
-				Name:         "test-controller",
-				UUID:         "00000001-0000-0000-0000-000000000001",
-				CloudName:    "test-cloud",
-				CloudRegion:  "test-region-1",
-				AgentVersion: "3.2.1",
-			},
-			CloudRegion: dbmodel.CloudRegion{
-				Cloud: dbmodel.Cloud{
-					Name: "test-cloud",
-					Type: "test",
-				},
-				Name: "test-region",
-			},
-			CloudCredential: dbmodel.CloudCredential{
-				Name: "test-credential",
-			},
-			Life: state.Alive.String(),
-		},
-	}, {
-		about:          "new model owner is local user",
-		user:           "alice@canonical.com",
-		controllerName: "test-controller",
-		newOwner:       "bob",
-		modelUUID:      "00000002-0000-0000-0000-000000000001",
-		expectedError:  "cannot import model from local user, try --owner to switch the model owner",
+		expectedError:  "switching the imported model owner is no longer supported",
 		jimmAdmin:      true,
 		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
 			info := jujuclient.ModelInfo{}
@@ -770,7 +703,7 @@ func TestImportModel(t *testing.T) {
 		},
 		expectedError: "model not found",
 	}, {
-		about:          "fail import from local user without newOwner flag",
+		about:          "fail import from local user",
 		user:           "alice@canonical.com",
 		controllerName: "test-controller",
 		newOwner:       "",
@@ -789,7 +722,7 @@ func TestImportModel(t *testing.T) {
 			info.Owner = "local-user"
 			return info, nil
 		},
-		expectedError: `cannot import model from local user, try --owner to switch the model owner`,
+		expectedError: `cannot import model from local user`,
 	}, {
 		about:          "cloud credentials not found",
 		user:           "alice@canonical.com",
@@ -810,7 +743,28 @@ func TestImportModel(t *testing.T) {
 			info.Owner = "alice@canonical.com"
 			return info, nil
 		},
-		expectedError: `Failed to find cloud credential for user alice@canonical.com on cloud invalid-cloud`,
+		expectedError: `Failed to find cloud credential "unknown-credential" for user alice@canonical.com on cloud invalid-cloud`,
+	}, {
+		about:          "matching cloud credential name not found",
+		user:           "alice@canonical.com",
+		controllerName: "test-controller",
+		newOwner:       "",
+		modelUUID:      "00000002-0000-0000-0000-000000000001",
+		jimmAdmin:      true,
+		modelInfo: func(model names.ModelTag) (jujuclient.ModelInfo, error) {
+			info := jujuclient.ModelInfo{}
+			info.Name = "test-model"
+			info.Type = "test-type"
+			info.UUID = "00000002-0000-0000-0000-000000000001"
+			info.ControllerUUID = "00000001-0000-0000-0000-000000000001"
+			info.DefaultSeries = "test-series"
+			info.Cloud = "test-cloud"
+			info.CloudRegion = "test-region"
+			info.CloudCredential = "test-cloud/alice@canonical.com/source-credential"
+			info.Owner = "alice@canonical.com"
+			return info, nil
+		},
+		expectedError: `Failed to find cloud credential "source-credential" for user alice@canonical.com on cloud test-cloud`,
 	}, {
 		about:          "cloud region not found",
 		user:           "alice@canonical.com",
@@ -926,7 +880,8 @@ func TestImportModel(t *testing.T) {
 				Name: "test-region",
 			},
 			CloudCredential: dbmodel.CloudCredential{
-				Name: "test-credential",
+				Name:     "test-credential",
+				AuthType: "empty",
 			},
 			Life: state.Alive.String(),
 			Offers: []dbmodel.ApplicationOffer{

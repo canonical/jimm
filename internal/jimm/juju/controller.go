@@ -370,11 +370,9 @@ func (j *JujuManager) EarliestControllerVersion(ctx context.Context) (version.Nu
 }
 
 type modelImporter struct {
-	jimm      *JujuManager
-	model     dbmodel.Model
-	modelInfo base.ModelInfo
-	// newOwner may be nil if the user wants to keep the original owner.
-	newOwner      *names.UserTag
+	jimm          *JujuManager
+	model         dbmodel.Model
+	modelInfo     base.ModelInfo
 	originalOwner names.UserTag
 	offersToAdd   []*crossmodel.ApplicationOfferDetails
 }
@@ -383,14 +381,9 @@ func newModelImporter(jimm *JujuManager, newOwner string) (modelImporter, error)
 	modelImporter := modelImporter{
 		jimm: jimm,
 	}
-	if newOwner == "" {
-		return modelImporter, nil
+	if newOwner != "" {
+		return modelImporter, errors.Codef(errors.CodeBadRequest, "switching the imported model owner is no longer supported")
 	}
-	if !names.IsValidUser(newOwner) {
-		return modelImporter, errors.Codef(errors.CodeBadRequest, "invalid new username for new model owner")
-	}
-	newOwnerTag := names.NewUserTag(newOwner)
-	modelImporter.newOwner = &newOwnerTag
 	return modelImporter, nil
 }
 
@@ -438,18 +431,11 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, user *openfga.User, 
 }
 
 func (m *modelImporter) setModelOwner(ctx context.Context) error {
-	var ownerTag names.UserTag
-	if m.newOwner != nil {
-		ownerTag = *m.newOwner
-	} else {
-		ownerTag = m.originalOwner
-	}
-
-	if ownerTag.IsLocal() {
-		return errors.New("cannot import model from local user, try --owner to switch the model owner")
+	if m.originalOwner.IsLocal() {
+		return errors.New("cannot import model from local user")
 	}
 	owner := dbmodel.Identity{}
-	owner.SetTag(ownerTag)
+	owner.SetTag(m.originalOwner)
 
 	err := m.jimm.Database.GetIdentity(ctx, &owner)
 	if err != nil {
@@ -483,21 +469,28 @@ func (m *modelImporter) addPermissions(ctx context.Context) error {
 }
 
 func (m *modelImporter) setCloudCredential(ctx context.Context) error {
-	// fetch cloud credential used by the model
+	if m.modelInfo.CloudCredential == "" {
+		return errors.Codef(errors.CodeNotFound, "model has no cloud credential configured")
+	}
 
-	// Note that the model already has a cloud credential configured which it will use when deploying new
-	// applications. JIMM needs some cloud credential reference to be able to import the model so use any
-	// credential against the cloud the model is deployed against. Even using the correct cloud for the
-	// credential is not strictly necessary, but will help prevent the user thinking they can create new
-	// models on the incoming cloud.
-	allCredentials, err := m.jimm.Database.GetIdentityCloudCredentials(ctx, &m.model.Owner, m.modelInfo.Cloud)
+	if !names.IsValidCloudCredential(m.modelInfo.CloudCredential) {
+		return errors.Codef(errors.CodeBadRequest, "invalid model cloud credential %q", m.modelInfo.CloudCredential)
+	}
+	sourceCredentialTag := names.NewCloudCredentialTag(m.modelInfo.CloudCredential)
+
+	cloudCredential := dbmodel.CloudCredential{
+		CloudName:         sourceCredentialTag.Cloud().Id(),
+		OwnerIdentityName: sourceCredentialTag.Owner().Id(),
+		Name:              sourceCredentialTag.Name(),
+	}
+	err := m.jimm.Database.GetCloudCredential(ctx, &cloudCredential)
 	if err != nil {
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			return errors.Codef(errors.CodeNotFound, "Failed to find cloud credential %q for user %s on cloud %s",
+				sourceCredentialTag.Name(), sourceCredentialTag.Owner().Id(), sourceCredentialTag.Cloud().Id())
+		}
 		return err
 	}
-	if len(allCredentials) == 0 {
-		return errors.Codef(errors.CodeNotFound, "Failed to find cloud credential for user %s on cloud %s", m.model.Owner.Name, m.modelInfo.Cloud)
-	}
-	cloudCredential := allCredentials[0]
 
 	m.model.CloudCredentialID = cloudCredential.ID
 	m.model.CloudCredential = cloudCredential
@@ -562,8 +555,7 @@ func (m *modelImporter) save(ctx context.Context) error {
 	})
 }
 
-// ImportModel imports a model and existing offers into JIMM.  A new owner  must be set to
-// represent the external user who will own this model (if the original owner is a local user).
+// ImportModel imports a model and existing offers into JIMM.
 func (j *JujuManager) ImportModel(ctx context.Context, user *openfga.User, controllerName string, modelTag names.ModelTag, newOwner string) error {
 
 	if err := j.checkJimmAdmin(user); err != nil {

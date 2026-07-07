@@ -476,7 +476,7 @@ func (a *API) CredentialContents(cloud string, credential string, withSecrets bo
 	if a.CredentialContents_ == nil {
 		return nil, errors.New("not implemented")
 	}
-	return a.CredentialContents(cloud, credential, withSecrets)
+	return a.CredentialContents_(cloud, credential, withSecrets)
 }
 
 func (a *API) UpgradeModel(modelUUID string, targetVersion version.Number, stream string, ignoreAgentVersions bool, dryRun bool) (version.Number, error) {
