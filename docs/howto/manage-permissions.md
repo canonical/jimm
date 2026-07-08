@@ -57,6 +57,14 @@ juju add-permission group-mygroup#member can-addmodel cloud-mycloud
 
 For any given resource, permissions are currently hierarchical and some permissions are implicit -- e.g., given a cloud associated with a controller and a model associated with the cloud, a controller `administrator` entails cloud `administrator` entails cloud `can_addmodel`.
 
+Granting the `reader` permission on a controller cascades read access to every model on that controller. For example, to give a user, all assignees of a role, or all members of an IdP group read access to all models on controller `mycontroller`:
+
+```text
+juju add-permission user-alice@canonical.com reader controller-mycontroller
+juju add-permission role-myrole#assignee reader controller-mycontroller
+juju add-permission idpgroup-myidpgroup#member reader controller-mycontroller
+```
+
 > See more: {doc}`juju add-permission <../reference/jaas-plugin>`
 
 

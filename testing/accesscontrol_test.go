@@ -1491,6 +1491,77 @@ func TestCheckRelationControllerAdministratorFlow(t *testing.T) {
 	c.Assert(results, qt.DeepEquals, expected)
 }
 
+// TestCheckRelationControllerReaderCascadesToModel verifies that granting a
+// user the reader relation on a controller cascades to read access on that
+// controller's models, via the "reader from controller" clause in the
+// authorisation model.
+func TestCheckRelationControllerReaderCascadesToModel(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+	ctx := context.Background()
+	ofgaClient := s.JIMM.OpenFGAClient
+
+	user, _, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
+	defer closeClient()
+
+	userTag := ofganames.ConvertTag(user.ResourceTag())
+	controllerTag := ofganames.ConvertTag(controller.ResourceTag())
+	modelTag := ofganames.ConvertTag(model.ResourceTag())
+
+	// JAAS style keys, to be translated and checked against UUIDs/users.
+	userJAASKey := "user-" + user.Name
+	modelJAASKey := "model-" + user.Name + "/" + model.Name
+
+	// Make the user a reader of the controller and relate the model to its
+	// controller so controller-level access cascades down to the model.
+	userToControllerReader := openfga.Tuple{
+		Object:   userTag,
+		Relation: "reader",
+		Target:   controllerTag,
+	}
+	controllerToModel := openfga.Tuple{
+		Object:   controllerTag,
+		Relation: "controller",
+		Target:   modelTag,
+	}
+
+	err := ofgaClient.AddRelation(ctx, userToControllerReader, controllerToModel)
+	c.Assert(err, qt.IsNil)
+
+	type test struct {
+		input apiparams.RelationshipTuple
+		want  bool
+	}
+
+	tests := []test{
+		// Test user -> reader -> model (due to reader from controller).
+		{
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "reader",
+				TargetObject: modelJAASKey,
+			},
+			want: true,
+		},
+		// Test user -> writer -> model (FAILS as reader does not imply writer).
+		{
+			input: apiparams.RelationshipTuple{
+				Object:       userJAASKey,
+				Relation:     "writer",
+				TargetObject: modelJAASKey,
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range tests {
+		req := apiparams.CheckRelationRequest{Tuple: tc.input}
+		res, err := client.CheckRelation(&req)
+		c.Assert(err, qt.IsNil)
+		c.Assert(res.Allowed, qt.Equals, tc.want)
+	}
+}
+
 /*
  None-facade related tests
 */
