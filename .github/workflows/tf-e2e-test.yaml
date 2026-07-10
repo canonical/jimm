@@ -34,11 +34,19 @@ jobs:
           ref: ${{ matrix.tf-ref }}
           path: terraform-provider-juju
 
+      # Use JIMM's Go version: building JIMM (make dev-env) requires the higher
+      # version declared in jimm/go.mod. A newer Go still builds and runs the
+      # terraform-provider-juju tests, so a single toolchain covers both repos.
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: terraform-provider-juju/go.mod
+          go-version-file: jimm/go.mod
           cache: false
+
+      # test-server's `make dev-env` uses `docker compose --profile`, which
+      # requires the Compose v2 plugin. Install it explicitly.
+      - name: Set up Docker Compose
+        uses: docker/setup-compose-action@v1
 
       # Build and start JIMM (dev = current checkout, i.e. v4) with a v3 backing
       # controller, using the shared JIMM server setup action. This also wires
