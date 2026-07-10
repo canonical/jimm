@@ -46,7 +46,18 @@ jobs:
       # test-server's `make dev-env` uses `docker compose --profile`, which
       # requires the Compose v2 plugin. Install it explicitly.
       - name: Set up Docker Compose
-        uses: docker/setup-compose-action@v1
+        uses: docker/setup-compose-action@v2
+
+      - name: Restore Docker image cache
+        id: docker-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: docker-images.tar
+          key: docker-v2-${{ runner.os }}-${{ hashFiles('docker-compose.yaml', 'docker-compose.common.yaml') }}
+
+      - name: Load Docker images from cache
+        if: steps.docker-cache.outputs.cache-hit == 'true'
+        run: docker load -i docker-images.tar
 
       # Build and start JIMM (dev = current checkout, i.e. v4) with a v3 backing
       # controller, using the shared JIMM server setup action. This also wires
