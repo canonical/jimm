@@ -1,0 +1,61 @@
+name: TF E2E Test
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-tf-e2e-test:
+    name: Run TF E2E Tests (${{ matrix.name }})
+    timeout-minutes: 67
+    runs-on: [self-hosted-linux-amd64-jammy-large]
+    strategy:
+      matrix:
+        include:
+          # CLI v3 -> JIMM v4 (from docker compose) -> backing controller v3,
+          # exercised by terraform-provider-juju v1.5.
+          - name: "JIMM v4, backing v3, TF v1.5"
+            cli-channel: "3/stable"
+            controller-channels: '["3/stable"]'
+            tf-ref: "v1.5"
+    steps:
+      - name: Checkout JIMM repo
+        uses: actions/checkout@v4
+        with:
+          path: jimm
+
+      - name: Checkout terraform-provider-juju (${{ matrix.tf-ref }})
+        uses: actions/checkout@v4
+        with:
+          repository: juju/terraform-provider-juju
+          ref: ${{ matrix.tf-ref }}
+          path: terraform-provider-juju
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: terraform-provider-juju/go.mod
+          cache: false
+
+      - name: Set up JIMM environment
+        id: jimm
+        uses: ./jimm/.github/actions/setup-jimm-env
+        with:
+          cli-channel: ${{ matrix.cli-channel }}
+          controller-channels: ${{ matrix.controller-channels }}
+          jimm-path: jimm
+
+      - name: Run terraform provider acceptance tests
+        working-directory: terraform-provider-juju
+        run: go test ./internal/provider/... -parallel 10 -v -timeout 40m
+        env:
+          TF_ACC: "1"
+          TEST_CLOUD: lxd
+          JUJU_CONTROLLER_ADDRESSES: ${{ steps.jimm.outputs.jimm-controller-addresses }}
+          JUJU_CLIENT_ID: ${{ steps.jimm.outputs.jimm-client-id }}
+          JUJU_CLIENT_SECRET: ${{ steps.jimm.outputs.jimm-client-secret }}
+          JUJU_CA_CERT: ${{ steps.jimm.outputs.jimm-ca-cert }}

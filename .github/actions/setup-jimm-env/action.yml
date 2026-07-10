@@ -1,0 +1,147 @@
+name: Setup JIMM Environment
+description: >
+  Install dependencies, initialise LXD/MicroK8s, start the JIMM test
+  environment via docker compose, and bootstrap one or more backing
+  controllers. Intended to be reused by end-to-end workflows.
+  Microk88s is added as a cloud explicitly, read to be used by tests.
+
+inputs:
+  cli-channel:
+    description: Juju snap channel to install for the CLI (e.g. "3/stable").
+    required: true
+  controller-channels:
+    description: >
+      JSON array of Juju snap channels to bootstrap backing controllers from.
+      One controller is bootstrapped per entry, named test-e2e-1, test-e2e-2,
+      etc. (e.g. '["3/stable"]' or '["3/stable", "4.0/stable"]').
+    required: true
+  jimm-path:
+    description: >
+      Path to the checked-out JIMM repository, relative to the workspace root.
+      Defaults to the workspace root.
+    required: false
+    default: "."
+
+outputs:
+  controllers:
+    description: Comma-separated list of bootstrapped controller names.
+    value: ${{ steps.controller-config.outputs.controllers }}
+  jimm-url:
+    description: URL where the running JIMM instance can be reached.
+    value: "https://jimm.localhost"
+  jimm-controller-addresses:
+    description: >
+      Host:port used to connect to JIMM, suitable for
+      JUJU_CONTROLLER_ADDRESSES.
+    value: "jimm.localhost:443"
+  jimm-client-id:
+    description: Test service-account client ID used to log in to JIMM.
+    value: "test-client-id"
+  jimm-client-secret:
+    description: Test service-account client secret used to log in to JIMM.
+    value: "2M2blFbO4GX4zfggQpivQSxwWX1XGgNf"
+  jimm-ca-cert:
+    description: CA certificate used to generate the JIMM server certificate.
+    value: ${{ steps.fetch-cert.outputs.jimm-ca }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Docker image cache
+      id: docker-cache
+      uses: actions/cache/restore@v5
+      with:
+        path: docker-images.tar
+        key: docker-v2-${{ runner.os }}-${{ hashFiles(format('{0}/docker-compose.yaml', inputs.jimm-path), format('{0}/docker-compose.common.yaml', inputs.jimm-path)) }}
+
+    - name: Load Docker images from cache
+      if: steps.docker-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: docker load -i docker-images.tar
+
+    - name: Set up Docker Compose
+      uses: docker/setup-compose-action@v1
+
+    - name: Install dependencies
+      shell: bash
+      run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
+
+    - name: Install Juju
+      shell: bash
+      run: |
+        sudo snap install juju --channel=${{ inputs.cli-channel }}
+        mkdir -p ~/.local/share/juju
+
+    - name: Initialise LXD
+      shell: bash
+      run: |
+        sudo lxd waitready && \
+        sudo lxd init --auto && \
+        sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket && \
+        lxc network set lxdbr0 ipv6.address none && \
+        sudo usermod -a -G lxd $USER && \
+        sudo iptables -F FORWARD && \
+        sudo iptables -P FORWARD ACCEPT
+
+    - name: Initialise Microk8s
+      shell: bash
+      run: |
+        sudo snap install microk8s --channel 1.32-strict
+        sudo adduser $(whoami) snap_microk8s
+        mkdir -p ~/.kube
+        sudo chown -f -R $(whoami) ~/.kube
+        sudo microk8s status --wait-ready
+        sudo microk8s enable hostpath-storage dns
+        sudo microk8s config > ~/.kube/config
+        sudo usermod -a -G snap_microk8s ubuntu
+        newgrp snap_microk8s
+        juju add-k8s microk8s-cp --client
+
+    - name: Generate certs
+      shell: bash
+      working-directory: ${{ inputs.jimm-path }}/local/traefik/certs
+      run: ./certs.sh
+
+    - name: Start test environment
+      shell: bash
+      working-directory: ${{ inputs.jimm-path }}
+      run: docker compose up -d --wait
+
+    - name: Retrieve JIMM CA cert
+      id: fetch-cert
+      shell: bash
+      working-directory: ${{ inputs.jimm-path }}
+      run: |
+        echo 'jimm-ca<<EOF' >> "$GITHUB_OUTPUT"
+        cat ./local/traefik/certs/ca.crt >> "$GITHUB_OUTPUT"
+        echo 'EOF' >> "$GITHUB_OUTPUT"
+
+    - name: Bootstrap controllers
+      shell: bash
+      working-directory: ${{ inputs.jimm-path }}
+      run: |
+        readarray -t channels < <(echo '${{ inputs.controller-channels }}' | jq -r '.[]')
+        for i in "${!channels[@]}"; do
+          sudo snap refresh juju --channel="${channels[$i]}"
+          JWKS_DNS=jwks.localhost CONTROLLER_NAME="test-e2e-$((i+1))" ./local/jimm/setup-controller.sh
+        done
+
+    - name: Generate controller config
+      id: controller-config
+      shell: bash
+      working-directory: ${{ inputs.jimm-path }}
+      run: |
+        controllers=$(echo '${{ inputs.controller-channels }}' | jq -r '[to_entries[] | "test-e2e-\(.key + 1)"] | join(",")')
+        echo "controllers=$controllers" >> "$GITHUB_OUTPUT"
+        CONTROLLERS="$controllers" make generate-test-env-multiple
+
+    - name: Proxy traffic from lxd to host for k8s api server
+      shell: bash
+      run: |
+        host_ip_addr=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
+        lxc list --format json | jq -r '.[].name' | while read lxc_name; do
+          lxc config device add $lxc_name k8sproxy-$lxc_name proxy \
+            listen=tcp:127.0.0.1:16443 \
+            connect=tcp:$host_ip_addr:16443 \
+            bind=container
+        done

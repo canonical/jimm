@@ -27,86 +27,17 @@ jobs:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4
 
-      - name: Restore Docker image cache
-        id: docker-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: docker-images.tar
-          key: docker-v2-${{ runner.os }}-${{ hashFiles('docker-compose.yaml', 'docker-compose.common.yaml') }}
-
-      - name: Load Docker images from cache
-        if: steps.docker-cache.outputs.cache-hit == 'true'
-        run: docker load -i docker-images.tar
-
-      - name: Set up Docker Compose
-        uses: docker/setup-compose-action@v1
-
       - name: Setup Go
-        uses:  actions/setup-go@v6
+        uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version-file: go.mod
           cache: false
 
-      - name: Install dependencies
-        run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
-
-      - name: Install Juju
-        run: |
-          sudo snap install juju --channel=$(echo '${{ matrix.versions }}' | jq -r '.[0]')
-          mkdir -p ~/.local/share/juju
-
-      - name: Initialise LXD
-        run: |
-          sudo lxd waitready && \
-          sudo lxd init --auto && \
-          sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket && \
-          lxc network set lxdbr0 ipv6.address none && \
-          sudo usermod -a -G lxd $USER && \
-          sudo iptables -F FORWARD && \
-          sudo iptables -P FORWARD ACCEPT
-      
-      - name: Initialise Microk8s
-        run: |
-          sudo snap install microk8s --channel 1.32-strict
-          sudo adduser $(whoami) snap_microk8s
-          mkdir -p ~/.kube
-          sudo chown -f -R $(whoami) ~/.kube
-          sudo microk8s status --wait-ready
-          sudo microk8s enable hostpath-storage dns
-          sudo microk8s config > ~/.kube/config
-          sudo usermod -a -G snap_microk8s ubuntu
-          newgrp snap_microk8s
-          juju add-k8s microk8s-cp --client
-      
-      - name: Generate certs
-        working-directory: local/traefik/certs
-        run: ./certs.sh
-
-      - name: Start test environment
-        run: docker compose up -d --wait
-
-      - name: Bootstrap controllers
-        run: |
-          readarray -t channels < <(echo '${{ matrix.versions }}' | jq -r '.[]')
-          for i in "${!channels[@]}"; do
-            sudo snap refresh juju --channel="${channels[$i]}"
-            JWKS_DNS=jwks.localhost CONTROLLER_NAME="test-e2e-$((i+1))" ./local/jimm/setup-controller.sh
-          done
-
-      - name: Generate controller config
-        run: |
-          controllers=$(echo '${{ matrix.versions }}' | jq -r '[to_entries[] | "test-e2e-\(.key + 1)"] | join(",")')
-          CONTROLLERS="$controllers" make generate-test-env-multiple
-      
-      - name: Proxy traffic from lxd to host for k8s api server
-        run: |
-          host_ip_addr=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
-          lxc list --format json | jq -r '.[].name' | while read lxc_name; do
-            lxc config device add $lxc_name k8sproxy-$lxc_name proxy \
-              listen=tcp:127.0.0.1:16443 \
-              connect=tcp:$host_ip_addr:16443 \
-              bind=container
-          done
+      - name: Set up JIMM environment
+        uses: ./.github/actions/setup-jimm-env
+        with:
+          cli-channel: ${{ fromJSON(matrix.versions)[0] }}
+          controller-channels: ${{ matrix.versions }}
 
       - name: Run E2E tests
         run: go test -v ./testing/... -timeout 30m
