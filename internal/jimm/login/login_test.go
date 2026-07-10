@@ -96,7 +96,7 @@ func (s *loginManagerSuite) Init(c *qt.C) {
 
 	mockAuthenticator.EXPECT().VerifyClientCredentials(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, clientID string, clientSecret string) ([]string, error) {
 		if clientID == "my-svc-acc" && clientSecret == "foo-secret" {
-			return []string{}, nil
+			return []string{"engineering", "platform"}, nil
 		}
 		return nil, fmt.Errorf("invalid client credentials")
 	}).AnyTimes()
@@ -162,6 +162,7 @@ func (s *loginManagerSuite) TestLoginClientCredentials(c *qt.C) {
 	user, err := s.manager.LoginClientCredentials(ctx, validClientID, "foo-secret")
 	c.Assert(err, qt.IsNil)
 	c.Assert(user.Name, qt.Equals, "my-svc-acc@serviceaccount")
+	c.Assert(user.IDPGroupIDs, qt.DeepEquals, []string{"engineering", "platform"})
 }
 
 func (s *loginManagerSuite) TestLoginWithSessionToken(c *qt.C) {

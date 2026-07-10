@@ -13,10 +13,10 @@ import (
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/auth"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/logger"
+	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/streamproxy"
 )
@@ -30,23 +30,9 @@ type streamModelProxier struct {
 }
 
 // Authenticate implements WSServer.Authenticate.
-// It attempts to perform basic auth and will return an unauthorized error if auth fails.
+// It supports both session-token and client-credentials Basic authentication.
 func (s streamModelProxier) Authenticate(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-	_, password, ok := req.BasicAuth()
-	if !ok {
-		return ctx, errors.Codef(errors.CodeUnauthorized, "authentication missing")
-	}
-	jwtToken, err := s.jimm.OAuthAuthenticator.VerifySessionToken(password)
-	if err != nil {
-		return ctx, errors.Codef(errors.CodeUnauthorized, "%w", err)
-	}
-	groups, err := auth.SessionGroupsFromToken(jwtToken)
-	if err != nil {
-		return ctx, errors.Codef(errors.CodeUnauthorized, "%w", err)
-	}
-	ctx = auth.ContextWithSessionIdentity(ctx, jwtToken.Subject())
-	ctx = auth.ContextWithSessionGroups(ctx, groups)
-	return ctx, nil
+	return authenticateStreamBasicAuth(ctx, req, s.jimm.LoginManager)
 }
 
 // ServeWS implements jimmhttp.WSServer.
@@ -67,13 +53,12 @@ func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.C
 		}
 	}
 
-	user, err := s.jimm.LoginManager.UserLogin(ctx, auth.SessionIdentityFromContext(ctx))
+	user, err := middleware.IdentityFromContext(ctx)
 	if err != nil {
-		zapctx.Error(ctx, "user login error", zap.Error(err))
+		zapctx.Error(ctx, "authenticated user missing from context", zap.Error(err))
 		writeError(err.Error(), errors.CodeUnauthorized)
 		return
 	}
-	user.SetIDPGroups(auth.SessionGroupsFromContext(ctx))
 
 	uuid, finalPath, err := modelInfoFromPath(jimmhttp.PathElementFromContext(ctx))
 	if err != nil {
