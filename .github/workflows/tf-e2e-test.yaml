@@ -40,7 +40,6 @@ jobs:
         with:
           go-version-file: terraform-provider-juju/go.mod
           cache: false
-
       - name: Set up JIMM environment
         id: jimm
         uses: ./jimm/.github/actions/setup-jimm-env
@@ -48,6 +47,16 @@ jobs:
           cli-channel: ${{ matrix.cli-channel }}
           controller-channels: ${{ matrix.controller-channels }}
           jimm-path: jimm
+
+      # Pre-install Terraform so the acceptance test framework does not try to
+      # auto-download it at runtime (that path fails GPG verification due to an
+      # expired HashiCorp signing key). terraform_wrapper must be false so the
+      # raw binary is on PATH for the test framework to discover.
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.14.*"
+          terraform_wrapper: false
 
       - name: Run terraform provider acceptance tests
         working-directory: terraform-provider-juju

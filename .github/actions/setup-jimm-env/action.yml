@@ -57,24 +57,33 @@ runs:
     - name: Load Docker images from cache
       if: steps.docker-cache.outputs.cache-hit == 'true'
       shell: bash
-      run: docker load -i docker-images.tar
+      run: |
+        echo "::group::Load Docker images from cache"
+        docker load -i docker-images.tar
+        echo "::endgroup::"
 
     - name: Set up Docker Compose
       uses: docker/setup-compose-action@v1
 
     - name: Install dependencies
       shell: bash
-      run: sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
+      run: |
+        echo "::group::Install dependencies"
+        sudo apt-get update -y && sudo apt-get install -y gcc git-core gnupg build-essential
+        echo "::endgroup::"
 
     - name: Install Juju
       shell: bash
       run: |
+        echo "::group::Install Juju"
         sudo snap install juju --channel=${{ inputs.cli-channel }}
         mkdir -p ~/.local/share/juju
+        echo "::endgroup::"
 
     - name: Initialise LXD
       shell: bash
       run: |
+        echo "::group::Initialise LXD"
         sudo lxd waitready && \
         sudo lxd init --auto && \
         sudo chmod a+wr /var/snap/lxd/common/lxd/unix.socket && \
@@ -82,10 +91,12 @@ runs:
         sudo usermod -a -G lxd $USER && \
         sudo iptables -F FORWARD && \
         sudo iptables -P FORWARD ACCEPT
+        echo "::endgroup::"
 
     - name: Initialise Microk8s
       shell: bash
       run: |
+        echo "::group::Initialise Microk8s"
         sudo snap install microk8s --channel 1.32-strict
         sudo adduser $(whoami) snap_microk8s
         mkdir -p ~/.kube
@@ -96,48 +107,62 @@ runs:
         sudo usermod -a -G snap_microk8s ubuntu
         newgrp snap_microk8s
         juju add-k8s microk8s-cp --client
+        echo "::endgroup::"
 
     - name: Generate certs
       shell: bash
       working-directory: ${{ inputs.jimm-path }}/local/traefik/certs
-      run: ./certs.sh
+      run: |
+        echo "::group::Generate certs"
+        ./certs.sh
+        echo "::endgroup::"
 
     - name: Start test environment
       shell: bash
       working-directory: ${{ inputs.jimm-path }}
-      run: docker compose up -d --wait
+      run: |
+        echo "::group::Start test environment"
+        docker compose up -d --wait
+        echo "::endgroup::"
 
     - name: Retrieve JIMM CA cert
       id: fetch-cert
       shell: bash
       working-directory: ${{ inputs.jimm-path }}
       run: |
+        echo "::group::Retrieve JIMM CA cert"
         echo 'jimm-ca<<EOF' >> "$GITHUB_OUTPUT"
         cat ./local/traefik/certs/ca.crt >> "$GITHUB_OUTPUT"
         echo 'EOF' >> "$GITHUB_OUTPUT"
+        echo "::endgroup::"
 
     - name: Bootstrap controllers
       shell: bash
       working-directory: ${{ inputs.jimm-path }}
       run: |
+        echo "::group::Bootstrap controllers"
         readarray -t channels < <(echo '${{ inputs.controller-channels }}' | jq -r '.[]')
         for i in "${!channels[@]}"; do
           sudo snap refresh juju --channel="${channels[$i]}"
           JWKS_DNS=jwks.localhost CONTROLLER_NAME="test-e2e-$((i+1))" ./local/jimm/setup-controller.sh
         done
+        echo "::endgroup::"
 
     - name: Generate controller config
       id: controller-config
       shell: bash
       working-directory: ${{ inputs.jimm-path }}
       run: |
+        echo "::group::Generate controller config"
         controllers=$(echo '${{ inputs.controller-channels }}' | jq -r '[to_entries[] | "test-e2e-\(.key + 1)"] | join(",")')
         echo "controllers=$controllers" >> "$GITHUB_OUTPUT"
         CONTROLLERS="$controllers" make generate-test-env-multiple
+        echo "::endgroup::"
 
     - name: Proxy traffic from lxd to host for k8s api server
       shell: bash
       run: |
+        echo "::group::Proxy traffic from lxd to host for k8s api server"
         host_ip_addr=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
         lxc list --format json | jq -r '.[].name' | while read lxc_name; do
           lxc config device add $lxc_name k8sproxy-$lxc_name proxy \
@@ -145,3 +170,4 @@ runs:
             connect=tcp:$host_ip_addr:16443 \
             bind=container
         done
+        echo "::endgroup::"
