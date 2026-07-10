@@ -24,13 +24,15 @@ parts:
     plugin: go
     source: ./
     source-type: git
+    build-snaps:
+      - go/1.26/stable
     prime:
       - bin/jaas
     override-build: |
       set -e
       CGO_ENABLED=0 go install github.com/canonical/jimm/v3/cmd/jaas
     override-prime: |
-      snapcraftctl prime
+      craftctl default
       # Add all CLI commands below as symlinks to make them appear top-level to Juju.
       ln -sf jaas bin/juju-jaas
       ln -sf jaas bin/juju-add-cloud

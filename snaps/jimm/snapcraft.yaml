@@ -4,7 +4,7 @@ description: Multi-cloud controller for managing JAAS models.
 grade: stable
 base: core24
 confinement: strict
-adopt-info: jimmsrv # Version our app via set-version within an override
+version: git
 
 apps:
   jimm:
@@ -20,13 +20,14 @@ parts:
     build-packages:
       - git
       - gcc
+    build-snaps:
+      - go/1.26/stable
     override-pull: |-
       set -e
-      snapcraftctl pull
+      craftctl default
       mkdir -p $SNAPCRAFT_PART_SRC/version
       git -C $SNAPCRAFT_PART_SRC rev-parse --verify HEAD | tee $SNAPCRAFT_PART_SRC/version/commit.txt
       git -C $SNAPCRAFT_PART_SRC describe --dirty --abbrev=0 | tee $SNAPCRAFT_PART_SRC/version/version.txt
-      snapcraftctl set-version `cat $SNAPCRAFT_PART_SRC/version/version.txt`
     override-build: |-
       set -e
       go install -mod readonly -ldflags '-linkmode=external' -tags version github.com/canonical/jimm/v3/cmd/jimmsrv
