@@ -10,17 +10,16 @@ concurrency:
 
 jobs:
   run-tf-e2e-test:
-    name: Run TF E2E Tests (${{ matrix.name }})
+    name: Run (${{ matrix.name }})
     timeout-minutes: 67
     runs-on: [self-hosted-linux-amd64-jammy-large]
     strategy:
       matrix:
         include:
-          # CLI v3 -> JIMM v4 (from docker compose) -> backing controller v3,
-          # exercised by terraform-provider-juju v1.5.
+          # JIMM v4 (built from the current checkout via the "dev" version) ->
+          # backing controller v3, exercised by terraform-provider-juju v1.5.
           - name: "JIMM v4, backing v3, TF v1.5"
-            cli-channel: "3/stable"
-            controller-channels: '["3/stable"]'
+            juju-channel: "3/stable"
             tf-ref: "v1.5"
     steps:
       - name: Checkout JIMM repo
@@ -40,13 +39,17 @@ jobs:
         with:
           go-version-file: terraform-provider-juju/go.mod
           cache: false
+
+      # Build and start JIMM (dev = current checkout, i.e. v4) with a v3 backing
+      # controller, using the shared JIMM server setup action. This also wires
+      # up JAAS CLI auth and a service-account cloud-credential.
       - name: Set up JIMM environment
         id: jimm
-        uses: ./jimm/.github/actions/setup-jimm-env
+        uses: ./jimm/.github/actions/test-server
         with:
-          cli-channel: ${{ matrix.cli-channel }}
-          controller-channels: ${{ matrix.controller-channels }}
-          jimm-path: jimm
+          jimm-version: dev
+          juju-channel: ${{ matrix.juju-channel }}
+          ghcr-pat: ""
 
       # Pre-install Terraform so the acceptance test framework does not try to
       # auto-download it at runtime (that path fails GPG verification due to an
@@ -58,13 +61,29 @@ jobs:
           terraform_version: "1.14.*"
           terraform_wrapper: false
 
+      # Derive the provider configuration from the running JIMM controller.
+      # The Juju API endpoint must come from the CLI (not the traefik
+      # https://jimm.localhost:443 web endpoint) or the client gets a 404.
+      # IS_JAAS=true switches the provider (and tests) into JAAS mode.
+      - name: Set environment to configure provider
+        run: |
+          CONTROLLER=$(juju whoami --format yaml | yq .controller)
+
+          # shellcheck disable=SC2129
+          echo "IS_JAAS=true" >> "$GITHUB_ENV"
+          echo "JUJU_AGENT_VERSION=$(juju show-controller | yq ".$CONTROLLER.details.agent-version" | tr -d '"')" >> "$GITHUB_ENV"
+          echo "JUJU_CONTROLLER_ADDRESSES=$(juju show-controller | yq ".$CONTROLLER.details.api-endpoints" | yq -r '. | join(",")')" >> "$GITHUB_ENV"
+          echo "JUJU_CLIENT_ID=${{ steps.jimm.outputs.client-id }}" >> "$GITHUB_ENV"
+          echo "JUJU_CLIENT_SECRET=${{ steps.jimm.outputs.client-secret }}" >> "$GITHUB_ENV"
+          echo "JUJU_CA_CERT<<EOF" >> "$GITHUB_ENV"
+          echo "${{ steps.jimm.outputs.ca-cert }}" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+          echo "JUJU_SKIP_FAILED_DELETION=true" >> "$GITHUB_ENV"
+
       - name: Run terraform provider acceptance tests
         working-directory: terraform-provider-juju
         run: go test ./internal/provider/... -parallel 10 -v -timeout 40m
         env:
           TF_ACC: "1"
           TEST_CLOUD: lxd
-          JUJU_CONTROLLER_ADDRESSES: ${{ steps.jimm.outputs.jimm-controller-addresses }}
-          JUJU_CLIENT_ID: ${{ steps.jimm.outputs.jimm-client-id }}
-          JUJU_CLIENT_SECRET: ${{ steps.jimm.outputs.jimm-client-secret }}
-          JUJU_CA_CERT: ${{ steps.jimm.outputs.jimm-ca-cert }}
+
