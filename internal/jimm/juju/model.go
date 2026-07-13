@@ -315,11 +315,52 @@ func (m *modelSummariesMap) addModelSummary(summary base.UserModelSummary) {
 	m.modelSummaries[summary.UUID] = summary
 }
 
+// listUserModelAccess returns a map from model UUID to the user's highest
+// access level ("admin", "write" or "read") for every model the user can
+// read.
+func (j *JujuManager) listUserModelAccess(ctx context.Context, user *openfga.User) (map[string]string, error) {
+	access := make(map[string]string)
+	for _, relation := range []openfga.Relation{
+		ofganames.ReaderRelation,
+		ofganames.WriterRelation,
+		ofganames.AdministratorRelation,
+	} {
+		uuids, err := user.ListModels(ctx, relation)
+		if err != nil {
+			return nil, err
+		}
+		accessStr := permissions.ToModelAccessString(relation)
+		for _, uuid := range uuids {
+			access[uuid] = accessStr
+		}
+	}
+	return access, nil
+}
+
 // ListModelSummaries returns the list of modelsummary the user has access to.
 // It queries the controllers and then merge the info from the JIMM db.
 func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User, maskingControllerUUID string) ([]base.UserModelSummary, error) {
 	modelSummariesSafeMap := modelSummariesMap{}
 	modelSummaryResults := []base.UserModelSummary{}
+
+	modelAccess, err := j.listUserModelAccess(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(modelAccess) == 0 {
+		return modelSummaryResults, nil
+	}
+
+	uuids := make([]string, 0, len(modelAccess))
+	for uuid := range modelAccess {
+		uuids = append(uuids, uuid)
+	}
+
+	dbModels, err := j.Database.GetModelsByUUID(ctx, uuids)
+	if err != nil {
+		return nil, err
+	}
 
 	var models []struct {
 		model      *dbmodel.Model
@@ -328,21 +369,17 @@ func (j *JujuManager) ListModelSummaries(ctx context.Context, user *openfga.User
 	// we collect models belonging to the user and we extract the unique controllers.
 	var uniqueControllers []dbmodel.Controller
 	uniqueControllerMap := make(map[string]struct{}, 0)
-	err := j.ForEachUserModel(ctx, user, func(m *dbmodel.Model, uap string) error {
+	for i := range dbModels {
+		m := &dbModels[i]
 		models = append(models, struct {
 			model      *dbmodel.Model
 			userAccess string
-		}{model: m, userAccess: uap})
+		}{model: m, userAccess: modelAccess[m.UUID.String]})
 
 		if _, ok := uniqueControllerMap[m.Controller.UUID]; !ok {
 			uniqueControllers = append(uniqueControllers, m.Controller)
 			uniqueControllerMap[m.Controller.UUID] = struct{}{}
 		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
 
 	// we query the model summaries for each controller
