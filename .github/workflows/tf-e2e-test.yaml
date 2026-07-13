@@ -16,8 +16,9 @@ jobs:
     strategy:
       matrix:
         include:
-          # JIMM v4 (built from the current checkout via the "dev" version) ->
-          # backing controller v3, exercised by terraform-provider-juju v1.5.
+          # Use the latest changes in JIMM by specifying the special string "dev"  
+          # in the `test-server` action below, use a Juju 3 backing controller, and use  
+          # the terraform-provider-juju v1.5 as a client.  
           - name: "JIMM v4, backing v3, TF v1.5"
             juju-channel: "3/stable"
             tf-ref: "v1.5"
@@ -37,11 +38,16 @@ jobs:
       # Use JIMM's Go version: building JIMM (make dev-env) requires the higher
       # version declared in jimm/go.mod. A newer Go still builds and runs the
       # terraform-provider-juju tests, so a single toolchain covers both repos.
+      # cache-dependency-path keys the module cache off both repos' go.sum files
+      # (this is a multi-module layout), so caching works for the JIMM build and
+      # the provider tests.
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: jimm/go.mod
-          cache: false
+          cache-dependency-path: |
+            jimm/go.sum
+            terraform-provider-juju/go.sum
 
       # test-server's `make dev-env` uses `docker compose --profile`, which
       # requires the Compose v2 plugin. Install it explicitly.
@@ -81,8 +87,10 @@ jobs:
           terraform_wrapper: false
 
       # Derive the provider configuration from the running JIMM controller.
-      # The Juju API endpoint must come from the CLI (not the traefik
-      # https://jimm.localhost:443 web endpoint) or the client gets a 404.
+      # Read the API endpoint from the CLI (juju show-controller) rather than
+      # hardcoding it: this uses the exact host:port JIMM advertised to the
+      # authenticated client, which avoids assumptions about traefik routing
+      # that can otherwise surface as a 404 from the API websocket.
       # IS_JAAS=true switches the provider (and tests) into JAAS mode.
       - name: Set environment to configure provider
         run: |
@@ -101,7 +109,7 @@ jobs:
 
       - name: Run terraform provider acceptance tests
         working-directory: terraform-provider-juju
-        run: go test ./internal/provider/... -parallel 10 -v -timeout 40m
+        run: go test ./internal/provider/... -parallel 4 -v -timeout 40m
         env:
           TF_ACC: "1"
           TEST_CLOUD: lxd
