@@ -1,0 +1,30 @@
+{
+  "cloud_credentials": [
+    {
+      "cloud": "aws",
+      "owner": "alice@canonical.com",
+      "name": "default",
+      "attributes": {
+        "access-key": "AKIAEXAMPLE",
+        "secret-key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      }
+    },
+    {
+      "cloud": "gce",
+      "owner": "bob@canonical.com",
+      "name": "prod",
+      "attributes": {
+        "client-email": "svc@project.iam.gserviceaccount.com",
+        "project-id": "my-project",
+        "private-key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+      }
+    }
+  ],
+  "controller_credentials": [
+    {
+      "controller": "controller-1",
+      "username": "jimm-user",
+      "password": "s3cr3t"
+    }
+  ]
+}
