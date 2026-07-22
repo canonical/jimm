@@ -198,7 +198,7 @@ func (s *SSHManager) DialController(ctx context.Context, dialInfo DialInfo, user
 	for _, addr := range dialInfo.Addresses {
 		dest := net.JoinHostPort(addr, fmt.Sprint(dialInfo.Port))
 		client, err = s.dialer.Dial("tcp", dest, &gossh.ClientConfig{
-			User: "jimm",
+			User: "external-auth",
 			//nolint:gosec // this will be removed once we handle hostkeys
 			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
 			Auth: []gossh.AuthMethod{
