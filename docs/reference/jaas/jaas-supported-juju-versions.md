@@ -35,7 +35,7 @@ support Juju controllers with the same major version as itself. E.g. JAAS v3 sho
 Additionally, JAAS will also support the last LTS release from Juju's previous major release E.g. JAAS v4 will also
 support the final Juju 3.x minor version.
 
-More information on Juju's roadmap and release information can be found [here](https://juju.is/docs/juju/roadmap).
+More information on Juju's roadmap and release information can be found [here](https://canonical.com/juju/docs/juju-cli/3.6/releasenotes/).
 
 ## Using the Juju Terraform Provider
 

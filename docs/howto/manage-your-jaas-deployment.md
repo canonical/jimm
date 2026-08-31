@@ -135,7 +135,7 @@ For this how-to you will need the following:
 
 - A basic understanding of JAAS tags.
 - A running JAAS environment, see {doc}`the tutorial <../tutorial/index>`.
-- An understanding of Juju permissions, see the [Juju docs](https://juju.is/docs/juju/user-permissions).
+- An understanding of Juju permissions, see the [Juju docs](https://canonical.com/juju/docs/juju-cli/3.6/reference/user/).
 
 ### Creating an admin user
 
@@ -193,7 +193,7 @@ For the complete list of components in COS, read the
 - A running JAAS. Please refer to the deployment {doc}`the tutorial <../tutorial/index>`.
 
 ```{tip}
-[Juju offers](https://juju.is/docs/juju/manage-offers) are a way of sharing software as a service between models. Make sure you deploy COS and setup offers so that you can relate to it across models.
+[Juju offers](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-offers/) are a way of sharing software as a service between models. Make sure you deploy COS and setup offers so that you can relate to it across models.
 ```
 
 It is generally recommended to keep the observability stack separate from any observed applications to separate failure domains.
@@ -303,7 +303,7 @@ juju integrate grafana-agent-k8s admin/cos-model.loki-logging
 
 ### Access the dashboards
 
-You can get the Grafana IP address with the [`juju status`](https://juju.is/docs/juju/status) command.
+You can get the Grafana IP address with the [`juju status`](https://canonical.com/juju/docs/juju-cli/3.6/reference/juju-cli/list-of-juju-cli-commands/status/) command.
 The default port for the Grafana HTTP server is 3000.
 
 The default credentials are:
@@ -343,7 +343,7 @@ Juju dashboard is a web UI that is intended to supplement the CLI experience wit
 This how-to provides you with instructions on how to setup Juju Dashboard for your JAAS deployment.
 
 ```{tip}
-To explore Juju Dashboard features you can go [here](https://juju.is/docs/juju/the-juju-dashboard).
+To explore Juju Dashboard features you can go [here](https://canonical.com/juju/docs/juju-cli/3.6/reference/juju-dashboard/).
 ```
 
 ### Prerequisites

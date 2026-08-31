@@ -2,7 +2,7 @@
 myst:
   html_meta:
     description: "JAAS documentation covering the Juju Intelligent Model Manager (JIMM) with enterprise authentication, ReBAC authorization, and centralized Juju control."
-relatedlinks: "[Charmcraft](https://documentation.ubuntu.com/charmcraft/), [Charmlibs](https://canonical-charmlibs.readthedocs-hosted.com/), [Concierge](https://github.com/canonical/concierge), [Jubilant](https://documentation.ubuntu.com/jubilant/), [Juju](https://documentation.ubuntu.com/juju/), [Ops](https://documentation.ubuntu.com/ops/), [Pebble](https://documentation.ubuntu.com/pebble/), [Terraform &nbsp; Provider &nbsp; for &nbsp; Juju](https://documentation.ubuntu.com/terraform-provider-juju/)"
+relatedlinks: "[Charmcraft](https://documentation.ubuntu.com/charmcraft/), [Charmlibs](https://canonical-charmlibs.readthedocs-hosted.com/), [Concierge](https://github.com/canonical/concierge), [Jubilant](https://canonical.com/juju/docs/jubilant/), [Juju](https://documentation.ubuntu.com/juju/), [Ops](https://canonical.com/juju/docs/ops/latest/), [Pebble](https://ubuntu.com/docs/pebble/), [Terraform &nbsp; Provider &nbsp; for &nbsp; Juju](https://documentation.ubuntu.com/terraform-provider-juju/)"
 ---
 
 (home)=
@@ -20,7 +20,7 @@ explanation/index
 
 JAAS is an enterprise layer on top of [Juju](https://documentation.ubuntu.com/juju/).
 
-JAAS provides JIMM (the Juju Infinite Model Manager), a Juju enterprise-level controller, as well as JIMM-specific extensions to the [`juju` CLI](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/), the [Juju dashboard](https://documentation.ubuntu.com/juju/3.6/reference/juju-dashboard/), and the [Terraform Provider for Juju](https://documentation.ubuntu.com/terraform-provider-juju/).
+JAAS provides JIMM (the Juju Infinite Model Manager), a Juju enterprise-level controller, as well as JIMM-specific extensions to the [`juju` CLI](https://canonical.com/juju/docs/juju-cli/3.6/reference/juju-cli/), the [Juju dashboard](https://canonical.com/juju/docs/juju-cli/3.6/reference/juju-dashboard/), and the [Terraform Provider for Juju](https://documentation.ubuntu.com/terraform-provider-juju/).
 
 When you use an existing Juju controller to deploy JIMM and its dependencies, and then connect your Juju controllers to JIMM, you gain the ability to use [OIDC](https://openid.net/developers/how-connect-works/) to authenticate with your Juju controller, use [ReBAC](https://auth0.com/blog/relationship-based-access-control-rebac/) for authorization, and interact with multiple Juju controllers from a single point of contact.
 

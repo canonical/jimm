@@ -29,7 +29,7 @@ sudo snap install jaas --channel=3/stable
 ## How it works
 
 When you install both the Juju and JAAS snaps, they automatically connect via snap's
-[content-interface](https://snapcraft.io/docs/content-interface) enabling new commands on the `juju` CLI.
+[content-interface](https://snapcraft.io/docs/content-interface/) enabling new commands on the `juju` CLI.
 
 To view a list of all the newly available commands run `juju jaas -h`.
 
