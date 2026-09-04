@@ -120,24 +120,11 @@ func (md *MacaroonDischarger) CheckThirdPartyCaveat(ctx context.Context, _ *http
 		zapctx.Error(ctx, "unknown third party caveat", zap.String("condition", relationString))
 		return nil, checkers.ErrCaveatNotRecognized
 	}
-	userTag, err := names.ParseUserTag(userTagString)
+	_, err := names.ParseUserTag(userTagString)
 	if err != nil {
 		zapctx.Error(ctx, "failed to parse caveat user tag", zap.Error(err))
 		return nil, checkers.ErrCaveatNotRecognized
 	}
-	offerTag := names.NewApplicationOfferTag(offerUUID)
-
-	allowed, err := md.offerAuthorizer.IsUserConsumerForOffer(ctx, userTag, offerTag)
-	if err != nil {
-		zapctx.Error(ctx, "failed to check if user is consumer for offer", zap.Error(err), zap.String("user", userTagString), zap.String("offer", offerUUID))
-		return nil, checkers.ErrCaveatNotRecognized
-	}
-	if allowed {
-		return []checkers.Caveat{
-			checkers.DeclaredCaveat("offer-uuid", offerUUID),
-			checkers.TimeBeforeCaveat(time.Now().Add(defaultDischargeExpiry)),
-		}, nil
-	}
-	zapctx.Debug(ctx, "macaroon dishcharge denied", zap.String("user", userTagString), zap.String("offer", offerUUID))
+	_ = names.NewApplicationOfferTag(offerUUID)
 	return nil, httpbakery.ErrPermissionDenied
 }
