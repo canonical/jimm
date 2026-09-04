@@ -4,8 +4,7 @@ package mocks
 
 import (
 	"context"
-
-	gossh "golang.org/x/crypto/ssh"
+	"net"
 
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
@@ -15,7 +14,7 @@ import (
 // SSHManager is an implementation of the SshManager interface.
 type SSHManager struct {
 	PublicKeyHandler_ func(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
-	DialController_   func(ctx context.Context, ctrlInfo ssh.DialInfo, user *openfga.User) (*gossh.Client, error)
+	DialController_   func(ctx context.Context, ctrlInfo ssh.DialInfo, virtualHostname string) (net.Conn, error)
 	DialInfo_         func(ctx context.Context, modelUUID string, user *openfga.User) (ssh.DialInfo, error)
 }
 
@@ -26,11 +25,11 @@ func (j SSHManager) PublicKeyHandler(ctx context.Context, claimUser string, key 
 	return j.PublicKeyHandler_(ctx, claimUser, key)
 }
 
-func (j SSHManager) DialController(ctx context.Context, ctrlInfo ssh.DialInfo, user *openfga.User) (*gossh.Client, error) {
+func (j SSHManager) DialController(ctx context.Context, ctrlInfo ssh.DialInfo, virtualHostname string) (net.Conn, error) {
 	if j.DialController_ == nil {
 		return nil, errors.New("not implemented")
 	}
-	return j.DialController_(ctx, ctrlInfo, user)
+	return j.DialController_(ctx, ctrlInfo, virtualHostname)
 }
 
 func (j SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (ssh.DialInfo, error) {

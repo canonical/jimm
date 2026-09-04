@@ -3,17 +3,21 @@
 package ssh
 
 import (
+	"bufio"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	goerr "errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/gliderlabs/ssh"
-	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/zaputil/zapctx"
-	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -22,16 +26,28 @@ import (
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
 
-// DialInfo is the struct holding the infomation
-// to dial a controller via SSH.
+// relayUpgradeToken is the custom HTTP upgrade token the controller's
+// relay endpoint requires. A bare "ssh" token is not used because
+// authentication already happened at the HTTP layer and any SSH client
+// could otherwise negotiate the upgrade.
+const relayUpgradeToken = "juju-ssh-relay"
+
+// relayDialTimeout bounds each attempt to dial a controller's relay
+// endpoint.
+const relayDialTimeout = 5 * time.Second
+
+// DialInfo is the struct holding the information
+// to dial a controller's SSH relay endpoint.
 type DialInfo struct {
-	// addresses to dial the controller
+	// Addresses to dial the controller's API server, each as host:port.
 	Addresses []string
 
-	// Port to establish the SSH connection
-	Port int
+	// TLSConfig authenticates the controller. It must pin ALPN to
+	// http/1.1: HTTP/2 disallows the upgrade mechanism.
+	TLSConfig *tls.Config
 
-	// JWT to authenticate to the controller
+	// JWT is the base64-encoded bearer token authenticating JIMM to the
+	// controller.
 	JWT string
 }
 
@@ -43,7 +59,6 @@ type IdentityManager interface {
 // JujuManager provides a means to fetch a model from the model service.
 type JujuManager interface {
 	GetModel(ctx context.Context, uuid string) (dbmodel.Model, error)
-	ControllerConfig(ctx context.Context, user *openfga.User, controllerName string) (jujucontroller.Config, error)
 }
 
 // SSHKeyManager provides a means to manage ssh keys within JIMM.
@@ -51,17 +66,77 @@ type SSHKeyManager interface {
 	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }
 
-// SSHDialer provides a means to establish an SSH connection.
+// SSHDialer provides a means to establish an upgraded connection to a
+// controller's SSH relay endpoint.
 type SSHDialer interface {
-	Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error)
+	// DialRelay dials the controller at addr (host:port of its API server)
+	// and performs the HTTP upgrade handshake for the given virtual
+	// hostname, returning the raw upgraded connection that carries the
+	// user's SSH session bytes.
+	DialRelay(ctx context.Context, addr string, tlsConfig *tls.Config, virtualHostname, bearerToken string) (net.Conn, error)
 }
 
-// BasicDialer is a wrapper around the default Go x/crypto/ssh
-// dialer for cases where no changes are needed.
+// BasicDialer is a wrapper around the default TLS dialer for cases where
+// no changes are needed.
 type BasicDialer struct{}
 
-func (d *BasicDialer) Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
-	return gossh.Dial(network, addr, config)
+// DialRelay implements SSHDialer. It dials the controller's API server
+// over TLS, sends the upgrade request, and returns the raw connection
+// after a 101 Switching Protocols response.
+func (d *BasicDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls.Config, virtualHostname, bearerToken string) (net.Conn, error) {
+	// ALPN must be pinned to http/1.1: HTTP/2 disallows the upgrade
+	// mechanism and Hijack returns ErrNotSupported on an h2 connection.
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	} else {
+		tlsConfig = tlsConfig.Clone()
+	}
+	tlsConfig.NextProtos = []string{"http/1.1"}
+
+	dialer := &tls.Dialer{
+		Config: tlsConfig,
+		NetDialer: &net.Dialer{
+			Timeout: relayDialTimeout,
+		},
+	}
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("dialing controller %s: %w", addr, err)
+	}
+
+	target := &url.URL{
+		Scheme: "https",
+		Host:   addr,
+		Path:  "/ssh-relay/" + virtualHostname,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("building relay upgrade request: %w", err)
+	}
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", relayUpgradeToken)
+	req.Header.Set("Authorization", "Bearer "+bearerToken)
+
+	if err := req.Write(conn); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("writing relay upgrade request: %w", err)
+	}
+	// Read the response head with a bounded reader; the connection is
+	// handed over raw afterwards so no buffered bytes may be lost.
+	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("reading relay upgrade response: %w", err)
+	}
+	if resp.StatusCode != http.StatusSwitchingProtocols {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		_ = resp.Body.Close()
+		_ = conn.Close()
+		return nil, fmt.Errorf("relay upgrade rejected: %s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+	_ = resp.Body.Close()
+	return conn, nil
 }
 
 // SSHManagerParams contains the dependencies
@@ -133,8 +208,8 @@ func (s *SSHManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 
 // DialInfo resolves the address of the controller to contact given the
 // model UUID and returns a struct with parameters to connect and authenticate
-// to the controller. The context should contain the public key the user
-// used to authenticate.
+// to the controller's SSH relay endpoint. The context should contain the
+// public key the user used to authenticate.
 func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (DialInfo, error) {
 	zapctx.Info(ctx, "SSHDialInfo")
 	model, err := s.jujuManager.GetModel(ctx, modelUUID)
@@ -142,26 +217,9 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 		return DialInfo{}, fmt.Errorf("cannot find model: %v", err)
 	}
 
-	controllerConfig, err := s.jujuManager.ControllerConfig(ctx, user, model.Controller.Name)
-	if err != nil {
-		return DialInfo{}, fmt.Errorf("cannot get controller config: %w", err)
-	}
-
-	addrs, _ := rpc.GetAddressesAndTLSConfig(ctx, &model.Controller)
+	addrs, tlsConfig := rpc.GetAddressesAndTLSConfig(ctx, &model.Controller)
 	if len(addrs) == 0 {
-		return DialInfo{}, fmt.Errorf("cannot find addresses for model's controller: %v", err)
-	}
-
-	addrsNoPort := make([]string, len(addrs))
-	for i, addr := range addrs {
-		hostNoPort, _, err := net.SplitHostPort(addr)
-		// If there was an error we will assume there is no port since
-		// SplitHostPort doesn't expose const error types for checking.
-		if err != nil {
-			addrsNoPort[i] = addr
-		} else {
-			addrsNoPort[i] = hostNoPort
-		}
+		return DialInfo{}, errors.New("cannot find addresses for model's controller")
 	}
 
 	publicKey, _ := ctx.Value(ssh.ContextKeyPublicKey).(ssh.PublicKey)
@@ -182,41 +240,33 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 	}
 
 	return DialInfo{
-		Addresses: addrsNoPort,
-		Port:      controllerConfig.SSHServerPort(),
-		JWT:       base64.StdEncoding.EncodeToString(token),
+		Addresses: addrs,
+		TLSConfig: tlsConfig,
+		JWT:      base64.StdEncoding.EncodeToString(token),
 	}, nil
 }
 
-// DialController dials a controller's SSH
-// server and returns an SSH connection.
-func (s *SSHManager) DialController(ctx context.Context, dialInfo DialInfo, user *openfga.User) (*gossh.Client, error) {
-	var client *gossh.Client
+// DialController dials a controller's SSH relay endpoint over an HTTP
+// upgrade connection and returns the raw connection carrying the user's
+// relayed SSH session bytes. The virtual hostname identifies the
+// destination within the controller.
+func (s *SSHManager) DialController(ctx context.Context, dialInfo DialInfo, virtualHostname string) (net.Conn, error) {
+	var conn net.Conn
 	var err error
 	var errs []error
 
 	for _, addr := range dialInfo.Addresses {
-		dest := net.JoinHostPort(addr, fmt.Sprint(dialInfo.Port))
-		client, err = s.dialer.Dial("tcp", dest, &gossh.ClientConfig{
-			User: "external-auth",
-			//nolint:gosec // this will be removed once we handle hostkeys
-			HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-			Auth: []gossh.AuthMethod{
-				gossh.PasswordCallback(func() (secret string, err error) {
-					return dialInfo.JWT, nil
-				}),
-			},
-			Timeout: 5 * time.Second,
-		})
+		conn, err = s.dialer.DialRelay(ctx, addr, dialInfo.TLSConfig, virtualHostname, dialInfo.JWT)
 		if err != nil {
+			conn = nil
 			errs = append(errs, err)
 		} else {
 			break
 		}
 	}
 
-	if client == nil {
+	if conn == nil {
 		return nil, fmt.Errorf("failed to dial controller: %v", goerr.Join(errs...))
 	}
-	return client, nil
+	return conn, nil
 }
