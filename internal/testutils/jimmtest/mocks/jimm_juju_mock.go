@@ -47,6 +47,7 @@ type JujuManager struct {
 	GetCloud_                          func(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error)
 	GetCloudCredential_                func(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
 	GetCloudCredentialAttributes_      func(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
+	ModelConfigSchema_                 func(ctx context.Context, user *openfga.User, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error)
 	GetCredentialStore_                func() jimmcreds.CredentialStore
 	GrantOfferAccessOnController_      func(ctx context.Context, user *openfga.User, ut names.UserTag, offerURL string, access jujuparams.OfferAccessPermission) error
 	InitiateInternalMigration_         func(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
@@ -175,6 +176,12 @@ func (j *JujuManager) GetCloudCredentialAttributes(ctx context.Context, u *openf
 		return nil, nil, errors.New("not implemented")
 	}
 	return j.GetCloudCredentialAttributes_(ctx, u, cred, hidden)
+}
+func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+	if j.ModelConfigSchema_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return j.ModelConfigSchema_(ctx, user, providerType)
 }
 
 func (j *JujuManager) GetCredentialStore() jimmcreds.CredentialStore {

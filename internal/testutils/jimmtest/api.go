@@ -151,6 +151,7 @@ type API struct {
 	IsBroken_                          bool
 	LatestLogTime_                     func(context.Context, string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
+	ModelConfigSchema_                 func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error)
 	ModelInfo_                         func(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_                       func(context.Context, names.ModelTag) (base.ModelStatus, error)
 	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
@@ -325,6 +326,13 @@ func (a *API) ListApplicationOffers(ctx context.Context, f []crossmodel.Applicat
 		return nil, errors.New("not implemented")
 	}
 	return a.ListApplicationOffers_(ctx, f)
+}
+
+func (a *API) ModelConfigSchema(ctx context.Context, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+	if a.ModelConfigSchema_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return a.ModelConfigSchema_(ctx, providerType)
 }
 
 func (a *API) ModelInfo(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {

@@ -597,6 +597,38 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 	return nil
 }
 
+// ModelConfigSchema returns the model config schema for the given provider
+// type. The schema is provider-static (it comes from the provider registry
+// compiled into the controller) so it is independent of any particular model
+// or cloud. JIMM therefore forwards the request to the first reachable
+// controller, trying each in turn until one responds.
+func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+	var controllers []dbmodel.Controller
+	err := j.Database.ForEachController(ctx, func(ctl *dbmodel.Controller) error {
+		controllers = append(controllers, *ctl)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(controllers) == 0 {
+		return nil, errors.New("no controllers registered")
+	}
+
+	var dialErr error
+	for i := range controllers {
+		api, err := j.dialController(ctx, &controllers[i], user)
+		if err != nil {
+			dialErr = err
+			continue
+		}
+		schema, err := api.ModelConfigSchema(ctx, providerType)
+		api.Close()
+		return schema, err
+	}
+	return nil, dialErr
+}
+
 // addCloudControllerRelation adds a controller relation between a cloud and controller.
 func (j *JujuManager) addCloudControllerRelation(ctx context.Context, cloud dbmodel.Cloud, ctl dbmodel.Controller) error {
 	err := j.OpenFGAClient.AddCloudController(ctx, cloud.ResourceTag(), ctl.ResourceTag())
