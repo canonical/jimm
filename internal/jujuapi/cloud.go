@@ -38,6 +38,7 @@ func init() {
 		updateCloudMethod := rpc.Method(r.UpdateCloud)
 		updateCredentialsCheckModelsMethod := rpc.Method(r.UpdateCredentialsCheckModels)
 		userCredentialsMethod := rpc.Method(r.UserCredentials)
+		modelConfigSchemaMethod := rpc.Method(r.ModelConfigSchema)
 
 		r.AddMethod("Cloud", 7, "AddCloud", addCloudMethod)
 		r.AddMethod("Cloud", 7, "AddCredentials", addCredentialsMethod)
@@ -55,8 +56,40 @@ func init() {
 		r.AddMethod("Cloud", 7, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
 		r.AddMethod("Cloud", 7, "UserCredentials", userCredentialsMethod)
 
-		return []int{7}
+		// Cloud facade version 8 is identical to version 7 except that it
+		// adds the ModelConfigSchema method. All version 7 methods are
+		// wire-identical at version 8 (Juju's CloudAPIV8 embeds the v7
+		// CloudAPI unchanged), so the same handlers are re-registered here.
+		r.AddMethod("Cloud", 8, "AddCloud", addCloudMethod)
+		r.AddMethod("Cloud", 8, "AddCredentials", addCredentialsMethod)
+		r.AddMethod("Cloud", 8, "CheckCredentialsModels", checkCredentialsModelsMethod)
+		r.AddMethod("Cloud", 8, "Cloud", cloudMethod)
+		r.AddMethod("Cloud", 8, "CloudInfo", cloudInfoMethod)
+		r.AddMethod("Cloud", 8, "Clouds", cloudsMethod)
+		r.AddMethod("Cloud", 8, "Credential", credentialMethod)
+		r.AddMethod("Cloud", 8, "CredentialContents", credentialContentsMethod)
+		r.AddMethod("Cloud", 8, "ListCloudInfo", listCloudInfoMethod)
+		r.AddMethod("Cloud", 8, "ModelConfigSchema", modelConfigSchemaMethod)
+		r.AddMethod("Cloud", 8, "ModifyCloudAccess", modifyCloudAccessMethod)
+		r.AddMethod("Cloud", 8, "RemoveClouds", removeCloudsMethod)
+		r.AddMethod("Cloud", 8, "RevokeCredentialsCheckModels", revokeCredentialsCheckModelsMethod)
+		r.AddMethod("Cloud", 8, "UpdateCloud", updateCloudMethod)
+		r.AddMethod("Cloud", 8, "UpdateCredentialsCheckModels", updateCredentialsCheckModelsMethod)
+		r.AddMethod("Cloud", 8, "UserCredentials", userCredentialsMethod)
+
+		return []int{7, 8}
 	}
+}
+
+// ModelConfigSchema implements the ModelConfigSchema method of the Cloud
+// (v8) facade. The schema for a provider type is controller-agnostic, so
+// JIMM forwards the request to a backing Juju controller.
+func (r *controllerRoot) ModelConfigSchema(ctx context.Context, args jujuparams.ModelConfigSchemaArgs) (jujuparams.ModelConfigSchemaResult, error) {
+	schema, err := r.jimm.JujuManager().ModelConfigSchema(ctx, r.user, args.ProviderType)
+	if err != nil {
+		return jujuparams.ModelConfigSchemaResult{Error: r.mapError(ctx, err)}, nil
+	}
+	return jujuparams.ModelConfigSchemaResult{Schema: schema}, nil
 }
 
 // DefaultCloud implements the DefaultCloud method of the Cloud facade.

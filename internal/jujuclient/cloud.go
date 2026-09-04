@@ -78,6 +78,16 @@ func (c Connection) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 	return cloudapi.NewClient(&c).RemoveCloud(ctx, tag.Id())
 }
 
+// ModelConfigSchema returns the model config schema for the given provider
+// type. The schema describes the configuration attributes, including
+// provider specific ones, that may be set on a model hosted by that type of
+// cloud. ModelConfigSchema uses the ModelConfigSchema procedure on the Cloud
+// facade, which requires the controller to support at least version 8 of the
+// Cloud facade.
+func (c Connection) ModelConfigSchema(ctx context.Context, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+	return cloudapi.NewClient(&c).ModelConfigSchema(ctx, providerType)
+}
+
 // UpdateCloud updates the given cloud with the given cloud definition.
 // UpdateCloud uses the UpdateCloud procedure on the cloud facade.
 func (c Connection) UpdateCloud(ctx context.Context, tag names.CloudTag, cloud jujucloud.Cloud) error {
