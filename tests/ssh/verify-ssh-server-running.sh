@@ -6,14 +6,19 @@ set -euo pipefail
 
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
 BACKING_CONTROLLER_NAME="${BACKING_CONTROLLER_NAME:-qa-lxd}"
-key_path="$(mktemp -u "${TMPDIR:-/tmp}/jimm-ssh-test-key.XXXXXX")"
 model_name="ssh-test-$RANDOM"
+ssh_dir="$HOME/.ssh"
+ssh_private_key="$ssh_dir/id_rsa"
+ssh_public_key="$ssh_private_key.pub"
+generated_default_key=false
 
 # Source the `JAAS` variable for executing jaas commands.
 source "local/jimm/detect-jaas.sh"
 
 cleanup() {
-	rm -f "$key_path" "$key_path.pub"
+	if [[ "$generated_default_key" == true ]]; then
+		rm -f "$ssh_private_key" "$ssh_public_key"
+	fi
 	juju destroy-model "$model_name" --force --no-prompt --destroy-all-models 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -24,8 +29,12 @@ trap cleanup EXIT
 juju switch "$JIMM_CONTROLLER_NAME"
 $JAAS add-model "$model_name" localhost --target-controller "$BACKING_CONTROLLER_NAME"
 
-ssh-keygen -q -t rsa -N "" -f "$key_path"
-juju add-ssh-key "$(cat "$key_path.pub")"
+mkdir -p "$ssh_dir"
+if [[ ! -f "$ssh_public_key" || ! -f "$ssh_private_key" ]]; then
+	ssh-keygen -q -t rsa -N "" -f "$ssh_private_key"
+	generated_default_key=true
+fi
+juju add-ssh-key "$(cat "$ssh_public_key")"
 juju add-machine
 until [ "$(juju status 0 --format json | jq -r '.machines["0"]["juju-status"].current')" = "started" ]; do
 	sleep 5
