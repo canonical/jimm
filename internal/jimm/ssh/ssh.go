@@ -107,7 +107,7 @@ func (d *BasicDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls
 	target := &url.URL{
 		Scheme: "https",
 		Host:   addr,
-		Path:  "/ssh-relay/" + virtualHostname,
+		Path:   "/ssh-relay/" + virtualHostname,
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {
@@ -272,7 +272,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 	return DialInfo{
 		Addresses: addrs,
 		TLSConfig: tlsConfig,
-		JWT:      base64.StdEncoding.EncodeToString(token),
+		JWT:       base64.StdEncoding.EncodeToString(token),
 	}, nil
 }
 
