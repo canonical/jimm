@@ -1559,6 +1559,45 @@ func (c *MockAPIListVolumesCall) DoAndReturn(f func(context.Context, []string) (
 	return c
 }
 
+// ModelConfigSchema mocks base method.
+func (m *MockAPI) ModelConfigSchema(arg0 context.Context, arg1 string) (map[string]params.ModelConfigSchemaField, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ModelConfigSchema", arg0, arg1)
+	ret0, _ := ret[0].(map[string]params.ModelConfigSchemaField)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ModelConfigSchema indicates an expected call of ModelConfigSchema.
+func (mr *MockAPIMockRecorder) ModelConfigSchema(arg0, arg1 any) *MockAPIModelConfigSchemaCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ModelConfigSchema", reflect.TypeOf((*MockAPI)(nil).ModelConfigSchema), arg0, arg1)
+	return &MockAPIModelConfigSchemaCall{Call: call}
+}
+
+// MockAPIModelConfigSchemaCall wrap *gomock.Call
+type MockAPIModelConfigSchemaCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPIModelConfigSchemaCall) Return(arg0 map[string]params.ModelConfigSchemaField, arg1 error) *MockAPIModelConfigSchemaCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPIModelConfigSchemaCall) Do(f func(context.Context, string) (map[string]params.ModelConfigSchemaField, error)) *MockAPIModelConfigSchemaCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPIModelConfigSchemaCall) DoAndReturn(f func(context.Context, string) (map[string]params.ModelConfigSchemaField, error)) *MockAPIModelConfigSchemaCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ModelInfo mocks base method.
 func (m *MockAPI) ModelInfo(arg0 context.Context, arg1 names.ModelTag) (jujuclient.ModelInfo, error) {
 	m.ctrl.T.Helper()
