@@ -122,9 +122,11 @@ func (d *BasicDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls
 		_ = conn.Close()
 		return nil, fmt.Errorf("writing relay upgrade request: %w", err)
 	}
-	// Read the response head with a bounded reader; the connection is
-	// handed over raw afterwards so no buffered bytes may be lost.
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
+	// Read the response head with a bounded reader. The connection is
+	// handed over raw afterwards, so any bytes the reader buffered past
+	// the response head must be preserved.
+	reader := bufio.NewReaderSize(conn, 4096)
+	resp, err := http.ReadResponse(reader, req)
 	if err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("reading relay upgrade response: %w", err)
@@ -136,7 +138,35 @@ func (d *BasicDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls
 		return nil, fmt.Errorf("relay upgrade rejected: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	_ = resp.Body.Close()
+	// If the reader buffered bytes past the response head (e.g. the
+	// controller's SSH banner), prepend them to the returned connection.
+	if buffered := reader.Buffered(); buffered > 0 {
+		prefix, err := reader.Peek(buffered)
+		if err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("reading buffered bytes: %w", err)
+		}
+		return &prefixConn{Conn: conn, prefix: append([]byte(nil), prefix...)}, nil
+	}
 	return conn, nil
+}
+
+// prefixConn wraps a net.Conn, serving a prefix of already-read bytes
+// before reading from the underlying connection. This preserves bytes
+// a bufio.Reader consumed past an HTTP response head.
+type prefixConn struct {
+	net.Conn
+	prefix []byte
+}
+
+// Read first drains the prefix, then reads from the underlying connection.
+func (c *prefixConn) Read(p []byte) (int, error) {
+	if len(c.prefix) > 0 {
+		n := copy(p, c.prefix)
+		c.prefix = c.prefix[n:]
+		return n, nil
+	}
+	return c.Conn.Read(p)
 }
 
 // SSHManagerParams contains the dependencies
