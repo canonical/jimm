@@ -169,6 +169,16 @@ func (c *prefixConn) Read(p []byte) (int, error) {
 	return c.Conn.Read(p)
 }
 
+// CloseWrite delegates to the underlying connection if it supports
+// half-close, so the relay pipe can signal EOF per direction through
+// the wrapper.
+func (c *prefixConn) CloseWrite() error {
+	if hc, ok := c.Conn.(interface{ CloseWrite() error }); ok {
+		return hc.CloseWrite()
+	}
+	return nil
+}
+
 // SSHManagerParams contains the dependencies
 // needed to create the SSHManager service.
 type SSHManagerParams struct {
