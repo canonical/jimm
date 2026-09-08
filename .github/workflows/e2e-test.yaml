@@ -20,9 +20,9 @@ jobs:
           - name: "Juju 3"
             versions: '["3/stable", "3/stable"]'
           - name: "Juju 4"
-            versions: '["4.0/edge", "4.0/edge"]'
+            versions: '["4.1/edge", "4.1/edge"]'
           - name: "Mix"
-            versions: '["3/stable", "4.0/edge"]'
+            versions: '["3/stable", "4.1/edge"]'
     steps:
       - name: Checkout JIMM repo
         uses: actions/checkout@v4

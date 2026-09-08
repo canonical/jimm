@@ -79,7 +79,7 @@ jobs:
         id: jaas
         with:
           jimm-version: dev
-          juju-channel: "4.0/edge"
+          juju-channel: "4.1/edge"
           ghcr-pat: ${{ secrets.GITHUB_TOKEN }}
 
       # Build the JAAS plugin to test any changes made 

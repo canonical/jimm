@@ -166,10 +166,8 @@ type SSHKeyManager interface {
 	AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
 	// ListUserPublicKeys lists a user's public keys.
 	ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
-	// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-	RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error
-	// RemoveUserKeyByFingerprint removes a user's public key(s) by the key fingerprint.
-	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
+	// RemoveUserKeys removes a user's public keys by fingerprint, comment, or full key value.
+	RemoveUserKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, targets ...string) error
 	// VerifyPublicKey lists the key for a user and compares the key to find a match.
 	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }

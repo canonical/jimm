@@ -28,7 +28,6 @@ type message struct {
 	ErrorCode string          `json:"error-code,omitempty"`
 	ErrorInfo map[string]any  `json:"error-info,omitempty"`
 	Response  json.RawMessage `json:"response,omitempty"`
-
 	// --- tracing fields ---
 	span       *telemetry.TrackedSpan `json:"-"`
 	TraceID    string                 `json:"trace-id,omitempty"`

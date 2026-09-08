@@ -17,12 +17,15 @@ import (
 	"github.com/juju/juju/api"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v6"
+	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 
+	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/servermon"
@@ -51,6 +54,13 @@ type RedirectInfoGetter interface {
 	GetRedirectInfo(ctx context.Context) (ControllerDetails, error)
 }
 
+// SSHKeyManager manages model-scoped SSH keys stored by JIMM.
+type SSHKeyManager interface {
+	AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
+	ListUserPublicKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
+	RemoveUserKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, targets ...string) error
+}
+
 // TokenGenerator authenticates a user and generates a JWT token.
 type TokenGenerator interface {
 	// MakeLoginToken returns a JWT containing claims about user's access
@@ -77,11 +87,12 @@ type WebsocketConnection interface {
 // WebsocketConnectionWithMetadata holds the websocket connection and metadata about the
 // established connection.
 type WebsocketConnectionWithMetadata struct {
-	Conn           WebsocketConnection
-	ControllerUUID string
-	ModelName      string
-	ModelUUID      string
-	MigrationMode  dbmodel.MigrationMode
+	Conn              WebsocketConnection
+	ControllerUUID    string
+	ControllerVersion string
+	ModelName         string
+	ModelUUID         string
+	MigrationMode     dbmodel.MigrationMode
 }
 
 // LoginService represents the LoginService interface used by the proxy.
@@ -98,6 +109,7 @@ type LoginService interface {
 // connection to a model.
 type ProxyHelpers struct {
 	ConnClient              WebsocketConnection
+	SSHKeyManager           SSHKeyManager
 	TokenGen                TokenGenerator
 	ConnectController       func(context.Context) (WebsocketConnectionWithMetadata, error)
 	AuditLog                func(*dbmodel.AuditLogEntry)
@@ -135,6 +147,7 @@ func ProxySockets(ctx context.Context, helpers ProxyHelpers) error {
 			tokenGen:                helpers.TokenGen,
 			auditLog:                helpers.AuditLog,
 			conversationId:          utils.NewConversationID(),
+			sshKeyManager:           helpers.SSHKeyManager,
 			loginService:            helpers.LoginService,
 			authenticatedIdentityID: helpers.AuthenticatedIdentityID,
 			redirectInfo:            helpers.RedirectInfo,
@@ -271,9 +284,11 @@ type modelProxy struct {
 	anonymousLogin          bool // anonymousLogin is true if the client is not authenticated.
 	auditLog                func(*dbmodel.AuditLogEntry)
 	tokenGen                TokenGenerator
+	sshKeyManager           SSHKeyManager
 	loginService            LoginService
 	modelName               string
 	modelUUID               string
+	controllerVersion       string
 	modelMigrationMode      dbmodel.MigrationMode
 	conversationId          string
 	authenticatedIdentityID string
@@ -364,6 +379,7 @@ func unexpectedReadError(err error) bool {
 // clientProxy proxies messages from client->controller.
 type clientProxy struct {
 	modelProxy
+	user                 *openfga.User
 	wg                   sync.WaitGroup
 	errChan              chan error
 	createControllerConn func(context.Context) (WebsocketConnectionWithMetadata, error)
@@ -371,6 +387,8 @@ type clientProxy struct {
 }
 
 // start begins the client->controller proxier.
+//
+//nolint:gocognit
 func (p *clientProxy) start(ctx context.Context) error {
 	defer func() {
 		if p.dst != nil {
@@ -420,6 +438,25 @@ func (p *clientProxy) start(ctx context.Context) error {
 				p.msgs.addLoginMessage(toController)
 			}
 		}
+		if msg.Type == "KeyManager" {
+			intercept, err := shouldInterceptKeyManager(p.controllerVersion)
+			if err != nil {
+				p.sendError(ctx, p.src, msg, err)
+				continue
+			}
+			if intercept {
+				toClient, err := p.handleKeyManagerFacade(ctx, msg)
+				if err != nil {
+					p.sendError(ctx, p.src, msg, err)
+					continue
+				}
+				p.src.sendMessage(nil, toClient)
+				if err := p.auditLogMessage(toClient, true); err != nil {
+					zapctx.Error(ctx, "failed to audit local KeyManager response", zap.Error(err))
+				}
+				continue
+			}
+		}
 		p.msgs.addMessage(ctx, msg)
 		if err := p.dst.writeJson(msg); err != nil {
 			zapctx.Error(ctx, "clientProxy error writing to dst", zap.Error(err))
@@ -447,6 +484,7 @@ func (p *clientProxy) makeControllerConnection(ctx context.Context) error {
 		p.msgs.controllerUUID = connWithMetadata.ControllerUUID
 		p.modelName = connWithMetadata.ModelName
 		p.modelUUID = connWithMetadata.ModelUUID
+		p.controllerVersion = connWithMetadata.ControllerVersion
 		p.modelMigrationMode = connWithMetadata.MigrationMode
 		p.dst = &writeLockConn{conn: connWithMetadata.Conn}
 		controllerToClient := controllerProxy{
@@ -695,6 +733,7 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		return nil, nil, err
 	}
 	controllerLoginMessageFnc := func(user *openfga.User) (*message, *message, error) {
+		p.user = user
 		// User logins funnel through here, so this is
 		// where client/model compatibility is enforced.
 		if err := checkClientModelCompatibility(ctx); err != nil {
@@ -786,6 +825,80 @@ func (p *clientProxy) handleAdminFacade(ctx context.Context, msg *message) (clie
 		return nil, controllerMessage, err
 	default:
 		return nil, nil, nil
+	}
+}
+
+// handleKeyManagerFacade processes a model-scoped Juju 4 KeyManager facade
+// call using JIMM's key store.
+func (p *clientProxy) handleKeyManagerFacade(ctx context.Context, msg *message) (*message, error) {
+	if p.user == nil {
+		return nil, errors.New("user not authenticated")
+	}
+	if p.sshKeyManager == nil {
+		return nil, errors.New("SSH key manager unavailable")
+	}
+	respond := func(data any) (*message, error) {
+		response, err := json.Marshal(data)
+		if err != nil {
+			return nil, err
+		}
+		msg.Response = response
+		return msg, nil
+	}
+	keyManager := keyManagerFacade{keyManager: p.sshKeyManager, user: p.user, modelUUID: p.modelUUID}
+
+	switch msg.Request {
+	case "ListKeys":
+		var request jujuparams.ListSSHKeys
+		if err := json.Unmarshal(msg.Params, &request); err != nil {
+			return nil, err
+		}
+		result, err := keyManager.ListKeys(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		return respond(result)
+	case "AddKeys":
+		var request jujuparams.ModifyUserSSHKeys
+		if err := json.Unmarshal(msg.Params, &request); err != nil {
+			return nil, err
+		}
+		result, err := keyManager.AddKeys(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		return respond(result)
+	case "DeleteKeys":
+		var request jujuparams.ModifyUserSSHKeys
+		if err := json.Unmarshal(msg.Params, &request); err != nil {
+			return nil, err
+		}
+		result, err := keyManager.DeleteKeys(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		return respond(result)
+	case "ImportKeys":
+		return nil, errors.Codef(errors.CodeNotImplemented, "ImportKeys not implemented")
+	default:
+		return nil, errors.New("unknown key manager request")
+	}
+}
+
+// shouldInterceptKeyManager reports whether JIMM must handle the model-scoped
+// KeyManager facade. Juju 3 calls continue through the normal proxy path.
+func shouldInterceptKeyManager(controllerVersion string) (bool, error) {
+	controller, err := version.Parse(controllerVersion)
+	if err != nil {
+		return false, errors.Codef(errors.CodeNotSupported, "cannot determine KeyManager routing: controller version %q is invalid", controllerVersion)
+	}
+	switch {
+	case controller.Major == 3:
+		return false, nil
+	case controller.Major >= 4:
+		return true, nil
+	default:
+		return false, errors.Codef(errors.CodeNotSupported, "cannot determine KeyManager routing for Juju %s", controllerVersion)
 	}
 }
 

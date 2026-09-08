@@ -89,22 +89,24 @@ func (sm *SSHKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.U
 	return pubKeys, nil
 }
 
-// RemoveUserKeyByComment removes a user's public key(s) by the key comment.
-func (sm *SSHKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
-
-	err := sm.store.RemoveSSHKeyByComment(ctx, user.Name, model, comment)
-	if err != nil {
-		return err
+// RemoveUserKeys removes a user's keys matching fingerprints, comments, or
+// full authorized-key values. Missing keys are ignored.
+func (sm *SSHKeyManager) RemoveUserKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, targets ...string) error {
+	for i, target := range targets {
+		publicKey, _, _, _, err := gossh.ParseAuthorizedKey([]byte(target))
+		if err == nil {
+			targets[i] = gossh.FingerprintLegacyMD5(publicKey)
+		}
 	}
-	return nil
+	return sm.store.RemoveSSHKeys(ctx, user.Name, model, targets...)
 }
 
-// RemoveUserKeyByFingerprint removes a user's public key by the key fingerprint.
-func (sm *SSHKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
+// RemoveUserKeyByComment removes a user's public key(s) by comment.
+func (sm *SSHKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
+	return sm.RemoveUserKeys(ctx, user, model, comment)
+}
 
-	err := sm.store.RemoveSSHKeyByFingerprint(ctx, user.Name, model, fingerprint)
-	if err != nil {
-		return err
-	}
-	return nil
+// RemoveUserKeyByFingerprint removes a user's public key by fingerprint.
+func (sm *SSHKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
+	return sm.RemoveUserKeys(ctx, user, model, fingerprint)
 }

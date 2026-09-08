@@ -84,7 +84,17 @@ func (c Connection) LatestLogTime(ctx context.Context, modelUUID string) (time.T
 
 // Import imports a model migration from the given bytes of the
 // serialized model description.
+//
+// This method uses a raw facade call because Juju 4.1+ registers
+// MigrationTarget v8, whose Import method takes a SerializedModelV2
+// envelope rather than the legacy SerializedModel. The legacy import
+// path is still served by facade versions 6 and 7, so we call those
+// explicitly to avoid the client negotiating v8 against newer
+// controllers.
 func (c Connection) Import(ctx context.Context, bytes []byte) error {
-	migrationTarget := migrationtarget.NewClient(&c)
-	return migrationTarget.Import(ctx, bytes)
+	args := jujuparams.SerializedModel{Bytes: bytes}
+	if err := c.CallHighestFacadeVersion(ctx, "MigrationTarget", []int{7, 6}, "", "Import", &args, nil); err != nil {
+		return err
+	}
+	return nil
 }

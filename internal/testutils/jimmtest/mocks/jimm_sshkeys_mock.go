@@ -12,11 +12,10 @@ import (
 )
 
 type SSHKeyManager struct {
-	AddUserPublicKey_           func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
-	ListUserPublicKeys_         func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
-	RemoveUserKeyByComment_     func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error
-	RemoveUserKeyByFingerprint_ func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
-	VerifyPublicKey_            func(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
+	AddUserPublicKey_   func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error
+	ListUserPublicKeys_ func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter) ([]sshkeys.PublicKey, error)
+	RemoveUserKeys_     func(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, targets ...string) error
+	VerifyPublicKey_    func(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
 }
 
 func (j *SSHKeyManager) AddUserPublicKey(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, publicKey sshkeys.PublicKey) error {
@@ -33,18 +32,11 @@ func (j *SSHKeyManager) ListUserPublicKeys(ctx context.Context, user *openfga.Us
 	return j.ListUserPublicKeys_(ctx, user, model)
 }
 
-func (j *SSHKeyManager) RemoveUserKeyByComment(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, comment string) error {
-	if j.RemoveUserKeyByComment_ == nil {
+func (j *SSHKeyManager) RemoveUserKeys(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, targets ...string) error {
+	if j.RemoveUserKeys_ == nil {
 		return errors.New("not implemented")
 	}
-	return j.RemoveUserKeyByComment_(ctx, user, model, comment)
-}
-
-func (j *SSHKeyManager) RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error {
-	if j.RemoveUserKeyByFingerprint_ == nil {
-		return errors.New("not implemented")
-	}
-	return j.RemoveUserKeyByFingerprint_(ctx, user, model, fingerprint)
+	return j.RemoveUserKeys_(ctx, user, model, targets...)
 }
 
 func (j *SSHKeyManager) VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error) {

@@ -209,6 +209,7 @@ func (s apiModelProxier) ServeWS(ctx context.Context, clientConn *websocket.Conn
 	zapctx.Debug(ctx, "Starting proxier")
 	proxyHelpers := rpcproxy.ProxyHelpers{
 		ConnClient:              clientConn,
+		SSHKeyManager:           s.jimm.SSHKeyManager,
 		TokenGen:                &jwtGenerator,
 		ConnectController:       connectionFunc,
 		AuditLog:                auditLogger,
@@ -261,11 +262,12 @@ func controllerConnectionFunc(jwtGenerator *jujuauth.LoginTokenGenerator, m *dbm
 		}
 		fullModelName := m.Controller.Name + "/" + m.Name
 		return rpcproxy.WebsocketConnectionWithMetadata{
-			Conn:           controllerConn,
-			ControllerUUID: m.Controller.UUID,
-			ModelName:      fullModelName,
-			ModelUUID:      m.UUID.String,
-			MigrationMode:  m.MigrationMode,
+			Conn:              controllerConn,
+			ControllerUUID:    m.Controller.UUID,
+			ControllerVersion: m.Controller.AgentVersion,
+			ModelName:         fullModelName,
+			ModelUUID:         m.UUID.String,
+			MigrationMode:     m.MigrationMode,
 		}, nil
 	}
 }

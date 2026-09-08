@@ -32,6 +32,32 @@ func (d *Database) AddSSHKey(ctx context.Context, sshKey *dbmodel.SSHKey) (err e
 	return nil
 }
 
+// RemoveSSHKeys removes a user's keys matching any provided fingerprint or
+// comment. Missing targets are ignored.
+func (d *Database) RemoveSSHKeys(ctx context.Context, identityName string, model SSHKeyModelFilter, targets ...string) (err error) {
+	const op = "db.RemoveSSHKeys"
+	if err := d.ready(); err != nil {
+		return err
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	query := d.DB.WithContext(ctx).
+		Where("identity_name = ?", identityName).
+		Where("model_uuid = ?", model.ModelUUID).
+		Where("md5_fingerprint IN ? OR key_comment IN ?", targets, targets).
+		Delete(&dbmodel.SSHKey{})
+	if query.Error != nil {
+		return dbError(query.Error)
+	}
+	return nil
+}
+
 // RemoveSSHKeyByFingerprint removes a user's ssh key identified by its fingerprint.
 func (d *Database) RemoveSSHKeyByFingerprint(ctx context.Context, identityName string, model SSHKeyModelFilter, fingerprint string) (err error) {
 	const op = "db.RemoveSSHKeyByFingerprint"
@@ -72,7 +98,8 @@ func (d *Database) RemoveSSHKeyByComment(ctx context.Context, identityName strin
 	defer durationObserver()
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
-	query := d.DB.Where("key_comment = ?", comment).
+	query := d.DB.Where("identity_name = ?", identityName).
+		Where("key_comment = ?", comment).
 		Where("model_uuid = ?", model.ModelUUID).
 		Delete(&dbmodel.SSHKey{})
 	if err := query.Error; err != nil {

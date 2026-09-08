@@ -206,6 +206,19 @@ func (s *sshKeysManagerSuite) TestRemoveUserKeyByFingerprint(c *qt.C) {
 	c.Assert(s.db.DB.First(&dbmodel.SSHKey{}).Error, qt.Equals, gorm.ErrRecordNotFound)
 }
 
+func (s *sshKeysManagerSuite) TestRemoveUserKeys(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	err := s.manager.AddUserPublicKey(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, s.pubKey)
+	c.Assert(err, qt.IsNil)
+
+	authorizedKey := string(gossh.MarshalAuthorizedKey(s.pubKey)) + s.pubKey.Comment
+	err = s.manager.RemoveUserKeys(ctx, s.user, db.SSHKeyModelFilter{ModelUUID: s.modelUUID}, authorizedKey)
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.db.DB.First(&dbmodel.SSHKey{}).Error, qt.Equals, gorm.ErrRecordNotFound)
+}
+
 func TestSSHKeyManager(t *testing.T) {
 	qtsuite.Run(qt.New(t), &sshKeysManagerSuite{})
 }
