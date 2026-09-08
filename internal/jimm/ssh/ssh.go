@@ -268,7 +268,7 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 	}
 
 	tokenArgs := jujuauth.SSHTokenArgs{
-		User:           user.Name,
+		User:           user.Tag().String(),
 		ControllerUUID: model.Controller.UUID,
 		ModelTag:       model.Tag(),
 		PublicKey:      publicKey.Marshal(),
