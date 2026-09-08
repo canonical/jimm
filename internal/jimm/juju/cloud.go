@@ -344,8 +344,10 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 // the controller. No error will be returned if the cloud already exists on
 // the controller or the user already has access to the cloud.
 //
-// Dials as the JIMM service identity after enforcing authorisation, since
-// users lack the required permission on the backing controller.
+// Dials as the JIMM service identity. Callers are responsible for
+// enforcing authorisation before calling this function (e.g.
+// doCloudAdmin checks cloud-admin access; AddHostedCloud checks
+// add-model access on the host cloud).
 // TODO(luci1900): dial as the user once Juju lets non-admins add clouds.
 func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (*jujucloud.Cloud, error) {
 	api, err := j.dialControllerAsService(ctx, ctl)
