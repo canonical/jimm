@@ -211,6 +211,73 @@ func TestCallerLoginTokenUsesCompatibilityTokenForOldController(t *testing.T) {
 	}
 }
 
+// TestCallerLoginTokenUsesCallerScopedTokenForNewController verifies that
+// NewCallerLoginToken routes to the caller-scoped path (not the superuser
+// fallback) for controllers >= 3.6.24.
+func TestCallerLoginTokenUsesCallerScopedTokenForNewController(t *testing.T) {
+	c := qt.New(t)
+	env := jimmtest.SetupJimmEnv(c)
+	ctx := c.Context()
+
+	aliceEmail := "alice@canonical.com"
+	env.AddAdminUser(c, aliceEmail)
+	aliceIdentity, err := dbmodel.NewIdentity(aliceEmail)
+	c.Assert(err, qt.IsNil)
+	err = env.JIMM.Database.GetIdentity(ctx, aliceIdentity)
+	c.Assert(err, qt.IsNil)
+	alice := env.NewUser(aliceIdentity)
+
+	cloudName := "caller-scoped-cloud"
+	err = env.JIMM.Database.AddCloud(ctx, &dbmodel.Cloud{Name: cloudName, Type: "lxd"})
+	c.Assert(err, qt.IsNil)
+	controllerUUID := uuid.New().String()
+	controllerTag := names.NewControllerTag(controllerUUID)
+	ctl := &dbmodel.Controller{
+		UUID:          controllerUUID,
+		Name:          "caller-scoped-controller",
+		CloudName:     cloudName,
+		CACertificate: "test-ca-cert",
+		AgentVersion:  "3.6.24",
+	}
+	err = env.JIMM.Database.AddController(ctx, ctl)
+	c.Assert(err, qt.IsNil)
+
+	modelUUID := uuid.New().String()
+	modelTag := names.NewModelTag(modelUUID)
+
+	// Grant alice admin on the controller and model so the caller-scoped
+	// token carries real access (not the NoAccess fallback).
+	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag(aliceEmail)),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(controllerTag),
+	})
+	c.Assert(err, qt.IsNil)
+	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTag(names.NewUserTag(aliceEmail)),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(modelTag),
+	})
+	c.Assert(err, qt.IsNil)
+
+	token, err := env.JIMM.JujuAuthFactory.NewCallerLoginToken(
+		ctx, []names.Tag{modelTag}, ctl, alice,
+	)
+	c.Assert(err, qt.IsNil)
+
+	parsed, err := jwt.Parse(token, jwt.WithVerify(false), jwt.WithValidate(false))
+	c.Assert(err, qt.IsNil)
+	c.Assert(parsed.Subject(), qt.Equals, alice.Tag().String())
+
+	access := decodeAccess(c, parsed)
+
+	// The caller-scoped path mints real access, not the superuser fallback.
+	c.Assert(access[controllerTag.String()], qt.Equals, "superuser",
+		qt.Commentf("admin on a >=3.6.24 controller must receive real controller access"))
+	c.Assert(access[modelTag.String()], qt.Equals, "admin",
+		qt.Commentf("model admin on a >=3.6.24 controller must receive real model access"))
+}
+
 func TestCallerLoginTokenAllowsControllerOnlyCompatibilityToken(t *testing.T) {
 	c := qt.New(t)
 	env := jimmtest.SetupJimmEnv(c)

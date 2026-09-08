@@ -3503,24 +3503,16 @@ func TestUpdateModelCredential(t *testing.T) {
 	}
 }
 
-// TestChangeModelCredentialNoForceWriteBeforeAuth verifies that
-// ChangeModelCredential does not force-write the credential to the
-// backing controller before model-admin authorization has been
-// enforced. A credential owner without model-admin access must not
-// cause controller-side credential state to be mutated.
-//
-// This reproduces the regression where the force-write was moved
-// before the doModelAdmin authorization check: a credential owner
-// could mutate controller-side state for a model they have no admin
-// access to, with no rollback when authorization subsequently failed.
+// TestChangeModelCredentialNoForceWriteBeforeAuth ensures the force-write
+// to the backing controller does not happen before model-admin authorization.
+// A credential owner without model-admin access must not trigger any
+// controller-side mutation.
 func TestChangeModelCredentialNoForceWriteBeforeAuth(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	// charlie owns the credential but only has write (not admin)
-	// access on the model. The owner check at the top of
-	// ChangeModelCredential passes because charlie owns the cred, but
-	// doModelAdmin must reject the call with unauthorized.
+	// charlie owns the credential but has only write (not admin) access on
+	// the model. The owner check passes; doModelAdmin must reject.
 	const env = `clouds:
 - name: test-cloud
   type: test-provider
@@ -3586,9 +3578,7 @@ models:
 	c.Check(err, qt.ErrorMatches, "unauthorized")
 	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
 
-	// The force-write must NOT have been called: model-admin
-	// authorization failed, so no controller-side mutation should
-	// have occurred before that check.
+	// The force-write must not run before model-admin authorization.
 	c.Check(forceWriteCalled, qt.IsFalse,
 		qt.Commentf("forceUpdateControllerCloudCredential must not run before model-admin authorization"))
 }

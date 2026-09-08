@@ -4,11 +4,13 @@ package jujuauth
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
@@ -79,6 +81,11 @@ func (f *Factory) NewCallerScopedLoginToken(ctx context.Context, resourceTags []
 	ctlWithClouds := dbmodel.Controller{}
 	ctlWithClouds.SetTag(ctl.ResourceTag())
 	if err := f.db.GetController(ctx, &ctlWithClouds); err != nil {
+		// Fall back only for not-found (e.g. controller not persisted
+		// yet during AddController). Propagate transient DB errors.
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			return nil, fmt.Errorf("failed to fetch controller for caller token: %w", err)
+		}
 		ctlWithClouds = *ctl
 	}
 	accessMap, err := buildAccessMap(ctx, user, resourceTags, ctl.ResourceTag(), ctlWithClouds, f.accessChecker)

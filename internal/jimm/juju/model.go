@@ -824,11 +824,9 @@ func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.U
 	}
 
 	var m *dbmodel.Model
-	// Juju rejects force=true from non-admin users, it requires superuser.
-	// We dial using JIMM's own service identity rather than the caller's.
-	// The force-write and the subsequent ChangeModelCredential call are
-	// performed inside doModelAdmin, which enforces model-admin access
-	// before either side-effect runs.
+	// Juju requires superuser for force=true, so the force-write dials as
+	// JIMM's service identity. Both the force-write and ChangeModelCredential
+	// run inside doModelAdmin so model-admin access is checked first.
 	// TODO(luci1900): dial as the user once Juju allows force=true for
 	// non-admins.
 	err = j.doModelAdmin(ctx, user, modelTag, func(model *dbmodel.Model, api API) error {
