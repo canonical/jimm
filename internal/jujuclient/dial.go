@@ -83,42 +83,17 @@ func (d *Dialer) newServiceJWTToken(ctx context.Context, ctl *dbmodel.Controller
 	return base64.StdEncoding.EncodeToString(jwt), nil
 }
 
-// newCallerJWTToken mints a caller-scoped JWT reflecting the user's real
-// OpenFGA-derived permissions on the given controller and resource tags.
-func (d *Dialer) newCallerJWTToken(ctx context.Context, ctl *dbmodel.Controller, resourceTags []names.Tag, user *openfga.User) (string, error) {
-	jwt, err := d.TokenMinter.NewCallerLoginToken(ctx, resourceTags, ctl, user)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(jwt), nil
-}
-
 // createLoginRequest creates a jujuparams.LoginRequest for the given
 // controller, resource tags and user.
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, resourceTags []names.Tag, user *openfga.User) (*jujuparams.LoginRequest, error) {
-	jwtString, err := d.newCallerJWTToken(ctx, ctl, resourceTags, user)
+	jwt, err := d.TokenMinter.NewCallerLoginToken(ctx, resourceTags, ctl, user)
 	if err != nil {
 		return nil, err
 	}
 	return &jujuparams.LoginRequest{
 		AuthTag:       user.ResourceTag().String(),
 		ClientVersion: jimmversion.ControllerVersion,
-		Token:         jwtString,
-	}, nil
-}
-
-// createServiceLoginRequest creates a jujuparams.LoginRequest for JIMM's own
-// service-identity (no real user). It always mints a superuser token under
-// the JIMM admin username.
-func (d *Dialer) createServiceLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (*jujuparams.LoginRequest, error) {
-	jwtString, err := d.newServiceJWTToken(ctx, ctl, modelTag)
-	if err != nil {
-		return nil, err
-	}
-	return &jujuparams.LoginRequest{
-		AuthTag:       names.NewUserTag(d.AdminUsername).String(),
-		ClientVersion: jimmversion.ControllerVersion,
-		Token:         jwtString,
+		Token:         base64.StdEncoding.EncodeToString(jwt),
 	}, nil
 }
 
@@ -210,19 +185,14 @@ func (d *Dialer) dial(ctx context.Context, ctl *dbmodel.Controller, connModelTag
 }
 
 // DialModelAsService dials the given model on behalf of JIMM itself (no
-// user). It mints a superuser token under the JIMM service identity
-// (jaas-<uuid>@external). Use this for internal housekeeping operations,
-// such as model-status polling, that are not initiated by a real user.
+// user); see the Dialer interface godoc.
 func (d *Dialer) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (*Connection, error) {
 	return d.dialAsService(ctx, ctl, modelTag)
 }
 
 // DialControllerAsService dials the given controller on behalf of JIMM
-// itself (no user), using a controller-scoped connection. It mints a
-// superuser token under the JIMM service identity (jaas-<uuid>@external).
-// Use this for internal housekeeping operations such as the watcher,
-// upgrade worker, and controller administration tasks that are not
-// initiated by a real user.
+// itself (no user), using a controller-scoped connection; see the Dialer
+// interface godoc.
 func (d *Dialer) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (*Connection, error) {
 	return d.dialAsService(ctx, ctl, names.ModelTag{})
 }
@@ -230,9 +200,14 @@ func (d *Dialer) DialControllerAsService(ctx context.Context, ctl *dbmodel.Contr
 // dialAsService dials the given controller/model on behalf of JIMM itself
 // (no user), minting a superuser token under the JIMM service identity.
 func (d *Dialer) dialAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (*Connection, error) {
-	loginRequest, err := d.createServiceLoginRequest(ctx, ctl, modelTag)
+	jwtString, err := d.newServiceJWTToken(ctx, ctl, modelTag)
 	if err != nil {
 		return nil, err
+	}
+	loginRequest := &jujuparams.LoginRequest{
+		AuthTag:       names.NewUserTag(d.AdminUsername).String(),
+		ClientVersion: jimmversion.ControllerVersion,
+		Token:         jwtString,
 	}
 	serviceUser := &openfga.User{Identity: &dbmodel.Identity{Name: d.AdminUsername}}
 	return d.dial(ctx, ctl, modelTag, serviceUser, loginRequest, true)
@@ -414,7 +389,9 @@ func (c *Connection) authorizationHeader(modelTag names.ModelTag, extraHeaders h
 		if modelTag.Id() != "" {
 			resourceTags = []names.Tag{modelTag}
 		}
-		jwtString, err = c.dialer.newCallerJWTToken(c.ctx, c.ctl, resourceTags, c.user)
+		var jwt []byte
+		jwt, err = c.dialer.TokenMinter.NewCallerLoginToken(c.ctx, resourceTags, c.ctl, c.user)
+		jwtString = base64.StdEncoding.EncodeToString(jwt)
 	}
 	if err != nil {
 		return nil, err

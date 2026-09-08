@@ -105,20 +105,11 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 		return
 	}
 
-	// Mint a login token scoped to the caller's real permissions. For
-	// controllers below the fix boundary (Juju <=3.6.23), a superuser
-	// token is used as a fallback due to a Juju bug where model-admin
-	// JWT claims are not honoured.
-	mt := names.NewModelTag(modelUUID)
-	ctl := &dbmodel.Controller{UUID: controllerDetails.ControllerUUID, AgentVersion: controllerDetails.AgentVersion}
-	jwt, err := hph.loginTokenProvider.NewCallerLoginToken(ctx, []names.Tag{mt}, ctl, user)
+	requestHeaders, err := callerAuthorizationHeader(ctx, hph.loginTokenProvider, controllerDetails, modelUUID, user)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate login token")
 		return
 	}
-
-	requestHeaders := make(http.Header)
-	requestHeaders.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(jwt))
 
 	details := rpc.ConnectionDetails{
 		Addresses:      controllerDetails.Addresses,
@@ -129,4 +120,21 @@ func (hph *HTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http.Request)
 	}
 
 	rpc.ProxyHTTP(ctx, details, w, req)
+}
+
+// callerAuthorizationHeader mints a login token scoped to the caller's
+// real permissions and returns an Authorization header carrying it. For
+// controllers below the fix boundary (Juju <=3.6.23), a superuser token
+// is used as a fallback due to a Juju bug where model-admin JWT claims
+// are not honoured.
+func callerAuthorizationHeader(ctx context.Context, tokenProvider LoginTokenProvider, controllerDetails juju.ControllerConnectionDetails, modelUUID string, user *openfga.User) (http.Header, error) {
+	mt := names.NewModelTag(modelUUID)
+	ctl := &dbmodel.Controller{UUID: controllerDetails.ControllerUUID, AgentVersion: controllerDetails.AgentVersion}
+	jwt, err := tokenProvider.NewCallerLoginToken(ctx, []names.Tag{mt}, ctl, user)
+	if err != nil {
+		return nil, err
+	}
+	header := make(http.Header)
+	header.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(jwt))
+	return header, nil
 }

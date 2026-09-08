@@ -54,25 +54,16 @@ type Dialer interface {
 	// controller-scoped, but the Juju permission check requires the
 	// user's access to the relevant resource(s) in the JWT.
 	//
-	// resourceTags is a generalisation of DialModel's modelTag: pass any
-	// mix of model and application-offer tags whose access levels should
-	// be resolved via OpenFGA and embedded as JWT access claims. Pass no
-	// resourceTags when the operation is not tied to a specific resource
-	// (e.g. cloud or controller-level calls).
+	// Pass no resourceTags when the operation is not tied to a specific
+	// resource (e.g. cloud or controller-level calls).
 	DialController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
 
 	// DialModelAsService creates a model-scoped API connection using
-	// JIMM's own service identity (no user). It mints a superuser token
-	// under the JIMM admin username and is intended solely for internal
-	// housekeeping operations (e.g. model-status polling) that are not
-	// initiated by a real user.
+	// JIMM's own service identity (no user).
 	DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
 
 	// DialControllerAsService creates a controller-scoped API connection
-	// using JIMM's own service identity (no user). It mints a superuser
-	// token under the JIMM admin username and is intended solely for
-	// internal housekeeping operations (watcher, upgrade, controller
-	// administration, etc.) that are not initiated by a real user.
+	// using JIMM's own service identity (no user).
 	DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (API, error)
 }
 

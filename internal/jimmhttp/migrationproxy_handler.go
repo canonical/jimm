@@ -3,17 +3,14 @@
 package jimmhttp
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
-	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/middleware"
 	"github.com/canonical/jimm/v3/internal/rpc"
@@ -91,20 +88,11 @@ func (hph *MigrationHTTPProxyHandler) ProxyHTTP(w http.ResponseWriter, req *http
 		return
 	}
 
-	// Mint a login token scoped to the caller's real permissions. For
-	// controllers below the fix boundary (Juju <=3.6.23), a superuser
-	// token is used as a fallback due to a Juju bug where model-admin
-	// JWT claims are not honoured.
-	mt := names.NewModelTag(modelUUID)
-	ctl := &dbmodel.Controller{UUID: controllerDetails.ControllerUUID, AgentVersion: controllerDetails.AgentVersion}
-	jwt, err := hph.loginTokenProvider.NewCallerLoginToken(ctx, []names.Tag{mt}, ctl, user)
+	requestHeaders, err := callerAuthorizationHeader(ctx, hph.loginTokenProvider, controllerDetails, modelUUID, user)
 	if err != nil {
 		writeError(ctx, w, http.StatusInternalServerError, err, "failed to generate login token")
 		return
 	}
-
-	requestHeaders := make(http.Header)
-	requestHeaders.Set("Authorization", "Bearer "+base64.StdEncoding.EncodeToString(jwt))
 
 	details := rpc.ConnectionDetails{
 		Addresses:      controllerDetails.Addresses,
