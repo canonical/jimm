@@ -8,6 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v6"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -1532,6 +1533,119 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 			}
 			c.Assert(err, qt.IsNil)
 			test.assertSuccess(c, j)
+		})
+	}
+}
+
+const modelConfigSchemaTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-cloud-region
+    priority: 1
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+var modelConfigSchemaTests = []struct {
+	name              string
+	env               string
+	dialError         error
+	modelConfigSchema func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error)
+	username          string
+	providerType      string
+	expectSchema      map[string]jujuparams.ModelConfigSchemaField
+	expectError       string
+}{{
+	name: "Success",
+	env:  modelConfigSchemaTestEnv,
+	modelConfigSchema: func(_ context.Context, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+		if providerType != "test-provider" {
+			return nil, errors.New("bad provider type")
+		}
+		return map[string]jujuparams.ModelConfigSchemaField{
+			"name": {
+				Description: "The name of the model.",
+				Type:        "string",
+				Mandatory:   true,
+			},
+		}, nil
+	},
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectSchema: map[string]jujuparams.ModelConfigSchemaField{
+		"name": {
+			Description: "The name of the model.",
+			Type:        "string",
+			Mandatory:   true,
+		},
+	},
+}, {
+	name:         "NoControllers",
+	env:          "",
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectError:  `no controllers registered`,
+}, {
+	name:         "DialError",
+	env:          modelConfigSchemaTestEnv,
+	dialError:    errors.New("test dial error"),
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectError:  `test dial error`,
+}, {
+	name: "APIError",
+	env:  modelConfigSchemaTestEnv,
+	modelConfigSchema: func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+		return nil, errors.New("test error")
+	},
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectError:  `test error`,
+}}
+
+func TestModelConfigSchema(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelConfigSchemaTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					ModelConfigSchema_: test.modelConfigSchema,
+				},
+				Err:  test.dialError,
+				UUID: "00000001-0000-0000-0000-000000000001",
+			}
+
+			j := newTestJujuManager(c, &parameters{
+				Dialer: dialer,
+			})
+
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+			dbUser := env.User(test.username).DBObject(c, j.Database)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+			schema, err := j.ModelConfigSchema(ctx, user, test.providerType)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(dialer.IsClosed(), qt.Equals, true)
+			c.Check(schema, qt.DeepEquals, test.expectSchema)
 		})
 	}
 }
