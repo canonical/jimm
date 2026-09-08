@@ -291,22 +291,15 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 // relayed SSH session bytes. The virtual hostname identifies the
 // destination within the controller.
 func (s *SSHManager) DialController(ctx context.Context, dialInfo DialInfo, virtualHostname string) (net.Conn, error) {
-	var conn net.Conn
-	var err error
 	var errs []error
 
 	for _, addr := range dialInfo.Addresses {
-		conn, err = s.dialer.DialRelay(ctx, addr, dialInfo.TLSConfig, virtualHostname, dialInfo.JWT)
-		if err != nil {
-			conn = nil
-			errs = append(errs, err)
-		} else {
-			break
+		conn, err := s.dialer.DialRelay(ctx, addr, dialInfo.TLSConfig, virtualHostname, dialInfo.JWT)
+		if err == nil {
+			return conn, nil
 		}
+		errs = append(errs, err)
 	}
 
-	if conn == nil {
-		return nil, fmt.Errorf("failed to dial controller: %v", goerr.Join(errs...))
-	}
-	return conn, nil
+	return nil, fmt.Errorf("failed to dial controller: %v", goerr.Join(errs...))
 }
