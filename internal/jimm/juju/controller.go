@@ -244,7 +244,7 @@ func (j *JujuManager) AddController(ctx context.Context, user *openfga.User, ctl
 		}
 	}
 
-	api, err := j.dialController(ctx, user, ctl)
+	api, err := j.dialControllerAsSuperuser(ctx, user, ctl)
 	if err != nil {
 		return fmt.Errorf("failed to dial the controller: %v", err)
 	}
@@ -393,7 +393,7 @@ func (m *modelImporter) fetchModelInfo(ctx context.Context, user *openfga.User, 
 		return err
 	}
 
-	api, err := m.jimm.dialController(ctx, user, controller)
+	api, err := m.jimm.dialControllerAsSuperuser(ctx, user, controller)
 	if err != nil {
 		return fmt.Errorf("failed to dial the controller: %w", err)
 	}
@@ -766,7 +766,7 @@ func (j *JujuManager) ControllerConfig(ctx context.Context, user *openfga.User, 
 		return jujucontroller.Config{}, err
 	}
 
-	api, err := j.dialController(ctx, user, controller)
+	api, err := j.dialControllerAsSuperuser(ctx, user, controller)
 	if err != nil {
 		return jujucontroller.Config{}, err
 	}
