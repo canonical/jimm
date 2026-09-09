@@ -35,25 +35,38 @@ import (
 	jimmversion "github.com/canonical/jimm/v3/version"
 )
 
+// CallerTokenMinter mints a caller JWT for a user operating on a
+// specific controller and set of resource tags (models, application
+// offers, etc.). It is satisfied by *jujuauth.Factory.
+type CallerTokenMinter interface {
+	NewCallerLoginToken(ctx context.Context, resourceTags []names.Tag, ctl *dbmodel.Controller, user *openfga.User) ([]byte, error)
+}
+
 // A Dialer is an implementation of a jimm.Dialer that adapts a juju API
 // connection to provide a jimm API.
 type Dialer struct {
+	// TokenMinter mints caller-scoped JWT tokens for AsUser dials.
+	TokenMinter CallerTokenMinter
+	// JWTService signs superuser JWT tokens for AsSuperuser and
+	// AsService dials.
 	JWTService    *jimmjwx.JWTService
 	AdminUsername string
 }
 
 // NewDialer creates a new Dialer from dependencies.
-func NewDialer(jwtService *jimmjwx.JWTService, controllerUUID string) *Dialer {
+func NewDialer(jwtService *jimmjwx.JWTService, tokenMinter CallerTokenMinter, controllerUUID string) *Dialer {
 	return &Dialer{
-		JWTService: jwtService,
+		JWTService:  jwtService,
+		TokenMinter: tokenMinter,
 		// The admin username is a Juju external user, just like the JIMM users.
 		AdminUsername: fmt.Sprintf("jaas-%s@external", controllerUUID),
 	}
 }
 
-func (d *Dialer) newControllerJWTToken(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, userTag string) (string, error) {
-	// Always request superuser permissions, even when representing a non-admin user
-	// This is only safe because we have already checked the user's openfga permissions in a layer above.
+// newServiceJWTToken mints a superuser JWT for JIMM's own
+// service-identity operations and AsSuperuser dials. The token is
+// issued under the JIMM admin username, not a real user.
+func (d *Dialer) newServiceJWTToken(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, userTag string) (string, error) {
 	permissions := map[string]string{
 		ctl.ResourceTag().String(): "superuser",
 	}
@@ -72,10 +85,11 @@ func (d *Dialer) newControllerJWTToken(ctx context.Context, ctl *dbmodel.Control
 	return base64.StdEncoding.EncodeToString(jwt), nil
 }
 
-// createLoginRequest creates a jujuparams.LoginRequest for the given controller, model and user.
+// createLoginRequest creates a superuser login request for the given
+// controller, model and user. Used by AsSuperuser and AsService dials.
 func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (*jujuparams.LoginRequest, error) {
 	userTag := user.ResourceTag().String()
-	jwtString, err := d.newControllerJWTToken(ctx, ctl, modelTag, userTag)
+	jwtString, err := d.newServiceJWTToken(ctx, ctl, modelTag, userTag)
 	if err != nil {
 		return nil, err
 	}
@@ -87,10 +101,49 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 	}, nil
 }
 
+// createUserLoginRequest creates a login request carrying the caller's
+// real access claims. Used by AsUser dials.
+func (d *Dialer) createUserLoginRequest(ctx context.Context, ctl *dbmodel.Controller, resourceTags []names.Tag, user *openfga.User) (*jujuparams.LoginRequest, error) {
+	jwt, err := d.TokenMinter.NewCallerLoginToken(ctx, resourceTags, ctl, user)
+	if err != nil {
+		return nil, err
+	}
+	return &jujuparams.LoginRequest{
+		AuthTag:       user.ResourceTag().String(),
+		ClientVersion: jimmversion.ControllerVersion,
+		Token:         base64.StdEncoding.EncodeToString(jwt),
+	}, nil
+}
+
+// DialModelAsUser implements jimm.Dialer. It creates a model-scoped
+// connection on behalf of a real user, with the caller's real permissions.
+func (d *Dialer) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (*Connection, error) {
+	if user == nil {
+		return nil, errors.New("DialModelAsUser requires a non-nil user")
+	}
+	loginRequest, err := d.createUserLoginRequest(ctx, ctl, []names.Tag{modelTag}, user)
+	if err != nil {
+		return nil, err
+	}
+	return d.dial(ctx, ctl, modelTag, user, loginRequest)
+}
+
+// DialControllerAsUser implements jimm.Dialer. It creates a
+// controller-scoped connection on behalf of a real user, with the
+// caller's real permissions for the given resource tags.
+func (d *Dialer) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (*Connection, error) {
+	if user == nil {
+		return nil, errors.New("DialControllerAsUser requires a non-nil user")
+	}
+	loginRequest, err := d.createUserLoginRequest(ctx, ctl, resourceTags, user)
+	if err != nil {
+		return nil, err
+	}
+	return d.dial(ctx, ctl, names.ModelTag{}, user, loginRequest)
+}
+
 // DialModelAsSuperuser implements jimm.Dialer. It creates a model-scoped
 // connection on behalf of a real user, forcing superuser permissions.
-// The user must be non-nil; use DialModelAsService for JIMM's own
-// internal operations that have no associated user.
 func (d *Dialer) DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (*Connection, error) {
 	if user == nil {
 		return nil, errors.New("DialModelAsSuperuser requires a non-nil user")
@@ -103,10 +156,8 @@ func (d *Dialer) DialModelAsSuperuser(ctx context.Context, user *openfga.User, c
 }
 
 // DialControllerAsSuperuser implements jimm.Dialer. It creates a
-// controller-scoped connection (so controller-level facades are
-// available) on behalf of a real user, forcing superuser permissions.
-// The user must be non-nil; use DialControllerAsService for JIMM's own
-// internal operations that have no associated user.
+// controller-scoped connection on behalf of a real user, forcing
+// superuser permissions.
 func (d *Dialer) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (*Connection, error) {
 	if user == nil {
 		return nil, errors.New("DialControllerAsSuperuser requires a non-nil user")
@@ -370,7 +421,7 @@ func (c *Connection) authorizationHeader(modelTag names.ModelTag, extraHeaders h
 		user = &openfga.User{Identity: &dbmodel.Identity{Name: c.dialer.AdminUsername}}
 	}
 
-	jwtString, err := c.dialer.newControllerJWTToken(c.ctx, c.ctl, modelTag, user.ResourceTag().String())
+	jwtString, err := c.dialer.newServiceJWTToken(c.ctx, c.ctl, modelTag, user.ResourceTag().String())
 	if err != nil {
 		return nil, err
 	}

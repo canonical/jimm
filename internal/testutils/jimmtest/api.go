@@ -79,11 +79,25 @@ func (d *Dialer) DialModelAsSuperuser(_ context.Context, _ *openfga.User, ctl *d
 	}, nil
 }
 
+// DialModelAsUser implements juju.Dialer. The test double does not
+// distinguish real vs superuser permissions; it delegates to
+// DialModelAsSuperuser.
+func (d *Dialer) DialModelAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, u, ctl, mt)
+}
+
 // DialControllerAsSuperuser implements juju.Dialer. The test double does not
 // distinguish connection scope or resource tags; it delegates to
 // DialModelAsSuperuser with no model tag.
 func (d *Dialer) DialControllerAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
 	return d.DialModelAsSuperuser(ctx, u, ctl, names.ModelTag{})
+}
+
+// DialControllerAsUser implements juju.Dialer. The test double does not
+// distinguish real vs superuser permissions; it delegates to
+// DialControllerAsSuperuser.
+func (d *Dialer) DialControllerAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialControllerAsSuperuser(ctx, u, ctl, resourceTags...)
 }
 
 // DialModelAsService implements juju.Dialer. It dials as JIMM's service identity.
@@ -127,10 +141,26 @@ func (m ModelDialerMap) DialModelAsSuperuser(ctx context.Context, u *openfga.Use
 	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
 }
 
+// DialModelAsUser implements juju.Dialer.
+func (m ModelDialerMap) DialModelAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	if d, ok := m[mt.Id()]; ok {
+		return d.DialModelAsUser(ctx, u, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
 // DialControllerAsSuperuser implements juju.Dialer.
 func (m ModelDialerMap) DialControllerAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
 	if d, ok := m[""]; ok {
 		return d.DialControllerAsSuperuser(ctx, u, ctl, resourceTags...)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsUser implements juju.Dialer.
+func (m ModelDialerMap) DialControllerAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	if d, ok := m[""]; ok {
+		return d.DialControllerAsUser(ctx, u, ctl, resourceTags...)
 	}
 	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
 }
@@ -163,10 +193,26 @@ func (m DialerMap) DialModelAsSuperuser(ctx context.Context, u *openfga.User, ct
 	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
 }
 
+// DialModelAsUser implements juju.Dialer.
+func (m DialerMap) DialModelAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialModelAsUser(ctx, u, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
 // DialControllerAsSuperuser implements juju.Dialer.
 func (m DialerMap) DialControllerAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
 	if d, ok := m[ctl.Name]; ok {
 		return d.DialControllerAsSuperuser(ctx, u, ctl, resourceTags...)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsUser implements juju.Dialer.
+func (m DialerMap) DialControllerAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialControllerAsUser(ctx, u, ctl, resourceTags...)
 	}
 	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
 }

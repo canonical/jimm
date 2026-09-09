@@ -107,7 +107,7 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		JWKS:   jwksService,
 	})
 
-	dialer := jujuclient.NewDialer(jwtService, ControllerUUID)
+	dialer := jujuclient.NewDialer(jwtService, nil, ControllerUUID)
 
 	deps := &jimmsvc.ServiceDependencies{
 		ControllerUUID:                params.ControllerUUID,

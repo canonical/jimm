@@ -370,16 +370,22 @@ func NewDialerAdapter(dialer *jujuclient.Dialer) *DialerAdapter {
 	}
 }
 
+// DialModelAsUser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsUser(ctx, user, ctl, modelTag)
+}
+
+// DialControllerAsUser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.dialer.DialControllerAsUser(ctx, user, ctl, resourceTags...)
+}
+
 // DialModelAsSuperuser implements the juju.Dialer interface for the DialerAdapter.
-// It uses the underlying jujuclient.Dialer to establish a model-scoped
-// connection to the Juju controller and returns a juju.API connection.
 func (d *DialerAdapter) DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
 	return d.dialer.DialModelAsSuperuser(ctx, user, ctl, modelTag)
 }
 
 // DialControllerAsSuperuser implements the juju.Dialer interface for the DialerAdapter.
-// It dials the controller with a controller-scoped connection on behalf
-// of the given user, forcing superuser permissions.
 func (d *DialerAdapter) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
 	return d.dialer.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
 }
