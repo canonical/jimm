@@ -216,7 +216,7 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 		return jujuclient.ModelInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dialController(ctx, user, &m.Controller)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &m.Controller)
 	if err != nil {
 		return jujuclient.ModelInfo{}, err
 	}
@@ -263,7 +263,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.U
 		if err := j.Database.GetModel(ctx, model); err != nil {
 			return jujuclient.ModelInfo{}, err
 		}
-		api, err := j.dialController(ctx, user, &model.Controller)
+		api, err := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
 		if err != nil {
 			return jujuclient.ModelInfo{}, err
 		}
@@ -491,7 +491,7 @@ func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt na
 		return base.ModelStatus{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dialController(ctx, user, &m.Controller)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &m.Controller)
 	if err != nil {
 		return base.ModelStatus{}, err
 	}
@@ -708,7 +708,7 @@ func (j *JujuManager) UpgradeController(ctx context.Context, user *openfga.User,
 		return version.Number{}, err
 	}
 
-	api, err := j.dialController(ctx, user, controller)
+	api, err := j.dialControllerAsSuperuser(ctx, user, controller)
 	if err != nil {
 		return version.Number{}, err
 	}
@@ -792,7 +792,7 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dialController(ctx, user, &m.Controller)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &m.Controller)
 	if err != nil {
 		return err
 	}

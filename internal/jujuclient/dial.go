@@ -87,13 +87,13 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 	}, nil
 }
 
-// DialModel implements jimm.Dialer. It creates a model-scoped
-// connection on behalf of a real user. The user must be non-nil; use
-// DialModelAsService for JIMM's own internal operations that have no
-// associated user.
-func (d *Dialer) DialModel(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (*Connection, error) {
+// DialModelAsSuperuser implements jimm.Dialer. It creates a model-scoped
+// connection on behalf of a real user, forcing superuser permissions.
+// The user must be non-nil; use DialModelAsService for JIMM's own
+// internal operations that have no associated user.
+func (d *Dialer) DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (*Connection, error) {
 	if user == nil {
-		return nil, errors.New("DialModel requires a non-nil user")
+		return nil, errors.New("DialModelAsSuperuser requires a non-nil user")
 	}
 	loginRequest, err := d.createLoginRequest(ctx, ctl, modelTag, user)
 	if err != nil {
@@ -102,14 +102,14 @@ func (d *Dialer) DialModel(ctx context.Context, user *openfga.User, ctl *dbmodel
 	return d.dial(ctx, ctl, modelTag, user, loginRequest)
 }
 
-// DialController implements jimm.Dialer. It creates a controller-scoped
-// connection (so controller-level facades are available) on behalf of a
-// real user. The user must be non-nil; use DialControllerAsService for
-// JIMM's own internal operations that have no associated user.
-// TODO(luci1900): refactor to pass in resource tags for scoped JWT minting.
-func (d *Dialer) DialController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (*Connection, error) {
+// DialControllerAsSuperuser implements jimm.Dialer. It creates a
+// controller-scoped connection (so controller-level facades are
+// available) on behalf of a real user, forcing superuser permissions.
+// The user must be non-nil; use DialControllerAsService for JIMM's own
+// internal operations that have no associated user.
+func (d *Dialer) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (*Connection, error) {
 	if user == nil {
-		return nil, errors.New("DialController requires a non-nil user")
+		return nil, errors.New("DialControllerAsSuperuser requires a non-nil user")
 	}
 	modelTag := names.ModelTag{}
 	loginRequest, err := d.createLoginRequest(ctx, ctl, modelTag, user)

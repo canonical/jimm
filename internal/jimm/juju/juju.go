@@ -77,16 +77,14 @@ func NewJujuManager(
 	}, nil
 }
 
-// dialController dials the controller with a controller-scoped
-// connection on behalf of the given user. Use this for operations that
-// call controller-level facades (e.g. ModelManager) with a model UUID
-// argument, or offer-related operations tied to a single offer.
-func (j *JujuManager) dialController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error) {
+// dialControllerAsSuperuser dials the controller on behalf of the given
+// user with forced superuser permissions.
+func (j *JujuManager) dialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
 	}
 
-	return j.Dialer.DialController(ctx, user, ctl, resourceTags...)
+	return j.Dialer.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
 }
 
 // dialModelAsService dials the model using JIMM's own service identity.

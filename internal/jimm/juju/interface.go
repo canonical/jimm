@@ -31,7 +31,7 @@ import (
 //
 // When to use which method:
 //
-//   - DialModel / DialController: dial on behalf of a real user. Prefer
+//   - DialModelAsSuperuser / DialControllerAsSuperuser: dial on behalf of a real user. Prefer
 //     these wherever possible.
 //
 //   - DialModelAsService / DialControllerAsService: dial as JIMM's
@@ -39,11 +39,11 @@ import (
 //     user. Every AsService call is a potential gap to close in Juju's
 //     permission model.
 type Dialer interface {
-	// DialModel creates a model-scoped API connection on behalf of a real
+	// DialModelAsSuperuser creates a model-scoped API connection on behalf of a real
 	// user. The user and modelTag must not be zero-valued.
-	DialModel(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
+	DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
 
-	// DialController creates a controller-scoped API connection on behalf
+	// DialControllerAsSuperuser creates a controller-scoped API connection on behalf
 	// of a real user. This is used for operations that call
 	// controller-level facades (e.g. ModelManager) with a model UUID
 	// argument, or offer-related operations tied to a single offer: the
@@ -54,7 +54,7 @@ type Dialer interface {
 	// mix of model and application-offer tags the operation is tied to.
 	// Pass no resourceTags when the operation is not tied to a specific
 	// resource (e.g. cloud or controller-level calls).
-	DialController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
+	DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
 
 	// DialModelAsService creates a model-scoped API connection using
 	// JIMM's own service identity (no user). It is intended solely for

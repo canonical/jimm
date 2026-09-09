@@ -44,7 +44,7 @@ func newPerControllerDialer(api juju.API) *perControllerDialer {
 	}
 }
 
-func (d *perControllerDialer) DialModel(_ context.Context, _ *openfga.User, ctl *dbmodel.Controller, _ names.ModelTag) (juju.API, error) {
+func (d *perControllerDialer) DialModelAsSuperuser(_ context.Context, _ *openfga.User, ctl *dbmodel.Controller, _ names.ModelTag) (juju.API, error) {
 	name := ctl.Name
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -59,25 +59,25 @@ func (d *perControllerDialer) DialModel(_ context.Context, _ *openfga.User, ctl 
 	}, nil
 }
 
-// DialController implements juju.Dialer. It delegates to DialModel since the
+// DialControllerAsSuperuser implements juju.Dialer. It delegates to DialModelAsSuperuser since the
 // perControllerDialer test double does not distinguish connection scope,
 // resource tags, or user vs service identity for JWT minting.
-func (d *perControllerDialer) DialController(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
-	return d.DialModel(ctx, user, ctl, names.ModelTag{})
+func (d *perControllerDialer) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, user, ctl, names.ModelTag{})
 }
 
-// DialModelAsService implements juju.Dialer. It delegates to DialModel since
+// DialModelAsService implements juju.Dialer. It delegates to DialModelAsSuperuser since
 // the perControllerDialer test double does not distinguish user vs service
 // identity for JWT minting.
 func (d *perControllerDialer) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
-	return d.DialModel(ctx, nil, ctl, mt)
+	return d.DialModelAsSuperuser(ctx, nil, ctl, mt)
 }
 
-// DialControllerAsService implements juju.Dialer. It delegates to DialModel
+// DialControllerAsService implements juju.Dialer. It delegates to DialModelAsSuperuser
 // since the perControllerDialer test double does not distinguish connection
 // scope or user vs service identity for JWT minting.
 func (d *perControllerDialer) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
-	return d.DialModel(ctx, nil, ctl, names.ModelTag{})
+	return d.DialModelAsSuperuser(ctx, nil, ctl, names.ModelTag{})
 }
 
 // openedCounts returns a snapshot of the dial counts per controller.
