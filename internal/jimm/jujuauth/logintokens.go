@@ -160,9 +160,9 @@ func buildAccessMap(
 	}
 	accessMap[ct.String()] = controllerAccess
 
-	clouds := make(map[names.CloudTag]bool)
+	clouds := make(map[names.CloudTag]struct{})
 	for _, cloudRegion := range ctl.CloudRegions {
-		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = true
+		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = struct{}{}
 	}
 	for cloudTag := range clouds {
 		accessLevel, err := accessChecker.GetUserCloudAccess(ctx, user, cloudTag)
@@ -221,9 +221,9 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch controller: %w", err)
 	}
-	clouds := make(map[names.CloudTag]bool)
+	clouds := make(map[names.CloudTag]struct{})
 	for _, cloudRegion := range ctl.CloudRegions {
-		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = true
+		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = struct{}{}
 	}
 	for cloudTag := range clouds {
 		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
