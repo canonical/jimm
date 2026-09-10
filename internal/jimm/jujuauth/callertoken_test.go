@@ -19,6 +19,7 @@ import (
 // testCallerTokenEnv defines a controller with a cloud, a non-admin user
 // (bob) with can_addmodel on the controller and writer on a model, and
 // an admin user (alice) with administrator on the controller and model.
+//
 //nolint:gosec // Test data, not real credentials.
 const testCallerTokenEnv = `clouds:
 - name: test-cloud
