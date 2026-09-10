@@ -13,9 +13,59 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
+
+// testCallerTokenEnv defines a controller with a cloud, a non-admin user
+// (bob) with can_addmodel on the controller and writer on a model, and
+// an admin user (alice) with administrator on the controller and model.
+const testCallerTokenEnv = `clouds:
+- name: test-cloud
+  type: lxd
+  regions:
+  - name: test-region
+cloud-credentials:
+- name: test-cred
+  cloud: test-cloud
+  owner: alice@canonical.com
+  type: empty
+users:
+- username: bob@canonical.com
+- username: alice@canonical.com
+controllers:
+- name: test-controller
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-region
+  agent-version: 3.6.24
+  users:
+  - user: bob@canonical.com
+    access: add-model
+  - user: alice@canonical.com
+    access: admin
+models:
+- name: test-model
+  uuid: 00000002-0000-0000-0000-000000000002
+  controller: test-controller
+  owner: alice@canonical.com
+  cloud: test-cloud
+  region: test-region
+  cloud-credential: test-cred
+  users:
+  - user: bob@canonical.com
+    access: write
+  - user: alice@canonical.com
+    access: admin
+application-offers:
+- model-name: test-model
+  model-owner: alice@canonical.com
+  name: test-offer
+  uuid: 00000003-0000-0000-0000-000000000003
+  url: alice/test-model.test-offer
+  users:
+  - user: bob@canonical.com
+    access: consume
+`
 
 // TestCallerScopedLoginTokenForNonAdminUser verifies that NewCallerScopedLoginToken
 // mints a JWT carrying the caller's real OpenFGA-derived permissions
@@ -25,75 +75,35 @@ func TestCallerScopedLoginTokenForNonAdminUser(t *testing.T) {
 	env := jimmtest.SetupJimmEnv(c)
 	ctx := c.Context()
 
-	// Create a non-admin user (bob) with can_addmodel on the controller
-	// and writer on a model, but NOT administrator on the controller.
-	bobEmail := "bob@canonical.com"
-	env.AddUser(c, bobEmail)
-	bobIdentity, err := dbmodel.NewIdentity(bobEmail)
+	testEnv := jimmtest.ParseEnvironment(c, testCallerTokenEnv)
+	testEnv.PopulateDBAndPermissions(c, env.JIMM.ResourceTag(), env.JIMM.Database, env.OFGAClient)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	err = env.JIMM.Database.GetIdentity(ctx, bobIdentity)
 	c.Assert(err, qt.IsNil)
 	bob := env.NewUser(bobIdentity)
 
-	// Add a controller to the DB so buildAccessMap can fetch it.
-	// A cloud row must exist first to satisfy the controllers_cloud_name_fkey.
-	cloudName := "test-cloud"
-	err = env.JIMM.Database.AddCloud(ctx, &dbmodel.Cloud{Name: cloudName, Type: "lxd"})
-	c.Assert(err, qt.IsNil)
-	controllerUUID := uuid.New().String()
-	controllerTag := names.NewControllerTag(controllerUUID)
-	ctl := &dbmodel.Controller{
-		UUID:          controllerUUID,
-		Name:          "test-controller",
-		CloudName:     cloudName,
-		CACertificate: "test-ca-cert",
-	}
-	err = env.JIMM.Database.AddController(ctx, ctl)
+	controllerTag := names.NewControllerTag("00000001-0000-0000-0000-000000000001")
+	modelTag := names.NewModelTag("00000002-0000-0000-0000-000000000002")
+	ctl := &dbmodel.Controller{UUID: controllerTag.Id()}
+	err = env.JIMM.Database.GetController(ctx, ctl)
 	c.Assert(err, qt.IsNil)
 
-	// Grant bob can_addmodel on the controller (not administrator).
-	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag(bobEmail)),
-		Relation: ofganames.CanAddModelRelation,
-		Target:   ofganames.ConvertTag(controllerTag),
-	})
+	token, err := env.JIMM.JujuAuthFactory.NewCallerScopedLoginToken(ctx, []names.Tag{modelTag}, ctl, bob)
 	c.Assert(err, qt.IsNil)
 
-	// Grant bob writer access on a model (only the tag is needed for the
-	// OpenFGA permission check; no DB row is required).
-	modelUUID := uuid.New().String()
-	modelTag := names.NewModelTag(modelUUID)
-
-	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag(bobEmail)),
-		Relation: ofganames.WriterRelation,
-		Target:   ofganames.ConvertTag(modelTag),
-	})
-	c.Assert(err, qt.IsNil)
-
-	// Mint a caller-scoped login token for bob.
-	factory := env.JIMM.JujuAuthFactory
-	token, err := factory.NewCallerScopedLoginToken(ctx, []names.Tag{modelTag}, ctl, bob)
-	c.Assert(err, qt.IsNil)
-
-	// Decode the JWT and inspect the access claim.
 	parsed, err := jwt.Parse(token, jwt.WithVerify(false), jwt.WithValidate(false))
 	c.Assert(err, qt.IsNil)
-
-	// The "sub" must be bob, not the JIMM admin identity.
 	c.Assert(parsed.Subject(), qt.Equals, bobIdentity.ResourceTag().String())
 
 	access := decodeAccess(c, parsed)
 
-	// Controller access must be "login" (the non-admin level), NOT "superuser".
 	c.Assert(access[controllerTag.String()], qt.Equals, "login",
 		qt.Commentf("non-admin user must not receive controller superuser access"))
-
-	// Model access must be "write" (the granted level), NOT "admin".
 	c.Assert(access[modelTag.String()], qt.Equals, "write",
 		qt.Commentf("model access must reflect the user's real OpenFGA permission"))
 
-	// The old hardcoded superuser claim must NOT be present anywhere.
 	for tag, level := range access {
 		if level == "superuser" {
 			c.Fatalf("non-admin user received superuser access on %s", tag)
@@ -101,9 +111,9 @@ func TestCallerScopedLoginTokenForNonAdminUser(t *testing.T) {
 	}
 }
 
-// TestCallerScopedLoginTokenForAdminUser verifies that an admin user still
-// receives controller superuser access in the caller-scoped token, matching
-// the old hardcoded behaviour for the admin case.
+// TestCallerLoginTokenUsesCompatibilityTokenForOldController verifies that
+// NewCallerLoginToken falls back to the superuser token for controllers
+// older than 3.6.24.
 func TestCallerLoginTokenUsesCompatibilityTokenForOldController(t *testing.T) {
 	c := qt.New(t)
 	env := jimmtest.SetupJimmEnv(c)
@@ -147,45 +157,19 @@ func TestCallerLoginTokenUsesCallerScopedTokenForNewController(t *testing.T) {
 	env := jimmtest.SetupJimmEnv(c)
 	ctx := c.Context()
 
-	aliceEmail := "alice@canonical.com"
-	env.AddAdminUser(c, aliceEmail)
-	aliceIdentity, err := dbmodel.NewIdentity(aliceEmail)
+	testEnv := jimmtest.ParseEnvironment(c, testCallerTokenEnv)
+	testEnv.PopulateDBAndPermissions(c, env.JIMM.ResourceTag(), env.JIMM.Database, env.OFGAClient)
+
+	aliceIdentity, err := dbmodel.NewIdentity("alice@canonical.com")
 	c.Assert(err, qt.IsNil)
 	err = env.JIMM.Database.GetIdentity(ctx, aliceIdentity)
 	c.Assert(err, qt.IsNil)
 	alice := env.NewUser(aliceIdentity)
 
-	cloudName := "caller-scoped-cloud"
-	err = env.JIMM.Database.AddCloud(ctx, &dbmodel.Cloud{Name: cloudName, Type: "lxd"})
-	c.Assert(err, qt.IsNil)
-	controllerUUID := uuid.New().String()
-	controllerTag := names.NewControllerTag(controllerUUID)
-	ctl := &dbmodel.Controller{
-		UUID:          controllerUUID,
-		Name:          "caller-scoped-controller",
-		CloudName:     cloudName,
-		CACertificate: "test-ca-cert",
-		AgentVersion:  "3.6.24",
-	}
-	err = env.JIMM.Database.AddController(ctx, ctl)
-	c.Assert(err, qt.IsNil)
-
-	modelUUID := uuid.New().String()
-	modelTag := names.NewModelTag(modelUUID)
-
-	// Grant alice admin on the controller and model so the caller-scoped
-	// token carries real access (not the NoAccess fallback).
-	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag(aliceEmail)),
-		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(controllerTag),
-	})
-	c.Assert(err, qt.IsNil)
-	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag(aliceEmail)),
-		Relation: ofganames.AdministratorRelation,
-		Target:   ofganames.ConvertTag(modelTag),
-	})
+	controllerTag := names.NewControllerTag("00000001-0000-0000-0000-000000000001")
+	modelTag := names.NewModelTag("00000002-0000-0000-0000-000000000002")
+	ctl := &dbmodel.Controller{UUID: controllerTag.Id()}
+	err = env.JIMM.Database.GetController(ctx, ctl)
 	c.Assert(err, qt.IsNil)
 
 	token, err := env.JIMM.JujuAuthFactory.NewCallerLoginToken(
@@ -199,7 +183,6 @@ func TestCallerLoginTokenUsesCallerScopedTokenForNewController(t *testing.T) {
 
 	access := decodeAccess(c, parsed)
 
-	// The caller-scoped path mints real access, not the superuser fallback.
 	c.Assert(access[controllerTag.String()], qt.Equals, "superuser",
 		qt.Commentf("admin on a >=3.6.24 controller must receive real controller access"))
 	c.Assert(access[modelTag.String()], qt.Equals, "admin",
@@ -239,45 +222,19 @@ func TestCallerScopedLoginTokenIncludesApplicationOfferAccess(t *testing.T) {
 	env := jimmtest.SetupJimmEnv(c)
 	ctx := c.Context()
 
-	bobEmail := "bob@canonical.com"
-	env.AddUser(c, bobEmail)
-	bobIdentity, err := dbmodel.NewIdentity(bobEmail)
+	testEnv := jimmtest.ParseEnvironment(c, testCallerTokenEnv)
+	testEnv.PopulateDBAndPermissions(c, env.JIMM.ResourceTag(), env.JIMM.Database, env.OFGAClient)
+
+	bobIdentity, err := dbmodel.NewIdentity("bob@canonical.com")
 	c.Assert(err, qt.IsNil)
 	err = env.JIMM.Database.GetIdentity(ctx, bobIdentity)
 	c.Assert(err, qt.IsNil)
 	bob := env.NewUser(bobIdentity)
 
-	cloudName := "offer-access-cloud"
-	err = env.JIMM.Database.AddCloud(ctx, &dbmodel.Cloud{Name: cloudName, Type: "lxd"})
-	c.Assert(err, qt.IsNil)
-	controllerUUID := uuid.New().String()
-	controllerTag := names.NewControllerTag(controllerUUID)
-	ctl := &dbmodel.Controller{
-		UUID:          controllerUUID,
-		Name:          "offer-access-controller",
-		CloudName:     cloudName,
-		CACertificate: "test-ca-cert",
-		AgentVersion:  "3.6.24",
-	}
-	err = env.JIMM.Database.AddController(ctx, ctl)
-	c.Assert(err, qt.IsNil)
-
-	// Grant bob can_addmodel on the controller (maps to "login" access).
-	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag(bobEmail)),
-		Relation: ofganames.CanAddModelRelation,
-		Target:   ofganames.ConvertTag(controllerTag),
-	})
-	c.Assert(err, qt.IsNil)
-
-	// Grant bob consumer access on an application offer.
-	offerUUID := uuid.New().String()
-	offerTag := names.NewApplicationOfferTag(offerUUID)
-	err = env.OFGAClient.AddRelation(ctx, openfga.Tuple{
-		Object:   ofganames.ConvertTag(names.NewUserTag(bobEmail)),
-		Relation: ofganames.ConsumerRelation,
-		Target:   ofganames.ConvertTag(offerTag),
-	})
+	controllerTag := names.NewControllerTag("00000001-0000-0000-0000-000000000001")
+	offerTag := names.NewApplicationOfferTag("00000003-0000-0000-0000-000000000003")
+	ctl := &dbmodel.Controller{UUID: controllerTag.Id()}
+	err = env.JIMM.Database.GetController(ctx, ctl)
 	c.Assert(err, qt.IsNil)
 
 	token, err := env.JIMM.JujuAuthFactory.NewCallerScopedLoginToken(
@@ -291,10 +248,7 @@ func TestCallerScopedLoginTokenIncludesApplicationOfferAccess(t *testing.T) {
 
 	access := decodeAccess(c, parsed)
 
-	// Controller access must be "login".
 	c.Assert(access[controllerTag.String()], qt.Equals, "login")
-
-	// Offer access must reflect the consume relation.
 	c.Assert(access[offerTag.String()], qt.Equals, "consume",
 		qt.Commentf("offer access must reflect the user's real OpenFGA permission"))
 }
