@@ -19,10 +19,7 @@ import (
 
 // TestCallerScopedLoginTokenForNonAdminUser verifies that NewCallerScopedLoginToken
 // mints a JWT carrying the caller's real OpenFGA-derived permissions
-// (controller: login, cloud: add-model, model: write) rather than the
-// old hardcoded superuser claim. This is the core behavioural guarantee
-// of the de-proxying change: non-admin users must not receive
-// controller-superuser tokens.
+// (controller: login, cloud: add-model, model: write).
 func TestCallerScopedLoginTokenForNonAdminUser(t *testing.T) {
 	c := qt.New(t)
 	env := jimmtest.SetupJimmEnv(c)
