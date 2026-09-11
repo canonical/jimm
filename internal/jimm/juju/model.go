@@ -216,7 +216,7 @@ func (j *JujuManager) ModelInfo(ctx context.Context, user *openfga.User, mt name
 		return jujuclient.ModelInfo{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dialControllerAsSuperuser(ctx, user, &m.Controller)
+	api, err := j.dialControllerAsUser(ctx, user, &m.Controller, mt)
 	if err != nil {
 		return jujuclient.ModelInfo{}, err
 	}
@@ -263,7 +263,7 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.U
 		if err := j.Database.GetModel(ctx, model); err != nil {
 			return jujuclient.ModelInfo{}, err
 		}
-		api, err := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
+		api, err := j.dialControllerAsUser(ctx, user, &model.Controller, model.ResourceTag())
 		if err != nil {
 			return jujuclient.ModelInfo{}, err
 		}
@@ -491,7 +491,7 @@ func (j *JujuManager) ModelStatus(ctx context.Context, user *openfga.User, mt na
 		return base.ModelStatus{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dialControllerAsSuperuser(ctx, user, &m.Controller)
+	api, err := j.dialControllerAsUser(ctx, user, &m.Controller, mt)
 	if err != nil {
 		return base.ModelStatus{}, err
 	}
@@ -708,6 +708,10 @@ func (j *JujuManager) UpgradeController(ctx context.Context, user *openfga.User,
 		return version.Number{}, err
 	}
 
+	// Upgrades the controller model, which is never related to users in
+	// OpenFGA.
+	// TODO(luci1900): dial as the user once Juju lets non-admins upgrade
+	// the controller model.
 	api, err := j.dialControllerAsSuperuser(ctx, user, controller)
 	if err != nil {
 		return version.Number{}, err
@@ -792,7 +796,7 @@ func (j *JujuManager) doModel(ctx context.Context, user *openfga.User, mt names.
 		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	api, err := j.dialControllerAsSuperuser(ctx, user, &m.Controller)
+	api, err := j.dialControllerAsUser(ctx, user, &m.Controller, mt)
 	if err != nil {
 		return err
 	}
@@ -823,8 +827,19 @@ func (j *JujuManager) ChangeModelCredential(ctx context.Context, user *openfga.U
 	if err != nil {
 		return err
 	}
+
+	// Juju requires superuser for force=true, so the force-write dials
+	// as superuser. Both the force-write and ChangeModelCredential run
+	// inside doModelAdmin so model-admin access is checked first.
+	// TODO(luci1900): dial as the user once Juju allows force=true for
+	// non-admins.
 	err = j.doModelAdmin(ctx, user, modelTag, func(model *dbmodel.Model, api API) error {
-		_, err = j.forceUpdateControllerCloudCredential(ctx, &credential, attrs, api)
+		svcAPI, err := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
+		if err != nil {
+			return err
+		}
+		_, err = j.forceUpdateControllerCloudCredential(ctx, &credential, attrs, svcAPI)
+		svcAPI.Close()
 		if err != nil {
 			return err
 		}

@@ -344,6 +344,7 @@ func (j *JujuManager) AddHostedCloud(ctx context.Context, user *openfga.User, ta
 // the controller. No error will be returned if the cloud already exists on
 // the controller or the user already has access to the cloud.
 func (j *JujuManager) addControllerCloud(ctx context.Context, ctl *dbmodel.Controller, user *openfga.User, tag names.CloudTag, cloud jujucloud.Cloud, force bool) (*jujucloud.Cloud, error) {
+	// TODO(luci1900): dial as the user once Juju lets non-admins add clouds.
 	api, err := j.dialControllerAsSuperuser(ctx, user, ctl)
 	if err != nil {
 		return nil, err
@@ -401,6 +402,7 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 		}
 		return fmt.Errorf("cloud administration not available for %s", ct.Id())
 	}
+	// TODO(luci1900): dial as the user once Juju lets non-admins manage clouds.
 	api, err := j.dialControllerAsSuperuser(ctx, user, &c.Regions[0].Controllers[0].Controller)
 	if err != nil {
 		return err
@@ -556,6 +558,7 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 		return errors.Codef(errors.CodeNotFound, "cloud not hosted by controller")
 	}
 
+	// TODO(luci1900): dial as the user once Juju lets non-admins remove clouds.
 	api, err := j.dialControllerAsSuperuser(ctx, user, &controller)
 	if err != nil {
 		return err

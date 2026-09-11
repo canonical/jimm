@@ -92,6 +92,8 @@ func (s streamControllerProxier) ServeWS(ctx context.Context, clientConn *websoc
 		return
 	}
 
+	// TODO(luci1900): dial as the user once Juju's migration log
+	// stream supports caller-scoped tokens.
 	api, err := s.jimm.Dialer.DialControllerAsSuperuser(ctx, user, &model.Controller)
 	if err != nil {
 		zapctx.Error(ctx, "failed to dial controller", zap.Error(err))
