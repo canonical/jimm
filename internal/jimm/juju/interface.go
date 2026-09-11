@@ -28,32 +28,27 @@ import (
 // dialing the controller the UUID, AgentVersion and HostPorts fields in the
 // given controller should be updated to the values provided by the
 // controller.
-//
-// When to use which method:
-//
-//   - DialModelAsSuperuser / DialControllerAsSuperuser: dial on behalf of a real user. Prefer
-//     these wherever possible.
-//
-//   - DialModelAsService / DialControllerAsService: dial as JIMM's
-//     service identity. Use only for internal housekeeping with no real
-//     user. Every AsService call is a potential gap to close in Juju's
-//     permission model.
 type Dialer interface {
-	// DialModelAsSuperuser creates a model-scoped API connection on behalf of a real
-	// user. The user and modelTag must not be zero-valued.
+	// DialModelAsUser creates a model-scoped connection for the given
+	// user with the caller's real permissions.
+	// Prefer whenever possible.
+	DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
+
+	// DialControllerAsUser creates a controller-scoped connection for
+	// the given user with the caller's real permissions. Pass
+	// resourceTags for operations tied to specific models or offers.
+	// Prefer whenever possible.
+	DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
+
+	// DialModelAsSuperuser creates a model-scoped connection for the
+	// given user with superuser permissions.
+	// Use as a workaround.
 	DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
 
-	// DialControllerAsSuperuser creates a controller-scoped API connection on behalf
-	// of a real user. This is used for operations that call
-	// controller-level facades (e.g. ModelManager) with a model UUID
-	// argument, or offer-related operations tied to a single offer: the
-	// connection must be controller-scoped, but the Juju permission
-	// check requires the user's access to the relevant resource(s).
-	//
-	// resourceTags is a generalisation of DialModel's modelTag: pass any
-	// mix of model and application-offer tags the operation is tied to.
-	// Pass no resourceTags when the operation is not tied to a specific
-	// resource (e.g. cloud or controller-level calls).
+	// DialControllerAsSuperuser creates a controller-scoped connection
+	// for the given user with superuser permissions. Pass
+	// resourceTags for operations tied to specific models or offers.
+	// Use as a workaround.
 	DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
 
 	// DialModelAsService creates a model-scoped API connection using

@@ -127,6 +127,50 @@ func (c *MockDialerDialControllerAsSuperuserCall) DoAndReturn(f func(context.Con
 	return c
 }
 
+// DialControllerAsUser mocks base method.
+func (m *MockDialer) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, user, ctl}
+	for _, a := range resourceTags {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DialControllerAsUser", varargs...)
+	ret0, _ := ret[0].(juju.API)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DialControllerAsUser indicates an expected call of DialControllerAsUser.
+func (mr *MockDialerMockRecorder) DialControllerAsUser(ctx, user, ctl any, resourceTags ...any) *MockDialerDialControllerAsUserCall {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, user, ctl}, resourceTags...)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DialControllerAsUser", reflect.TypeOf((*MockDialer)(nil).DialControllerAsUser), varargs...)
+	return &MockDialerDialControllerAsUserCall{Call: call}
+}
+
+// MockDialerDialControllerAsUserCall wrap *gomock.Call
+type MockDialerDialControllerAsUserCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockDialerDialControllerAsUserCall) Return(arg0 juju.API, arg1 error) *MockDialerDialControllerAsUserCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockDialerDialControllerAsUserCall) Do(f func(context.Context, *openfga.User, *dbmodel.Controller, ...names.Tag) (juju.API, error)) *MockDialerDialControllerAsUserCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockDialerDialControllerAsUserCall) DoAndReturn(f func(context.Context, *openfga.User, *dbmodel.Controller, ...names.Tag) (juju.API, error)) *MockDialerDialControllerAsUserCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // DialModelAsService mocks base method.
 func (m *MockDialer) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
 	m.ctrl.T.Helper()
@@ -201,6 +245,45 @@ func (c *MockDialerDialModelAsSuperuserCall) Do(f func(context.Context, *openfga
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockDialerDialModelAsSuperuserCall) DoAndReturn(f func(context.Context, *openfga.User, *dbmodel.Controller, names.ModelTag) (juju.API, error)) *MockDialerDialModelAsSuperuserCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DialModelAsUser mocks base method.
+func (m *MockDialer) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DialModelAsUser", ctx, user, ctl, modelTag)
+	ret0, _ := ret[0].(juju.API)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DialModelAsUser indicates an expected call of DialModelAsUser.
+func (mr *MockDialerMockRecorder) DialModelAsUser(ctx, user, ctl, modelTag any) *MockDialerDialModelAsUserCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DialModelAsUser", reflect.TypeOf((*MockDialer)(nil).DialModelAsUser), ctx, user, ctl, modelTag)
+	return &MockDialerDialModelAsUserCall{Call: call}
+}
+
+// MockDialerDialModelAsUserCall wrap *gomock.Call
+type MockDialerDialModelAsUserCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockDialerDialModelAsUserCall) Return(arg0 juju.API, arg1 error) *MockDialerDialModelAsUserCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockDialerDialModelAsUserCall) Do(f func(context.Context, *openfga.User, *dbmodel.Controller, names.ModelTag) (juju.API, error)) *MockDialerDialModelAsUserCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockDialerDialModelAsUserCall) DoAndReturn(f func(context.Context, *openfga.User, *dbmodel.Controller, names.ModelTag) (juju.API, error)) *MockDialerDialModelAsUserCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

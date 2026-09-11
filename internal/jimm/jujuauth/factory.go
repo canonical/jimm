@@ -4,11 +4,27 @@ package jujuauth
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/juju/names/v5"
+	"github.com/juju/version/v2"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
+	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
+
+// minJujuVersionForCallerToken is the first Juju controller version that
+// correctly honours model-level access in a JWT during permission checks.
+// Controllers older than this version incorrectly reject tokens that carry
+// model-admin access without a controller-superuser claim, so a superuser
+// fallback token must be minted for them instead.
+//
+// TODO(luci1900): Once the minimum supported Juju controller version
+// exceeds this boundary, remove the superuser fallback in
+// NewCallerLoginToken and makeSuperuserToken entirely.
+var minJujuVersionForCallerToken = version.MustParse("3.6.24")
 
 // Factory holds the necessary components for producing
 // Juju authenticator objects. Currently a login token generator
@@ -55,7 +71,53 @@ func (f *Factory) NewLoginToken(ctx context.Context, modelTag names.ModelTag, co
 func (f *Factory) NewSuperuserLoginToken(ctx context.Context, modelTag names.ModelTag, controllerTag names.ControllerTag, user *openfga.User) ([]byte, error) {
 	generator := f.NewLoginGenerator()
 	generator.SetTags(modelTag, controllerTag)
-	return generator.makeSuperuserToken(ctx, user)
+	var resourceTags []names.Tag
+	if modelTag.Id() != "" {
+		resourceTags = []names.Tag{modelTag}
+	}
+	return generator.makeSuperuserToken(ctx, user, resourceTags)
+}
+
+// NewCallerScopedLoginToken mints a login token carrying the caller's
+// real access for the given user on the specified controller. If the
+// controller is already persisted, its CloudRegions are fetched from the
+// database so cloud-access claims can be resolved; otherwise the
+// passed-in controller is used as-is.
+//
+// resourceTags may contain any mix of model and application-offer tags
+// whose access levels should be embedded in the token.
+func (f *Factory) NewCallerScopedLoginToken(ctx context.Context, resourceTags []names.Tag, ctl *dbmodel.Controller, user *openfga.User) ([]byte, error) {
+	ctlWithClouds := dbmodel.Controller{}
+	ctlWithClouds.SetTag(ctl.ResourceTag())
+	if err := f.db.GetController(ctx, &ctlWithClouds); err != nil {
+		if errors.ErrorCode(err) != errors.CodeNotFound {
+			return nil, fmt.Errorf("failed to fetch controller for caller token: %w", err)
+		}
+		ctlWithClouds = *ctl
+	}
+	accessMap, err := buildAccessMap(ctx, user, resourceTags, ctl.ResourceTag(), ctlWithClouds, f.accessChecker)
+	if err != nil {
+		return nil, err
+	}
+	return f.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
+		Controller: ctl.ResourceTag().Id(),
+		User:       user.Tag().String(),
+		Access:     accessMap,
+	})
+}
+
+// NewCallerLoginToken returns a login token suitable for a real user's
+// call to the specified controller. Older Juju controllers do not
+// correctly honour model-level JWT claims, so unknown and older versions
+// use the compatibility superuser token.
+func (f *Factory) NewCallerLoginToken(ctx context.Context, resourceTags []names.Tag, ctl *dbmodel.Controller, user *openfga.User) ([]byte, error) {
+	ctrlVersion, err := version.Parse(ctl.AgentVersion)
+	if err != nil || ctrlVersion.Compare(minJujuVersionForCallerToken) < 0 {
+		generator := f.NewLoginGenerator()
+		generator.SetTags(names.ModelTag{}, ctl.ResourceTag())
+		return generator.makeSuperuserToken(ctx, user, resourceTags)
+	}
+	return f.NewCallerScopedLoginToken(ctx, resourceTags, ctl, user)
 }
 
 // NewSSHGenerator returns a new token generator for Juju SSH connections.

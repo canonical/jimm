@@ -66,6 +66,18 @@ func (d *perControllerDialer) DialControllerAsSuperuser(ctx context.Context, use
 	return d.DialModelAsSuperuser(ctx, user, ctl, names.ModelTag{})
 }
 
+// DialModelAsUser implements juju.Dialer. It delegates to DialModelAsSuperuser
+// since the test double does not distinguish real vs superuser permissions.
+func (d *perControllerDialer) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, user, ctl, mt)
+}
+
+// DialControllerAsUser implements juju.Dialer. It delegates to DialControllerAsSuperuser
+// since the test double does not distinguish real vs superuser permissions.
+func (d *perControllerDialer) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
+}
+
 // DialModelAsService implements juju.Dialer. It delegates to DialModelAsSuperuser since
 // the perControllerDialer test double does not distinguish user vs service
 // identity for JWT minting.
