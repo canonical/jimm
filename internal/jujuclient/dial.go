@@ -102,7 +102,7 @@ func (d *Dialer) createLoginRequest(ctx context.Context, ctl *dbmodel.Controller
 }
 
 // createUserLoginRequest creates a login request carrying the caller's
-// real access claims. Used by AsUser dials.
+// real access claims.
 func (d *Dialer) createUserLoginRequest(ctx context.Context, ctl *dbmodel.Controller, resourceTags []names.Tag, user *openfga.User) (*jujuparams.LoginRequest, error) {
 	jwt, err := d.TokenMinter.NewCallerLoginToken(ctx, resourceTags, ctl, user)
 	if err != nil {
