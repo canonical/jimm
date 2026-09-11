@@ -16,7 +16,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	gliderssh "github.com/gliderlabs/ssh"
 	"github.com/juju/names/v6"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -182,12 +181,6 @@ func (s *sshManagerSuite) TestDialInfo(c *qt.C) {
 	err := s.database.GetController(ctx, &ctrl)
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctrl.PublicAddress, qt.Equals, "localhost:1234")
-
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	c.Assert(err, qt.IsNil)
-	pubKey, err := gossh.NewPublicKey(&key.PublicKey)
-	c.Assert(err, qt.IsNil)
-	ctx = context.WithValue(ctx, gliderssh.ContextKeyPublicKey, pubKey)
 
 	// Test that the DialInfo returns the correct controller address and user when the model UUID is valid.
 	connInfo, err := s.sshManager.DialInfo(ctx, s.allowedModelUUID, s.userWithAccess)

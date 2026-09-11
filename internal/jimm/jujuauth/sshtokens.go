@@ -4,16 +4,11 @@ package jujuauth
 
 import (
 	"context"
-	"encoding/base64"
 
 	"github.com/juju/juju/core/permission"
 	"github.com/juju/names/v6"
 
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
-)
-
-const (
-	sshPublicKeyClaim = "ssh_public_key"
 )
 
 // SSHTokenGenerator provides the ability to generate JWT tokens that
@@ -35,7 +30,6 @@ type SSHTokenArgs struct {
 	User           string
 	ControllerUUID string
 	ModelTag       names.Tag
-	PublicKey      []byte
 }
 
 // NewSSHToken generates a JWT token with the correct claims
@@ -48,9 +42,6 @@ func (s *SSHTokenGenerator) NewSSHToken(ctx context.Context, tokenArgs SSHTokenA
 		User:       tokenArgs.User,
 		Access: map[string]string{
 			tokenArgs.ModelTag.String(): string(permission.AdminAccess),
-		},
-		ExtraClaims: map[string]any{
-			sshPublicKeyClaim: base64.StdEncoding.EncodeToString(tokenArgs.PublicKey),
 		},
 	})
 	if err != nil {

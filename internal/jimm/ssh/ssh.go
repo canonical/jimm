@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gliderlabs/ssh"
 	"github.com/juju/zaputil/zapctx"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -248,8 +247,7 @@ func (s *SSHManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 
 // DialInfo resolves the address of the controller to contact given the
 // model UUID and returns a struct with parameters to connect and authenticate
-// to the controller's SSH relay endpoint. The context should contain the
-// public key the user used to authenticate.
+// to the controller's SSH relay endpoint.
 func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (DialInfo, error) {
 	zapctx.Info(ctx, "SSHDialInfo")
 	model, err := s.jujuManager.GetModel(ctx, modelUUID)
@@ -262,16 +260,10 @@ func (s *SSHManager) DialInfo(ctx context.Context, modelUUID string, user *openf
 		return DialInfo{}, errors.New("cannot find addresses for model's controller")
 	}
 
-	publicKey, _ := ctx.Value(ssh.ContextKeyPublicKey).(ssh.PublicKey)
-	if publicKey == nil {
-		return DialInfo{}, errors.New("cannot find user's public key")
-	}
-
 	tokenArgs := jujuauth.SSHTokenArgs{
 		User:           user.Tag().String(),
 		ControllerUUID: model.Controller.UUID,
 		ModelTag:       model.Tag(),
-		PublicKey:      publicKey.Marshal(),
 	}
 	jwtGenerator := s.jwtFactory.NewSSHGenerator()
 	token, err := jwtGenerator.NewSSHToken(ctx, tokenArgs)

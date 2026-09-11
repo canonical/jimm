@@ -24,7 +24,6 @@ func TestNewSSHToken(t *testing.T) {
 		User:           "testuser",
 		ControllerUUID: "123",
 		ModelTag:       names.NewModelTag("testmodel"),
-		PublicKey:      []byte("testkey"),
 	}
 	sshToken, err := sshTokenGen.NewSSHToken(context.Background(), params)
 	c.Assert(err, qt.IsNil)
@@ -32,9 +31,7 @@ func TestNewSSHToken(t *testing.T) {
 
 	c.Assert(jwtSvc.params.User, qt.Equals, "testuser")
 	c.Assert(jwtSvc.params.Controller, qt.Equals, "123")
-	c.Assert(jwtSvc.params.ExtraClaims, qt.DeepEquals, map[string]any{
-		"ssh_public_key": "dGVzdGtleQ==", // base64.StdEncoding.EncodeToString([]byte("testkey"))
-	})
+	c.Assert(jwtSvc.params.ExtraClaims, qt.IsNil)
 	c.Assert(jwtSvc.params.Access, qt.DeepEquals, map[string]string{
 		"model-testmodel": string(permission.AdminAccess),
 	})
