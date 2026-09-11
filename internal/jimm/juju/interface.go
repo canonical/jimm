@@ -42,12 +42,14 @@ type Dialer interface {
 
 	// DialModelAsSuperuser creates a model-scoped connection for the
 	// given user with superuser permissions.
+	//
 	// Deprecated: Use as a workaround.
 	DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
 
 	// DialControllerAsSuperuser creates a controller-scoped connection
 	// for the given user with superuser permissions. Pass
 	// resourceTags for operations tied to specific models or offers.
+	//
 	// Deprecated: Use as a workaround.
 	DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
 
