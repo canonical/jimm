@@ -5,6 +5,7 @@ package jujuclient
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -21,6 +22,7 @@ type fakeTokenMinter struct {
 	resourceTags []names.Tag
 	controller   *dbmodel.Controller
 	user         *openfga.User
+	err          error
 }
 
 func (f *fakeTokenMinter) NewCallerLoginToken(ctx context.Context, resourceTags []names.Tag, ctl *dbmodel.Controller, user *openfga.User) ([]byte, error) {
@@ -28,6 +30,9 @@ func (f *fakeTokenMinter) NewCallerLoginToken(ctx context.Context, resourceTags 
 	f.resourceTags = resourceTags
 	f.controller = ctl
 	f.user = user
+	if f.err != nil {
+		return nil, f.err
+	}
 	return []byte("fake-jwt"), nil
 }
 
@@ -74,4 +79,18 @@ func TestNewDialerWiresTokenMinter(t *testing.T) {
 	c.Assert(d.TokenMinter, qt.Equals, minter)
 	c.Assert(d.JWTService, qt.Equals, jwtSvc)
 	c.Assert(d.AdminUsername, qt.Equals, "jaas-test-uuid@external")
+}
+
+func TestCreateUserLoginRequestPropagatesMintError(t *testing.T) {
+	c := qt.New(t)
+	minter := &fakeTokenMinter{err: errors.New("mint failed")}
+	d := &Dialer{TokenMinter: minter}
+
+	user := &openfga.User{Identity: &dbmodel.Identity{Name: "bob@external"}}
+	ctl := &dbmodel.Controller{UUID: uuid.New().String()}
+	modelTag := names.NewModelTag(uuid.New().String())
+
+	_, err := d.createUserLoginRequest(context.Background(), ctl, []names.Tag{modelTag}, user)
+	c.Assert(err, qt.ErrorMatches, "mint failed")
+	c.Assert(minter.called, qt.IsTrue)
 }
