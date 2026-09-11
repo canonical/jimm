@@ -94,3 +94,16 @@ func TestCreateUserLoginRequestPropagatesMintError(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, "mint failed")
 	c.Assert(minter.called, qt.IsTrue)
 }
+
+func TestCreateLoginRequestPropagatesJWTError(t *testing.T) {
+	c := qt.New(t)
+	// Zero-value JWTService has no signing key, so NewJWT errors.
+	d := &Dialer{JWTService: &jimmjwx.JWTService{}}
+
+	user := &openfga.User{Identity: &dbmodel.Identity{Name: "bob@external"}}
+	ctl := &dbmodel.Controller{UUID: uuid.New().String()}
+	modelTag := names.NewModelTag(uuid.New().String())
+
+	_, err := d.createLoginRequest(context.Background(), ctl, modelTag, user)
+	c.Assert(err, qt.ErrorMatches, "missing signing key provider")
+}
