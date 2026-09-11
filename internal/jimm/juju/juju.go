@@ -77,8 +77,22 @@ func NewJujuManager(
 	}, nil
 }
 
+// dialModelAsUser dials the model on behalf of the given user with the
+// caller's real permissions.
+//
+//nolint:unused
+func (j *JujuManager) dialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error) {
+	if j == nil || j.Dialer == nil {
+		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
+	}
+
+	return j.Dialer.DialModelAsUser(ctx, user, ctl, modelTag)
+}
+
 // dialControllerAsUser dials the controller on behalf of the given user
 // with the caller's real permissions.
+//
+//nolint:unused
 func (j *JujuManager) dialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")

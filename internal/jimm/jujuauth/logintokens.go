@@ -110,7 +110,7 @@ func (auth *LoginTokenGenerator) makeSuperuserToken(ctx context.Context, user *o
 }
 
 // resolveTargetAccess resolves the caller's access level for a single
-// target tag. Unrecognised tag kinds resolve to an empty access level.
+// target tag.
 func resolveTargetAccess(ctx context.Context, user *openfga.User, target names.Tag, accessChecker GeneratorAccessChecker) (string, error) {
 	switch tag := target.(type) {
 	case names.ModelTag:
@@ -128,7 +128,7 @@ func resolveTargetAccess(ctx context.Context, user *openfga.User, target names.T
 		}
 		return access, nil
 	default:
-		return "", nil
+		return "", fmt.Errorf("unsupported resource tag type: %T", target)
 	}
 }
 
@@ -144,27 +144,14 @@ func buildAccessMap(
 ) (map[string]string, error) {
 	accessMap := make(map[string]string)
 
-	targetAccess := make(map[names.Tag]string, len(resourceTags))
-	hasRealAccess := false
 	for _, target := range resourceTags {
 		access, err := resolveTargetAccess(ctx, user, target, accessChecker)
 		if err != nil {
 			return nil, err
 		}
-		targetAccess[target] = access
 		if access != "" {
-			hasRealAccess = true
+			accessMap[target.String()] = access
 		}
-	}
-
-	// Juju rejects logins with empty access claims. Drop empty claims
-	// when the user holds real access to at least one tag. Otherwise,
-	// keep one so Juju itself denies the login.
-	for target, access := range targetAccess {
-		if access == "" && hasRealAccess {
-			continue
-		}
-		accessMap[target.String()] = access
 	}
 
 	controllerAccess, err := accessChecker.GetUserControllerAccess(ctx, user, ct)
@@ -173,9 +160,9 @@ func buildAccessMap(
 	}
 	accessMap[ct.String()] = controllerAccess
 
-	clouds := make(map[names.CloudTag]bool)
+	clouds := make(map[names.CloudTag]struct{})
 	for _, cloudRegion := range ctl.CloudRegions {
-		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = true
+		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = struct{}{}
 	}
 	for cloudTag := range clouds {
 		accessLevel, err := accessChecker.GetUserCloudAccess(ctx, user, cloudTag)
@@ -234,9 +221,9 @@ func (auth *LoginTokenGenerator) MakeLoginToken(ctx context.Context, user *openf
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch controller: %w", err)
 	}
-	clouds := make(map[names.CloudTag]bool)
+	clouds := make(map[names.CloudTag]struct{})
 	for _, cloudRegion := range ctl.CloudRegions {
-		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = true
+		clouds[cloudRegion.CloudRegion.Cloud.ResourceTag()] = struct{}{}
 	}
 	for cloudTag := range clouds {
 		accessLevel, err := auth.accessChecker.GetUserCloudAccess(ctx, auth.user, cloudTag)
