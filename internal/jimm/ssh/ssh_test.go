@@ -6,16 +6,16 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"net"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	gliderssh "github.com/gliderlabs/ssh"
-	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/names/v6"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -110,21 +110,8 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 			return m, err
 		},
 	}
-	attrs := map[string]any{
-		"ssh-server-port": "17023",
-	}
-	certPEM, _, err := jimmtest.GenerateTestCACert()
-	c.Assert(err, qt.IsNil)
-	cfg, err := jujucontroller.NewConfig(uuid, certPEM, attrs)
-	c.Assert(err, qt.IsNil)
-	controllerService := mocks.ControllerService{
-		ControllerConfig_: func(ctx context.Context, user *openfga.User, controllerName string) (jujucontroller.Config, error) {
-			return cfg, nil
-		},
-	}
 	jujuManager := mocks.JujuManager{
-		ModelManager:      modelManager,
-		ControllerService: controllerService,
+		ModelManager: modelManager,
 	}
 	permissionManager, err := permissions.NewManager(s.database, ofgaClient, uuid, jimmTag)
 	c.Assert(err, qt.IsNil)
@@ -195,19 +182,12 @@ func (s *sshManagerSuite) TestDialInfo(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctrl.PublicAddress, qt.Equals, "localhost:1234")
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	c.Assert(err, qt.IsNil)
-	pubKey, err := gossh.NewPublicKey(&key.PublicKey)
-	c.Assert(err, qt.IsNil)
-	ctx = context.WithValue(ctx, gliderssh.ContextKeyPublicKey, pubKey)
-
 	// Test that the DialInfo returns the correct controller address and user when the model UUID is valid.
 	connInfo, err := s.sshManager.DialInfo(ctx, s.allowedModelUUID, s.userWithAccess)
 	c.Assert(err, qt.IsNil)
 	c.Assert(connInfo.Addresses, qt.HasLen, 1)
-	c.Assert(connInfo.Addresses[0], qt.Equals, "localhost")
+	c.Assert(connInfo.Addresses[0], qt.Equals, "localhost:1234")
 	c.Assert(connInfo.JWT, qt.Not(qt.HasLen), 0)
-	c.Assert(connInfo.Port, qt.Equals, 17023)
 	_, err = base64.StdEncoding.DecodeString(connInfo.JWT)
 	c.Assert(err, qt.IsNil)
 
@@ -221,10 +201,10 @@ type mockDialer struct {
 	callCount    int
 }
 
-func (d *mockDialer) Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+func (d *mockDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls.Config, virtualHostname, bearerToken string) (net.Conn, error) {
 	d.callCount++
 	if addr == d.validAddress {
-		return &gossh.Client{}, nil
+		return &net.TCPConn{}, nil
 	}
 	return nil, errors.New("dial error")
 }
@@ -233,18 +213,17 @@ func (s *sshManagerSuite) TestDialAllAddresses(c *qt.C) {
 	ctx := context.Background()
 
 	dialInfo := ssh.DialInfo{
-		Addresses: []string{"10.1.2.3", "10.1.2.4"},
-		Port:      1234,
+		Addresses: []string{"10.1.2.3:17070", "10.1.2.4:17070"},
 		JWT:       "fake-jwt",
 	}
 
-	_, err := s.sshManager.DialController(ctx, dialInfo, s.userWithAccess)
+	_, err := s.sshManager.DialController(ctx, dialInfo, "1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local")
 	c.Assert(err, qt.ErrorMatches, "failed to dial controller: dial error\ndial error")
 	c.Assert(s.mockDialer.callCount, qt.Equals, 2)
 
-	s.mockDialer.validAddress = "10.1.2.4:1234"
+	s.mockDialer.validAddress = "10.1.2.4:17070"
 	// Test that DialController works when there are multiple addresses.
-	_, err = s.sshManager.DialController(ctx, dialInfo, s.userWithAccess)
+	_, err = s.sshManager.DialController(ctx, dialInfo, "1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local")
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.mockDialer.callCount, qt.Equals, 4)
 }

@@ -3,12 +3,14 @@
 package ssh_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -73,27 +75,22 @@ func (s *sshSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	userWithoutAccess := openfga.NewUser(i2, ofgaClient)
 
-	// setup destination server
+	// setup destination server. This simulates the controller's embedded
+	// terminating SSH server: the jump server relays the user's session
+	// bytes to it over the upgraded relay connection.
 	s.received = make(chan bool)
 	destinationServerListener := bufconn.Listen(1 * 1024)
 
 	s.destinationJujuSSHServer = &gliderssh.Server{
-		ChannelHandlers: map[string]gliderssh.ChannelHandler{
-			"direct-tcpip": func(srv *gliderssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx gliderssh.Context) {
-				d := ssh.ForwardMessage{}
-				if err := gossh.Unmarshal(newChan.ExtraData(), &d); err != nil {
-					err := newChan.Reject(gossh.ConnectionFailed, "Failed to parse channel data")
-					c.Check(err, qt.IsNil)
-					return
-				}
-				_, _, err := newChan.Accept()
-				c.Check(err, qt.IsNil)
-				s.testInDestinationServerF(d)
-				s.received <- true
-			},
+		// The destination server terminates the user's SSH session relayed
+		// by the jump server over the upgraded connection.
+		PublicKeyHandler: func(ctx gliderssh.Context, key gliderssh.PublicKey) bool {
+			return true
 		},
-		PasswordHandler: func(ctx gliderssh.Context, password string) bool {
-			return password == "valid-jwt"
+		Handler: func(sess gliderssh.Session) {
+			_, _ = sess.Write([]byte("session established\n"))
+			_ = sess.Exit(0)
+			s.received <- true
 		},
 	}
 	go func() {
@@ -133,24 +130,11 @@ func (s *sshSuite) Init(c *qt.C) {
 				}
 				return jimmssh.DialInfo{}, nil
 			},
-			DialController_: func(ctx context.Context, ctrlInfo jimmssh.DialInfo, user *openfga.User) (*gossh.Client, error) {
-				conn, err := destinationServerListener.Dial()
-				if err != nil {
-					return nil, err
-				}
-				sshConn, newChan, reqs, err := gossh.NewClientConn(conn, "", &gossh.ClientConfig{
-					//nolint:gosec
-					HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-					Auth: []gossh.AuthMethod{
-						gossh.Password("valid-jwt"),
-					},
-					User: user.Name,
-				})
-				if err != nil {
-					return nil, err
-				}
-
-				return gossh.NewClient(sshConn, newChan, reqs), nil
+			DialController_: func(ctx context.Context, ctrlInfo jimmssh.DialInfo, virtualHostname string) (net.Conn, error) {
+				// Simulate the upgraded relay connection: a raw pipe to the
+				// destination server. The user's SSH session bytes are relayed
+				// over it and terminated by the destination server.
+				return destinationServerListener.Dial()
 			},
 		})
 	c.Assert(err, qt.IsNil)
@@ -192,13 +176,36 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 	})
 	defer client.Close()
 
-	// send forward message
-	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
-		c.Check(fm.DestAddr, qt.Equals, s.virtualHostname.String())
-	}
-	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
+	// Open a tunnel to the virtual hostname, then establish the
+	// terminating SSH session over it. The session bytes are relayed by
+	// the jump server over the upgraded connection and terminated by the
+	// destination server.
+	tunnel, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
 	c.Assert(err, qt.IsNil)
-	defer conn.Close()
+	defer tunnel.Close()
+
+	sshConn, newChan, reqs, err := gossh.NewClientConn(tunnel, "", &gossh.ClientConfig{
+		//nolint:gosec // test host key
+		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		Auth: []gossh.AuthMethod{
+			gossh.PublicKeys(s.privateKey),
+		},
+		User: "alice",
+	})
+	c.Assert(err, qt.IsNil)
+	terminatingClient := gossh.NewClient(sshConn, newChan, reqs)
+	defer terminatingClient.Close()
+
+	session, err := terminatingClient.NewSession()
+	c.Assert(err, qt.IsNil)
+	defer session.Close()
+
+	var output bytes.Buffer
+	session.Stdout = &output
+	err = session.Run("")
+	c.Assert(err, qt.IsNil)
+	c.Check(output.String(), qt.Equals, "session established\n")
+
 	select {
 	case <-s.received:
 	case <-time.After(100 * time.Millisecond):
