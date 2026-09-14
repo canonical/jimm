@@ -83,6 +83,11 @@ func TestModelConfigSchema(t *testing.T) {
 	conn := s.Open(c, nil, "test@canonical.com", nil)
 	defer conn.Close()
 
+	ctrlVers, _ := conn.ServerVersion()
+	if ctrlVers.Major < 3 {
+		t.Skip("Skipping test: controller version does not support ModelConfigSchema")
+	}
+
 	client := cloudapi.NewClient(conn)
 	schema, err := client.ModelConfigSchema(t.Context(), jimmtest.TestE2EProviderType)
 	c.Assert(err, qt.Equals, nil)
