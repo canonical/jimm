@@ -38,8 +38,10 @@ type SSHManager interface {
 	// returns a struct with parameters to connect and authenticate to the controller.
 	DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.DialInfo, error)
 
-	// DialController dials a controller's SSH server using the provided info.
-	DialController(ctx context.Context, dialInfo jimmssh.DialInfo, user *openfga.User) (*gossh.Client, error)
+	// DialController dials a controller's SSH relay endpoint using the
+	// provided info and virtual hostname, returning the raw upgraded
+	// connection.
+	DialController(ctx context.Context, dialInfo jimmssh.DialInfo, virtualHostname string) (net.Conn, error)
 }
 
 // forwardMessage is the struct holding the information about the jump message received by the ssh client.
@@ -160,18 +162,14 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 
-		client, err := sshManager.DialController(ctx, dialInfo, user)
+		// The virtual hostname identifies the destination within the
+		// controller; the relay upgrade request carries it in its URL path.
+		controllerConn, err := sshManager.DialController(ctx, dialInfo, d.DestAddr)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to dial controller", err)
 			return
 		}
 
-		// The port below is arbitrary as the controller ignores it.
-		controllerConn, err := client.Dial("tcp", fmt.Sprintf("%s:22", d.DestAddr))
-		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, "failed to create tunnel to controller", err)
-			return
-		}
 		clientConn, reqs, err := newChan.Accept()
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to accept channel creation request", err)
