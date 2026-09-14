@@ -328,6 +328,7 @@ func (a *API) ListApplicationOffers(ctx context.Context, f []crossmodel.Applicat
 	return a.ListApplicationOffers_(ctx, f)
 }
 
+// ModelConfigSchema returns the model config schema for the given provider type.
 func (a *API) ModelConfigSchema(ctx context.Context, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
 	if a.ModelConfigSchema_ == nil {
 		return nil, errors.New("not implemented")
