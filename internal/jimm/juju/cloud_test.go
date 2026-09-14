@@ -1650,36 +1650,43 @@ func TestModelConfigSchema(t *testing.T) {
 	}
 }
 
-// modelConfigSchemaVersionEnv defines three controllers with out-of-order
-// agent versions so we can assert ModelConfigSchema dials the highest
-// version controller first.
+// modelConfigSchemaVersionEnv defines several controllers with out-of-order
+// agent versions, including version 3 controllers that must be filtered out,
+// so we can assert ModelConfigSchema only considers version 4+ controllers
+// and dials the highest version controller first.
 const modelConfigSchemaVersionEnv = `clouds:
 - name: test-cloud
   type: test-provider
   regions:
   - name: test-cloud-region
 controllers:
-- name: controller-low
+- name: controller-v3-low
   uuid: 00000001-0000-0000-0000-000000000001
   cloud: test-cloud
   region: test-cloud-region
   agent-version: 3.6.4
-- name: controller-high
+- name: controller-v4-high
   uuid: 00000001-0000-0000-0000-000000000002
   cloud: test-cloud
   region: test-cloud-region
   agent-version: 4.0.1
-- name: controller-mid
+- name: controller-v3-high
   uuid: 00000001-0000-0000-0000-000000000003
   cloud: test-cloud
   region: test-cloud-region
   agent-version: 3.6.6
+- name: controller-v4-low
+  uuid: 00000001-0000-0000-0000-000000000004
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 4.0.0
 users:
 - username: alice@canonical.com
   controller-access: superuser
 `
 
-// TestModelConfigSchemaVersionOrdering asserts that ModelConfigSchema tries
+// TestModelConfigSchemaVersionOrdering asserts that ModelConfigSchema
+// discards version 3 (and below) controllers and tries the remaining
 // controllers in descending agent-version order, so the highest version
 // controller is dialled first regardless of the order controllers are
 // returned from the database.
@@ -1709,9 +1716,10 @@ func TestModelConfigSchemaVersionOrdering(t *testing.T) {
 	}
 
 	dialer := jimmtest.DialerMap{
-		"controller-high": makeDialer("controller-high", highSchema),
-		"controller-mid":  makeDialer("controller-mid", nil),
-		"controller-low":  makeDialer("controller-low", nil),
+		"controller-v4-high": makeDialer("controller-v4-high", highSchema),
+		"controller-v4-low":  makeDialer("controller-v4-low", nil),
+		"controller-v3-high": makeDialer("controller-v3-high", nil),
+		"controller-v3-low":  makeDialer("controller-v3-low", nil),
 	}
 
 	j := newTestJujuManager(c, &parameters{Dialer: dialer})
@@ -1724,7 +1732,60 @@ func TestModelConfigSchemaVersionOrdering(t *testing.T) {
 
 	schema, err := j.ModelConfigSchema(ctx, user, "test-provider")
 	c.Assert(err, qt.IsNil)
-	// Only the highest version controller should have been dialled.
-	c.Check(dialled, qt.DeepEquals, []string{"controller-high"})
+	// Version 3 controllers are discarded, so only the highest version 4
+	// controller should have been dialled.
+	c.Check(dialled, qt.DeepEquals, []string{"controller-v4-high"})
 	c.Check(schema, qt.DeepEquals, highSchema)
+}
+
+// modelConfigSchemaOnlyV3Env defines a fleet made up entirely of version 3
+// controllers, all of which must be filtered out.
+const modelConfigSchemaOnlyV3Env = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-v3-a
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.4
+- name: controller-v3-b
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.6
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+// TestModelConfigSchemaOnlyV3Controllers asserts that when every registered
+// controller is version 3 or below they are all discarded, leaving no
+// controllers to serve the schema.
+func TestModelConfigSchemaOnlyV3Controllers(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	dialer := &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelConfigSchema_: func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+				c.Fatal("no controller should be dialled")
+				return nil, nil
+			},
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+
+	env := jimmtest.ParseEnvironment(c, modelConfigSchemaOnlyV3Env)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+	_, err := j.ModelConfigSchema(ctx, user, "test-provider")
+	c.Check(err, qt.ErrorMatches, `no controllers registered`)
 }

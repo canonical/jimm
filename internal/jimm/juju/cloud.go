@@ -617,6 +617,21 @@ func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User,
 		return nil, errors.New("no controllers registered")
 	}
 
+	// Drop controllers whose major version is 3 or below. Their schemas
+	// are not compatible with the schema JIMM presents, so we only
+	// consider version 4 and above. Controllers with an unparseable
+	// agent version are retained (they sort last below).
+	controllers = slices.DeleteFunc(controllers, func(ctl dbmodel.Controller) bool {
+		v, err := version.Parse(ctl.AgentVersion)
+		if err != nil {
+			return false
+		}
+		return v.Major <= 3
+	})
+	if len(controllers) == 0 {
+		return nil, errors.New("no controllers registered")
+	}
+
 	// TODO: We prefer the highest reachable versioned controller when
 	// responding to config schema calls. Naturally, this means we may
 	// respond to an older version controller with a newer schema.
