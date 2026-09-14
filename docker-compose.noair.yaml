@@ -1,0 +1,22 @@
+# Monkey-patch compose override: run jimm-dev WITHOUT air (no hot reload,
+# no file watcher). Used to check whether air skews the SSH benchmarks.
+#
+# Usage (note both -f flags; the override must come last):
+#   docker compose -f docker-compose.yaml -f docker-compose.noair.yaml \
+#       --profile dev up -d --build jimm-dev
+#
+# Then run the benchmark as usual. To go back to air, just restart with the
+# normal docker-compose.yaml (no -f docker-compose.noair.yaml).
+
+services:
+  jimm-dev:
+    # Replace air's entrypoint with a one-shot build + exec, same as the
+    # smoke target's entrypoint.sh. The container still uses the dev image
+    # (golang + mounted source), so no image rebuild is needed.
+    entrypoint:
+      - bash
+      - -c
+      - >-
+        cd /jimm
+        && go build -buildvcs=false -o jimmsrv ./cmd/jimmsrv
+        && exec ./jimmsrv
