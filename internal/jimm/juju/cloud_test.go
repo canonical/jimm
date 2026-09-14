@@ -1649,3 +1649,82 @@ func TestModelConfigSchema(t *testing.T) {
 		})
 	}
 }
+
+// modelConfigSchemaVersionEnv defines three controllers with out-of-order
+// agent versions so we can assert ModelConfigSchema dials the highest
+// version controller first.
+const modelConfigSchemaVersionEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-low
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.4
+- name: controller-high
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 4.0.1
+- name: controller-mid
+  uuid: 00000001-0000-0000-0000-000000000003
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.6
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+// TestModelConfigSchemaVersionOrdering asserts that ModelConfigSchema tries
+// controllers in descending agent-version order, so the highest version
+// controller is dialled first regardless of the order controllers are
+// returned from the database.
+func TestModelConfigSchemaVersionOrdering(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	var dialled []string
+	makeDialer := func(name string, schema map[string]jujuparams.ModelConfigSchemaField) *jimmtest.Dialer {
+		return &jimmtest.Dialer{
+			API: &jimmtest.API{
+				ModelConfigSchema_: func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+					dialled = append(dialled, name)
+					return schema, nil
+				},
+			},
+		}
+	}
+
+	highSchema := map[string]jujuparams.ModelConfigSchemaField{
+		"name": {
+			Description: "The name of the model.",
+			Type:        "string",
+			Mandatory:   true,
+		},
+	}
+
+	dialer := jimmtest.DialerMap{
+		"controller-high": makeDialer("controller-high", highSchema),
+		"controller-mid":  makeDialer("controller-mid", nil),
+		"controller-low":  makeDialer("controller-low", nil),
+	}
+
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+
+	env := jimmtest.ParseEnvironment(c, modelConfigSchemaVersionEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+	schema, err := j.ModelConfigSchema(ctx, user, "test-provider")
+	c.Assert(err, qt.IsNil)
+	// Only the highest version controller should have been dialled.
+	c.Check(dialled, qt.DeepEquals, []string{"controller-high"})
+	c.Check(schema, qt.DeepEquals, highSchema)
+}

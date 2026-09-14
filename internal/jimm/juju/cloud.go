@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	jujucloud "github.com/juju/juju/cloud"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v6"
+	"github.com/juju/version/v2"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -614,6 +616,27 @@ func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User,
 	if len(controllers) == 0 {
 		return nil, errors.New("no controllers registered")
 	}
+
+	// TODO: We prefer the highest reachable versioned controller when
+	// responding to config schema calls. Naturally, this means we may
+	// respond to an older version controller with a newer schema.
+	//
+	// We do this at least until we have a more stable solution, which may involve
+	// better handling of controller versions and schema compatibility.
+	sort.SliceStable(controllers, func(i, k int) bool {
+		vi, erri := version.Parse(controllers[i].AgentVersion)
+		vk, errk := version.Parse(controllers[k].AgentVersion)
+		switch {
+		case erri != nil && errk != nil:
+			return false
+		case erri != nil:
+			return false
+		case errk != nil:
+			return true
+		default:
+			return vi.Compare(vk) > 0
+		}
+	})
 
 	var dialErr error
 	for i := range controllers {
