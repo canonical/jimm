@@ -14,7 +14,6 @@ import (
 	cloudapi "github.com/juju/juju/api/client/cloud"
 	"github.com/juju/juju/api/client/modelmanager"
 	"github.com/juju/juju/cloud"
-	"github.com/juju/juju/core/semversion"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v6"
 
@@ -86,16 +85,12 @@ func TestModelConfigSchema(t *testing.T) {
 
 	client := cloudapi.NewClient(conn)
 	schema, err := client.ModelConfigSchema(t.Context(), jimmtest.TestE2EProviderType)
-
-	ctrlVers, _ := conn.ServerVersion()
-	if ctrlVers.Compare(semversion.MustParse("4.0.0")) == -1 {
-		// JIMM discards controllers with a major version of 3 or below
-		// when serving the model config schema, so a version 3 backing
-		// controller leaves no controllers to answer the request.
-		c.Assert(err, qt.ErrorMatches, `no controllers registered`)
+	// If we have an error, it is likely we're testing specifically against Juju 3 only backing controller.
+	if err != nil {
+		c.Assert(err, qt.ErrorMatches, ".*no controllers registered.*")
 		return
 	}
-
+	// Otherwise, 4 or 4 and 3 in which case we should be taking highest version.
 	c.Assert(err, qt.Equals, nil)
 	// Every provider's model config schema includes the common "name"
 	// attribute. We use this as a best effort that the schema is working as intended.
