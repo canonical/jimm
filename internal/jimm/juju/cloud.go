@@ -657,6 +657,7 @@ func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User,
 	for i := range controllers {
 		api, err := j.dialController(ctx, &controllers[i], user)
 		if err != nil {
+			zapctx.Error(ctx, "failed to dial controller", zap.Error(err))
 			dialErr = err
 			continue
 		}
