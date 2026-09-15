@@ -44,6 +44,10 @@ type sshSuite struct {
 	received                 chan bool
 	virtualHostname          virtualhostname.Info
 	maxConcurrentConnections int
+
+	// controllerClient holds the client returned by the mock DialController,
+	// allowing tests to observe the controller connection's lifecycle.
+	controllerClient *gossh.Client
 }
 
 func (s *sshSuite) Init(c *qt.C) {
@@ -150,7 +154,8 @@ func (s *sshSuite) Init(c *qt.C) {
 					return nil, err
 				}
 
-				return gossh.NewClient(sshConn, newChan, reqs), nil
+				s.controllerClient = gossh.NewClient(sshConn, newChan, reqs)
+				return s.controllerClient, nil
 			},
 		})
 	c.Assert(err, qt.IsNil)
@@ -203,6 +208,42 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 	case <-s.received:
 	case <-time.After(100 * time.Millisecond):
 		c.Fail()
+	}
+}
+
+// TestSSHJumpClosesControllerConnection verifies that the connection to the
+// controller is closed once the user's tunnel is torn down, so it doesn't leak.
+func (s *sshSuite) TestSSHJumpClosesControllerConnection(c *qt.C) {
+	client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
+		Auth: []gossh.AuthMethod{
+			gossh.PublicKeys(s.privateKey),
+		},
+		User: "alice",
+	})
+	defer client.Close()
+
+	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
+		c.Check(fm.DestAddr, qt.Equals, s.virtualHostname.String())
+	}
+	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
+	c.Assert(err, qt.IsNil)
+
+	// Tear down the tunnel from the client side.
+	err = conn.Close()
+	c.Assert(err, qt.IsNil)
+
+	// The jump server should close the controller connection in response.
+	// Wait on the controller client's underlying connection; it returns
+	// once the connection is closed.
+	done := make(chan error, 1)
+	go func() {
+		done <- s.controllerClient.Conn.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		c.Fatal("test timed out waiting for connection close")
 	}
 }
 
