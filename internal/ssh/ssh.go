@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -165,6 +166,9 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			rejectConnectionAndLogError(ctx, newChan, "failed to dial controller", err)
 			return
 		}
+		// The connection to the controller is closed when this handler
+		// returns, which happens once the tunnel below is torn down.
+		defer client.Close()
 
 		// The port below is arbitrary as the controller ignores it.
 		controllerConn, err := client.Dial("tcp", fmt.Sprintf("%s:22", d.DestAddr))
@@ -182,21 +186,26 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Since we only need the raw data to redirect, we can discard them.
 		go gossh.DiscardRequests(reqs)
 
-		go func() {
+		// Copy data in both directions until the tunnel is torn down.
+		// Closing either connection unblocks the other copy, and the
+		// deferred client.Close above then tears down the connection
+		// to the controller.
+		var wg sync.WaitGroup
+		wg.Go(func() {
 			defer clientConn.Close()
 			defer controllerConn.Close()
 			if _, err := io.Copy(clientConn, controllerConn); err != nil {
 				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
 			}
-
-		}()
-		go func() {
+		})
+		wg.Go(func() {
 			defer clientConn.Close()
 			defer controllerConn.Close()
 			if _, err := io.Copy(controllerConn, clientConn); err != nil {
 				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
 			}
-		}()
+		})
+		wg.Wait()
 	}
 }
 
