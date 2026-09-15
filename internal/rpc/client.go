@@ -45,7 +45,7 @@ func (e *Error) ErrorCode() string {
 
 // NewClient takes a websocket connection and returns an RPC client.
 // Note that a go routine is started that reads on the websocket.
-func NewClient(conn *websocket.Conn) *Client {
+func NewClient(conn *TrackedConn) *Client {
 	cl := &Client{
 		conn:   conn,
 		closed: make(chan struct{}),
@@ -62,7 +62,7 @@ type inflight struct {
 
 // A Client is a juju RPC client.
 type Client struct {
-	conn   *websocket.Conn
+	conn   *TrackedConn
 	closed chan struct{}
 
 	mu    sync.Mutex
