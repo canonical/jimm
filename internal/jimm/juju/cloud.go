@@ -632,9 +632,9 @@ func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User,
 		return nil, errors.New("no controllers registered")
 	}
 
-	// TODO: We prefer the highest reachable versioned controller when
-	// responding to config schema calls. Naturally, this means we may
-	// respond to an older version controller with a newer schema.
+	// TODO: We prefer the highest versioned controller when responding to
+	// config schema calls. Naturally, this means we may respond to an older
+	// version controller with a newer schema.
 	//
 	// We do this at least until we have a more stable solution, which may involve
 	// better handling of controller versions and schema compatibility.
@@ -653,19 +653,13 @@ func (j *JujuManager) ModelConfigSchema(ctx context.Context, user *openfga.User,
 		}
 	})
 
-	var dialErr error
-	for i := range controllers {
-		api, err := j.dialController(ctx, &controllers[i], user)
-		if err != nil {
-			zapctx.Error(ctx, "failed to dial controller", zap.Error(err))
-			dialErr = err
-			continue
-		}
-		schema, err := api.ModelConfigSchema(ctx, providerType)
-		api.Close()
-		return schema, err
+	api, err := j.dialController(ctx, &controllers[0], user)
+	if err != nil {
+		zapctx.Error(ctx, "failed to dial controller", zap.Error(err))
+		return nil, err
 	}
-	return nil, dialErr
+	defer api.Close()
+	return api.ModelConfigSchema(ctx, providerType)
 }
 
 // addCloudControllerRelation adds a controller relation between a cloud and controller.

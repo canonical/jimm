@@ -85,7 +85,7 @@ func TestModelConfigSchema(t *testing.T) {
 
 	client := cloudapi.NewClient(conn)
 	schema, err := client.ModelConfigSchema(t.Context(), jimmtest.TestE2EProviderType)
-	// If we have an error, it is likely we're testing specifically against Juju 3 only backing controller.
+	// If we have an error, it is because we're testing specifically against Juju 3 only backing controller.
 	if err != nil {
 		c.Assert(err, qt.ErrorMatches, ".*no controllers registered.*")
 		return
