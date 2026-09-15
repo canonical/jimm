@@ -94,7 +94,7 @@ func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 			break
 		}
 		lastErr = err
-		if results != nil && len(results) == 1 && results[0].Error != nil {
+		if len(results) == 1 && results[0].Error != nil {
 			lastErr = results[0].Error
 		}
 		time.Sleep(time.Second)
