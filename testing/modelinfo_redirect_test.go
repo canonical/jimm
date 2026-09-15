@@ -20,12 +20,9 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 )
 
-// redirectingDialer wraps a juju.Dialer so that the first ModelInfo call
-// on the given controller returns a redirect error pointing at the same
-// controller. This simulates the redirect a Juju controller returns after
-// an internal (JIMM-to-JIMM) model migration, without running a real
-// migration. All dials still go to the real controller with real
-// caller-scoped credentials.
+// redirectingDialer wraps a juju.Dialer and fakes the redirect a controller
+// returns after an internal model migration. Only the first ModelInfo on
+// ctlName is intercepted; everything else hits the real controller.
 type redirectingDialer struct {
 	juju.Dialer
 	ctlName    string
@@ -44,8 +41,8 @@ func (d *redirectingDialer) DialControllerAsUser(ctx context.Context, u *openfga
 	return &redirectingAPI{API: api, ctlName: d.ctlName}, nil
 }
 
-// redirectingAPI wraps an API so its first ModelInfo call returns a
-// redirect error as if the model had been migrated to another controller.
+// redirectingAPI returns a redirect error from ModelInfo, as if the
+// model had been migrated away.
 type redirectingAPI struct {
 	juju.API
 	ctlName string
@@ -61,13 +58,11 @@ func (a *redirectingAPI) ModelInfo(ctx context.Context, mt names.ModelTag) (juju
 	}
 }
 
-// TestModelInfoAfterInternalMigrationRedirect verifies that when a
-// controller returns a redirect error for ModelInfo (as happens after an
-// internal model migration), JIMM re-dials the target controller as the
-// calling user with their real permissions and serves the model info from
-// there. The redirect is synthetic, but both dials hit the real Juju
-// controller with caller-scoped JWTs, so the test proves Juju accepts the
-// caller-scoped token on the re-dial.
+// TestModelInfoAfterInternalMigrationRedirect checks that JIMM handles a
+// post-migration redirect: it repoints the model and re-dials as the
+// calling user. The redirect itself is faked (see redirectingDialer) since
+// we only have one controller. The re-dial goes to real Juju with the
+// caller's own permissions.
 func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
@@ -75,29 +70,22 @@ func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 	model := s.CreateModelForBob(c)
 	ctrlName := model.Controller.Name
 
-	// Put the model into internal-migration mode, as
-	// initiateMigration would.
+	// Mark the model as mid-migration, as initiateMigration would.
 	model.MigrationMode = dbmodel.MigrationModeMigrateInternal
 	err := s.JIMM.Database.UpdateModel(c.Context(), model)
 	c.Assert(err, qt.IsNil)
 
-	// Wrap the real dialer so the first ModelInfo on the source
-	// controller returns a redirect to the same controller.
 	s.JIMM.JujuManager.Dialer = &redirectingDialer{
 		Dialer:  s.JIMM.JujuManager.Dialer,
 		ctlName: ctrlName,
 	}
 
-	// Call ModelInfo as bob (non-admin model owner) through JIMM's API.
 	conn := s.Open(c, nil, "bob@canonical.com", nil)
 	defer conn.Close()
 	client := modelmanager.NewClient(conn)
 
 	var info jujuparams.ModelInfo
 	var lastErr error
-	// The re-dial serves the model from the target controller; since no
-	// real migration ran, the model exists there (same controller), so
-	// the call must succeed with real model data.
 	for range 10 {
 		results, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(model.UUID.String)})
 		if err == nil && len(results) == 1 && results[0].Error == nil {
@@ -115,8 +103,7 @@ func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 	c.Check(info.UUID, qt.Equals, model.UUID.String)
 	c.Check(info.Name, qt.Equals, model.Name)
 
-	// JIMM must have repointed the model at the target controller and
-	// cleared the migration mode.
+	// The model must be repointed and out of migration mode.
 	var updated dbmodel.Model
 	updated.SetTag(model.ResourceTag())
 	err = s.JIMM.Database.GetModel(c.Context(), &updated)
