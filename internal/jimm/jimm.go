@@ -360,9 +360,34 @@ func NewDialerAdapter(dialer *jujuclient.Dialer) *DialerAdapter {
 	}
 }
 
-// Dial implements the juju.Dialer interface for the DialerAdapter.
-// It uses the underlying jujuclient.Dialer to establish a connection
-// to the Juju controller and returns a juju.API connection.
-func (d *DialerAdapter) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (juju.API, error) {
-	return d.dialer.Dial(ctx, ctl, modelTag, user)
+// DialModelAsUser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsUser(ctx, user, ctl, modelTag)
+}
+
+// DialControllerAsUser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.dialer.DialControllerAsUser(ctx, user, ctl, resourceTags...)
+}
+
+// DialModelAsSuperuser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsSuperuser(ctx, user, ctl, modelTag)
+}
+
+// DialControllerAsSuperuser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.dialer.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
+}
+
+// DialModelAsService implements the juju.Dialer interface for the
+// DialerAdapter. It dials the model using JIMM's own service identity.
+func (d *DialerAdapter) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsService(ctx, ctl, modelTag)
+}
+
+// DialControllerAsService implements the juju.Dialer interface for the
+// DialerAdapter. It dials the controller using JIMM's own service identity.
+func (d *DialerAdapter) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
+	return d.dialer.DialControllerAsService(ctx, ctl)
 }

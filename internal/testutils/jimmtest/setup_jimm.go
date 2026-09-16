@@ -29,6 +29,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
@@ -107,7 +109,10 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		JWKS:   jwksService,
 	})
 
-	dialer := jujuclient.NewDialer(jwtService, ControllerUUID)
+	dialerPermManager, err := permissions.NewManager(database, s.OFGAClient, ControllerUUID, names.NewControllerTag(ControllerUUID))
+	c.Assert(err, qt.IsNil)
+	dialerFactory := jujuauth.NewFactory(database, jwtService, dialerPermManager)
+	dialer := jujuclient.NewDialer(jwtService, dialerFactory, ControllerUUID)
 
 	deps := &jimmsvc.ServiceDependencies{
 		ControllerUUID:                params.ControllerUUID,

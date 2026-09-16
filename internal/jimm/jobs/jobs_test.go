@@ -11,7 +11,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -39,51 +38,6 @@ func setupDeps(c *qt.C) testDeps {
 	}
 
 	return deps
-}
-
-func TestGetJobInfo_Success(t *testing.T) {
-	c := qt.New(t)
-	deps := setupDeps(c)
-
-	ctx := context.Background()
-	jobID := int64(123)
-	finishedAt := time.Now()
-
-	deps.jobQuerier.EXPECT().GetJobInfo(gomock.Any(), jobID).
-		Return(&rivertype.JobRow{
-			ID:          jobID,
-			Kind:        "test_job",
-			State:       rivertype.JobStateCompleted,
-			Attempt:     2,
-			MaxAttempts: 5,
-			FinalizedAt: &finishedAt,
-			Errors: []rivertype.AttemptError{
-				{Error: "test error", At: time.Now(), Attempt: 1},
-			},
-		}, nil)
-
-	result, err := deps.jobManager.GetJobInfo(ctx, jobID)
-	assert.NoError(t, err)
-	assert.Equal(t, jobID, result.ID)
-	assert.Equal(t, "test_job", result.Kind)
-	assert.Equal(t, 2, result.CurrentAttempt)
-	assert.Equal(t, 5, result.MaxAttempts)
-	assert.Equal(t, 1, len(result.Errors))
-}
-
-func TestGetJobInfo_QueryError(t *testing.T) {
-	c := qt.New(t)
-	deps := setupDeps(c)
-
-	ctx := context.Background()
-	jobID := int64(123)
-
-	deps.jobQuerier.EXPECT().GetJobInfo(gomock.Any(), int64(123)).
-		Return(nil, errors.New("query error"))
-
-	_, err := deps.jobManager.GetJobInfo(ctx, jobID)
-	c.Assert(err, qt.IsNotNil)
-	c.Assert(err, qt.ErrorMatches, "query error")
 }
 
 func TestGetActiveBootstrapStatusForController_Success(t *testing.T) {

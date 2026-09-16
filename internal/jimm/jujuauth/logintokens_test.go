@@ -40,6 +40,8 @@ type testAccessChecker struct {
 	controllerAccessCheckErr error
 	modelAccess              map[string]string
 	modelAccessCheckErr      error
+	offerAccess              map[string]string
+	offerAccessCheckErr      error
 	cloudAccess              map[string]string
 	cloudAccessCheckErr      error
 	permissions              map[string]string
@@ -52,6 +54,14 @@ func (tac *testAccessChecker) GetUserModelAccess(ctx context.Context, user *open
 		return "", tac.modelAccessCheckErr
 	}
 	return tac.modelAccess[mt.String()], nil
+}
+
+// GetUserApplicationOfferAccess implements the GetUserApplicationOfferAccess method of the JWTGeneratorAccessChecker interface.
+func (tac *testAccessChecker) GetUserApplicationOfferAccess(ctx context.Context, user *openfga.User, ot names.ApplicationOfferTag) (string, error) {
+	if tac.offerAccessCheckErr != nil {
+		return "", tac.offerAccessCheckErr
+	}
+	return tac.offerAccess[ot.String()], nil
 }
 
 // GetUserControllerAccess implements the GetUserControllerAccess method of the JWTGeneratorAccessChecker interface.

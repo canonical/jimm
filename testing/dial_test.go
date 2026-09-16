@@ -31,7 +31,7 @@ func TestDial(t *testing.T) {
 		TLSHostname:   "juju-apiserver",
 	}
 
-	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api, err := s.JIMM.Dialer.DialControllerAsService(context.Background(), &ctl)
 	c.Assert(err, qt.Equals, nil)
 	defer api.Close()
 
@@ -69,7 +69,7 @@ func TestDialWithJWT(t *testing.T) {
 	}
 
 	// Check dial is OK
-	api, err := dialer.Dial(ctx, &ctl, names.ModelTag{}, nil)
+	api, err := dialer.DialControllerAsService(ctx, &ctl)
 	c.Assert(err, qt.Equals, nil)
 	defer api.Close()
 
@@ -98,7 +98,7 @@ func TestDialModelStatusMissingModel(t *testing.T) {
 		TLSHostname:   "juju-apiserver",
 	}
 
-	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, names.ModelTag{}, nil)
+	api, err := s.JIMM.Dialer.DialControllerAsService(context.Background(), &ctl)
 	c.Assert(err, qt.Equals, nil)
 	defer api.Close()
 
@@ -124,7 +124,7 @@ func TestConnectStreams(t *testing.T) {
 		TLSHostname:   "juju-apiserver",
 	}
 
-	api, err := s.JIMM.Dialer.Dial(context.Background(), &ctl, model.ResourceTag(), nil)
+	api, err := s.JIMM.Dialer.DialModelAsService(context.Background(), &ctl, model.ResourceTag())
 	c.Assert(err, qt.Equals, nil)
 	defer api.Close()
 

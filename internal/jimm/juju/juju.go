@@ -77,15 +77,59 @@ func NewJujuManager(
 	}, nil
 }
 
-// dial dials the controller and model specified by the given Controller
-// and ModelTag. If no Dialer has been configured then an error with a
-// code of CodeConnectionFailed will be returned.
-func (j *JujuManager) dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (API, error) {
+// dialModelAsUser dials the model on behalf of the given user with the
+// caller's real permissions.
+//
+//nolint:unused
+func (j *JujuManager) dialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error) {
 	if j == nil || j.Dialer == nil {
 		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
 	}
 
-	return j.Dialer.Dial(ctx, ctl, modelTag, user)
+	return j.Dialer.DialModelAsUser(ctx, user, ctl, modelTag)
+}
+
+// dialControllerAsUser dials the controller on behalf of the given user
+// with the caller's real permissions.
+//
+//nolint:unused
+func (j *JujuManager) dialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error) {
+	if j == nil || j.Dialer == nil {
+		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
+	}
+
+	return j.Dialer.DialControllerAsUser(ctx, user, ctl, resourceTags...)
+}
+
+// dialControllerAsSuperuser dials the controller on behalf of the given
+// user with forced superuser permissions.
+func (j *JujuManager) dialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error) {
+	if j == nil || j.Dialer == nil {
+		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
+	}
+
+	return j.Dialer.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
+}
+
+// dialModelAsService dials the model using JIMM's own service identity.
+// Use this for internal housekeeping that has no associated user.
+func (j *JujuManager) dialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error) {
+	if j == nil || j.Dialer == nil {
+		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
+	}
+
+	return j.Dialer.DialModelAsService(ctx, ctl, modelTag)
+}
+
+// dialControllerAsService dials the controller using JIMM's own service
+// identity. Use this for internal housekeeping that has no associated
+// user.
+func (j *JujuManager) dialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (API, error) {
+	if j == nil || j.Dialer == nil {
+		return nil, errors.Codef(errors.CodeConnectionFailed, "no dialer configured")
+	}
+
+	return j.Dialer.DialControllerAsService(ctx, ctl)
 }
 
 // ResourceTag returns JIMM's controller tag stating its UUID.

@@ -75,7 +75,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 	if err == nil {
 		// The offer exists in JIMM's database, check against the Juju controller
 		// It's possible for an offer record in JIMM to dangle
-		checkAPI, dialErr := j.dial(ctx, &model.Controller, names.ModelTag{}, user)
+		checkAPI, dialErr := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
 		if dialErr != nil {
 			return dialErr
 		}
@@ -99,7 +99,7 @@ func (j *JujuManager) Offer(ctx context.Context, user *openfga.User, offer AddAp
 		return err
 	}
 
-	api, err := j.dial(ctx, &model.Controller, names.ModelTag{}, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (j *JujuManager) GetApplicationOfferConsumeDetails(ctx context.Context, use
 		return errors.Codef(errors.CodeNotFound, "not found")
 	}
 
-	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{}, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &offer.Model.Controller)
 	if err != nil {
 		return err
 	}
@@ -384,7 +384,7 @@ func (j *JujuManager) GetApplicationOffer(ctx context.Context, user *openfga.Use
 	// controller. The all-watcher events do not include enough
 	// information to reasonably keep the local database up-to-date,
 	// and it would be non-trivial to make it do so.
-	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{}, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &offer.Model.Controller)
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +555,7 @@ func (j *JujuManager) queryControllersForOffers(ctx context.Context, user *openf
 			// Return early if a single controller has an error
 			// to avoid misleading clients about what exists which
 			// could cause unneeded reconciliation.
-			api, err := j.dial(ctx, ctl, names.ModelTag{}, user)
+			api, err := j.dialControllerAsSuperuser(ctx, user, ctl)
 			if err != nil {
 				return err
 			}
@@ -613,7 +613,7 @@ func (j *JujuManager) doApplicationOfferAdmin(ctx context.Context, user *openfga
 		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 	// add offer admin claim
-	api, err := j.dial(ctx, &offer.Model.Controller, names.ModelTag{}, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &offer.Model.Controller)
 	if err != nil {
 		return err
 	}
