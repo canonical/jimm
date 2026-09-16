@@ -51,8 +51,6 @@ the caller holds.
   Results re-authorized via OpenFGA
 - `jujuapi/streamcontrollerproxy.go`: migration log-transfer stream
 
-## Revisiting these exceptions
-
 TODO(luci1900): revisit each when its blocker is resolved:
 
 - migration facades accept caller-scoped tokens
