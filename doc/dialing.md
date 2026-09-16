@@ -19,7 +19,7 @@ User-triggered, but JIMM is the acting party.
 
 ### JIMM-admin operations
 
-User-triggered, but the admin holds no OpenFGA relations on the backing controller's resources, so there are no claims to mint.
+User-triggered, but the JIMM admin has no OpenFGA relations on the backing controller's resources, so there are no permissions to encode in a caller-scoped token.
 
 - `model.go` `UpgradeController`: upgrades the controller model, which is never related to users in OpenFGA
 - `controller.go` `ControllerConfig`
@@ -32,15 +32,14 @@ JIMM enforces authorization, but the backing facade needs more than the caller h
 
 - `cloud.go`: add/manage/remove hosted clouds
 - `model.go` `ChangeModelCredential`: forced credential update (`force=true` requires controller superuser)
-- `modelbuilder.go`: forced credential update on model create. `GrantJIMMModelAdmin` (JUJU-8869)
+- `modelbuilder.go`: forced credential update on model create and `GrantJIMMModelAdmin` (JUJU-8869)
 - `applicationoffer.go` `queryControllersForOffers`: spans many models, a single caller-scoped JWT can't satisfy Juju's per-model check. Results re-authorized via OpenFGA
 - `jujuapi/streamcontrollerproxy.go`: migration log-transfer stream
 
+### Revisit
 TODO(luci1900): revisit each when its blocker is resolved:
-
 - migration facades accept caller-scoped tokens
 - non-admins can manage clouds
 - non-admins can use `force=true` credentials
 - offer queries across many models work with a single caller-scoped JWT
-- controller registration, import, and config no longer require superuser
-
+- controller registration, import and config no longer require superuser
