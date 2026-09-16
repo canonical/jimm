@@ -144,6 +144,13 @@ func (j *PermissionManager) GetUserModelAccess(ctx context.Context, user *openfg
 	return ToModelAccessString(accessLevel), nil
 }
 
+// GetUserApplicationOfferAccess returns the access level a user has
+// against a specific application offer.
+func (j *PermissionManager) GetUserApplicationOfferAccess(ctx context.Context, user *openfga.User, offer names.ApplicationOfferTag) (string, error) {
+	accessLevel := user.GetApplicationOfferAccess(ctx, offer)
+	return ToOfferAccessString(accessLevel), nil
+}
+
 // GrantAuditLogAccess grants audit log access for the target user.
 func (j *PermissionManager) GrantAuditLogAccess(ctx context.Context, user *openfga.User, targetUserTag names.UserTag) error {
 

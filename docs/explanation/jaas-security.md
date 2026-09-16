@@ -16,7 +16,7 @@ Cloud credentials are API keys used by Juju/JAAS to provision cloud infrastructu
 These credentials are securely uploaded to and stored by JAAS.
 When a model is created, the key is passed to the Juju controller to manage cloud resources.
 
-User-provided cloud credentials are stored securely in a [Vault](https://www.vaultproject.io/),
+User-provided cloud credentials are stored securely in a [Vault](https://developer.hashicorp.com/vault),
 a tool for managing secrets. Ensuring the secure handling of these credentials is essential
 to prevent unauthorised access or data breaches.
 
@@ -228,7 +228,7 @@ TLS is not enabled by default.
 
 CORS or Cross-Origin Resource Sharing is a browser security feature designed to prevent
 malicious use of your online credentials. Read more about CORS
-[here](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS#what_requests_use_cors).
+[here](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#what_requests_use_cors).
 
 JAAS supports the use of CORS headers specifically for the Juju dashboard. The dashboard
 requires the ability to send cross-origin requests from the domain where it is hosted to

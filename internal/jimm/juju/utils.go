@@ -5,10 +5,6 @@ package juju
 import (
 	"context"
 
-	"github.com/juju/names/v6"
-	"github.com/juju/zaputil"
-	"github.com/juju/zaputil/zapctx"
-
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -58,14 +54,4 @@ func (j *JujuManager) getControllerByName(ctx context.Context, controllerName st
 		return nil, errors.Codef(errors.CodeNotFound, "controller not found")
 	}
 	return &controller, nil
-}
-
-// dialController dials a controller.
-func (j *JujuManager) dialController(ctx context.Context, ctl *dbmodel.Controller, user *openfga.User) (API, error) {
-	api, err := j.dial(ctx, ctl, names.ModelTag{}, user)
-	if err != nil {
-		zapctx.Error(ctx, "failed to dial the controller", zaputil.Error(err))
-		return nil, err
-	}
-	return api, nil
 }

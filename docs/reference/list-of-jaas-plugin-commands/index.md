@@ -707,48 +707,6 @@ The --owner command is necessary when importing a model created by a
 local user and it will switch the model owner to the desired external user.
 
 
-# JOBS
-
-**Aliases:** list-jobs
-
-## Summary
-Lists all jobs known to JIMM.
-
-## Usage
-```text
-jaas jobs [options]
-```
-
-### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--count` | 100 | Maximum number of jobs to return (max 10000) |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `--kind` |  | Filter jobs by kind (can be specified multiple times) |
-| `-o`, `--output` |  | Specify an output file |
-| `--status` |  | Filter jobs by status (can be specified multiple times) |
-
-## Examples
-
-    juju jobs
-    juju jobs --format json
-    juju jobs --count 500
-    juju jobs --kind backup --kind restore
-    juju jobs --status running --status pending
-    juju jobs --count 1000 --status failed --kind backup
-
-
-## Details
-
-Displays information on long-running jobs.
-
-The command supports filtering by job kind and status, and allows you to
-limit the number of results returned (up to 10,000 jobs).
-
-Valid job statuses are: running, successful, pending, failed, unknown
-
-
 # LIST-AUDIT-EVENTS
 
 **Aliases:** audit-events
@@ -849,48 +807,6 @@ Displays controller information for all controllers known to JIMM.
 For JAAS admins, this will also display controllers that are in the process of being bootstrapped.
 
 
-# LIST-JOBS
-
-**Aliases:** list-jobs
-
-## Summary
-Lists all jobs known to JIMM.
-
-## Usage
-```text
-jaas jobs [options]
-```
-
-### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--count` | 100 | Maximum number of jobs to return (max 10000) |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `--kind` |  | Filter jobs by kind (can be specified multiple times) |
-| `-o`, `--output` |  | Specify an output file |
-| `--status` |  | Filter jobs by status (can be specified multiple times) |
-
-## Examples
-
-    juju jobs
-    juju jobs --format json
-    juju jobs --count 500
-    juju jobs --kind backup --kind restore
-    juju jobs --status running --status pending
-    juju jobs --count 1000 --status failed --kind backup
-
-
-## Details
-
-Displays information on long-running jobs.
-
-The command supports filtering by job kind and status, and allows you to
-limit the number of results returned (up to 10,000 jobs).
-
-Valid job statuses are: running, successful, pending, failed, unknown
-
-
 # LIST-MIGRATION-TARGETS
 
 ## Summary
@@ -924,6 +840,36 @@ criteria:
 - The controller can deploy to the the same cloud/region as the current controller.
 - The controller is running a compatible Juju version i.e. newer than or equal to
   the current controller.
+
+
+# LIST-MODELS
+
+**Aliases:** list-models
+
+## Summary
+Lists all models accessible via JIMM.
+
+## Usage
+```text
+jaas models [options]
+```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju models
+    juju models --format json
+
+
+## Details
+
+Displays model and controller information for all models accessible to the authenticated user.
 
 
 # LIST-PERMISSIONS
@@ -1136,6 +1082,36 @@ jaas model-status [options] <model uuid>
 ## Details
 
 Displays full model status.
+
+
+# MODELS
+
+**Aliases:** list-models
+
+## Summary
+Lists all models accessible via JIMM.
+
+## Usage
+```text
+jaas models [options]
+```
+
+### Options
+| Flag | Default | Usage |
+| --- | --- | --- |
+| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output` |  | Specify an output file |
+
+## Examples
+
+    juju models
+    juju models --format json
+
+
+## Details
+
+Displays model and controller information for all models accessible to the authenticated user.
 
 
 # PERMISSIONS

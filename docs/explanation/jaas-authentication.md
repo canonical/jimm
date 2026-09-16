@@ -37,7 +37,7 @@ The username for external users in JAAS is either an email address or a service 
 Because JAAS uses the OAuth 2.0/OIDC standard, theoretically various providers can be connected to JAAS and used as a login provider.
 However, due to the varying security practices and slight deviations from the standard, not all providers are supported with JAAS.
 
-Officially, JAAS supports [Ory Hydra](https://www.ory.sh/hydra/), a cloud native OAuth 2.0 and OIDC server. This is a key component of
+Officially, JAAS supports [Ory Hydra](https://www.ory.com/hydra), a cloud native OAuth 2.0 and OIDC server. This is a key component of
 the [Canonical identity platform](https://charmhub.io/topics/canonical-identity-platform) which not only provides a standards compliant OAuth/OIDC server but also allows you to configure
 social sign-on via other OIDC compliant identity providers (e.g. Azure AD, Google, Okta, etc.).
 

@@ -44,7 +44,7 @@ func newPerControllerDialer(api juju.API) *perControllerDialer {
 	}
 }
 
-func (d *perControllerDialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ *openfga.User) (juju.API, error) {
+func (d *perControllerDialer) DialModelAsSuperuser(_ context.Context, _ *openfga.User, ctl *dbmodel.Controller, _ names.ModelTag) (juju.API, error) {
 	name := ctl.Name
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -57,6 +57,39 @@ func (d *perControllerDialer) Dial(_ context.Context, ctl *dbmodel.Controller, _
 			d.closed[name]++
 		},
 	}, nil
+}
+
+// DialControllerAsSuperuser implements juju.Dialer. It delegates to DialModelAsSuperuser since the
+// perControllerDialer test double does not distinguish connection scope,
+// resource tags, or user vs service identity for JWT minting.
+func (d *perControllerDialer) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, user, ctl, names.ModelTag{})
+}
+
+// DialModelAsUser implements juju.Dialer. It delegates to DialModelAsSuperuser
+// since the test double does not distinguish real vs superuser permissions.
+func (d *perControllerDialer) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, user, ctl, mt)
+}
+
+// DialControllerAsUser implements juju.Dialer. It delegates to DialControllerAsSuperuser
+// since the test double does not distinguish real vs superuser permissions.
+func (d *perControllerDialer) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
+}
+
+// DialModelAsService implements juju.Dialer. It delegates to DialModelAsSuperuser since
+// the perControllerDialer test double does not distinguish user vs service
+// identity for JWT minting.
+func (d *perControllerDialer) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, nil, ctl, mt)
+}
+
+// DialControllerAsService implements juju.Dialer. It delegates to DialModelAsSuperuser
+// since the perControllerDialer test double does not distinguish connection
+// scope or user vs service identity for JWT minting.
+func (d *perControllerDialer) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, nil, ctl, names.ModelTag{})
 }
 
 // openedCounts returns a snapshot of the dial counts per controller.

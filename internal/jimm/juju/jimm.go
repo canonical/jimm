@@ -44,7 +44,7 @@ func (j *JujuManager) forEachController(ctx context.Context, controllers []dbmod
 	eg := new(errgroup.Group)
 	for i := range controllers {
 		eg.Go(func() error {
-			api, err := j.dial(ctx, &controllers[i], names.ModelTag{}, nil)
+			api, err := j.dialControllerAsService(ctx, &controllers[i])
 			if err != nil {
 				return err
 			}
@@ -206,7 +206,7 @@ func (j *JujuManager) FullModelStatus(ctx context.Context, user *openfga.User, m
 		return nil, err
 	}
 
-	api, err := j.dial(ctx, &model.Controller, modelTag, nil)
+	api, err := j.dialModelAsService(ctx, &model.Controller, modelTag)
 	if err != nil {
 		return nil, err
 	}
