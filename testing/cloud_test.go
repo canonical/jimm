@@ -861,18 +861,18 @@ func TestRecoverModelCredential(t *testing.T) {
 	req := apiparams.RecoverModelCredentialRequest{
 		CredentialTag: credTag.String(),
 	}
-	err = nonAdminConn.APICall("JIMM", 4, "", "RecoverModelCredential", &req, nil)
+	err = nonAdminConn.APICall(c.Context(), "JIMM", 4, "", "RecoverModelCredential", &req, nil)
 	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
 
 	// Dry-run: the secrets are fetched from the backing controller but
 	// not written back to the credential store.
 	req.DryRun = true
-	err = conn.APICall("JIMM", 4, "", "RecoverModelCredential", &req, nil)
+	err = conn.APICall(c.Context(), "JIMM", 4, "", "RecoverModelCredential", &req, nil)
 	c.Assert(err, qt.IsNil)
 
 	// Full recovery: the secrets are fetched and written back.
 	req.DryRun = false
-	err = conn.APICall("JIMM", 4, "", "RecoverModelCredential", &req, nil)
+	err = conn.APICall(c.Context(), "JIMM", 4, "", "RecoverModelCredential", &req, nil)
 	c.Assert(err, qt.IsNil)
 
 	// The recovered secrets must match what the controller holds for

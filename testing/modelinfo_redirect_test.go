@@ -11,7 +11,7 @@ import (
 	"github.com/juju/juju/api/client/modelmanager"
 	jujurpc "github.com/juju/juju/rpc"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
+	"github.com/juju/names/v6"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
@@ -90,7 +90,7 @@ func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 	var info jujuparams.ModelInfo
 	var lastErr error
 	for range 10 {
-		results, err := client.ModelInfo([]names.ModelTag{names.NewModelTag(model.UUID.String)})
+		results, err := client.ModelInfo(c.Context(), []names.ModelTag{names.NewModelTag(model.UUID.String)})
 		if err == nil && len(results) == 1 && results[0].Error == nil {
 			info = *results[0].Result
 			lastErr = nil
