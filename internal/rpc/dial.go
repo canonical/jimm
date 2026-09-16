@@ -10,7 +10,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"runtime"
+	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/gorilla/websocket"
 	"github.com/juju/juju/core/network"
@@ -21,6 +24,81 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 )
+
+// A TrackedConn is a websocket connection that removes itself from
+// the package registry on Close. All connections returned by Dial
+// are of this type.
+type TrackedConn struct {
+	*websocket.Conn
+}
+
+// Close closes the connection and removes it from the registry.
+func (c *TrackedConn) Close() error {
+	untrackConn(c.Conn)
+	return c.Conn.Close()
+}
+
+// ConnInfo describes a controller connection opened via Dial.
+type ConnInfo struct {
+	Controller string
+	ModelTag   string
+	DialStack  string
+}
+
+var (
+	// connTracking enables recording controller connections opened
+	// via Dial. Test setups only.
+	connTracking atomic.Bool
+
+	regMu    sync.Mutex
+	registry = map[*websocket.Conn]ConnInfo{}
+)
+
+// EnableConnTracking enables recording controller connections opened
+// via Dial, so tests can detect leaked connections. Test setups only.
+func EnableConnTracking() {
+	connTracking.Store(true)
+}
+
+func trackConn(conn *websocket.Conn, info ConnInfo) {
+	if !connTracking.Load() {
+		return
+	}
+	info.DialStack = captureDialStack()
+	regMu.Lock()
+	defer regMu.Unlock()
+	registry[conn] = info
+}
+
+func untrackConn(conn *websocket.Conn) {
+	if !connTracking.Load() {
+		return
+	}
+	regMu.Lock()
+	defer regMu.Unlock()
+	delete(registry, conn)
+}
+
+// ActiveControllerConnections returns the controller connections
+// opened via Dial that have not been closed yet.
+func ActiveControllerConnections() map[*websocket.Conn]ConnInfo {
+	regMu.Lock()
+	defer regMu.Unlock()
+	m := make(map[*websocket.Conn]ConnInfo, len(registry))
+	for conn, info := range registry {
+		m[conn] = info
+	}
+	return m
+}
+
+// ResetConnTracking clears the connection registry. Test cleanup use
+// only: it drops references to any leaked connections (and their
+// stack traces) so they don't affect subsequent tests.
+func ResetConnTracking() {
+	regMu.Lock()
+	defer regMu.Unlock()
+	clear(registry)
+}
 
 // A Dialer is used to create client connections to an RPC URL.
 type Dialer struct {
@@ -34,7 +112,7 @@ func (d Dialer) Dial(ctx context.Context, url string, headers http.Header) (*Cli
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(conn), nil
+	return NewClient(&TrackedConn{Conn: conn}), nil
 }
 
 // DialWebsocket dials a url and returns a websocket.
@@ -87,10 +165,10 @@ func GetAddressesAndTLSConfig(ctx context.Context, ctl *dbmodel.Controller) ([]s
 	return addrs, tlsConfig
 }
 
-// Dial connects to the controller/model and returns a raw websocket
-// that can be used as is.
-// It accepts the endpoints to dial, normally /api or /commands.
-func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string, headers http.Header, attrs url.Values) (*websocket.Conn, error) {
+// Dial connects to the controller/model and returns a websocket
+// that can be used as is. It accepts the endpoints to dial,
+// normally /api or /commands.
+func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, finalPath string, headers http.Header, attrs url.Values) (*TrackedConn, error) {
 	addrs, tlsConfig := GetAddressesAndTLSConfig(ctx, ctl)
 	dialer := Dialer{
 		TLSConfig: tlsConfig,
@@ -104,7 +182,30 @@ func Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag,
 	if err != nil {
 		return nil, err
 	}
-	return conn, nil
+	trackConn(conn, ConnInfo{
+		Controller: ctl.Name,
+		ModelTag:   modelTag.Id(),
+	})
+	return &TrackedConn{Conn: conn}, nil
+}
+
+// captureDialStack returns a compact stack trace identifying the
+// caller of Dial, skipping frames inside this package.
+func captureDialStack() string {
+	pcs := make([]uintptr, 32)
+	n := runtime.Callers(2, pcs)
+	frames := runtime.CallersFrames(pcs[:n])
+	var sb strings.Builder
+	for {
+		frame, more := frames.Next()
+		if !strings.Contains(frame.File, "internal/rpc/") {
+			fmt.Fprintf(&sb, "%s\n  %s:%d\n", frame.Function, frame.File, frame.Line)
+		}
+		if !more {
+			break
+		}
+	}
+	return sb.String()
 }
 
 // maybeReachable decides what kinds of links JIMM should try to connect via.

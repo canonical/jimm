@@ -37,6 +37,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/river"
+	"github.com/canonical/jimm/v3/internal/rpc"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 )
 
@@ -154,6 +155,11 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 
 	s.service, err = jimmsvc.NewServiceFromDependencies(ctx, deps)
 	c.Assert(err, qt.IsNil)
+
+	rpc.EnableConnTracking()
+	// Registered before the service cleanup (LIFO) so it runs after
+	// JIMM has shut down.
+	CheckNoLeakedControllerConnections(c, 2*time.Second)
 	c.Cleanup(s.service.Cleanup)
 
 	s.JIMM = s.service.JIMM()

@@ -20,8 +20,9 @@ func TestImportLogs(t *testing.T) {
 	conn := s.Open(c, &api.Info{}, s.AdminUser.Name, nil)
 	defer conn.Close()
 	client := migrationtarget.NewClient(conn)
-	_, err := client.OpenLogTransferStream(model.UUID.String)
+	stream, err := client.OpenLogTransferStream(model.UUID.String)
 	c.Assert(err, qt.IsNil)
+	defer stream.Close()
 }
 
 // TestImportLogsError tests that an error is returned when
@@ -34,6 +35,7 @@ func TestImportLogsError(t *testing.T) {
 	conn := s.Open(c, &api.Info{}, s.AdminUser.Name, nil)
 	defer conn.Close()
 	client := migrationtarget.NewClient(conn)
-	_, err := client.OpenLogTransferStream(model.UUID.String)
+	stream, err := client.OpenLogTransferStream(model.UUID.String)
 	c.Assert(err, qt.IsNil)
+	defer stream.Close()
 }
