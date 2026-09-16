@@ -24,14 +24,18 @@ import (
 	jujucloud "github.com/juju/juju/cloud"
 	"github.com/juju/juju/core/macaroon"
 	"github.com/juju/names/v5"
+	"go.uber.org/mock/gomock"
 
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	offerpkg "github.com/canonical/jimm/v3/internal/jimm/offer"
+	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
 	"github.com/canonical/jimm/v3/internal/vault"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 func TestMain(m *testing.M) {
@@ -359,11 +363,12 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	tests := []struct {
-		about          string
-		setup          func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity)
-		caveats        []string
-		expectDeclared map[string]string
-		expectedError  string
+		about           string
+		setup           func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity)
+		idpGroupFetcher func(ctrl *gomock.Controller) offerpkg.IdPGroupFetcher
+		caveats         []string
+		expectDeclared  map[string]string
+		expectedError   string
 	}{{
 		about:         "unknown caveats",
 		caveats:       []string{"unknown-caveat"},
@@ -399,6 +404,41 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 		},
 		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
 		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
+	}, {
+		// The consume permission is granted to an IdP group; the user's
+		// membership is resolved via the IdPGroupFetcher at discharge time.
+		about: "user is an offer consumer via IdP group membership only",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
+			// Grant consume access on the offer to the IdP group. The user
+			// holds no direct tuples on the offer.
+			err := ofgaClient.AddRelation(ctx, openfga.Tuple{
+				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("canonical"), ofganames.MemberRelation),
+				Relation: ofganames.ConsumerRelation,
+				Target:   ofganames.ConvertTag(offer.ResourceTag()),
+			})
+			c.Assert(err, qt.IsNil)
+		},
+		idpGroupFetcher: func(ctrl *gomock.Controller) offerpkg.IdPGroupFetcher {
+			fetcher := offermocks.NewMockIdPGroupFetcher(ctrl)
+			fetcher.EXPECT().FetchGroups(gomock.Any(), "alice@canonical.com").
+				Return([]string{"canonical"}, nil).AnyTimes()
+			return fetcher
+		},
+		caveats:        []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectDeclared: map[string]string{"offer-uuid": offer.UUID},
+	}, {
+		// Without an IdPGroupFetcher, group-derived access is denied.
+		about: "user is an offer consumer via IdP group membership only, no group fetcher",
+		setup: func(c *qt.C, ofgaClient *openfga.OFGAClient, user *dbmodel.Identity) {
+			err := ofgaClient.AddRelation(ctx, openfga.Tuple{
+				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("canonical"), ofganames.MemberRelation),
+				Relation: ofganames.ConsumerRelation,
+				Target:   ofganames.ConvertTag(offer.ResourceTag()),
+			})
+			c.Assert(err, qt.IsNil)
+		},
+		caveats:       []string{fmt.Sprintf("is-consumer %s %s", user.ResourceTag(), offer.UUID)},
+		expectedError: ".*cannot discharge: permission denied",
 	}}
 	for _, test := range tests {
 		c.Run(test.about, func(c *qt.C) {
@@ -408,7 +448,15 @@ func TestThirdPartyCaveatDischarge(t *testing.T) {
 			p := newTestServiceParameters(c)
 			p.OpenFGAParams = cofgaParamsToJIMMOpenFGAParams(*cofgaParams)
 			p.InsecureSecretStorage = true
-			svc, err := jimmsvc.NewService(ctx, p)
+			deps, err := jimmsvc.NewServiceDependencies(ctx, p)
+			c.Assert(err, qt.IsNil)
+			// Override the IdPGroupFetcher with the test's implementation
+			// (nil for cases that don't set one).
+			ctrl := gomock.NewController(c)
+			if test.idpGroupFetcher != nil {
+				deps.IdPGroupFetcher = test.idpGroupFetcher(ctrl)
+			}
+			svc, err := jimmsvc.NewServiceFromDependencies(ctx, deps)
 			c.Assert(err, qt.IsNil)
 			defer svc.Cleanup()
 

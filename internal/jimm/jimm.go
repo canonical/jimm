@@ -77,6 +77,11 @@ type Parameters struct {
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator login.OAuthAuthenticator
 
+	// IdPGroupFetcher resolves a user's IdP groups without a login session,
+	// for non-session flows such as macaroon discharge. If nil, group-based
+	// access is denied in those flows.
+	IdPGroupFetcher offer.IdPGroupFetcher
+
 	// MigrationTokenGenerator is used to generate migration tokens for
 	// authentication between Juju and JIMM during model migration.
 	MigrationTokenGenerator juju.MigrationTokenGenerator
@@ -241,7 +246,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.ConfigManager = configManager
 
-	offerAuthorizer, err := offer.NewOfferAuthorizer(j.Database, j.OpenFGAClient)
+	offerAuthorizer, err := offer.NewOfferAuthorizer(j.Database, j.OpenFGAClient, p.IdPGroupFetcher)
 	if err != nil {
 		return nil, err
 	}
