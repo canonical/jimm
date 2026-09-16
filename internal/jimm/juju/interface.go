@@ -123,6 +123,10 @@ type API interface {
 	// ListModelSummaries lists models summaries
 	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
 
+	// ModelConfigSchema fetches the model config schema for the given
+	// provider type.
+	ModelConfigSchema(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error)
+
 	// ModelInfo fetches a model's ModelInfo.
 	ModelInfo(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 

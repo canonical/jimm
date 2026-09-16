@@ -8,6 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	jujucloud "github.com/juju/juju/cloud"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v6"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -1534,4 +1535,257 @@ func TestRemoveFromControllerCloud(t *testing.T) {
 			test.assertSuccess(c, j)
 		})
 	}
+}
+
+const modelConfigSchemaTestEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-cloud-region
+    priority: 1
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+var modelConfigSchemaTests = []struct {
+	name              string
+	env               string
+	dialError         error
+	modelConfigSchema func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error)
+	username          string
+	providerType      string
+	expectSchema      map[string]jujuparams.ModelConfigSchemaField
+	expectError       string
+}{{
+	name: "Success",
+	env:  modelConfigSchemaTestEnv,
+	modelConfigSchema: func(_ context.Context, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+		if providerType != "test-provider" {
+			return nil, errors.New("bad provider type")
+		}
+		return map[string]jujuparams.ModelConfigSchemaField{
+			"name": {
+				Description: "The name of the model.",
+				Type:        "string",
+				Mandatory:   true,
+			},
+		}, nil
+	},
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectSchema: map[string]jujuparams.ModelConfigSchemaField{
+		"name": {
+			Description: "The name of the model.",
+			Type:        "string",
+			Mandatory:   true,
+		},
+	},
+}, {
+	name:         "NoControllers",
+	env:          "",
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectError:  `no controllers registered`,
+}, {
+	name:         "DialError",
+	env:          modelConfigSchemaTestEnv,
+	dialError:    errors.New("test dial error"),
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectError:  `test dial error`,
+}, {
+	name: "APIError",
+	env:  modelConfigSchemaTestEnv,
+	modelConfigSchema: func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+		return nil, errors.New("test error")
+	},
+	username:     "alice@canonical.com",
+	providerType: "test-provider",
+	expectError:  `test error`,
+}}
+
+func TestModelConfigSchema(t *testing.T) {
+	c := qt.New(t)
+
+	for _, test := range modelConfigSchemaTests {
+		c.Run(test.name, func(c *qt.C) {
+			ctx := context.Background()
+
+			env := jimmtest.ParseEnvironment(c, test.env)
+			dialer := &jimmtest.Dialer{
+				API: &jimmtest.API{
+					ModelConfigSchema_: test.modelConfigSchema,
+				},
+				Err:  test.dialError,
+				UUID: "00000001-0000-0000-0000-000000000001",
+			}
+
+			j := newTestJujuManager(c, &parameters{
+				Dialer: dialer,
+			})
+
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+			dbUser := env.User(test.username).DBObject(c, j.Database)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+			schema, err := j.ModelConfigSchema(ctx, user, test.providerType)
+			if test.expectError != "" {
+				c.Check(err, qt.ErrorMatches, test.expectError)
+				return
+			}
+			c.Assert(err, qt.IsNil)
+			c.Check(dialer.IsClosed(), qt.Equals, true)
+			c.Check(schema, qt.DeepEquals, test.expectSchema)
+		})
+	}
+}
+
+// modelConfigSchemaVersionEnv defines several controllers with out-of-order
+// agent versions, including version 3 controllers that must be filtered out,
+// so we can assert ModelConfigSchema only considers version 4+ controllers
+// and dials the highest version controller first.
+const modelConfigSchemaVersionEnv = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-v3-low
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.4
+- name: controller-v4-high
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 4.0.1
+- name: controller-v3-high
+  uuid: 00000001-0000-0000-0000-000000000003
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.6
+- name: controller-v4-low
+  uuid: 00000001-0000-0000-0000-000000000004
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 4.0.0
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+// TestModelConfigSchemaVersionOrdering asserts that ModelConfigSchema
+// discards version 3 (and below) controllers and tries the remaining
+// controllers in descending agent-version order, so the highest version
+// controller is dialled first regardless of the order controllers are
+// returned from the database.
+func TestModelConfigSchemaVersionOrdering(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	var dialled []string
+	makeDialer := func(name string, schema map[string]jujuparams.ModelConfigSchemaField) *jimmtest.Dialer {
+		return &jimmtest.Dialer{
+			API: &jimmtest.API{
+				ModelConfigSchema_: func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+					dialled = append(dialled, name)
+					return schema, nil
+				},
+			},
+		}
+	}
+
+	highSchema := map[string]jujuparams.ModelConfigSchemaField{
+		"name": {
+			Description: "The name of the model.",
+			Type:        "string",
+			Mandatory:   true,
+		},
+	}
+
+	dialer := jimmtest.DialerMap{
+		"controller-v4-high": makeDialer("controller-v4-high", highSchema),
+		"controller-v4-low":  makeDialer("controller-v4-low", nil),
+		"controller-v3-high": makeDialer("controller-v3-high", nil),
+		"controller-v3-low":  makeDialer("controller-v3-low", nil),
+	}
+
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+
+	env := jimmtest.ParseEnvironment(c, modelConfigSchemaVersionEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+	schema, err := j.ModelConfigSchema(ctx, user, "test-provider")
+	c.Assert(err, qt.IsNil)
+	// Version 3 controllers are discarded, so only the highest version 4
+	// controller should have been dialled.
+	c.Check(dialled, qt.DeepEquals, []string{"controller-v4-high"})
+	c.Check(schema, qt.DeepEquals, highSchema)
+}
+
+// modelConfigSchemaOnlyV3Env defines a fleet made up entirely of version 3
+// controllers, all of which must be filtered out.
+const modelConfigSchemaOnlyV3Env = `clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-cloud-region
+controllers:
+- name: controller-v3-a
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.4
+- name: controller-v3-b
+  uuid: 00000001-0000-0000-0000-000000000002
+  cloud: test-cloud
+  region: test-cloud-region
+  agent-version: 3.6.6
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+// TestModelConfigSchemaOnlyV3Controllers asserts that when every registered
+// controller is version 3 or below they are all discarded, leaving no
+// controllers to serve the schema.
+func TestModelConfigSchemaOnlyV3Controllers(t *testing.T) {
+	c := qt.New(t)
+
+	ctx := context.Background()
+
+	dialer := &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelConfigSchema_: func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+				c.Fatal("no controller should be dialled")
+				return nil, nil
+			},
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+
+	env := jimmtest.ParseEnvironment(c, modelConfigSchemaOnlyV3Env)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+	_, err := j.ModelConfigSchema(ctx, user, "test-provider")
+	c.Check(err, qt.ErrorMatches, `no controllers registered`)
 }
