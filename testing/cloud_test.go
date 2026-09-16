@@ -846,7 +846,7 @@ func TestRecoverModelCredential(t *testing.T) {
 	existingCloudCred := s.GetExistingClientCredentialsForCloud(c, jimmtest.TestE2ECloudName)
 	credTag := s.BobCredential.ResourceTag()
 
-	// Simulate a credential-store outage by wiping the stored secrets.
+	// Check that the credential is currently in the store.
 	_, err := s.JIMM.CredentialStore.Get(context.Background(), credTag)
 	c.Assert(err, qt.IsNil)
 

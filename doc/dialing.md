@@ -53,7 +53,7 @@ the caller holds.
 
 ## Revisiting these exceptions
 
-TODO(luci1900) revisit when each is resolved:
+TODO(luci1900): revisit each when its blocker is resolved:
 
 - migration facades accept caller-scoped tokens
 - non-admins can manage clouds

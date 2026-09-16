@@ -21,8 +21,8 @@ import (
 )
 
 // redirectingDialer wraps a juju.Dialer and fakes the redirect a controller
-// returns after an internal model migration. Only the first ModelInfo on
-// ctlName is intercepted; everything else hits the real controller.
+// returns after an internal model migration. Only the first dial is
+// intercepted, while everything else hits the real controller.
 type redirectingDialer struct {
 	juju.Dialer
 	ctlName    string
