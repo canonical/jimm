@@ -402,7 +402,6 @@ func (j *JujuManager) doCloudAdmin(ctx context.Context, user *openfga.User, ct n
 		}
 		return fmt.Errorf("cloud administration not available for %s", ct.Id())
 	}
-	// TODO(luci1900): dial as the user once Juju lets non-admins manage clouds.
 	api, err := j.dialControllerAsSuperuser(ctx, user, &c.Regions[0].Controllers[0].Controller)
 	if err != nil {
 		return err
@@ -558,7 +557,6 @@ func (j *JujuManager) RemoveCloudFromController(ctx context.Context, user *openf
 		return errors.Codef(errors.CodeNotFound, "cloud not hosted by controller")
 	}
 
-	// TODO(luci1900): dial as the user once Juju lets non-admins remove clouds.
 	api, err := j.dialControllerAsSuperuser(ctx, user, &controller)
 	if err != nil {
 		return err

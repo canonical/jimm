@@ -50,3 +50,15 @@ the caller holds.
   a single caller-scoped JWT can't satisfy Juju's per-model check.
   Results re-authorized via OpenFGA
 - `jujuapi/streamcontrollerproxy.go`: migration log-transfer stream
+
+## Revisiting these exceptions
+
+TODO(luci1900) revisit when each is resolved:
+
+- migration facades accept caller-scoped tokens
+- non-admins can manage clouds
+- non-admins can use `force=true` credentials
+- offer queries across many models work with a single
+  caller-scoped JWT
+- controller registration, import, and config no longer require
+  superuser

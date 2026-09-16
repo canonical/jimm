@@ -557,8 +557,6 @@ func (j *JujuManager) queryControllersForOffers(ctx context.Context, user *openf
 			// to avoid misleading clients about what exists which
 			// could cause unneeded reconciliation.
 
-			// TODO(luci1900): dial as the user once Juju supports
-			// multi-model offer queries with caller-scoped tokens.
 			api, err := j.dialControllerAsSuperuser(ctx, user, ctl)
 			if err != nil {
 				return err

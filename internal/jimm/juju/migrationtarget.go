@@ -30,10 +30,8 @@ import (
 
 const TIMEOUT_PENDING_MIGRATION = 24 * time.Hour
 
-// All dial calls in this file use AsServiceecause JIMM is the acting
-// party during migration, not the user.
-// TODO(luci1900): reconsider once Juju's migration facades
-// support caller-scoped tokens.
+// All dial calls in this file use AsService because JIMM is the acting
+// party during migration, not the user. See doc/dialing.md.
 
 // AbortMigration aborts a model migration with the given model UUID.
 // It does this by calling the Abort method on the target Juju controller.

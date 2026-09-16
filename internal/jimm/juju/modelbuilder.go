@@ -546,8 +546,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	}
 
 	if b.credential != nil {
-		// TODO(luci1900): dial as the user once Juju allows force=true
-		// for non-admins.
 		svcAPI, err := b.jujuManager.dialControllerAsSuperuser(b.ctx, b.ofgaUser, b.controller)
 		if err != nil {
 			b.err = err
@@ -606,8 +604,6 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	// attempts to create a model with the same name again.
 	// TODO(JUJU-8869): We need to keep this despite encoding permissions in
 	// JWTs because Juju returns a different result on migrated models otherwise.
-	// TODO(luci1900): dial as the user once Juju lets users grant JIMM
-	// model access themselves.
 	svcAPI, err := b.jujuManager.dialControllerAsSuperuser(b.ctx, b.ofgaUser, b.controller)
 	if err != nil {
 		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))

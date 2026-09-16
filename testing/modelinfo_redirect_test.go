@@ -34,7 +34,9 @@ func (d *redirectingDialer) DialControllerAsUser(ctx context.Context, u *openfga
 	if err != nil {
 		return nil, err
 	}
-	if ctl.Name != d.ctlName || d.redirected {
+	// Only the first dial is intercepted. The re-dial after JIMM
+	// handles the redirect must hit the real controller.
+	if d.redirected {
 		return api, nil
 	}
 	d.redirected = true
@@ -59,10 +61,11 @@ func (a *redirectingAPI) ModelInfo(ctx context.Context, mt names.ModelTag) (juju
 }
 
 // TestModelInfoAfterInternalMigrationRedirect checks that JIMM handles a
-// post-migration redirect: it repoints the model and re-dials as the
-// calling user. The redirect itself is faked (see redirectingDialer) since
-// we only have one controller. The re-dial goes to real Juju with the
-// caller's own permissions.
+// post-migration redirect: it updates the model's controller in the
+// database and re-dials the target controller as the calling user. The
+// redirect itself is faked (see redirectingDialer) since we only have one
+// controller. The re-dial goes to real Juju with the caller's own
+// permissions.
 func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)
@@ -103,7 +106,8 @@ func TestModelInfoAfterInternalMigrationRedirect(t *testing.T) {
 	c.Check(info.UUID, qt.Equals, model.UUID.String)
 	c.Check(info.Name, qt.Equals, model.Name)
 
-	// The model must be repointed and out of migration mode.
+	// The model must be updated to point at the target controller and be
+	// out of migration mode.
 	var updated dbmodel.Model
 	updated.SetTag(model.ResourceTag())
 	err = s.JIMM.Database.GetModel(c.Context(), &updated)
