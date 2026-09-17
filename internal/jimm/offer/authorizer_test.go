@@ -15,6 +15,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/jimm/offer"
 	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -168,6 +169,50 @@ func TestIsUserConsumerForOffer(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 		}
 	}
+}
+
+// TestIsUserConsumerForOfferViaHookServiceGroupFetcher verifies the
+// authorization path with the real hook-service IdPGroupFetcher
+// (docker compose up -d hook-service).
+func TestIsUserConsumerForOfferViaHookServiceGroupFetcher(t *testing.T) {
+	addr := jimmtest.HookServiceAddress()
+
+	c := qt.New(t)
+	deps := SetupOfferAuthorizerTests(c)
+	ctx := c.Context()
+
+	// Members of the "canonical" group (see local/hook-service/entrypoint.sh).
+	user := "jimm-group-user@canonical.com"
+	serviceAccount := "jimm-group-client@serviceaccount"
+	idpGroupName := "canonical"
+
+	// Grant consume access on the offer to the IdP group. The users hold
+	// no direct tuples on the offer.
+	err := deps.ofgaClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(idpGroupName), ofganames.MemberRelation),
+		Relation: ofganames.ConsumerRelation,
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag(deps.offerUUID)),
+	})
+	c.Assert(err, qt.IsNil)
+
+	fetcher, err := idpgroupfetcher.NewHookService(addr, "dummy-token")
+	c.Assert(err, qt.IsNil)
+
+	authorizer, err := offer.NewOfferAuthorizer(deps.db, deps.ofgaClient, fetcher)
+	c.Assert(err, qt.IsNil)
+
+	allowed, err := authorizer.IsUserConsumerForOffer(ctx, names.NewUserTag(user), names.NewApplicationOfferTag(deps.offerUUID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsTrue)
+
+	// The @serviceaccount suffix is stripped before lookup.
+	allowed, err = authorizer.IsUserConsumerForOffer(ctx, names.NewUserTag(serviceAccount), names.NewApplicationOfferTag(deps.offerUUID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsTrue)
+
+	allowed, err = authorizer.IsUserConsumerForOffer(ctx, names.NewUserTag("nobody@canonical.com"), names.NewApplicationOfferTag(deps.offerUUID))
+	c.Assert(err, qt.IsNil)
+	c.Assert(allowed, qt.IsFalse)
 }
 
 // TestIsUserConsumerForOfferViaIdPGroup verifies that a user whose consume

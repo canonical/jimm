@@ -232,8 +232,7 @@ type Params struct {
 	// <scheme><ip/dns>[<port>]/.well-known/jwks.json"
 	BootstrapLoginTokenRefreshURL string
 
-	// IdPGroupFetcherParams holds parameters needed to configure an
-	// IdPGroupFetcher implementation.
+	// IdPGroupFetcherParams configures the IdPGroupFetcher implementation.
 	IdPGroupFetcherParams idpgroupfetcher.Params
 }
 

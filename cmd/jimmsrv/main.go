@@ -20,6 +20,7 @@ import (
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/ssh"
@@ -257,6 +258,10 @@ func start(ctx context.Context, s *service.Service) error {
 		},
 		CrossModelQueryTimeout:        crossModelQueryTimeout,
 		BootstrapLoginTokenRefreshURL: os.Getenv("JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL"),
+		IdPGroupFetcherParams: idpgroupfetcher.Params{
+			HookServiceAddress: os.Getenv("JIMM_IDP_HOOK_SERVICE_ADDRESS"),
+			HookServiceToken:   os.Getenv("JIMM_IDP_HOOK_SERVICE_TOKEN"),
+		},
 	})
 	if err != nil {
 		return err
