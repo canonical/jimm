@@ -93,6 +93,8 @@ services:
         -----END OPENSSH PRIVATE KEY-----
       # To Q/A this, use any reachable address for this compose JIMM. 
       JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL:  "${JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL:-https://jimm.localhost/.well-known/jwks.json}"
+      JIMM_IDP_HOOK_SERVICE_ADDRESS: "${JIMM_IDP_HOOK_SERVICE_ADDRESS:-}"
+      JIMM_IDP_HOOK_SERVICE_TOKEN: "${JIMM_IDP_HOOK_SERVICE_TOKEN:-dummy-token}"
       GOTOOLCHAIN: auto
     healthcheck:
       test: [ "CMD", "curl", "http://jimm.localhost/.well-known/jwks.json" ]
