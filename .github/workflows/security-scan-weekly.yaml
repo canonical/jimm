@@ -5,19 +5,27 @@ on:
     - cron: "0 0 * * 1" # Runs every Monday at 00:00 UTC.
   workflow_dispatch:
 
+# Least-privilege token: security-events:write is needed to upload
+# SARIF results to the Security tab, actions:read for private repos
+# when uploading SARIF, contents:read for checkout.
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 jobs:
   repo-security-scan:
     runs-on: [ubuntu-latest]
     name: Repo Security Scan
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       #########
       # Trivy #
       #########
       - name: Run Trivy vulnerability scanner in repo mode
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           format: 'sarif'
@@ -27,22 +35,23 @@ jobs:
           TRIVY_DB_REPOSITORY: ghcr.io/canonical/comsys-build-tools/trivy-db:2
   
       - name: Upload trivy scan results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: trivy-security-scan-results
           path: 'trivy-results.sarif'
   
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@3ea06614dafe36dec890db3446326e0d40ce53d4 # v3
         with:
           sarif_file: 'trivy-results.sarif'
+          category: trivy-fs
   
       ##########
       # Govuln #
       ##########
       - name: Go Vulnerability Check
         id: govulncheck
-        uses: golang/govulncheck-action@v1
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
           output-format: 'sarif'
           output-file: 'govuln-results.sarif'
@@ -50,7 +59,7 @@ jobs:
           repo-checkout: false
   
       - name: Upload govuln scan results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: govuln-security-scan-results
           path: 'govuln-results.sarif'
@@ -59,8 +68,12 @@ jobs:
       # a large threadflow count and prevent the file
       # from being uploaded to the Security tab.
       # See https://github.com/github/codeql-action/issues/1245
+      # All three IDs are github.com/juju/juju vulnerabilities that the
+      # Go vuln DB marks as affecting every module version (juju's fixes
+      # are not mapped to Go module versions), so they cannot be resolved
+      # by upgrading and this filter must stay.
       - name: filter-sarif
-        uses: advanced-security/filter-sarif@v1
+        uses: advanced-security/filter-sarif@f3b8118a9349d88f7b1c0c488476411145b6270d # v1
         with:
           patterns: |
             -go.mod:GO-2024-3010
@@ -70,9 +83,10 @@ jobs:
           output: 'govuln-results-filtered.sarif'
   
       - name: Upload govuln scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@3ea06614dafe36dec890db3446326e0d40ce53d4 # v3
         with:
           sarif_file: 'govuln-results-filtered.sarif'
+          category: govulncheck
       
       #############
       # KEV Check #
@@ -91,7 +105,7 @@ jobs:
           KNOWN_CVES_FILE: kev.json
 
       - name: Upload KEV Trivy scan results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kev-trivy-fs-scan-results
           path: 'kev-trivy-fs-scan.txt'
@@ -104,7 +118,7 @@ jobs:
           KNOWN_CVES_FILE: kev.json
 
       - name: Upload KEV Govuln scan results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kev-govuln-scan-results
           path: 'kev-govuln-scan.txt'
@@ -114,10 +128,10 @@ jobs:
     name: Container Security Scan
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Run Trivy container scanner for the latest JIMM image
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: 'ghcr.io/canonical/jimm:latest'
           format: 'sarif'
@@ -127,15 +141,16 @@ jobs:
           TRIVY_DB_REPOSITORY: ghcr.io/canonical/comsys-build-tools/trivy-db:2
 
       - name: Upload container scan results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: jimm-container-scan-results
           path: 'jimm-container-trivy-results.sarif'
 
       - name: Upload container Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@3ea06614dafe36dec890db3446326e0d40ce53d4 # v3
         with:
           sarif_file: 'jimm-container-trivy-results.sarif'
+          category: trivy-container
 
       - name: Fetch KEV list from CISA
         shell: bash
@@ -150,7 +165,7 @@ jobs:
           KNOWN_CVES_FILE: kev.json
 
       - name: Upload KEV Trivy Container scan results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: kev-trivy-container-scan-results
           path: 'kev-trivy-container-scan.txt'
