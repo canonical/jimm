@@ -30,7 +30,7 @@ jobs:
           scan-type: 'fs'
           format: 'sarif'
           output: 'trivy-results.sarif'
-          version: 'v0.69.3'
+          version: 'v0.74.0'
         env:
           TRIVY_DB_REPOSITORY: ghcr.io/canonical/comsys-build-tools/trivy-db:2
   
@@ -136,7 +136,7 @@ jobs:
           image-ref: 'ghcr.io/canonical/jimm:latest'
           format: 'sarif'
           output: 'jimm-container-trivy-results.sarif'
-          version: 'v0.69.3'
+          version: 'v0.74.0'
         env:
           TRIVY_DB_REPOSITORY: ghcr.io/canonical/comsys-build-tools/trivy-db:2
 
