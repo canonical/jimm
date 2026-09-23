@@ -6,9 +6,9 @@ package db
 import (
 	"context"
 	"database/sql"
-	"embed"
 	stderr "errors"
 	"fmt"
+	"io/fs"
 	"path"
 	"sync/atomic"
 	"time"
@@ -87,8 +87,8 @@ func (d *Database) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (d *Database) migrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {
-	sqlDir, err := iofs.New(fs, sqlPath)
+func (d *Database) migrateFromSource(ctx context.Context, migrationFS fs.FS, sqlPath string) error {
+	sqlDir, err := iofs.New(migrationFS, sqlPath)
 	if err != nil {
 		return fmt.Errorf("unable to create new sql filesys: %w", err)
 	}
