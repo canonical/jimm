@@ -4,7 +4,7 @@ package db
 
 import (
 	"context"
-	"embed"
+	"io/fs"
 )
 
 var (
@@ -13,6 +13,6 @@ var (
 	JobLogLockQuery    = &jobLoglockQuery
 )
 
-func (d *Database) MigrateFromSource(ctx context.Context, fs embed.FS, sqlPath string) error {
-	return d.migrateFromSource(ctx, fs, sqlPath)
+func (d *Database) MigrateFromSource(ctx context.Context, migrationFS fs.FS, sqlPath string) error {
+	return d.migrateFromSource(ctx, migrationFS, sqlPath)
 }

@@ -5,7 +5,12 @@ package db_test
 import (
 	"context"
 	"embed"
+	"io/fs"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+	"testing/fstest"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/golang-migrate/migrate/v4"
@@ -55,6 +60,52 @@ func (s *dbSuite) TestMigrate(c *qt.C) {
 	// also work.
 	err = s.Database.Migrate(context.Background())
 	c.Assert(err, qt.IsNil)
+}
+
+// TestMigrationRanges verifies that migrations below 1000 can be applied first,
+// followed by the complete migration set. This models upgrading a v3 database
+// before applying the v4-only 1000+ migrations.
+func (s *dbSuite) TestMigrationRanges(c *qt.C) {
+	ctx := context.Background()
+	lowMigrations, err := migrationsBelow(1000)
+	c.Assert(err, qt.IsNil)
+
+	err = s.Database.MigrateFromSource(ctx, lowMigrations, "migrations")
+	c.Assert(err, qt.IsNil)
+
+	// The complete set must then apply the v4-only migrations successfully.
+	err = s.Database.Migrate(ctx)
+	c.Assert(err, qt.IsNil)
+}
+
+func migrationsBelow(limit int) (fs.FS, error) {
+	result := fstest.MapFS{}
+	err := fs.WalkDir(dbmodel.SQL, "sql/postgres", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".up.sql") {
+			return err
+		}
+
+		base := strings.TrimSuffix(filepath.Base(path), ".up.sql")
+		versionText, _, ok := strings.Cut(base, "_")
+		if !ok {
+			return nil
+		}
+		version, err := strconv.Atoi(versionText)
+		if err != nil {
+			return err
+		}
+		if version >= limit {
+			return nil
+		}
+
+		contents, err := fs.ReadFile(dbmodel.SQL, path)
+		if err != nil {
+			return err
+		}
+		result[filepath.Join("migrations", filepath.Base(path))] = &fstest.MapFile{Data: contents}
+		return nil
+	})
+	return result, err
 }
 
 // TestFailedMigration verifies a failed migration will cause a dirty migration
