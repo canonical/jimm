@@ -227,7 +227,7 @@ func (s *permissionManagerSuite) TestCheckPermissionUsesUserIDPGroupsAsContextua
 	user := openfga.NewUser(userIdentity, s.ofgaClient)
 	user.SetIDPGroups([]string{"engineering-team"})
 
-	_, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
 		Object:       "idpgroup-engineering-team#member",
 		Relation:     names.ReaderRelation.String(),
