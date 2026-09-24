@@ -10,16 +10,6 @@ myst:
 >
 > See also: {ref}`group`
 
-```{important}
-**Deprecation notice — migration to IdP groups**
-
-JAAS groups (created with `juju add-group`) are deprecated and will be **removed** in the next major release of JAAS on the `v4` track. They are replaced by **groups managed by the Identity Provider**.
-
-With Identity Provider (IdP) groups you no longer need to create groups in JAAS or assign users to them, group membership is managed by the IdP. In JAAS you only need to **assign permissions to an IdP group**, and every member of group inherits the permission automatically.
-
-JAAS groups remain fully supported on the current `v3` track. If you are starting a new deployment, prefer IdP groups from the outset. If you already use JAAS groups, see {ref}`migrate-to-IdP-groups` below for the migration path.
-```
-
 ````{dropdown} Preview an example workflow
 ```text
 # Create a group:

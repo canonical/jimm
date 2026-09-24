@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "Enable Grafana dashboards for JAAS/JIMM by integrating with the Canonical Observability Stack (COS)."
+    description: "Enable Grafana dashboards for JAAS by integrating with the Canonical Observability Stack (COS)."
 ---
 
 (enable-monitoring)=
@@ -13,10 +13,10 @@ JAAS ships three Grafana dashboards — **JAAS Metrics**, **JAAS Logs**, and **J
 
 ## Prerequisites
 
-- A running JAAS deployment (see {ref}`Manage your JAAS deployment <manage-your-jaas-deployment>`)
-- A deployed COS stack. How you deploy and expose COS is up to you — see the [COS documentation](https://documentation.ubuntu.com/observability/) for deployment options.
+- A running JAAS deployment
+- A deployed COS stack
 
-## Integrate with COS
+## Integrate with Grafana, Prometheus and Loki
 
 JIMM exposes three COS integration endpoints:
 
@@ -26,17 +26,7 @@ JIMM exposes three COS integration endpoints:
 | `metrics-endpoint`  | `prometheus_scrape` | Scraping of JIMM's `/metrics` endpoint |
 | `logging`           | `loki_push_api`     | Forwarding of JIMM's workload logs     |
 
-Relate each endpoint to the corresponding application in your COS stack. For example, with a COS stack deployed in the same model as JIMM:
-
-```text
-juju relate jimm:grafana-dashboard grafana
-juju relate jimm:metrics-endpoint prometheus
-juju relate jimm:logging loki
-```
-
-```{note}
-If your COS stack lives in a different model, deploy a `grafana-agent` subordinate next to JIMM and relate it to JIMM's `cos-agent` endpoint instead. The agent forwards dashboards, metrics and logs to the remote COS applications.
-```
+To integrate JAAS with the Grafana, Prometheus and Loki applications of your COS stack — directly or through an application offer — follow the integration instructions in {ref}`Integrate JAAS with the Canonical Observability Stack <integrate-jaas-with-the-canonical-observability-stack>`.
 
 Once the relations settle, Grafana automatically provisions the JAAS dashboards — no manual import is needed.
 

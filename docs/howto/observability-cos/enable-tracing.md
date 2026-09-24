@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "Enable distributed tracing for JAAS/JIMM by integrating with Tempo through the Canonical Observability Stack (COS)."
+    description: "Enable distributed tracing for JAAS by integrating with Tempo through the Canonical Observability Stack (COS)."
 ---
 
 (enable-tracing)=
@@ -25,7 +25,7 @@ JIMM instruments the request path end to end. A single Juju API call typically p
 | `jimm.juju-rpc`            | RPC calls forwarded to a managed Juju controller (with facade, version and method attributes) |
 | `jimm.model-proxy`         | RPC messages proxied through to a managed model (with trace propagation to the controller)    |
 
-This means traces appear for Juju API activity — `juju` CLI commands against the JAAS controller, dashboard sessions issuing Juju API calls, and any Juju client interaction — but not for plain HTTP requests such as the OAuth login redirect.
+This means traces appear for Juju API activity — `juju` CLI commands against the JIMM controller, dashboard sessions issuing Juju API calls, and any Juju client interaction — but not for plain HTTP requests such as the OAuth login redirect.
 
 ```{note}
 On an idle deployment no traces are produced. Traces appear as soon as JIMM handles Juju API calls.
@@ -33,10 +33,10 @@ On an idle deployment no traces are produced. Traces appear as soon as JIMM hand
 
 ## Prerequisites
 
-- A running JAAS deployment (see {ref}`Manage your JAAS deployment <manage-your-jaas-deployment>`)
-- A deployed COS stack including Tempo (coordinator and worker) with a configured storage backend. See the [COS documentation](https://documentation.ubuntu.com/observability/) for deployment options.
+- A running JAAS deployment
+- A deployed COS stack including Tempo (coordinator and worker) with a configured storage backend
 
-## Integrate with COS
+## Integrate with Tempo
 
 JIMM exposes a tracing integration endpoint:
 
@@ -44,20 +44,12 @@ JIMM exposes a tracing integration endpoint:
 | ------------- | --------- | -------------------------------------------------------- |
 | `tracing`     | `tracing` | OTLP trace export endpoint and the JAAS Traces dashboard |
 
-Relate the endpoint to the Tempo coordinator in your COS stack. For example, with COS deployed in the same model as JIMM:
-
-```text
-juju relate jimm:tracing tempo-coordinator
-```
+To integrate JAAS with the Tempo coordinator of your COS stack — directly or through an application offer — follow the integration instructions in {ref}`Integrate JAAS with the Canonical Observability Stack <integrate-jaas-with-the-canonical-observability-stack>`.
 
 Once the relation settles:
 
 - JIMM receives the OTLP endpoint over the relation and starts exporting traces to Tempo.
 - Grafana receives the Tempo datasource and the **JAAS Traces** dashboard.
-
-```{note}
-If your COS stack lives in a different model, deploy a `grafana-agent` subordinate next to JIMM and relate it to JIMM's `cos-agent` endpoint instead. The agent forwards traces to the remote Tempo.
-```
 
 ## Sampling
 
@@ -80,7 +72,7 @@ Open the Grafana UI of your COS deployment and log in. In the Grafana UI, open *
 
 Click a **Trace ID** to open the trace in Grafana Explore, where the full span waterfall is rendered.
 
-If the list is empty, generate some Juju API activity (for example, run a `juju` command against the JAAS controller, or use the JAAS dashboard to interact with a model) and refresh the dashboard.
+If the list is empty, generate some Juju API activity (for example, run a `juju` command against the JIMM controller, or use the Juju dashboard to interact with a model) and refresh the dashboard.
 
 ## Troubleshooting
 

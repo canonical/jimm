@@ -1,7 +1,7 @@
 ---
 myst:
   html_meta:
-    description: "Enable Prometheus and Loki alert rules for JAAS/JIMM by integrating with the Canonical Observability Stack (COS)."
+    description: "Enable Prometheus and Loki alert rules for JAAS by integrating with the Canonical Observability Stack (COS)."
 ---
 
 (enable-alert-rules)=
@@ -26,10 +26,10 @@ For the up-to-date list of rules and their exact expressions, see the [alert rul
 
 ## Prerequisites
 
-- A running JAAS deployment (see {ref}`Manage your JAAS deployment <manage-your-jaas-deployment>`)
-- A deployed COS stack, integrated with JIMM as described in {ref}`Enable monitoring <enable-monitoring>`
+- A running JAAS deployment
+- A deployed COS stack, integrated with JAAS as described in {ref}`Enable monitoring <enable-monitoring>`
 
-## Integrate with COS
+## Integrate with Prometheus
 
 The alert rules are transferred over the monitoring relations:
 
@@ -37,11 +37,7 @@ The alert rules are transferred over the monitoring relations:
 | ------------------ | ------------------- | ------------------------------------------------ |
 | `metrics-endpoint` | `prometheus_scrape` | Prometheus alert rules based on `jimm_*` metrics |
 
-Relate the endpoint to the corresponding application in your COS stack — the same relation described in {ref}`Enable monitoring <enable-monitoring>`:
-
-```text
-juju relate jimm:metrics-endpoint prometheus
-```
+The `metrics-endpoint` relation is the same one used for monitoring — no additional integration is required beyond the ones described in {ref}`Enable monitoring <enable-monitoring>`.
 
 To be notified when an alert fires, also integrate the Prometheus application of your COS stack with Alertmanager.
 
