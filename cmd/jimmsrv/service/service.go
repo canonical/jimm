@@ -39,9 +39,11 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
 	jimmcreds "github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
+	"github.com/canonical/jimm/v3/internal/jimm/offer"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
@@ -234,6 +236,10 @@ type Params struct {
 	// It should look something like:
 	// <scheme><ip/dns>[<port>]/.well-known/jwks.json"
 	BootstrapLoginTokenRefreshURL string
+
+	// IdPGroupFetcherParams holds parameters needed to configure an
+	// IdPGroupFetcher implementation.
+	IdPGroupFetcherParams idpgroupfetcher.Params
 }
 
 // A Service is the implementation of a JIMM server.
@@ -276,6 +282,7 @@ type ServiceDependencies struct {
 	OAuthHandler            *jimmhttp.OAuthHandler
 	OpenFGAClient           *openfga.OFGAClient
 	Tracer                  jujuTrace.Tracer
+	IdPGroupFetcher         offer.IdPGroupFetcher
 	// Cleanup
 	cleanupFuncs []func() error
 }
@@ -504,6 +511,11 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	dialerFactory := jujuauth.NewFactory(db, jwtService, dialerPermManager)
 	dialer := jujuclient.NewDialer(jwtService, dialerFactory, controllerUUID)
 
+	groupFetcher, err := idpgroupfetcher.New(ctx, p.IdPGroupFetcherParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create idp group fetcher: %w", err)
+	}
+
 	deps := &ServiceDependencies{
 		ControllerUUID:                controllerUUID,
 		PublicDNSName:                 p.PublicDNSName,
@@ -526,6 +538,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		CredentialStore:               credentialStore,
 		JWTService:                    jwtService,
 		JWKSService:                   jwksService,
+		IdPGroupFetcher:               groupFetcher,
 	}
 	deps.cleanupFuncs = append(deps.cleanupFuncs, func() error {
 		return shutdownTracer(context.Background())
@@ -628,6 +641,7 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 		ControllerConfig:              deps.ControllerConfig,
 		CrossModelQueryTimeout:        deps.CrossModelQueryTimeout,
 		BootstrapLoginTokenRefreshURL: deps.BootstrapLoginTokenRefreshURL,
+		IdPGroupFetcher:               deps.IdPGroupFetcher,
 	}
 	jimmParameters.AuditLogRetentionDays = deps.AuditLogRetentionDays
 
