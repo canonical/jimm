@@ -36,6 +36,7 @@ parts:
       # Add all CLI commands below as symlinks to make them appear top-level to Juju.
       ln -sf jaas bin/juju-jaas
       ln -sf jaas bin/juju-add-cloud
+      ln -sf jaas bin/juju-add-group
       ln -sf jaas bin/juju-add-model
       ln -sf jaas bin/juju-add-permission
       ln -sf jaas bin/juju-add-role
@@ -45,9 +46,11 @@ parts:
       ln -sf jaas bin/juju-controllers
       ln -sf jaas bin/juju-grant-audit-log
       ln -sf jaas bin/juju-grant-service-account-access
+      ln -sf jaas bin/juju-groups
       ln -sf jaas bin/juju-import-model
       ln -sf jaas bin/juju-list-audit-events
       ln -sf jaas bin/juju-list-controllers
+      ln -sf jaas bin/juju-list-groups
       ln -sf jaas bin/juju-list-migration-targets
       ln -sf jaas bin/juju-list-permissions
       ln -sf jaas bin/juju-list-roles
@@ -61,8 +64,10 @@ parts:
       ln -sf jaas bin/juju-register-controller
       ln -sf jaas bin/juju-register-model
       ln -sf jaas bin/juju-remove-cloud
+      ln -sf jaas bin/juju-remove-group
       ln -sf jaas bin/juju-remove-permission
       ln -sf jaas bin/juju-remove-role
+      ln -sf jaas bin/juju-rename-group
       ln -sf jaas bin/juju-rename-role
       ln -sf jaas bin/juju-revoke-audit-log
       ln -sf jaas bin/juju-roles

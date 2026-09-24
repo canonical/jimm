@@ -46,14 +46,14 @@ Certain reserved tags exist to denote specific resource types:
 -f    Read from a file where filename is the location of a JSON encoded file of the form:
     [
         {
-            "object":"user-alice",
-            "relation":"administrator",
-            "target_object":"controller-MyController"
+            "object":"user-mike",
+            "relation":"member",
+            "target_object":"group-yellow"
         },
         {
-            "object":"user-bob",
-            "relation":"reader",
-            "target_object":"model-mymodel"
+            "object":"user-alice",
+            "relation":"member",
+            "target_object":"group-yellow"
         }
     ]
 
@@ -61,12 +61,17 @@ Certain constraints apply when creating/removing permissions, namely:
 Resources may be one of:
 
     user tag                = "user-<name>"
+    group tag               = "group-<name>"
     idp group tag           = "idpgroup-<id>"
     role tag 			    = "role-<name>"
     controller tag          = "controller-<name>"
     model tag               = "model-<name>"
 	cloud tag			    = "cloud-<name>"
     application-offer tag   = "applicationoffer-<name>"
+
+If target_object is a group, the relation can only be:
+
+    member
 
 If target_object is a role, the relation can only be:
 
@@ -95,12 +100,16 @@ If target_object is an application offer, the relation can be one of:
     consumer
     administrator
 
-If the object is an IDP group, a userset must be applied by adding #member as follows.
-This will grant/revoke access to all users within the IDP group:
+If the object is a group, a userset must be applied by adding #member as follows.
+This will grant/revoke access to all users within TeamA:
+
+    group-TeamA#member administrator controller-MyController
+
+IDP-owned groups use the idpgroup tag and also require the #member userset:
 
 	idpgroup-external-team-id#member administrator controller-MyController
 
-If the object is a role, a userset must be applied by adding #assignee as follows.
+Similarly if the object is a role, a userset must be applied by adding #member as follows.
 
 	role-Auditor#assignee audit_log_viewer controller-MyController
 `
@@ -110,9 +119,8 @@ Grants access to a resource.
 ` + genericConstraintsDoc
 
 	addRelationExample = `
-    juju add-permission user-alice@canonical.com administrator controller-MyController
-    juju add-permission idpgroup-external-team-id#member reader model-mymodel
-    juju add-permission role-Auditor#assignee audit_log_viewer controller-MyController
+    juju add-permission user-alice@canonical.com member group-mygroup
+    juju add-permission group-MyTeam#member admin model-mymodel
     juju add-permission -f /path/to/file.yaml
 `
 

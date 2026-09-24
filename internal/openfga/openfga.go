@@ -20,7 +20,7 @@ import (
 
 var (
 	// resourceTypes contains a list of all resource kinds (i.e. tags) used throughout JIMM.
-	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.IdPGroupTagKind, jimmnames.RoleTagKind}
+	resourceTypes = [...]string{names.UserTagKind, names.ModelTagKind, names.ControllerTagKind, names.ApplicationOfferTagKind, jimmnames.GroupTagKind, jimmnames.IdPGroupTagKind, jimmnames.RoleTagKind}
 )
 
 // BatchCheckSize is the maximum number of checks sent in one OpenFGA batch
@@ -54,6 +54,8 @@ var (
 	UserType Kind = names.UserTagKind
 	// ModelType represents a model object.
 	ModelType Kind = names.ModelTagKind
+	// GroupType represents a group object.
+	GroupType Kind = jimmnames.GroupTagKind
 	// IdPGroupType represents an IDP-owned group object.
 	IdPGroupType Kind = jimmnames.IdPGroupTagKind
 	// RoleType represents a role object.
@@ -413,6 +415,38 @@ func (o *OFGAClient) RemoveRole(ctx context.Context, role jimmnames.RoleTag) err
 		}
 		newTuple := Tuple{
 			Object: ofganames.ConvertTagWithRelation(role, ofganames.AssigneeRelation),
+			Target: kt,
+		}
+		err = o.removeTuples(ctx, newTuple)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RemoveGroup removes a group.
+func (o *OFGAClient) RemoveGroup(ctx context.Context, group jimmnames.GroupTag) error {
+	// Remove all access to a group. I.e. user->group
+	if err := o.removeTuples(
+		ctx,
+		Tuple{
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.ConvertTag(group),
+		},
+	); err != nil {
+		return err
+	}
+	// Next remove all access that a group had. I.e. group->model
+	// We need to loop through all resource types because the OpenFGA Read API does not provide
+	// means for only specifying a user resource, it must be paired with an object type.
+	for _, kind := range resourceTypes {
+		kt, err := ofganames.BlankKindTag(kind)
+		if err != nil {
+			return err
+		}
+		newTuple := Tuple{
+			Object: ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 			Target: kt,
 		}
 		err = o.removeTuples(ctx, newTuple)

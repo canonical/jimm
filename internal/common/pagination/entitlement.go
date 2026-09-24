@@ -22,6 +22,7 @@ var entitlementResources = []openfga.Kind{
 	openfga.CloudType,
 	openfga.ModelType,
 	openfga.ApplicationOfferType,
+	openfga.GroupType,
 	openfga.IdPGroupType,
 	openfga.RoleType,
 }

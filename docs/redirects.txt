@@ -16,6 +16,7 @@ how-to/setup_ingress_with_tls/ howto/setup_ingress_with_tls/
 how-to/setup_dashboard/ howto/setup_dashboard/
 how-to/setup_new_users/ howto/setup_new_users/
 tutorial/role_management/ howto/manage-roles/
+tutorial/group_management/ howto/manage-groups/
 tutorial/deploy_jaas_microk8s/ tutorial/index/
 explanation/jaas_tags/ reference/tag/
 # reference/juju_required_version/ reference/jaas/juju_required_version/
@@ -38,7 +39,6 @@ reference/jaas/authorisation_model/ explanation/jaas-authorization
 reference/jaas/authorisation/ reference/jaas/jaas-authorization
 explanation/jaas_overview/ explanation/jaas_architecture/
 howto/manage-jimm-controllers/ howto/manage-your-jaas-deployment/
-tutorial/group_management/ howto/manage-groups/
 howto/setup_new_users/ howto/manage-users/
 reference/juju_required_version/ reference/jaas/supported-juju-versions/
 # reference/jaas/authentication/ reference/jaas/security/

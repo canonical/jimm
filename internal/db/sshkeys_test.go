@@ -38,7 +38,7 @@ func (s *sshKeysSuite) Init(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	err = s.Database.Migrate(ctx)
 	c.Assert(err, qt.Equals, nil)
-	user, controller, model, _, cloud, cloudCred, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.Database)
+	user, _, controller, model, _, cloud, cloudCred, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.Database)
 	id, _ := uuid.NewRandom()
 	model2 := dbmodel.Model{
 		Name: petname.Generate(2, "-"),

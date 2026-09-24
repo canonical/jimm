@@ -9,7 +9,7 @@ myst:
 
 JAAS provides enterprise-level features on top of Juju. One such feature is enhanced authorization, which provides enterprises with more control over user permissions to access underlying Juju resources (e.g., controllers or models).
 
-JAAS reshapes Juju's permission model based on access levels into the more flexible [Relationship-Based Access Control (ReBAC)](https://en.wikipedia.org/wiki/Relationship-based_access_control) paradigm: while with Juju you can grant a specific user access to a specific entity, with JAAS you can pick every user, or every user in a given IDP group or with a given role.
+JAAS reshapes Juju's permission model based on access levels into the more flexible [Relationship-Based Access Control (ReBAC)](https://en.wikipedia.org/wiki/Relationship-based_access_control) paradigm: while with Juju you can grant a specific user access to a specific entity, with JAAS you can pick every user, or every user in a given group or with a given role.
 
 At present JAAS relations are parallel to {external+juju:ref}`Juju access levels <user-access-levels>`, but in the future they're expected to become a superset thereof.
 
@@ -24,7 +24,7 @@ As an example, consider a simple file-system structure with two kinds of resourc
 
 Conceptually, the JAAS authorization system consists of two main components:
 
-1. **Authorization model**, which defines the schema of different entity types (e.g. controllers, users, or IDP groups), the possible relationships between them (e.g. IDP group memberships, or administrator relation for controllers), and the inheritance structure for permissions (e.g. a controller administrator is also an administrator for all models on that controller).
+1. **Authorization model**, which defines the schema of different entity types (e.g. controllers, users, or groups), the possible relationships between them (e.g. group memberships, or administrator relation for controllers), and the inheritance structure for permissions (e.g. a controller administrator is also an administrator for all models on that controller).
 
 ````{dropdown} View the authorization model (diagram)
 
@@ -50,38 +50,38 @@ type user
 
 type role
  relations
-   define assignee: [user, user:*, idpgroup#member]
+   define assignee: [user, user:*, group#member]
 
-type idpgroup
+type group
   relations
-    define member: [user, user:*]
+    define member: [user, user:*, group#member]
 
 type controller
   relations
     define controller: [controller]
-    define administrator: [user, user:*, idpgroup#member, role#assignee] or administrator from controller
-    define audit_log_viewer: [user, user:*, idpgroup#member, role#assignee] or administrator
-    define can_addmodel: [user, user:*, idpgroup#member, role#assignee] or administrator
+    define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
+    define audit_log_viewer: [user, user:*, group#member, role#assignee] or administrator
+    define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
 
 type model
   relations
     define controller: [controller]
-    define administrator: [user, user:*, idpgroup#member, role#assignee] or administrator from controller
-    define reader: [user, user:*, idpgroup#member, role#assignee] or writer
-    define writer: [user, user:*, idpgroup#member, role#assignee] or administrator
+    define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
+    define reader: [user, user:*, group#member, role#assignee] or writer
+    define writer: [user, user:*, group#member, role#assignee] or administrator
 
 type applicationoffer
   relations
     define model: [model]
-    define administrator: [user, user:*, idpgroup#member, role#assignee] or administrator from model
-    define consumer: [user, user:*, idpgroup#member, role#assignee] or administrator
-    define reader: [user, user:*, idpgroup#member, role#assignee] or consumer
+    define administrator: [user, user:*, group#member, role#assignee] or administrator from model
+    define consumer: [user, user:*, group#member, role#assignee] or administrator
+    define reader: [user, user:*, group#member, role#assignee] or consumer
 
 type cloud
   relations
     define controller: [controller]
-    define administrator: [user, user:*, idpgroup#member, role#assignee] or administrator from controller
-    define can_addmodel: [user, user:*, idpgroup#member, role#assignee] or administrator
+    define administrator: [user, user:*, group#member, role#assignee] or administrator from controller
+    define can_addmodel: [user, user:*, group#member, role#assignee] or administrator
 
 
 ```

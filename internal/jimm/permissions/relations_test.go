@@ -29,7 +29,7 @@ func (s *permissionManagerSuite) TestListRelationshipTuples(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, _, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	err := s.manager.AddRelation(ctx, u, []apiparams.RelationshipTuple{
 		{
@@ -188,7 +188,7 @@ func (s *permissionManagerSuite) TestCheckRelationUsesUserIDPGroupsAsContextualT
 	user := openfga.NewUser(userIdentity, s.ofgaClient)
 	user.SetIDPGroups([]string{"engineering-team"})
 
-	_, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
 		Object:       "idpgroup-engineering-team#member",
 		Relation:     names.ReaderRelation.String(),
@@ -227,7 +227,7 @@ func (s *permissionManagerSuite) TestCheckPermissionUsesUserIDPGroupsAsContextua
 	user := openfga.NewUser(userIdentity, s.ofgaClient)
 	user.SetIDPGroups([]string{"engineering-team"})
 
-	_, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
 		Object:       "idpgroup-engineering-team#member",
 		Relation:     names.ReaderRelation.String(),
@@ -256,7 +256,7 @@ func (s *permissionManagerSuite) TestResourceAdminCheckUsesUserIDPGroupsAsContex
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.db.DB.Create(subjectIdentity).Error, qt.IsNil)
 
-	_, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
 		Object:       "idpgroup-model-admins#member",
 		Relation:     names.AdministratorRelation.String(),
@@ -284,7 +284,7 @@ func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	err := s.manager.AddRelation(ctx, u, []apiparams.RelationshipTuple{
 		{
@@ -317,6 +317,11 @@ func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 			Relation:     names.CanAddModelRelation.String(),
 			TargetObject: cloud.ResourceTag().String(),
 		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.MemberRelation.String(),
+			TargetObject: group.ResourceTag().String(),
+		},
 	})
 
 	c.Assert(err, qt.IsNil)
@@ -340,14 +345,14 @@ func (s *permissionManagerSuite) TestListObjectRelations(c *qt.C) {
 			object:               user.Tag().String(),
 			pageSize:             10,
 			expectNumPages:       1,
-			expectedTuplesLength: 6,
+			expectedTuplesLength: 7,
 		},
 		{
 			description:          "test listing all relations in multiple pages",
 			object:               user.Tag().String(),
 			pageSize:             2,
-			expectNumPages:       3,
-			expectedTuplesLength: 6,
+			expectNumPages:       4,
+			expectedTuplesLength: 7,
 		},
 		{
 			description:   "invalid initial token",
@@ -394,7 +399,7 @@ func (s *permissionManagerSuite) TestListResources(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	_, controller, model, applicationOffer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, controller, model, applicationOffer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	ids := []string{applicationOffer.UUID, cloud.Name, controller.UUID, model.UUID.String}
 
@@ -443,7 +448,7 @@ func (s *permissionManagerSuite) TestCheckPermissions(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, group, controller, model, _, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	tuples := []apiparams.RelationshipTuple{
 		{
 			Object:       user.Tag().String(),
@@ -475,6 +480,11 @@ func (s *permissionManagerSuite) TestCheckPermissions(c *qt.C) {
 			Relation:     names.CanAddModelRelation.String(),
 			TargetObject: cloud.ResourceTag().String(),
 		},
+		{
+			Object:       user.Tag().String(),
+			Relation:     names.MemberRelation.String(),
+			TargetObject: group.ResourceTag().String(),
+		},
 	}
 	err := s.manager.AddRelation(ctx, u, tuples)
 
@@ -495,7 +505,7 @@ func (s *permissionManagerSuite) TestCheckRelationsWithErrors(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	tuples := []apiparams.RelationshipTuple{
 		{
 			Object:       user.Tag().String(),
@@ -534,7 +544,7 @@ func (s *permissionManagerSuite) TestRelationManagementAsResourceAdministrator(c
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.db.DB.Create(subjectIdentity).Error, qt.IsNil)
 
-	_, controller, model, offer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, controller, model, offer, cloud, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	testCases := []struct {
 		description string
@@ -625,7 +635,7 @@ func (s *permissionManagerSuite) TestRelationManagementAsResourceAdministrator(c
 	}
 }
 
-func (s *permissionManagerSuite) TestRoleRelationManagementRemainsJimmAdminOnly(c *qt.C) {
+func (s *permissionManagerSuite) TestGroupAndRoleRelationManagementRemainJimmAdminOnly(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
@@ -638,12 +648,20 @@ func (s *permissionManagerSuite) TestRoleRelationManagementRemainsJimmAdminOnly(
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.db.DB.Create(subjectIdentity).Error, qt.IsNil)
 
-	_, _, _, _, _, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, group, _, _, _, _, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	testCases := []struct {
 		description string
 		tuple       apiparams.RelationshipTuple
 	}{
+		{
+			description: "group membership changes remain restricted",
+			tuple: apiparams.RelationshipTuple{
+				Object:       subjectIdentity.Tag().String(),
+				Relation:     names.MemberRelation.String(),
+				TargetObject: group.ResourceTag().String(),
+			},
+		},
 		{
 			description: "role assignment changes remain restricted",
 			tuple: apiparams.RelationshipTuple{
@@ -689,7 +707,7 @@ func (s *permissionManagerSuite) TestStructuralRelationManagementRequiresJimmAdm
 	c.Assert(s.db.DB.Create(grantorIdentity).Error, qt.IsNil)
 	grantor := openfga.NewUser(grantorIdentity, s.ofgaClient)
 
-	_, controller, model, offer, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, controller, model, offer, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	// The grantor administers the model and the offer, so the target-admin
 	// check passes; only the structural-relation and grantee-kind guards
@@ -758,7 +776,7 @@ func (s *permissionManagerSuite) TestRelationshipLogUserUpdated(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: adminId}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	user, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	tuples := []apiparams.RelationshipTuple{
 		{
 			Object:       user.Tag().String(),
@@ -790,7 +808,7 @@ func (s *permissionManagerSuite) TestAddRelationBatch(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	_, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(c.Context(), c, s.db)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(c.Context(), c, s.db)
 	tuples := []apiparams.RelationshipTuple{}
 
 	expectedLength := permissions.BatchSizeOpenfga*2 + 1
@@ -823,7 +841,7 @@ func (s *permissionManagerSuite) TestRemoveRelationBatch(c *qt.C) {
 	u := openfga.NewUser(&dbmodel.Identity{Name: "admin@canonical.com"}, s.ofgaClient)
 	u.JimmAdmin = true
 
-	_, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(c.Context(), c, s.db)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(c.Context(), c, s.db)
 	tuples := []apiparams.RelationshipTuple{}
 
 	for range permissions.BatchSizeOpenfga*2 + 1 {
