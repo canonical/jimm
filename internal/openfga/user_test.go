@@ -21,19 +21,19 @@ func TestIsAdministrator(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
+	groupUUID := uuid.NewString()
 	controllerUUID, _ := uuid.NewRandom()
 	controller := names.NewControllerTag(controllerUUID.String())
 
 	user := names.NewUserTag("eve")
 	userToGroup := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user),
-		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Relation: "member",
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 	groupToController := openfga.Tuple{
-		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(groupID), ofganames.MemberRelation),
-		Relation: ofganames.AdministratorRelation,
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
+		Relation: "administrator",
 		Target:   ofganames.ConvertTag(controller),
 	}
 
@@ -112,8 +112,8 @@ func TestModelAccess(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
-	group := jimmnames.NewIdPGroupTag(groupID)
+	groupUUID := uuid.NewString()
+	group := jimmnames.NewGroupTag(groupUUID)
 
 	controllerUUID, err := uuid.NewRandom()
 	c.Assert(err, qt.IsNil)
@@ -129,7 +129,7 @@ func TestModelAccess(t *testing.T) {
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}, {
 		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -245,8 +245,8 @@ func TestCloudAccess(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
-	group := jimmnames.NewIdPGroupTag(groupID)
+	groupUUID := uuid.NewString()
+	group := jimmnames.NewGroupTag(groupUUID)
 
 	controllerUUID, err := uuid.NewRandom()
 	c.Assert(err, qt.IsNil)
@@ -262,7 +262,7 @@ func TestCloudAccess(t *testing.T) {
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}, {
 		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -346,8 +346,8 @@ func TestControllerAccess(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
-	group := jimmnames.NewIdPGroupTag(groupID)
+	groupUUID := uuid.NewString()
+	group := jimmnames.NewGroupTag(groupUUID)
 
 	controllerUUID, err := uuid.NewRandom()
 	c.Assert(err, qt.IsNil)
@@ -359,7 +359,7 @@ func TestControllerAccess(t *testing.T) {
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}, {
 		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -404,14 +404,14 @@ func TestCanAddModelToController(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
-	group := jimmnames.NewIdPGroupTag(groupID)
+	groupUUID := uuid.NewString()
+	group := jimmnames.NewGroupTag(groupUUID)
 
 	controllerUUID, err := uuid.NewRandom()
 	c.Assert(err, qt.IsNil)
 	controller := names.NewControllerTag(controllerUUID.String())
 
-	// eve has addmodel access via idp group membership
+	// eve has addmodel access via group membership
 	eve := names.NewUserTag("eve")
 	// alice has addmodel access set directly
 	alice := names.NewUserTag("alice")
@@ -421,7 +421,7 @@ func TestCanAddModelToController(t *testing.T) {
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}, {
 		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.CanAddModelRelation,
@@ -548,6 +548,12 @@ func TestListRelatedUsers(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
+	groupUUID := uuid.NewString()
+	group := jimmnames.NewGroupTag(groupUUID)
+
+	groupUUID2 := uuid.NewString()
+	group2 := jimmnames.NewGroupTag(groupUUID2)
+
 	controllerUUID, err := uuid.NewRandom()
 	c.Assert(err, qt.IsNil)
 	controller := names.NewControllerTag(controllerUUID.String())
@@ -560,12 +566,6 @@ func TestListRelatedUsers(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	offer := names.NewApplicationOfferTag(offerUUID.String())
 
-	groupID := uuid.NewString()
-	group := jimmnames.NewIdPGroupTag(groupID)
-
-	groupID2 := uuid.NewString()
-	group2 := jimmnames.NewIdPGroupTag(groupID2)
-
 	adam := names.NewUserTag("adam")
 	alice := names.NewUserTag("alice")
 	eve := names.NewUserTag("eve")
@@ -573,7 +573,7 @@ func TestListRelatedUsers(t *testing.T) {
 	tuples := []openfga.Tuple{{
 		Object:   ofganames.ConvertTag(eve),
 		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}, {
 		Object:   ofganames.ConvertTagWithRelation(group, ofganames.MemberRelation),
 		Relation: ofganames.AdministratorRelation,
@@ -600,8 +600,8 @@ func TestListRelatedUsers(t *testing.T) {
 		Target:   ofganames.ConvertTag(group2),
 	}, {
 		Object:   ofganames.ConvertTagWithRelation(group2, ofganames.MemberRelation),
-		Relation: ofganames.ReaderRelation,
-		Target:   ofganames.ConvertTag(offer),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(group),
 	}}
 	err = s.ofgaClient.AddRelation(ctx, tuples...)
 	c.Assert(err, qt.IsNil)

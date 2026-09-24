@@ -34,8 +34,8 @@ func TestFromResourceTag(t *testing.T) {
 	result = ofganames.ConvertTag(names.NewCloudTag("test"))
 	c.Assert(result, qt.DeepEquals, ofganames.NewTag("test", names.CloudTagKind, ""))
 
-	result = ofganames.ConvertTag(jimmnames.NewIdPGroupTag(id.String()))
-	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), jimmnames.IdPGroupTagKind, ""))
+	result = ofganames.ConvertTag(jimmnames.NewGroupTag(id.String()))
+	c.Assert(result, qt.DeepEquals, ofganames.NewTag(id.String(), jimmnames.GroupTagKind, ""))
 }
 
 func TestFromGenericResourceTag(t *testing.T) {

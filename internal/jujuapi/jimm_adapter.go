@@ -24,6 +24,11 @@ func (j *JIMMAdapter) RoleManager() RoleManager {
 	return j.j.RoleManager
 }
 
+// GroupManager returns the group manager from the underlying JIMM instance.
+func (j *JIMMAdapter) GroupManager() GroupManager {
+	return j.j.GroupManager
+}
+
 // IdentityManager returns the identity manager from the underlying JIMM instance.
 func (j *JIMMAdapter) IdentityManager() IdentityManager {
 	return j.j.IdentityManager

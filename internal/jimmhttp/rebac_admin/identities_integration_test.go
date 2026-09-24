@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/names/v6"
 
+	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimmhttp/rebac_admin"
 	"github.com/canonical/jimm/v3/internal/jujuapi"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -52,6 +53,145 @@ func TestIdentitiesList(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.Not(qt.IsNil))
 	c.Assert(len(res.Data), qt.Equals, pageSize)
+}
+
+func TestIdentityPatchGroups(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmEnv(c)
+	// initialization
+	ctx := c.Context()
+
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
+	groupName := "group-test1"
+	username := s.AdminUser.Name
+	group := s.AddGroup(c, groupName)
+
+	// test add identity group
+	changed, err := identitySvc.PatchIdentityGroups(ctx, username, []resources.IdentityGroupsPatchItem{{
+		Group: group.UUID,
+		Op:    resources.IdentityGroupsPatchItemOpAdd,
+	}})
+	c.Assert(err, qt.IsNil)
+	c.Assert(changed, qt.Equals, true)
+
+	// test user added to groups
+	objUser, err := s.JIMM.IdentityManager.FetchIdentity(ctx, username)
+	c.Assert(err, qt.IsNil)
+	tuples, _, err := s.JIMM.PermissionManager.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+		Object:       objUser.ResourceTag().String(),
+		Relation:     ofganames.MemberRelation.String(),
+		TargetObject: group.ResourceTag().String(),
+	}, 10, "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(tuples), qt.Equals, 1)
+	c.Assert(group.UUID, qt.Equals, tuples[0].Target.ID)
+
+	// test user remove from group
+	changed, err = identitySvc.PatchIdentityGroups(ctx, username, []resources.IdentityGroupsPatchItem{{
+		Group: group.UUID,
+		Op:    resources.IdentityGroupsPatchItemOpRemove,
+	}})
+	c.Assert(err, qt.IsNil)
+	c.Assert(changed, qt.Equals, true)
+	tuples, _, err = s.JIMM.PermissionManager.ListRelationshipTuples(ctx, s.AdminUser, params.RelationshipTuple{
+		Object:       objUser.ResourceTag().String(),
+		Relation:     ofganames.MemberRelation.String(),
+		TargetObject: group.ResourceTag().String(),
+	}, 10, "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(len(tuples), qt.Equals, 0)
+}
+
+func TestIdentityGetGroups(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmEnv(c)
+	// initialization
+	ctx := c.Context()
+
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
+	username := s.AdminUser.Name
+	groupsSize := 10
+	groupsToAdd := make([]resources.IdentityGroupsPatchItem, groupsSize)
+	groupTags := make([]jimmnames.GroupTag, groupsSize)
+	for i := range groupsSize {
+		groupName := fmt.Sprintf("group-test%d", i)
+		group := s.AddGroup(c, groupName)
+		groupTags[i] = group.ResourceTag()
+		groupsToAdd[i] = resources.IdentityGroupsPatchItem{
+			Group: group.UUID,
+			Op:    resources.IdentityGroupsPatchItemOpAdd,
+		}
+
+	}
+	changed, err := identitySvc.PatchIdentityGroups(ctx, username, groupsToAdd)
+	c.Assert(err, qt.IsNil)
+	c.Assert(changed, qt.Equals, true)
+
+	// test list identity's groups with token pagination
+	size := 3
+	token := ""
+	totalGroups := 0
+	for i := 0; ; i += size {
+		groups, err := identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{
+			Size:      &size,
+			NextToken: &token,
+		})
+		c.Assert(err, qt.IsNil)
+		for j := 0; j < len(groups.Data); j++ {
+			totalGroups++
+			c.Assert(groups.Data[j].Name, qt.Matches, `group-test\d+`)
+			c.Assert(groupTags[j].Id(), qt.Matches, `\w*-\w*-\w*-\w*-\w*`)
+		}
+		if groups.Next.PageToken == nil || *groups.Next.PageToken == "" {
+			break
+		}
+		token = *groups.Next.PageToken
+	}
+	c.Assert(totalGroups, qt.Equals, groupsSize)
+}
+
+// TestGetIdentityGroupsWithDeletedDbGroup tests the behaviour
+// of GetIdentityGroups when a tuple lingers in OpenFGA but the group
+// has been removed from the database.
+func TestGetIdentityGroupsWithDeletedDbGroup(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmEnv(c)
+	ctx := c.Context()
+
+	ctx = rebac_handlers.ContextWithIdentity(ctx, s.AdminUser)
+	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
+	username := s.AdminUser.Name
+
+	group1 := s.AddGroup(c, "group1")
+	group2 := s.AddGroup(c, "group2")
+
+	baseTuple := openfga.Tuple{
+		Object:   ofganames.ConvertTag(s.AdminUser.ResourceTag()),
+		Relation: ofganames.MemberRelation,
+	}
+	group1Access := baseTuple
+	group1Access.Target = ofganames.ConvertTag(group1.ResourceTag())
+	group2Access := baseTuple
+	group2Access.Target = ofganames.ConvertTag(group2.ResourceTag())
+
+	err := s.JIMM.OpenFGAClient.AddRelation(ctx, group1Access, group2Access)
+	c.Assert(err, qt.IsNil)
+
+	groups, err := identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(groups.Data, qt.HasLen, 2)
+
+	groupToDelete := dbmodel.GroupEntry{Name: "group2"}
+	err = s.JIMM.Database.GetGroup(ctx, &groupToDelete)
+	c.Assert(err, qt.IsNil)
+	err = s.JIMM.Database.RemoveGroup(ctx, &groupToDelete)
+	c.Assert(err, qt.IsNil)
+
+	groups, err = identitySvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, qt.IsNil)
+	c.Assert(groups.Data, qt.HasLen, 1)
 }
 
 func TestIdentityPatchRoles(t *testing.T) {
@@ -152,7 +292,7 @@ func TestIdentityGetRoles(t *testing.T) {
 }
 
 // TestIdentityEntitlements tests the listing of entitlements for a specific identityId.
-// Setup: add controllers, models to a user.
+// Setup: add controllers, models to a user and add the user to a group.
 func TestIdentityEntitlements(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmEnv(c)
@@ -160,8 +300,15 @@ func TestIdentityEntitlements(t *testing.T) {
 	ctx := c.Context()
 
 	identitySvc := rebac_admin.NewidentitiesService(jujuapi.NewJIMMAdapter(s.JIMM))
+	group := s.AddGroup(c, "test-group")
 	user := names.NewUserTag("test-user@canonical.com")
 	s.AddUser(c, user.Id())
+	err := s.JIMM.OpenFGAClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTag(user),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(group.ResourceTag()),
+	})
+	c.Assert(err, qt.IsNil)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user),
 		Relation: ofganames.AdministratorRelation,
@@ -177,7 +324,7 @@ func TestIdentityEntitlements(t *testing.T) {
 		t.Target = ofganames.ConvertTag(names.NewControllerTag(fmt.Sprintf("test-controller-%d", i)))
 		tuples = append(tuples, t)
 	}
-	err := s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
+	err = s.JIMM.OpenFGAClient.AddRelation(ctx, tuples...)
 	c.Assert(err, qt.IsNil)
 
 	// test
@@ -189,9 +336,10 @@ func TestIdentityEntitlements(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.Not(qt.IsNil))
 	entitlements = append(entitlements, res.Data...)
-	c.Assert(entitlements, qt.HasLen, 6)
+	c.Assert(entitlements, qt.HasLen, 7)
 	modelEntitlementCount := 0
 	controllerEntitlementCount := 0
+	groupEntitlementCount := 0
 	for _, entitlement := range entitlements {
 		switch entitlement.EntityType {
 		case openfga.ModelType.String():
@@ -202,6 +350,9 @@ func TestIdentityEntitlements(t *testing.T) {
 			c.Assert(entitlement.EntityId, qt.Matches, `test-controller-\d`)
 			c.Assert(entitlement.Entitlement, qt.Equals, ofganames.AdministratorRelation.String())
 			controllerEntitlementCount++
+		case openfga.GroupType.String():
+			c.Assert(entitlement.Entitlement, qt.Equals, ofganames.MemberRelation.String())
+			groupEntitlementCount++
 		default:
 			c.Logf("Unexpected entitlement found of type %s", entitlement.EntityType)
 			c.FailNow()
@@ -209,6 +360,7 @@ func TestIdentityEntitlements(t *testing.T) {
 	}
 	c.Assert(modelEntitlementCount, qt.Equals, 3)
 	c.Assert(controllerEntitlementCount, qt.Equals, 3)
+	c.Assert(groupEntitlementCount, qt.Equals, 1)
 }
 
 // patchIdentitiesEntitlementTestEnv is used to create entries in JIMM's database.

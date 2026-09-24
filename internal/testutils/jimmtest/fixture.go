@@ -32,12 +32,19 @@ import (
 // and make the suite argument an interface of the required calls we use here.
 func CreateTestControllerEnvironment(ctx context.Context, c *qt.C, db *db.Database) (
 	dbmodel.Identity,
+	dbmodel.GroupEntry,
 	dbmodel.Controller,
 	dbmodel.Model,
 	dbmodel.ApplicationOffer,
 	dbmodel.Cloud,
 	dbmodel.CloudCredential,
 	dbmodel.RoleEntry) {
+
+	_, err := db.AddGroup(ctx, "test-group")
+	c.Assert(err, qt.IsNil)
+	group := dbmodel.GroupEntry{Name: "test-group"}
+	err = db.GetGroup(ctx, &group)
+	c.Assert(err, qt.IsNil)
 
 	u, err := dbmodel.NewIdentity(petname.Generate(2, "-"+"canonical.com"))
 	c.Assert(err, qt.IsNil)
@@ -108,5 +115,5 @@ func CreateTestControllerEnvironment(ctx context.Context, c *qt.C, db *db.Databa
 	role, err := db.AddRole(ctx, petname.Generate(2, "-"))
 	c.Assert(err, qt.IsNil)
 
-	return *u, controller, model, offer, cloud, cred, *role
+	return *u, group, controller, model, offer, cloud, cred, *role
 }

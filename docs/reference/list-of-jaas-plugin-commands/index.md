@@ -9,13 +9,13 @@ jaas add-cloud [options] <controller_name> <cloud_name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--cloud` |  | The path to the cloud's definition file. The cloud name must be present in the file. |
-| `--force` | false | Forces the cloud to be added to the controller |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                                                                |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                            |
+| `--cloud`                  |         | The path to the cloud's definition file. The cloud name must be present in the file. |
+| `--force`                  | false   | Forces the cloud to be added to the controller                                       |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                                               |
+| `-o`, `--output`           |         | Specify an output file                                                               |
 
 ## Examples
 
@@ -43,12 +43,12 @@ jaas add-controller-profile [options] <name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--file` |  | Specify a file-path for the controller profile, use '-' to read from stdin. |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                                                       |
+| -------------------------- | ------- | --------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                   |
+| `--file`                   |         | Specify a file-path for the controller profile, use '-' to read from stdin. |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                                      |
+| `-o`, `--output`           |         | Specify an output file                                                      |
 
 ## Examples
 
@@ -92,6 +92,31 @@ bootstrap-options:
 		automatically-retry-hooks: "false"
 
 
+# ADD-GROUP
+
+## Summary
+Add group to jimm.
+
+## Usage
+```juju jaas add-group [options] <name>```
+
+### Options
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
+
+## Examples
+
+    juju add-group
+
+
+## Details
+
+Adds a group.
+
+
 # ADD-MODEL
 
 ## Summary
@@ -103,15 +128,15 @@ jaas add-model [options] <model name> [cloud|region|(cloud/region)]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `-c`, `--controller` |  | Controller to operate in |
-| `--config` |  | Specify the path to a YAML model configuration file or individual configuration options (`--config config.yaml [--config key=value ...]`) |
-| `--credential` |  | Specify the credential to be used by the model |
-| `--no-switch` | false | Choose not to switch to the newly created model |
-| `--owner` |  | Specify the user who will own the model, if not the current user |
-| `--target-controller` |  | Target controller for the model |
+| Flag                       | Default | Usage                                                                                                                                     |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                                                                                 |
+| `-c`, `--controller`       |         | Controller to operate in                                                                                                                  |
+| `--config`                 |         | Specify the path to a YAML model configuration file or individual configuration options (`--config config.yaml [--config key=value ...]`) |
+| `--credential`             |         | Specify the credential to be used by the model                                                                                            |
+| `--no-switch`              | false   | Choose not to switch to the newly created model                                                                                           |
+| `--owner`                  |         | Specify the user who will own the model, if not the current user                                                                          |
+| `--target-controller`      |         | Target controller for the model                                                                                                           |
 
 ## Examples
 
@@ -137,18 +162,17 @@ jaas add-permission [options] <object> <relation> <target_object>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `-f` |  | file location of JSON encoded tuples |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `-f`                       |         | file location of JSON encoded tuples      |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
-    juju add-permission user-alice@canonical.com administrator controller-MyController
-    juju add-permission idpgroup-external-team-id#member reader model-mymodel
-    juju add-permission role-Auditor#assignee audit_log_viewer controller-MyController
+    juju add-permission user-alice@canonical.com member group-mygroup
+    juju add-permission group-MyTeam#member admin model-mymodel
     juju add-permission -f /path/to/file.yaml
 
 
@@ -172,14 +196,14 @@ Certain reserved tags exist to denote specific resource types:
 -f    Read from a file where filename is the location of a JSON encoded file of the form:
     [
         {
-            "object":"user-alice",
-            "relation":"administrator",
-            "target_object":"controller-MyController"
+            "object":"user-mike",
+            "relation":"member",
+            "target_object":"group-yellow"
         },
         {
-            "object":"user-bob",
-            "relation":"reader",
-            "target_object":"model-mymodel"
+            "object":"user-alice",
+            "relation":"member",
+            "target_object":"group-yellow"
         }
     ]
 
@@ -187,12 +211,17 @@ Certain constraints apply when creating/removing permissions, namely:
 Resources may be one of:
 
     user tag                = "user-<name>"
+    group tag               = "group-<name>"
     idp group tag           = "idpgroup-<id>"
     role tag 			    = "role-<name>"
     controller tag          = "controller-<name>"
     model tag               = "model-<name>"
 	cloud tag			    = "cloud-<name>"
     application-offer tag   = "applicationoffer-<name>"
+
+If target_object is a group, the relation can only be:
+
+    member
 
 If target_object is a role, the relation can only be:
 
@@ -221,12 +250,16 @@ If target_object is an application offer, the relation can be one of:
     consumer
     administrator
 
-If the object is an IDP group, a userset must be applied by adding #member as follows.
-This will grant/revoke access to all users within the IDP group:
+If the object is a group, a userset must be applied by adding #member as follows.
+This will grant/revoke access to all users within TeamA:
+
+    group-TeamA#member administrator controller-MyController
+
+IDP-owned groups use the idpgroup tag and also require the #member userset:
 
 	idpgroup-external-team-id#member administrator controller-MyController
 
-If the object is a role, a userset must be applied by adding #assignee as follows.
+Similarly if the object is a role, a userset must be applied by adding #member as follows.
 
 	role-Auditor#assignee audit_log_viewer controller-MyController
 
@@ -242,11 +275,11 @@ jaas add-role [options] <role name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -271,19 +304,19 @@ jaas list-audit-events [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--after` |  | display events that happened after a specified time, formatted as RFC3339 |
-| `--before` |  | display events that happened before specified time, formatted as RFC3339 |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `--limit` | 0 | limit the maximum number of returned audit events |
-| `--method` |  | display events for a specific method call |
-| `--model` |  | display events for a specific model (model name is controller/model) |
-| `-o`, `--output` |  | Specify an output file |
-| `--offset` | 0 | offset the set of returned audit events |
-| `--reverse` | false | reverse the order of logs, showing the most recent first |
-| `--user-tag` |  | display events performed by authenticated user |
+| Flag                       | Default | Usage                                                                     |
+| -------------------------- | ------- | ------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                 |
+| `--after`                  |         | display events that happened after a specified time, formatted as RFC3339 |
+| `--before`                 |         | display events that happened before specified time, formatted as RFC3339  |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml)                       |
+| `--limit`                  | 0       | limit the maximum number of returned audit events                         |
+| `--method`                 |         | display events for a specific method call                                 |
+| `--model`                  |         | display events for a specific model (model name is controller/model)      |
+| `-o`, `--output`           |         | Specify an output file                                                    |
+| `--offset`                 | 0       | offset the set of returned audit events                                   |
+| `--reverse`                | false   | reverse the order of logs, showing the most recent first                  |
+| `--user-tag`               |         | display events performed by authenticated user                            |
 
 ## Examples
 
@@ -308,20 +341,20 @@ jaas bootstrap [options] <cloud name>[/region] <controller name> <juju version>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--bootstrap-base` |  | Specify the base of the bootstrap machine. |
-| `--bootstrap-constraints` | [] | Specify bootstrap machine constraints. |
-| `--config` |  | Specify a configuration file, or one or more configuration options.     (`--config config.yaml [--config key=value ...])` |
-| `--constraints` | [] | Set model constraints |
-| `--credential` |  | The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud. |
-| `--detach` | false | If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete. |
-| `--format` | json | Specify output format (json&#x7c;yaml) |
-| `--model-default` |  | Specify a configuration file, or one or more configuration options to be set for all models, unless otherwise specified.     (`--model-default config.yaml [--model-default key=value ...])` |
-| `-o`, `--output` |  | Specify an output file |
-| `--profile` |  | Apply a saved controller profile before processing explicit bootstrap flags. Explicit command line values override the profile. |
-| `--storage-pool` |  | Specify options for an initial storage pool. 'name' and 'type' are required, plus any additional attributes.     (`--storage-pool pool-config.yaml [--storage-pool key=value ...])` |
+| Flag                       | Default | Usage                                                                                                                                                                                        |
+| -------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                                                                                                                                    |
+| `--bootstrap-base`         |         | Specify the base of the bootstrap machine.                                                                                                                                                   |
+| `--bootstrap-constraints`  | []      | Specify bootstrap machine constraints.                                                                                                                                                       |
+| `--config`                 |         | Specify a configuration file, or one or more configuration options.     (`--config config.yaml [--config key=value ...])`                                                                    |
+| `--constraints`            | []      | Set model constraints                                                                                                                                                                        |
+| `--credential`             |         | The name of the cloud credential to use for bootstrapping. Only required if more than one credential is available for the cloud.                                                             |
+| `--detach`                 | false   | If set, the command will start the bootstrap job and return immediately with the job ID, without waiting for the job to complete.                                                            |
+| `--format`                 | json    | Specify output format (json&#x7c;yaml)                                                                                                                                                       |
+| `--model-default`          |         | Specify a configuration file, or one or more configuration options to be set for all models, unless otherwise specified.     (`--model-default config.yaml [--model-default key=value ...])` |
+| `-o`, `--output`           |         | Specify an output file                                                                                                                                                                       |
+| `--profile`                |         | Apply a saved controller profile before processing explicit bootstrap flags. Explicit command line values override the profile.                                                              |
+| `--storage-pool`           |         | Specify options for an initial storage pool. 'name' and 'type' are required, plus any additional attributes.     (`--storage-pool pool-config.yaml [--storage-pool key=value ...])`          |
 
 ## Examples
 
@@ -402,10 +435,10 @@ jaas bootstrap-status [options] <job id>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `-f` | false | follow the logs |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `-f`                       | false   | follow the logs                           |
 
 ## Examples
 
@@ -429,9 +462,9 @@ jaas bootstrap-stop [options] <job id>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
 
 ## Examples
 
@@ -454,11 +487,11 @@ jaas check-permission [options] <object> <relation> <target_object>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | smart | Specify output format (json&#x7c;smart&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                             |
+| -------------------------- | ------- | ------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication         |
+| `--format`                 | smart   | Specify output format (json&#x7c;smart&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                            |
 
 ## Examples
 
@@ -483,11 +516,11 @@ jaas controllers [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -513,13 +546,13 @@ jaas destroy-controller [options] <controller name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--detach` | false | If set, the command will start the destroy-controller job and return immediately with the job ID, without waiting for the job to complete. |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `--no-prompt` | false | If set, the command will not prompt the user for the controller name before proceeding |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                                                                                                                      |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                                                                                  |
+| `--detach`                 | false   | If set, the command will start the destroy-controller job and return immediately with the job ID, without waiting for the job to complete. |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                                                                                                     |
+| `--no-prompt`              | false   | If set, the command will not prompt the user for the controller name before proceeding                                                     |
+| `-o`, `--output`           |         | Specify an output file                                                                                                                     |
 
 ## Examples
 
@@ -567,10 +600,10 @@ jaas bootstrap-status [options] <job id>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `-f` | false | follow the logs |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `-f`                       | false   | follow the logs                           |
 
 ## Examples
 
@@ -594,13 +627,13 @@ jaas documentation [options] --out <target-folder> --no-index --split --url <bas
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `--discourse-ids` |  | File containing a mapping of commands and their discourse ids |
-| `--no-index` | false | Do not generate the commands index |
-| `--out` |  | Documentation output folder if not set the result is displayed using the standard output |
-| `--split` | false | Generate a separate Markdown file for each command |
-| `--url` |  | Documentation host URL |
+| Flag              | Default | Usage                                                                                    |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `--discourse-ids` |         | File containing a mapping of commands and their discourse ids                            |
+| `--no-index`      | false   | Do not generate the commands index                                                       |
+| `--out`           |         | Documentation output folder if not set the result is displayed using the standard output |
+| `--split`         | false   | Generate a separate Markdown file for each command                                       |
+| `--url`           |         | Documentation host URL                                                                   |
 
 ## Examples
 
@@ -643,9 +676,9 @@ jaas grant-audit-log [options] <username>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
 
 ## Examples
 
@@ -655,6 +688,32 @@ jaas grant-audit-log [options] <username>
 ## Details
 
 Grants a user access to read audit logs.
+
+
+# GROUPS
+
+**Aliases:** groups
+
+## Summary
+List all groups.
+
+### Options
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `--limit`                  | 0       | The maximum number of groups to return    |
+| `-o`, `--output`           |         | Specify an output file                    |
+| `--offset`                 | 0       | The offset to use when requesting groups  |
+
+## Examples
+
+    juju list-groups
+
+
+## Details
+
+Lists all groups.
 
 
 # HELP
@@ -685,10 +744,10 @@ jaas import-model [options] <controller name> <model uuid>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--owner` |  | switch the model owner to the desired user |
+| Flag                       | Default | Usage                                      |
+| -------------------------- | ------- | ------------------------------------------ |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication  |
+| `--owner`                  |         | switch the model owner to the desired user |
 
 ## Examples
 
@@ -720,19 +779,19 @@ jaas list-audit-events [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--after` |  | display events that happened after a specified time, formatted as RFC3339 |
-| `--before` |  | display events that happened before specified time, formatted as RFC3339 |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `--limit` | 0 | limit the maximum number of returned audit events |
-| `--method` |  | display events for a specific method call |
-| `--model` |  | display events for a specific model (model name is controller/model) |
-| `-o`, `--output` |  | Specify an output file |
-| `--offset` | 0 | offset the set of returned audit events |
-| `--reverse` | false | reverse the order of logs, showing the most recent first |
-| `--user-tag` |  | display events performed by authenticated user |
+| Flag                       | Default | Usage                                                                     |
+| -------------------------- | ------- | ------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                 |
+| `--after`                  |         | display events that happened after a specified time, formatted as RFC3339 |
+| `--before`                 |         | display events that happened before specified time, formatted as RFC3339  |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml)                       |
+| `--limit`                  | 0       | limit the maximum number of returned audit events                         |
+| `--method`                 |         | display events for a specific method call                                 |
+| `--model`                  |         | display events for a specific model (model name is controller/model)      |
+| `-o`, `--output`           |         | Specify an output file                                                    |
+| `--offset`                 | 0       | offset the set of returned audit events                                   |
+| `--reverse`                | false   | reverse the order of logs, showing the most recent first                  |
+| `--user-tag`               |         | display events performed by authenticated user                            |
 
 ## Examples
 
@@ -757,12 +816,12 @@ jaas list-controller-profiles [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `--juju-version` |  | Only return profiles compatible with the specified Juju version. |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                                            |
+| -------------------------- | ------- | ---------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                        |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml)              |
+| `--juju-version`           |         | Only return profiles compatible with the specified Juju version. |
+| `-o`, `--output`           |         | Specify an output file                                           |
 
 ## Examples
 
@@ -788,11 +847,11 @@ jaas controllers [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -807,22 +866,82 @@ Displays controller information for all controllers known to JIMM.
 For JAAS admins, this will also display controllers that are in the process of being bootstrapped.
 
 
+# LIST-GROUPS
+
+**Aliases:** groups
+
+## Summary
+List all groups.
+
+### Options
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `--limit`                  | 0       | The maximum number of groups to return    |
+| `-o`, `--output`           |         | Specify an output file                    |
+| `--offset`                 | 0       | The offset to use when requesting groups  |
+
+## Examples
+
+    juju list-groups
+
+
+## Details
+
+Lists all groups.
+
+
+# LIST-JOBS
+
+**Aliases:** list-jobs
+
+## Summary
+Lists all jobs known to JIMM.
+
+### Options
+| Flag                       | Default | Usage                                                   |
+| -------------------------- | ------- | ------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication               |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                  |
+| `--kind`                   |         | Filter jobs by kind (can be specified multiple times)   |
+| `-o`, `--output`           |         | Specify an output file                                  |
+| `--status`                 |         | Filter jobs by status (can be specified multiple times) |
+
+## Examples
+
+    juju jobs
+    juju jobs --format json
+    juju jobs --count 500
+    juju jobs --kind backup --kind restore
+    juju jobs --status running --status pending
+    juju jobs --count 1000 --status failed --kind backup
+
+
+## Details
+
+Displays information on long-running jobs.
+
+The command supports filtering by job kind and status, and allows you to
+limit the number of results returned (up to 10,000 jobs).
+
+Valid job statuses are: running, successful, pending, failed, unknown
+
+
 # LIST-MIGRATION-TARGETS
 
 ## Summary
 List migration targets for internal model migration.
 
 ## Usage
-```text
-jaas list-migration-targets [options] <model uuid>
-```
+```juju jaas list-migration-targets [options] <model uuid>```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -849,17 +968,12 @@ criteria:
 ## Summary
 Lists all models accessible via JIMM.
 
-## Usage
-```text
-jaas models [options]
-```
-
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                               |
+| -------------------------- | ------- | --------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication           |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                              |
 
 ## Examples
 
@@ -885,15 +999,15 @@ jaas list-permissions [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
-| `--object` |  | relation object |
-| `--relation` |  | relation name |
-| `--resolve` | true | resolves UUIDs to human readable tags |
-| `--target` |  | relation target object |
+| Flag                       | Default | Usage                                               |
+| -------------------------- | ------- | --------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication           |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                              |
+| `--object`                 |         | relation object                                     |
+| `--relation`               |         | relation name                                       |
+| `--resolve`                | true    | resolves UUIDs to human readable tags               |
+| `--target`                 |         | relation target object                              |
 
 ## Examples
 
@@ -929,13 +1043,13 @@ jaas list-roles [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `--limit` | 0 | The maximum number of roles to return |
-| `-o`, `--output` |  | Specify an output file |
-| `--offset` | 0 | The offset to use when requesting roles |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `--limit`                  | 0       | The maximum number of roles to return     |
+| `-o`, `--output`           |         | Specify an output file                    |
+| `--offset`                 | 0       | The offset to use when requesting roles   |
 
 ## Examples
 
@@ -958,13 +1072,13 @@ jaas migrate [options] <model-name> <jaas-name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--backing-controller` |  | Specify the name of the controller that will host the model in JIMM. |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
-| `--user-mapping` |  | Specify a comma-separated user mapping of local users to external users |
+| Flag                       | Default | Usage                                                                   |
+| -------------------------- | ------- | ----------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                               |
+| `--backing-controller`     |         | Specify the name of the controller that will host the model in JIMM.    |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                                  |
+| `-o`, `--output`           |         | Specify an output file                                                  |
+| `--user-mapping`           |         | Specify a comma-separated user mapping of local users to external users |
 
 ## Examples
 
@@ -1031,11 +1145,11 @@ jaas migrate-internal [options] <controller name> <model uuid> [<model uuid>...]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1067,11 +1181,11 @@ jaas model-status [options] <model uuid>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1091,17 +1205,12 @@ Displays full model status.
 ## Summary
 Lists all models accessible via JIMM.
 
-## Usage
-```text
-jaas models [options]
-```
-
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                               |
+| -------------------------- | ------- | --------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication           |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                              |
 
 ## Examples
 
@@ -1127,15 +1236,15 @@ jaas list-permissions [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
-| `--object` |  | relation object |
-| `--relation` |  | relation name |
-| `--resolve` | true | resolves UUIDs to human readable tags |
-| `--target` |  | relation target object |
+| Flag                       | Default | Usage                                               |
+| -------------------------- | ------- | --------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication           |
+| `--format`                 | yaml    | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                              |
+| `--object`                 |         | relation object                                     |
+| `--relation`               |         | relation name                                       |
+| `--resolve`                | true    | resolves UUIDs to human readable tags               |
+| `--target`                 |         | relation target object                              |
 
 ## Examples
 
@@ -1169,11 +1278,11 @@ jaas purge-audit-logs [options] <date>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1200,11 +1309,11 @@ jaas query-models [options] <query>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | json | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | json    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1234,11 +1343,11 @@ jaas recover-model-credential [options] [<cloud>/<owner>/<name>]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--all` | false | recover every cloud credential known to JIMM |
-| `--dry-run` | false | check that credentials can be fetched without writing them back |
+| Flag                       | Default | Usage                                                           |
+| -------------------------- | ------- | --------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                       |
+| `--all`                    | false   | recover every cloud credential known to JIMM                    |
+| `--dry-run`                | false   | check that credentials can be fetched without writing them back |
 
 ## Examples
 
@@ -1287,16 +1396,16 @@ jaas register-controller [options] <filepath>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--dry-run` | false | Dry-run enabled will only print the controller details. |
-| `--file` |  | Specify a file-path for controller details, use '-' to read from stdin. |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `--local` | false | If local flag is specified, then the local API addresses and CA cert of the controller will be used. |
-| `-o`, `--output` |  | Specify an output file |
-| `--public-address` |  | Specify a custom public address to use for dialing the controller. |
-| `--tls-hostname` |  | Specify the hostname for TLS verification. |
+| Flag                       | Default | Usage                                                                                                |
+| -------------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                                            |
+| `--dry-run`                | false   | Dry-run enabled will only print the controller details.                                              |
+| `--file`                   |         | Specify a file-path for controller details, use '-' to read from stdin.                              |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                                                               |
+| `--local`                  | false   | If local flag is specified, then the local API addresses and CA cert of the controller will be used. |
+| `-o`, `--output`           |         | Specify an output file                                                                               |
+| `--public-address`         |         | Specify a custom public address to use for dialing the controller.                                   |
+| `--tls-hostname`           |         | Specify the hostname for TLS verification.                                                           |
 
 ## Examples
 
@@ -1341,10 +1450,10 @@ jaas import-model [options] <controller name> <model uuid>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--owner` |  | switch the model owner to the desired user |
+| Flag                       | Default | Usage                                      |
+| -------------------------- | ------- | ------------------------------------------ |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication  |
+| `--owner`                  |         | switch the model owner to the desired user |
 
 ## Examples
 
@@ -1374,11 +1483,11 @@ jaas remove-cloud [options] <controller_name> <cloud_name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1401,10 +1510,10 @@ jaas remove-controller-profile [options] <name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--force` | false | delete controller profile without prompt |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--force`                  | false   | delete controller profile without prompt  |
 
 ## Examples
 
@@ -1415,6 +1524,32 @@ jaas remove-controller-profile [options] <name>
 ## Details
 
 Removes a saved controller profile.
+
+
+# REMOVE-GROUP
+
+## Summary
+Remove a group.
+
+## Usage
+```juju jaas remove-group [options] <name>```
+
+### Options
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--force`                  | false   | delete group without prompt               |
+| `--format`                 | smart   | Specify output format (smart)             |
+| `-o`, `--output`           |         | Specify an output file                    |
+
+## Examples
+
+    juju remove-group mygroup
+
+
+## Details
+
+Removes a group.
 
 
 # REMOVE-PERMISSION
@@ -1428,12 +1563,12 @@ jaas remove-permission [options] <object> <relation> <target_object>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `-f` |  | file location of JSON encoded tuples |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `-f`                       |         | file location of JSON encoded tuples      |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1462,14 +1597,14 @@ Certain reserved tags exist to denote specific resource types:
 -f    Read from a file where filename is the location of a JSON encoded file of the form:
     [
         {
-            "object":"user-alice",
-            "relation":"administrator",
-            "target_object":"controller-MyController"
+            "object":"user-mike",
+            "relation":"member",
+            "target_object":"group-yellow"
         },
         {
-            "object":"user-bob",
-            "relation":"reader",
-            "target_object":"model-mymodel"
+            "object":"user-alice",
+            "relation":"member",
+            "target_object":"group-yellow"
         }
     ]
 
@@ -1477,12 +1612,17 @@ Certain constraints apply when creating/removing permissions, namely:
 Resources may be one of:
 
     user tag                = "user-<name>"
+    group tag               = "group-<name>"
     idp group tag           = "idpgroup-<id>"
     role tag 			    = "role-<name>"
     controller tag          = "controller-<name>"
     model tag               = "model-<name>"
 	cloud tag			    = "cloud-<name>"
     application-offer tag   = "applicationoffer-<name>"
+
+If target_object is a group, the relation can only be:
+
+    member
 
 If target_object is a role, the relation can only be:
 
@@ -1511,12 +1651,16 @@ If target_object is an application offer, the relation can be one of:
     consumer
     administrator
 
-If the object is an IDP group, a userset must be applied by adding #member as follows.
-This will grant/revoke access to all users within the IDP group:
+If the object is a group, a userset must be applied by adding #member as follows.
+This will grant/revoke access to all users within TeamA:
+
+    group-TeamA#member administrator controller-MyController
+
+IDP-owned groups use the idpgroup tag and also require the #member userset:
 
 	idpgroup-external-team-id#member administrator controller-MyController
 
-If the object is a role, a userset must be applied by adding #assignee as follows.
+Similarly if the object is a role, a userset must be applied by adding #member as follows.
 
 	role-Auditor#assignee audit_log_viewer controller-MyController
 
@@ -1532,12 +1676,12 @@ jaas remove-role [options] <role name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | smart | Specify output format (smart) |
-| `-o`, `--output` |  | Specify an output file |
-| `-y` | false | delete role without prompt |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | smart   | Specify output format (smart)             |
+| `-o`, `--output`           |         | Specify an output file                    |
+| `-y`                       | false   | delete role without prompt                |
 
 ## Examples
 
@@ -1547,6 +1691,29 @@ jaas remove-role [options] <role name>
 ## Details
 
 Removes a role.
+
+
+# RENAME-GROUP
+
+## Summary
+Rename a group.
+
+## Usage
+```juju jaas rename-group [options] <name> <new name>```
+
+### Options
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+
+## Examples
+
+    juju rename-group mygroup newgroup
+
+
+## Details
+
+Renames a group.
 
 
 # RENAME-ROLE
@@ -1560,9 +1727,9 @@ jaas rename-role [options] <role name> <new role name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
 
 ## Examples
 
@@ -1585,9 +1752,9 @@ jaas revoke-audit-log [options] <user>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
 
 ## Examples
 
@@ -1612,13 +1779,13 @@ jaas list-roles [options]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `--limit` | 0 | The maximum number of roles to return |
-| `-o`, `--output` |  | Specify an output file |
-| `--offset` | 0 | The offset to use when requesting roles |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `--limit`                  | 0       | The maximum number of roles to return     |
+| `-o`, `--output`           |         | Specify an output file                    |
+| `--offset`                 | 0       | The offset to use when requesting roles   |
 
 ## Examples
 
@@ -1641,11 +1808,11 @@ jaas set-controller-deprecated [options] <controller name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1668,11 +1835,11 @@ jaas show-controller [options] <controller name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1698,11 +1865,11 @@ jaas show-controller-profile [options] <name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1726,11 +1893,11 @@ jaas show-model [options] <model>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | tabular | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                               |
+| -------------------------- | ------- | --------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication           |
+| `--format`                 | tabular | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                              |
 
 ## Examples
 
@@ -1762,12 +1929,12 @@ jaas unregister-controller [options] <name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--force` | false | force unregister a controller |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
+| `--force`                  | false   | force unregister a controller             |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)    |
+| `-o`, `--output`           |         | Specify an output file                    |
 
 ## Examples
 
@@ -1791,12 +1958,12 @@ jaas update-controller-profile [options] <name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--file` |  | Specify a file-path for the controller profile, use '-' to read from stdin. |
-| `--format` | yaml | Specify output format (json&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                                                       |
+| -------------------------- | ------- | --------------------------------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                                   |
+| `--file`                   |         | Specify a file-path for the controller profile, use '-' to read from stdin. |
+| `--format`                 | yaml    | Specify output format (json&#x7c;yaml)                                      |
+| `-o`, `--output`           |         | Specify an output file                                                      |
 
 ## Examples
 
@@ -1825,9 +1992,9 @@ jaas update-migrated-model [options] <controller name> <model uuid>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
+| Flag                       | Default | Usage                                     |
+| -------------------------- | ------- | ----------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication |
 
 ## Examples
 
@@ -1851,13 +2018,13 @@ jaas upgrade-controller [options] <controller-name>
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--agent-stream` |  | Check this agent stream for upgrades |
-| `--dry-run` | false | Don't change anything, just report what version would be chosen |
-| `--ignore-agent-versions` | false | Don't check if all agents have already reached the current version |
-| `--target-version` |  | Upgrade to this specific version |
+| Flag                       | Default | Usage                                                              |
+| -------------------------- | ------- | ------------------------------------------------------------------ |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication                          |
+| `--agent-stream`           |         | Check this agent stream for upgrades                               |
+| `--dry-run`                | false   | Don't change anything, just report what version would be chosen    |
+| `--ignore-agent-versions`  | false   | Don't check if all agents have already reached the current version |
+| `--target-version`         |         | Upgrade to this specific version                                   |
 
 ## Examples
 
@@ -1886,11 +2053,11 @@ jaas upgrade-to [options] <controller-name> <model-uuid> [<model-uuid>...]
 ```
 
 ### Options
-| Flag | Default | Usage |
-| --- | --- | --- |
-| `-B`, `--no-browser-login` | false | Do not use web browser for authentication |
-| `--format` | tabular | Specify output format (json&#x7c;tabular&#x7c;yaml) |
-| `-o`, `--output` |  | Specify an output file |
+| Flag                       | Default | Usage                                               |
+| -------------------------- | ------- | --------------------------------------------------- |
+| `-B`, `--no-browser-login` | false   | Do not use web browser for authentication           |
+| `--format`                 | tabular | Specify output format (json&#x7c;tabular&#x7c;yaml) |
+| `-o`, `--output`           |         | Specify an output file                              |
 
 ## Examples
 

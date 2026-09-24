@@ -4,10 +4,13 @@ tuples:
     # Group (gr)
     - user: user:gr-user-1
       relation: member
-      object: idpgroup:gr-group-1
+      object: group:gr-group-1
+    - user: group:gr-group-1#member
+      relation: member
+      object: group:gr-group-2
     - user: user:*
       relation: member
-      object: idpgroup:gr-group-3
+      object: group:gr-group-3
 
     # Role (ro)
     # User to role direct
@@ -18,9 +21,9 @@ tuples:
     # User to role via group with resources
     - user: user:ro-user-2
       relation: member
-      object: idpgroup:ro-group-1
+      object: group:ro-group-1
 
-    - user: idpgroup:ro-group-1#member
+    - user: group:ro-group-1#member
       relation: assignee
       object: role:ro-role-2
 
@@ -89,14 +92,14 @@ tuples:
       object: controller:co-controller-1
     - user: user:co-user-3
       relation: member
-      object: idpgroup:co-group-1
-    - user: idpgroup:co-group-1#member
+      object: group:co-group-1
+    - user: group:co-group-1#member
       relation: administrator
       object: controller:co-controller-2
     - user: user:co-user-4
       relation: member
-      object: idpgroup:co-group-2
-    - user: idpgroup:co-group-2#member
+      object: group:co-group-2
+    - user: group:co-group-2#member
       relation: audit_log_viewer
       object: controller:co-controller-2
     - user: user:co-user-5
@@ -104,8 +107,8 @@ tuples:
       object: controller:co-controller-1
     - user: user:co-user-6
       relation: member
-      object: idpgroup:co-group-3
-    - user: idpgroup:co-group-3#member
+      object: group:co-group-3
+    - user: group:co-group-3#member
       relation: can_addmodel
       object: controller:co-controller-2
 
@@ -116,7 +119,7 @@ tuples:
     - user: user:*
       relation: administrator
       object: model:mo-model-2
-    - user: idpgroup:mo-group-1#member
+    - user: group:mo-group-1#member
       relation: administrator
       object: model:mo-model-1
     - user: controller:mo-controller-1
@@ -125,7 +128,7 @@ tuples:
     - user: user:mo-user-3
       relation: administrator
       object: controller:mo-controller-1
-    - user: idpgroup:mo-group-2#member
+    - user: group:mo-group-2#member
       relation: writer
       object: model:mo-model-1
     - user: user:mo-user-4
@@ -133,9 +136,15 @@ tuples:
       object: model:mo-model-1
     - user: user:mo-user-5
       relation: member
-      object: idpgroup:mo-group-3
-    - user: idpgroup:mo-group-3#member
+      object: group:mo-group-3
+    - user: group:mo-group-3#member
       relation: writer
+      object: model:mo-model-1
+    - user: user:mo-user-6
+      relation: member
+      object: idpgroup:mo-idpgroup-1
+    - user: idpgroup:mo-idpgroup-1#member
+      relation: reader
       object: model:mo-model-1
     
     # Cloud (cl)
@@ -145,7 +154,7 @@ tuples:
     - user: user:*
       relation: administrator
       object: cloud:cl-cloud-2
-    - user: idpgroup:cl-group-1#member
+    - user: group:cl-group-1#member
       relation: administrator
       object: cloud:cl-cloud-1
     - user: user:cl-user-2
@@ -154,13 +163,13 @@ tuples:
     - user: controller:cl-controller-1
       relation: controller
       object: cloud:cl-cloud-1
-    - user: idpgroup:cl-group-2#member
+    - user: group:cl-group-2#member
       relation: can_addmodel
       object: cloud:cl-cloud-1
     - user: user:cl-user-3
       relation: member
-      object: idpgroup:cl-group-3
-    - user: idpgroup:cl-group-3#member
+      object: group:cl-group-3
+    - user: group:cl-group-3#member
       relation: can_addmodel
       object: cloud:cl-cloud-1
     
@@ -171,7 +180,7 @@ tuples:
     - user: user:*
       relation: administrator
       object: applicationoffer:ao-applicationoffer-2
-    - user: idpgroup:ao-group-1#member
+    - user: group:ao-group-1#member
       relation: administrator
       object: applicationoffer:ao-applicationoffer-1
     - user: user:ao-user-2
@@ -180,7 +189,7 @@ tuples:
     - user: model:ao-model-1
       relation: model
       object: applicationoffer:ao-applicationoffer-1
-    - user: idpgroup:ao-group-2#member
+    - user: group:ao-group-2#member
       relation: consumer
       object: applicationoffer:ao-applicationoffer-1
     - user: user:ao-user-3
@@ -188,19 +197,32 @@ tuples:
       object: applicationoffer:ao-applicationoffer-1
     - user: user:ao-user-4
       relation: member
-      object: idpgroup:ao-group-3
-    - user: idpgroup:ao-group-3#member
+      object: group:ao-group-3
+    - user: group:ao-group-3#member
       relation: consumer
       object: applicationoffer:ao-applicationoffer-1
     - user: user:ao-user-5
       relation: member
-      object: idpgroup:ao-group-4
-    - user: idpgroup:ao-group-4#member
+      object: group:ao-group-4
+    - user: group:ao-group-4#member
       relation: reader
       object: applicationoffer:ao-applicationoffer-1
     
 # Tests directly correspond to the types available in JIMM's authorisation model
 tests:
+    # Ensures:
+    # - all or individual users can become members of a group
+    # - group membership can have multiple layers
+    - name: Group
+      list_objects:
+        - user: user:gr-user-1
+          type: group
+          assertions:
+            member:
+                - group:gr-group-1
+                - group:gr-group-2
+                - group:gr-group-3
+
     # Ensures:
     # - User can directly become an assignee of a role
     # - User may go through a group to be indirectly an assignee
@@ -302,7 +324,7 @@ tests:
              can_addmodel:
                - controller:co-controller-1
                - controller:co-controller-2
-         - user: idpgroup:co-group-1#member
+         - user: group:co-group-1#member
            type: controller
            assertions:
              administrator:
@@ -327,7 +349,7 @@ tests:
              can_addmodel:
                - controller:co-controller-1
                - controller:co-controller-2
-         - user: idpgroup:co-group-3#member
+         - user: group:co-group-3#member
            type: controller
            assertions:
              can_addmodel:
@@ -364,7 +386,7 @@ tests:
             reader:
               - model:mo-model-1
               - model:mo-model-2
-        - user: idpgroup:mo-group-1#member
+        - user: group:mo-group-1#member
           type: model
           assertions:
             administrator:
@@ -401,8 +423,14 @@ tests:
             reader:
               - model:mo-model-1
               - model:mo-model-2
+        - user: user:mo-user-6
+          type: model
+          assertions:
+            reader:
+              - model:mo-model-1
+              - model:mo-model-2
       check:
-        - user: idpgroup:mo-group-2#member
+        - user: group:mo-group-2#member
           object: model:mo-model-1
           assertions:
             writer: true
@@ -430,7 +458,7 @@ tests:
             can_addmodel:
               - cloud:cl-cloud-1
               - cloud:cl-cloud-2
-        - user: idpgroup:cl-group-1#member
+        - user: group:cl-group-1#member
           type: cloud
           assertions:
             administrator:
@@ -452,7 +480,7 @@ tests:
               - cloud:cl-cloud-1
               - cloud:cl-cloud-2
       check:
-        - user: idpgroup:cl-group-2#member
+        - user: group:cl-group-2#member
           object: cloud:cl-cloud-1
           assertions:
             can_addmodel: true
@@ -481,7 +509,7 @@ tests:
             reader:
               - applicationoffer:ao-applicationoffer-1
               - applicationoffer:ao-applicationoffer-2
-        - user: idpgroup:ao-group-1#member
+        - user: group:ao-group-1#member
           type: applicationoffer
           assertions:
             administrator:
@@ -508,7 +536,7 @@ tests:
               - applicationoffer:ao-applicationoffer-1
               - applicationoffer:ao-applicationoffer-2
       check:
-        - user: idpgroup:ao-group-2#member
+        - user: group:ao-group-2#member
           object: applicationoffer:ao-applicationoffer-1
           assertions:
             administrator: false

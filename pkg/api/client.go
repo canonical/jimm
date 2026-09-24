@@ -182,7 +182,7 @@ func (c *Client) UpdateMigratedModel(ctx context.Context, req *params.UpdateMigr
 
 // Authorisation RPC commands
 
-// User Group
+// User Groups
 // AddGroup adds the group to JIMM.
 func (c *Client) AddGroup(ctx context.Context, req *params.AddGroupRequest) (params.AddGroupResponse, error) {
 	var resp params.AddGroupResponse

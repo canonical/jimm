@@ -58,6 +58,13 @@ type JIMMAPI interface {
 	RevokeAuditLogAccess(ctx context.Context, req *params.AuditLogAccessRequest) error
 	PurgeLogs(ctx context.Context, req *params.PurgeLogsRequest) (*params.PurgeLogsResponse, error)
 
+	// Group operations
+	AddGroup(ctx context.Context, req *params.AddGroupRequest) (params.AddGroupResponse, error)
+	GetGroup(ctx context.Context, req *params.GetGroupRequest) (params.GetGroupResponse, error)
+	RenameGroup(ctx context.Context, req *params.RenameGroupRequest) error
+	RemoveGroup(ctx context.Context, req *params.RemoveGroupRequest) error
+	ListGroups(ctx context.Context, req *params.ListGroupsRequest) ([]params.Group, error)
+
 	// Role operations
 	AddRole(ctx context.Context, req *params.AddRoleRequest) (params.AddRoleResponse, error)
 	GetRole(ctx context.Context, req *params.GetRoleRequest) (params.GetRoleResponse, error)

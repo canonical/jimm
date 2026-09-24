@@ -39,27 +39,27 @@ func TestWritingTuplesToOFGASucceeds(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
+	groupUUID := uuid.NewString()
 
 	uuid1, _ := uuid.NewRandom()
 	user1 := names.NewUserTag(uuid1.String())
 	tuple1 := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user1),
-		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Relation: "member",
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	uuid2, _ := uuid.NewRandom()
 	user2 := names.NewUserTag(uuid2.String())
 	tuple2 := openfga.Tuple{
 		Object:   ofganames.ConvertTag(user2),
-		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Relation: "member",
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	err := s.ofgaClient.AddRelation(ctx, tuple1, tuple2)
 	c.Assert(err, qt.IsNil)
-	changes, err := s.cofgaClient.ReadChanges(ctx, "idpgroup", 99, "")
+	changes, err := s.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, qt.IsNil)
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2].GetTupleKey()
@@ -74,21 +74,21 @@ func TestRemovingTuplesFromOFGASucceeds(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
+	groupUUID := uuid.NewString()
 
 	// Create tuples before writing to db
 	user1 := ofganames.ConvertTag(names.NewUserTag("bob"))
 	tuple1 := openfga.Tuple{
 		Object:   user1,
-		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Relation: "member",
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	user2 := ofganames.ConvertTag(names.NewUserTag("alice"))
 	tuple2 := openfga.Tuple{
 		Object:   user2,
-		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Relation: "member",
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 
 	err := s.ofgaClient.AddRelation(ctx, tuple1, tuple2)
@@ -97,7 +97,7 @@ func TestRemovingTuplesFromOFGASucceeds(t *testing.T) {
 	// Delete after insert should succeed.
 	err = s.ofgaClient.RemoveRelation(ctx, tuple1, tuple2)
 	c.Assert(err, qt.IsNil)
-	changes, err := s.cofgaClient.ReadChanges(ctx, "idpgroup", 99, "")
+	changes, err := s.cofgaClient.ReadChanges(ctx, "group", 99, "")
 	c.Assert(err, qt.IsNil)
 
 	secondToLastInsertedTuple := changes.GetChanges()[len(changes.GetChanges())-2]
@@ -116,19 +116,20 @@ func TestCheckRelationSucceeds(t *testing.T) {
 	s := SetupTest(c)
 	ctx := c.Context()
 
-	groupID := uuid.NewString()
-	controller := ofganames.ConvertTag(names.NewControllerTag(uuid.NewString()))
+	groupUUID := uuid.NewString()
+	controllerUUID, _ := uuid.NewRandom()
+	controller := names.NewControllerTag(controllerUUID.String())
 
 	user := ofganames.ConvertTag(names.NewUserTag("eve"))
 	userToGroup := openfga.Tuple{
 		Object:   user,
-		Relation: ofganames.MemberRelation,
-		Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Relation: "member",
+		Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 	groupToController := openfga.Tuple{
-		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(groupID), ofganames.MemberRelation),
-		Relation: ofganames.AdministratorRelation,
-		Target:   controller,
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
+		Relation: "administrator",
+		Target:   ofganames.ConvertTag(controller),
 	}
 
 	err := s.ofgaClient.AddRelation(ctx, userToGroup, groupToController)
@@ -136,8 +137,8 @@ func TestCheckRelationSucceeds(t *testing.T) {
 
 	checkTuple := openfga.Tuple{
 		Object:   user,
-		Relation: ofganames.AdministratorRelation,
-		Target:   controller,
+		Relation: "administrator",
+		Target:   ofganames.ConvertTag(controller),
 	}
 	allowed, err := s.ofgaClient.CheckRelation(ctx, checkTuple, true)
 	c.Assert(err, qt.IsNil)
@@ -177,7 +178,7 @@ func TestBatchCheckRelationsExceedingBatchLimit(t *testing.T) {
 func TestRemoveTuplesSucceeds(t *testing.T) {
 	c := qt.New(t)
 	s := SetupTest(c)
-	groupID := uuid.NewString()
+	groupUUID := uuid.NewString()
 
 	// Note (babakks): OpenFGA only supports a limited number of write operation
 	// per request (default is 100). That's why we're testing with a large number
@@ -188,15 +189,15 @@ func TestRemoveTuplesSucceeds(t *testing.T) {
 	for i := range 150 {
 		tuple := openfga.Tuple{
 			Object:   ofganames.ConvertTag(names.NewUserTag("test" + strconv.Itoa(i))),
-			Relation: ofganames.MemberRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+			Relation: "member",
+			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 		}
 		err := s.ofgaClient.AddRelation(context.Background(), tuple)
 		c.Assert(err, qt.IsNil)
 	}
 
 	checkTuple := openfga.Tuple{
-		Target: ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+		Target: ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 	}
 	c.Logf("checking for tuple %v\n", checkTuple)
 	err := s.ofgaClient.RemoveTuples(context.Background(), checkTuple)
@@ -402,13 +403,13 @@ func TestRemoveRoleWithDirectAccess(t *testing.T) {
 	c.Assert(allowed, qt.Equals, false)
 }
 
-func TestRemoveRoleWithAccessViaIDPGroup(t *testing.T) {
+func TestRemoveRoleWithAccessViaGroup(t *testing.T) {
 	c := qt.New(t)
 	s := SetupTest(c)
 	ctx := c.Context()
 
 	user1 := ofganames.ConvertTag(names.NewUserTag("user1@canonical.com"))
-	group1 := jimmnames.NewIdPGroupTag(uuid.NewString())
+	group1 := jimmnames.NewGroupTag(uuid.NewString())
 	role1 := ofganames.ConvertTag(jimmnames.NewRoleTag(uuid.NewString()))
 
 	tuples := []openfga.Tuple{
@@ -451,6 +452,62 @@ func TestRemoveRoleWithAccessViaIDPGroup(t *testing.T) {
 			Object:   user1,
 			Relation: ofganames.AssigneeRelation,
 			Target:   role1,
+		},
+		false,
+	)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(allowed, qt.Equals, false)
+}
+
+func TestRemoveGroup(t *testing.T) {
+	c := qt.New(t)
+	s := SetupTest(c)
+	group1 := jimmnames.NewGroupTag(uuid.NewString())
+	group2 := jimmnames.NewGroupTag(uuid.NewString())
+	alice := names.NewUserTag("alice@canonical.com")
+	adam := names.NewUserTag("adam@canonical.com")
+
+	tuples := []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(alice),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(group1),
+	}, {
+		Object:   ofganames.ConvertTag(adam),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(group2),
+	}, {
+		Object:   ofganames.ConvertTagWithRelation(group1, ofganames.MemberRelation),
+		Relation: ofganames.MemberRelation,
+		Target:   ofganames.ConvertTag(group2),
+	}}
+
+	err := s.ofgaClient.AddRelation(context.Background(), tuples...)
+	c.Assert(err, qt.Equals, nil)
+
+	allowed, err := s.ofgaClient.CheckRelation(
+		context.TODO(),
+		openfga.Tuple{
+			Object:   ofganames.ConvertTag(alice),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.ConvertTag(group2),
+		},
+		false,
+	)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(allowed, qt.Equals, true)
+
+	err = s.ofgaClient.RemoveGroup(context.Background(), group1)
+	c.Assert(err, qt.Equals, nil)
+
+	err = s.ofgaClient.RemoveGroup(context.Background(), group1)
+	c.Assert(err, qt.Equals, nil)
+
+	allowed, err = s.ofgaClient.CheckRelation(
+		context.TODO(),
+		openfga.Tuple{
+			Object:   ofganames.ConvertTag(alice),
+			Relation: ofganames.MemberRelation,
+			Target:   ofganames.ConvertTag(group2),
 		},
 		false,
 	)
@@ -584,7 +641,7 @@ func TestListObjectsWithContextualTuples(t *testing.T) {
 		}
 	}
 
-	groupID := uuid.NewString()
+	groupUUID := uuid.NewString()
 
 	ids, err := s.ofgaClient.ListObjects(ctx, ofganames.ConvertTag(names.NewUserTag("alice")), "reader", "model", []openfga.Tuple{
 		{
@@ -592,14 +649,14 @@ func TestListObjectsWithContextualTuples(t *testing.T) {
 			Relation: ofganames.ReaderRelation,
 			Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[0])),
 		},
-		// Reader to model via idp group
+		// Reader to model via group
 		{
 			Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 			Relation: ofganames.MemberRelation,
-			Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+			Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 		},
 		{
-			Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(groupID), ofganames.MemberRelation),
+			Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
 			Relation: ofganames.ReaderRelation,
 			Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
 		},
@@ -679,7 +736,7 @@ func TestListObjectsWithPeristedTuples(t *testing.T) {
 		}
 	}
 
-	groupID := uuid.NewString()
+	groupUUID := uuid.NewString()
 
 	c.Assert(s.ofgaClient.AddRelation(ctx,
 		[]openfga.Tuple{
@@ -688,14 +745,14 @@ func TestListObjectsWithPeristedTuples(t *testing.T) {
 				Relation: ofganames.ReaderRelation,
 				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[0])),
 			},
-			// Reader to model via idp group
+			// Reader to model via group
 			{
 				Object:   ofganames.ConvertTag(names.NewUserTag("alice")),
 				Relation: ofganames.MemberRelation,
-				Target:   ofganames.ConvertTag(jimmnames.NewIdPGroupTag(groupID)),
+				Target:   ofganames.ConvertTag(jimmnames.NewGroupTag(groupUUID)),
 			},
 			{
-				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(groupID), ofganames.MemberRelation),
+				Object:   ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(groupUUID), ofganames.MemberRelation),
 				Relation: ofganames.ReaderRelation,
 				Target:   ofganames.ConvertTag(names.NewModelTag(modelUUIDs[1])),
 			},

@@ -151,6 +151,17 @@ func TestListIdentities(t *testing.T) {
 
 func TestGetIdentityGroups(t *testing.T) {
 	c := qt.New(t)
+	var listTuplesErr error
+	testTuple := openfga.Tuple{
+		Object:   &ofga.Entity{Kind: "user", ID: "foo"},
+		Relation: ofga.Relation("member"),
+		Target:   &ofga.Entity{Kind: "group", ID: "my-group-id"},
+	}
+	groupManager := mocks.GroupManager{
+		GetGroupByUUID_: func(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error) {
+			return &dbmodel.GroupEntry{Name: "fake-group-name"}, nil
+		},
+	}
 	identityManager := mocks.IdentityManager{
 		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
 			if id == "bob@canonical.com" {
@@ -159,9 +170,20 @@ func TestGetIdentityGroups(t *testing.T) {
 			return nil, dbmodel.ErrIdentityCreation
 		},
 	}
+	permissionManager := mocks.PermissionManager{
+		ListRelationshipTuples_: func(ctx context.Context, user *openfga.User, tuple params.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
+			return []openfga.Tuple{testTuple}, "continuation-token", listTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
 		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
+		},
+		PermissionManager_: func() jujuapi.PermissionManager {
+			return &permissionManager
+		},
+		GroupManager_: func() jujuapi.GroupManager {
+			return &groupManager
 		},
 	}
 	user := openfga.User{}
@@ -174,12 +196,21 @@ func TestGetIdentityGroups(t *testing.T) {
 	username := "bob@canonical.com"
 
 	res, err := idSvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
-	c.Assert(err, qt.ErrorMatches, "Bad Request: JAAS groups are no longer supported; use IDP groups instead")
-	c.Assert(res, qt.IsNil)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res, qt.IsNotNil)
+	c.Assert(res.Data, qt.HasLen, 1)
+	c.Assert(*res.Data[0].Id, qt.Equals, "my-group-id")
+	c.Assert(res.Data[0].Name, qt.Equals, "fake-group-name")
+	c.Assert(*res.Next.PageToken, qt.Equals, "continuation-token")
+
+	listTuplesErr = errors.New("foo")
+	_, err = idSvc.GetIdentityGroups(ctx, username, &resources.GetIdentitiesItemGroupsParams{})
+	c.Assert(err, qt.ErrorMatches, "foo")
 }
 
 func TestPatchIdentityGroups(t *testing.T) {
 	c := qt.New(t)
+	var patchTuplesErr error
 	identityManager := mocks.IdentityManager{
 		FetchIdentity_: func(ctx context.Context, id string) (*openfga.User, error) {
 			if id == "bob@canonical.com" {
@@ -188,9 +219,20 @@ func TestPatchIdentityGroups(t *testing.T) {
 			return nil, dbmodel.ErrIdentityCreation
 		},
 	}
+	permissionManager := mocks.PermissionManager{
+		AddRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+		RemoveRelation_: func(ctx context.Context, user *openfga.User, tuples []params.RelationshipTuple) error {
+			return patchTuplesErr
+		},
+	}
 	jimm := jimmtest.JIMM{
 		IdentityManager_: func() jujuapi.IdentityManager {
 			return &identityManager
+		},
+		PermissionManager_: func() jujuapi.PermissionManager {
+			return &permissionManager
 		},
 	}
 	user := openfga.User{}
@@ -202,18 +244,25 @@ func TestPatchIdentityGroups(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".* not found")
 
 	username := "bob@canonical.com"
-	// With no patches, the call succeeds (no-op).
-	res, err := idSvc.PatchIdentityGroups(ctx, username, nil)
+	group1ID := uuid.New()
+	group2ID := uuid.New()
+	operations := []resources.IdentityGroupsPatchItem{
+		{Group: group1ID.String(), Op: resources.IdentityGroupsPatchItemOpAdd},
+		{Group: group2ID.String(), Op: resources.IdentityGroupsPatchItemOpRemove},
+	}
+	res, err := idSvc.PatchIdentityGroups(ctx, username, operations)
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.IsTrue)
 
-	// Any patch is rejected since JAAS groups are no longer supported.
-	group1ID := uuid.New()
-	operations := []resources.IdentityGroupsPatchItem{
-		{Group: group1ID.String(), Op: resources.IdentityGroupsPatchItemOpAdd},
-	}
+	patchTuplesErr = errors.New("foo")
 	_, err = idSvc.PatchIdentityGroups(ctx, username, operations)
-	c.Assert(err, qt.ErrorMatches, "Bad Request: JAAS groups are no longer supported; use IDP groups instead")
+	c.Assert(err, qt.ErrorMatches, ".*foo")
+
+	invalidGroupName := []resources.IdentityGroupsPatchItem{
+		{Group: "test-group1", Op: resources.IdentityGroupsPatchItemOpAdd},
+	}
+	_, err = idSvc.PatchIdentityGroups(ctx, "bob@canonical.com", invalidGroupName)
+	c.Assert(err, qt.ErrorMatches, "Bad Request: ID test-group1 is not a valid group ID")
 }
 
 func TestGetIdentityRoles(t *testing.T) {

@@ -61,6 +61,42 @@ var capabilities = []resources.Capability{
 		},
 	},
 	{
+		Endpoint: "/groups",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"POST",
+		},
+	},
+	{
+		Endpoint: "/groups/{id}",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"PUT",
+			"DELETE",
+		},
+	},
+	{
+		Endpoint: "/groups/{id}/identities",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"PATCH",
+		},
+	},
+	{
+		Endpoint: "/groups/{id}/entitlements",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"PATCH",
+		},
+	},
+	{
+		Endpoint: "/groups/{id}/roles",
+		Methods: []resources.CapabilityMethods{
+			"GET",
+			"PATCH",
+		},
+	},
+	{
 		Endpoint: "/roles",
 		Methods: []resources.CapabilityMethods{
 			"GET",

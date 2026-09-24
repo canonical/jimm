@@ -121,6 +121,45 @@ func (c *MockJIMMAPIAddControllerCall) DoAndReturn(f func(context.Context, *para
 	return c
 }
 
+// AddGroup mocks base method.
+func (m *MockJIMMAPI) AddGroup(ctx context.Context, req *params.AddGroupRequest) (params.AddGroupResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddGroup", ctx, req)
+	ret0, _ := ret[0].(params.AddGroupResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddGroup indicates an expected call of AddGroup.
+func (mr *MockJIMMAPIMockRecorder) AddGroup(ctx, req any) *MockJIMMAPIAddGroupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddGroup", reflect.TypeOf((*MockJIMMAPI)(nil).AddGroup), ctx, req)
+	return &MockJIMMAPIAddGroupCall{Call: call}
+}
+
+// MockJIMMAPIAddGroupCall wrap *gomock.Call
+type MockJIMMAPIAddGroupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIAddGroupCall) Return(arg0 params.AddGroupResponse, arg1 error) *MockJIMMAPIAddGroupCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIAddGroupCall) Do(f func(context.Context, *params.AddGroupRequest) (params.AddGroupResponse, error)) *MockJIMMAPIAddGroupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIAddGroupCall) DoAndReturn(f func(context.Context, *params.AddGroupRequest) (params.AddGroupResponse, error)) *MockJIMMAPIAddGroupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // AddModelToController mocks base method.
 func (m *MockJIMMAPI) AddModelToController(ctx context.Context, req *params.AddModelToControllerRequest) (params0.ModelInfo, error) {
 	m.ctrl.T.Helper()
@@ -509,6 +548,45 @@ func (c *MockJIMMAPIGetControllerProfileCall) DoAndReturn(f func(context.Context
 	return c
 }
 
+// GetGroup mocks base method.
+func (m *MockJIMMAPI) GetGroup(ctx context.Context, req *params.GetGroupRequest) (params.GetGroupResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetGroup", ctx, req)
+	ret0, _ := ret[0].(params.GetGroupResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetGroup indicates an expected call of GetGroup.
+func (mr *MockJIMMAPIMockRecorder) GetGroup(ctx, req any) *MockJIMMAPIGetGroupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGroup", reflect.TypeOf((*MockJIMMAPI)(nil).GetGroup), ctx, req)
+	return &MockJIMMAPIGetGroupCall{Call: call}
+}
+
+// MockJIMMAPIGetGroupCall wrap *gomock.Call
+type MockJIMMAPIGetGroupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIGetGroupCall) Return(arg0 params.GetGroupResponse, arg1 error) *MockJIMMAPIGetGroupCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIGetGroupCall) Do(f func(context.Context, *params.GetGroupRequest) (params.GetGroupResponse, error)) *MockJIMMAPIGetGroupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIGetGroupCall) DoAndReturn(f func(context.Context, *params.GetGroupRequest) (params.GetGroupResponse, error)) *MockJIMMAPIGetGroupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetRole mocks base method.
 func (m *MockJIMMAPI) GetRole(ctx context.Context, req *params.GetRoleRequest) (params.GetRoleResponse, error) {
 	m.ctrl.T.Helper()
@@ -698,6 +776,84 @@ func (c *MockJIMMAPIListControllersCall) Do(f func(context.Context) ([]params.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockJIMMAPIListControllersCall) DoAndReturn(f func(context.Context) ([]params.ControllerInfo, error)) *MockJIMMAPIListControllersCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListGroups mocks base method.
+func (m *MockJIMMAPI) ListGroups(ctx context.Context, req *params.ListGroupsRequest) ([]params.Group, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListGroups", ctx, req)
+	ret0, _ := ret[0].([]params.Group)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListGroups indicates an expected call of ListGroups.
+func (mr *MockJIMMAPIMockRecorder) ListGroups(ctx, req any) *MockJIMMAPIListGroupsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListGroups", reflect.TypeOf((*MockJIMMAPI)(nil).ListGroups), ctx, req)
+	return &MockJIMMAPIListGroupsCall{Call: call}
+}
+
+// MockJIMMAPIListGroupsCall wrap *gomock.Call
+type MockJIMMAPIListGroupsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIListGroupsCall) Return(arg0 []params.Group, arg1 error) *MockJIMMAPIListGroupsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIListGroupsCall) Do(f func(context.Context, *params.ListGroupsRequest) ([]params.Group, error)) *MockJIMMAPIListGroupsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIListGroupsCall) DoAndReturn(f func(context.Context, *params.ListGroupsRequest) ([]params.Group, error)) *MockJIMMAPIListGroupsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListJobs mocks base method.
+func (m *MockJIMMAPI) ListJobs(ctx context.Context, req *params.ListJobsRequest) (*params.ListJobsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListJobs", ctx, req)
+	ret0, _ := ret[0].(*params.ListJobsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListJobs indicates an expected call of ListJobs.
+func (mr *MockJIMMAPIMockRecorder) ListJobs(ctx, req any) *MockJIMMAPIListJobsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListJobs", reflect.TypeOf((*MockJIMMAPI)(nil).ListJobs), ctx, req)
+	return &MockJIMMAPIListJobsCall{Call: call}
+}
+
+// MockJIMMAPIListJobsCall wrap *gomock.Call
+type MockJIMMAPIListJobsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIListJobsCall) Return(arg0 *params.ListJobsResponse, arg1 error) *MockJIMMAPIListJobsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIListJobsCall) Do(f func(context.Context, *params.ListJobsRequest) (*params.ListJobsResponse, error)) *MockJIMMAPIListJobsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIListJobsCall) DoAndReturn(f func(context.Context, *params.ListJobsRequest) (*params.ListJobsResponse, error)) *MockJIMMAPIListJobsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1207,6 +1363,44 @@ func (c *MockJIMMAPIRemoveControllerProfileCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// RemoveGroup mocks base method.
+func (m *MockJIMMAPI) RemoveGroup(ctx context.Context, req *params.RemoveGroupRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveGroup", ctx, req)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveGroup indicates an expected call of RemoveGroup.
+func (mr *MockJIMMAPIMockRecorder) RemoveGroup(ctx, req any) *MockJIMMAPIRemoveGroupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveGroup", reflect.TypeOf((*MockJIMMAPI)(nil).RemoveGroup), ctx, req)
+	return &MockJIMMAPIRemoveGroupCall{Call: call}
+}
+
+// MockJIMMAPIRemoveGroupCall wrap *gomock.Call
+type MockJIMMAPIRemoveGroupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIRemoveGroupCall) Return(arg0 error) *MockJIMMAPIRemoveGroupCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIRemoveGroupCall) Do(f func(context.Context, *params.RemoveGroupRequest) error) *MockJIMMAPIRemoveGroupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIRemoveGroupCall) DoAndReturn(f func(context.Context, *params.RemoveGroupRequest) error) *MockJIMMAPIRemoveGroupCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RemoveRelation mocks base method.
 func (m *MockJIMMAPI) RemoveRelation(ctx context.Context, req *params.RemoveRelationRequest) error {
 	m.ctrl.T.Helper()
@@ -1279,6 +1473,44 @@ func (c *MockJIMMAPIRemoveRoleCall) Do(f func(context.Context, *params.RemoveRol
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockJIMMAPIRemoveRoleCall) DoAndReturn(f func(context.Context, *params.RemoveRoleRequest) error) *MockJIMMAPIRemoveRoleCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// RenameGroup mocks base method.
+func (m *MockJIMMAPI) RenameGroup(ctx context.Context, req *params.RenameGroupRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RenameGroup", ctx, req)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RenameGroup indicates an expected call of RenameGroup.
+func (mr *MockJIMMAPIMockRecorder) RenameGroup(ctx, req any) *MockJIMMAPIRenameGroupCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RenameGroup", reflect.TypeOf((*MockJIMMAPI)(nil).RenameGroup), ctx, req)
+	return &MockJIMMAPIRenameGroupCall{Call: call}
+}
+
+// MockJIMMAPIRenameGroupCall wrap *gomock.Call
+type MockJIMMAPIRenameGroupCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockJIMMAPIRenameGroupCall) Return(arg0 error) *MockJIMMAPIRenameGroupCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockJIMMAPIRenameGroupCall) Do(f func(context.Context, *params.RenameGroupRequest) error) *MockJIMMAPIRenameGroupCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockJIMMAPIRenameGroupCall) DoAndReturn(f func(context.Context, *params.RenameGroupRequest) error) *MockJIMMAPIRenameGroupCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

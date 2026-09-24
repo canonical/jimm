@@ -1861,7 +1861,7 @@ func (s *permissionManagerSuite) TestParseAndValidateTag(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	user, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	jimmTag := "model-" + user.Name + "/" + model.Name + "#administrator"
 
@@ -1904,7 +1904,7 @@ func (s *permissionManagerSuite) TestResolveTags(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	identity, controller, model, offer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	identity, group, controller, model, offer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	testCases := []struct {
 		desc     string
@@ -1914,6 +1914,18 @@ func (s *permissionManagerSuite) TestResolveTags(c *qt.C) {
 		desc:     "map identity name with relation",
 		input:    "user-" + identity.Name + "#member",
 		expected: ofganames.ConvertTagWithRelation(names.NewUserTag(identity.Name), ofganames.MemberRelation),
+	}, {
+		desc:     "map group name with relation",
+		input:    "group-" + group.Name + "#member",
+		expected: ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
+	}, {
+		desc:     "map group UUID",
+		input:    "group-" + group.UUID,
+		expected: ofganames.ConvertTag(jimmnames.NewGroupTag(group.UUID)),
+	}, {
+		desc:     "map group UUID with relation",
+		input:    "group-" + group.UUID + "#member",
+		expected: ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(group.UUID), ofganames.MemberRelation),
 	}, {
 		desc:     "map IDP group ID with relation",
 		input:    "idpgroup-engineering-team#member",
@@ -1973,7 +1985,7 @@ func (s *permissionManagerSuite) TestResolveTupleObjectHandlesErrors(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	_, controller, model, offer, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, controller, model, offer, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	type test struct {
 		input string
@@ -1985,6 +1997,11 @@ func (s *permissionManagerSuite) TestResolveTupleObjectHandlesErrors(c *qt.C) {
 		{
 			input: "unknowntag-blabla",
 			want:  "failed to map tag, unknown kind: unknowntag",
+		},
+		// Resolves bad groups where they do not exist
+		{
+			input: "group-myspecialpokemon-his-name-is-youguessedit-diglett",
+			want:  "group myspecialpokemon-his-name-is-youguessedit-diglett not found",
 		},
 		// Resolves bad controllers where they do not exist
 		{
@@ -2027,7 +2044,7 @@ func (s *permissionManagerSuite) TestToJAASTag(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	user, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, group, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 
 	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
 
@@ -2041,6 +2058,9 @@ func (s *permissionManagerSuite) TestToJAASTag(c *qt.C) {
 	}, {
 		tag:             ofganames.ConvertTag(names.NewUserTag(serviceAccountId)),
 		expectedJAASTag: "user-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.Name,
 	}, {
 		tag:             ofganames.ConvertTag(jimmnames.NewIdPGroupTag("engineering-team")),
 		expectedJAASTag: "idpgroup-engineering-team",
@@ -2078,7 +2098,7 @@ func (s *permissionManagerSuite) TestToJAASTagNoUUIDResolution(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
 
-	user, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, group, controller, model, applicationOffer, cloud, _, role := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	serviceAccountId := petname.Generate(2, "-") + "@serviceaccount"
 
 	tests := []struct {
@@ -2091,6 +2111,9 @@ func (s *permissionManagerSuite) TestToJAASTagNoUUIDResolution(c *qt.C) {
 	}, {
 		tag:             ofganames.ConvertTag(names.NewUserTag(serviceAccountId)),
 		expectedJAASTag: "user-" + serviceAccountId,
+	}, {
+		tag:             ofganames.ConvertTag(group.ResourceTag()),
+		expectedJAASTag: "group-" + group.UUID,
 	}, {
 		tag:             ofganames.ConvertTag(jimmnames.NewIdPGroupTag("engineering-team")),
 		expectedJAASTag: "idpgroup-engineering-team",
@@ -2160,6 +2183,10 @@ func (s *permissionManagerSuite) TestOpenFGACleanup(c *qt.C) {
 		createTargetTag createTagFunction
 	}{{
 		createObjectTag: createStringTag(openfga.UserType),
+		relation:        "member",
+		createTargetTag: createStringTag(openfga.GroupType),
+	}, {
+		createObjectTag: createStringTag(openfga.UserType),
 		relation:        "administrator",
 		createTargetTag: createUUIDTag(openfga.ControllerType),
 	}, {
@@ -2209,7 +2236,7 @@ func (s *permissionManagerSuite) TestOpenFGACleanupPreservesIdPGroupTuples(c *qt
 	c.Parallel()
 	ctx := context.Background()
 
-	_, _, _, model, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	tuple := openfga.Tuple{
 		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("engineering-team"), ofganames.MemberRelation),
 		Relation: ofganames.ReaderRelation,
