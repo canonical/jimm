@@ -6,16 +6,21 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/frankban/quicktest/qtsuite"
-	gliderssh "github.com/gliderlabs/ssh"
-	jujucontroller "github.com/juju/juju/controller"
 	"github.com/juju/names/v6"
 	gossh "golang.org/x/crypto/ssh"
 
@@ -110,21 +115,8 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 			return m, err
 		},
 	}
-	attrs := map[string]any{
-		"ssh-server-port": "17023",
-	}
-	certPEM, _, err := jimmtest.GenerateTestCACert()
-	c.Assert(err, qt.IsNil)
-	cfg, err := jujucontroller.NewConfig(uuid, certPEM, attrs)
-	c.Assert(err, qt.IsNil)
-	controllerService := mocks.ControllerService{
-		ControllerConfig_: func(ctx context.Context, user *openfga.User, controllerName string) (jujucontroller.Config, error) {
-			return cfg, nil
-		},
-	}
 	jujuManager := mocks.JujuManager{
-		ModelManager:      modelManager,
-		ControllerService: controllerService,
+		ModelManager: modelManager,
 	}
 	permissionManager, err := permissions.NewManager(s.database, ofgaClient, uuid, jimmTag)
 	c.Assert(err, qt.IsNil)
@@ -195,19 +187,12 @@ func (s *sshManagerSuite) TestDialInfo(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(ctrl.PublicAddress, qt.Equals, "localhost:1234")
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	c.Assert(err, qt.IsNil)
-	pubKey, err := gossh.NewPublicKey(&key.PublicKey)
-	c.Assert(err, qt.IsNil)
-	ctx = context.WithValue(ctx, gliderssh.ContextKeyPublicKey, pubKey)
-
 	// Test that the DialInfo returns the correct controller address and user when the model UUID is valid.
 	connInfo, err := s.sshManager.DialInfo(ctx, s.allowedModelUUID, s.userWithAccess)
 	c.Assert(err, qt.IsNil)
 	c.Assert(connInfo.Addresses, qt.HasLen, 1)
-	c.Assert(connInfo.Addresses[0], qt.Equals, "localhost")
+	c.Assert(connInfo.Addresses[0], qt.Equals, "localhost:1234")
 	c.Assert(connInfo.JWT, qt.Not(qt.HasLen), 0)
-	c.Assert(connInfo.Port, qt.Equals, 17023)
 	_, err = base64.StdEncoding.DecodeString(connInfo.JWT)
 	c.Assert(err, qt.IsNil)
 
@@ -221,10 +206,10 @@ type mockDialer struct {
 	callCount    int
 }
 
-func (d *mockDialer) Dial(network string, addr string, config *gossh.ClientConfig) (*gossh.Client, error) {
+func (d *mockDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls.Config, virtualHostname, bearerToken string) (net.Conn, error) {
 	d.callCount++
 	if addr == d.validAddress {
-		return &gossh.Client{}, nil
+		return &net.TCPConn{}, nil
 	}
 	return nil, errors.New("dial error")
 }
@@ -233,20 +218,186 @@ func (s *sshManagerSuite) TestDialAllAddresses(c *qt.C) {
 	ctx := context.Background()
 
 	dialInfo := ssh.DialInfo{
-		Addresses: []string{"10.1.2.3", "10.1.2.4"},
-		Port:      1234,
+		Addresses: []string{"10.1.2.3:17070", "10.1.2.4:17070"},
 		JWT:       "fake-jwt",
 	}
 
-	_, err := s.sshManager.DialController(ctx, dialInfo, s.userWithAccess)
+	_, err := s.sshManager.DialController(ctx, dialInfo, "1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local")
 	c.Assert(err, qt.ErrorMatches, "failed to dial controller: dial error\ndial error")
 	c.Assert(s.mockDialer.callCount, qt.Equals, 2)
 
-	s.mockDialer.validAddress = "10.1.2.4:1234"
+	s.mockDialer.validAddress = "10.1.2.4:17070"
 	// Test that DialController works when there are multiple addresses.
-	_, err = s.sshManager.DialController(ctx, dialInfo, s.userWithAccess)
+	_, err = s.sshManager.DialController(ctx, dialInfo, "1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local")
 	c.Assert(err, qt.IsNil)
 	c.Assert(s.mockDialer.callCount, qt.Equals, 4)
+}
+
+// relayTestServer is an httptest TLS server that emulates the controller's
+// relay endpoint. It validates the upgrade request, writes a 101 response
+// and optionally some banner bytes, then echoes anything the client sends.
+type relayTestServer struct {
+	server *httptest.Server
+
+	// statusCode is the HTTP status the handler responds with. When it is
+	// http.StatusSwitchingProtocols the connection is hijacked, otherwise
+	// the body is returned as an error to the dialer.
+	statusCode int
+	// rejectBody is written as the response body for non-101 responses.
+	rejectBody string
+	// banner is written to the raw connection immediately after the 101,
+	// before the reader on the dialer side reads its response head, to
+	// exercise the buffered-bytes preservation path.
+	banner string
+
+	// gotPath, gotUpgrade and gotAuth record what the handler observed on
+	// the request so the test can assert the wire contract.
+	gotPath    string
+	gotUpgrade string
+	gotAuth    string
+}
+
+func newRelayTestServer(t *testing.T) *relayTestServer {
+	rts := &relayTestServer{statusCode: http.StatusSwitchingProtocols}
+	rts.server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rts.gotPath = r.URL.Path
+		rts.gotUpgrade = r.Header.Get("Upgrade")
+		rts.gotAuth = r.Header.Get("Authorization")
+
+		if rts.statusCode != http.StatusSwitchingProtocols {
+			http.Error(w, rts.rejectBody, rts.statusCode)
+			return
+		}
+
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "no hijack", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Connection", "Upgrade")
+		w.Header().Set("Upgrade", "juju-ssh-relay")
+		w.WriteHeader(http.StatusSwitchingProtocols)
+		conn, _, err := hijacker.Hijack()
+		if err != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		if rts.banner != "" {
+			if _, err := conn.Write([]byte(rts.banner)); err != nil {
+				return
+			}
+		}
+		// Echo whatever the client sends so the returned connection can be
+		// exercised end to end.
+		_, _ = io.Copy(conn, conn)
+	}))
+	t.Cleanup(rts.server.Close)
+	return rts
+}
+
+// tlsConfig returns a client TLS config that trusts the test server.
+func (rts *relayTestServer) tlsConfig() *tls.Config {
+	pool := x509.NewCertPool()
+	pool.AddCert(rts.server.Certificate())
+	return &tls.Config{RootCAs: pool}
+}
+
+// addr returns the host:port of the test server.
+func (rts *relayTestServer) addr() string {
+	return strings.TrimPrefix(rts.server.URL, "https://")
+}
+
+func TestBasicDialerDialRelaySuccess(t *testing.T) {
+	c := qt.New(t)
+	rts := newRelayTestServer(t)
+
+	dialer := &ssh.BasicDialer{}
+	conn, err := dialer.DialRelay(
+		context.Background(),
+		rts.addr(),
+		rts.tlsConfig(),
+		"1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local",
+		"fake-bearer-token",
+	)
+	c.Assert(err, qt.IsNil)
+	defer conn.Close()
+
+	// The wire contract: path, upgrade token and bearer auth.
+	c.Check(rts.gotPath, qt.Equals, "/ssh-relay/1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local")
+	c.Check(rts.gotUpgrade, qt.Equals, "juju-ssh-relay")
+	c.Check(rts.gotAuth, qt.Equals, "Bearer fake-bearer-token")
+
+	// The connection is usable: what we write is echoed back.
+	_, err = conn.Write([]byte("hello"))
+	c.Assert(err, qt.IsNil)
+	buf := make([]byte, 5)
+	_, err = io.ReadFull(conn, buf)
+	c.Assert(err, qt.IsNil)
+	c.Check(string(buf), qt.Equals, "hello")
+}
+
+func TestBasicDialerDialRelayPreservesBufferedBytes(t *testing.T) {
+	c := qt.New(t)
+	rts := newRelayTestServer(t)
+	// The server writes a banner immediately after the 101. The dialer's
+	// bufio.Reader may consume these bytes past the response head, so they
+	// must be preserved and served from the returned connection first.
+	rts.banner = "SSH-2.0-Juju\r\n"
+
+	dialer := &ssh.BasicDialer{}
+	conn, err := dialer.DialRelay(
+		context.Background(),
+		rts.addr(),
+		rts.tlsConfig(),
+		"1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local",
+		"fake-bearer-token",
+	)
+	c.Assert(err, qt.IsNil)
+	defer conn.Close()
+
+	// The banner must be the first thing read from the connection.
+	buf := make([]byte, len(rts.banner))
+	_, err = io.ReadFull(conn, buf)
+	c.Assert(err, qt.IsNil)
+	c.Check(string(buf), qt.Equals, rts.banner)
+}
+
+func TestBasicDialerDialRelayRejected(t *testing.T) {
+	c := qt.New(t)
+	rts := newRelayTestServer(t)
+	rts.statusCode = http.StatusForbidden
+	rts.rejectBody = "unauthorized"
+
+	dialer := &ssh.BasicDialer{}
+	conn, err := dialer.DialRelay(
+		context.Background(),
+		rts.addr(),
+		rts.tlsConfig(),
+		"1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local",
+		"fake-bearer-token",
+	)
+	c.Assert(err, qt.IsNotNil)
+	c.Check(conn, qt.IsNil)
+	c.Check(err.Error(), qt.Contains, "relay upgrade rejected")
+	c.Check(err.Error(), qt.Contains, "403")
+	c.Check(err.Error(), qt.Contains, "unauthorized")
+}
+
+func TestBasicDialerDialRelayDialError(t *testing.T) {
+	c := qt.New(t)
+
+	dialer := &ssh.BasicDialer{}
+	// Nothing is listening on this address, so the dial must fail.
+	conn, err := dialer.DialRelay(
+		context.Background(),
+		"127.0.0.1:1",
+		&tls.Config{InsecureSkipVerify: true}, //nolint:gosec // test only
+		"1.postgresql.8419cd78-4993-4c3a-928e-c646226beeee.juju.local",
+		"fake-bearer-token",
+	)
+	c.Assert(err, qt.IsNotNil)
+	c.Check(conn, qt.IsNil)
+	c.Check(err.Error(), qt.Contains, "dialing controller")
 }
 
 func TestSSHManager(t *testing.T) {

@@ -3,12 +3,14 @@
 package ssh_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"testing"
 	"time"
 
@@ -45,9 +47,9 @@ type sshSuite struct {
 	virtualHostname          virtualhostname.Info
 	maxConcurrentConnections int
 
-	// controllerClient holds the client returned by the mock DialController,
-	// allowing tests to observe the controller connection's lifecycle.
-	controllerClient *gossh.Client
+	// controllerConn holds the raw relay connection returned by the mock
+	// DialController, allowing tests to observe its lifecycle.
+	controllerConn net.Conn
 }
 
 func (s *sshSuite) Init(c *qt.C) {
@@ -77,27 +79,22 @@ func (s *sshSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	userWithoutAccess := openfga.NewUser(i2, ofgaClient)
 
-	// setup destination server
+	// setup destination server. This simulates the controller's embedded
+	// terminating SSH server: the jump server relays the user's session
+	// bytes to it over the upgraded relay connection.
 	s.received = make(chan bool)
 	destinationServerListener := bufconn.Listen(1 * 1024)
 
 	s.destinationJujuSSHServer = &gliderssh.Server{
-		ChannelHandlers: map[string]gliderssh.ChannelHandler{
-			"direct-tcpip": func(srv *gliderssh.Server, conn *gossh.ServerConn, newChan gossh.NewChannel, ctx gliderssh.Context) {
-				d := ssh.ForwardMessage{}
-				if err := gossh.Unmarshal(newChan.ExtraData(), &d); err != nil {
-					err := newChan.Reject(gossh.ConnectionFailed, "Failed to parse channel data")
-					c.Check(err, qt.IsNil)
-					return
-				}
-				_, _, err := newChan.Accept()
-				c.Check(err, qt.IsNil)
-				s.testInDestinationServerF(d)
-				s.received <- true
-			},
+		// The destination server terminates the user's SSH session relayed
+		// by the jump server over the upgraded connection.
+		PublicKeyHandler: func(ctx gliderssh.Context, key gliderssh.PublicKey) bool {
+			return true
 		},
-		PasswordHandler: func(ctx gliderssh.Context, password string) bool {
-			return password == "valid-jwt"
+		Handler: func(sess gliderssh.Session) {
+			_, _ = sess.Write([]byte("session established\n"))
+			_ = sess.Exit(0)
+			s.received <- true
 		},
 	}
 	go func() {
@@ -137,25 +134,16 @@ func (s *sshSuite) Init(c *qt.C) {
 				}
 				return jimmssh.DialInfo{}, nil
 			},
-			DialController_: func(ctx context.Context, ctrlInfo jimmssh.DialInfo, user *openfga.User) (*gossh.Client, error) {
+			DialController_: func(ctx context.Context, ctrlInfo jimmssh.DialInfo, virtualHostname string) (net.Conn, error) {
+				// Simulate the upgraded relay connection: a raw pipe to the
+				// destination server. The user's SSH session bytes are relayed
+				// over it and terminated by the destination server.
 				conn, err := destinationServerListener.Dial()
 				if err != nil {
 					return nil, err
 				}
-				sshConn, newChan, reqs, err := gossh.NewClientConn(conn, "", &gossh.ClientConfig{
-					//nolint:gosec
-					HostKeyCallback: gossh.InsecureIgnoreHostKey(),
-					Auth: []gossh.AuthMethod{
-						gossh.Password("valid-jwt"),
-					},
-					User: user.Name,
-				})
-				if err != nil {
-					return nil, err
-				}
-
-				s.controllerClient = gossh.NewClient(sshConn, newChan, reqs)
-				return s.controllerClient, nil
+				s.controllerConn = halfCloseConn{conn}
+				return s.controllerConn, nil
 			},
 		})
 	c.Assert(err, qt.IsNil)
@@ -187,6 +175,19 @@ func (s *sshSuite) Init(c *qt.C) {
 	})
 }
 
+// halfCloseConn wraps the in-memory relay connection so it supports
+// CloseWrite like the production TLS connection does. A bufconn pipe
+// cannot signal EOF per direction, so CloseWrite closes the connection:
+// the destination server reacts to the EOF by ending the session, as
+// the real controller does.
+type halfCloseConn struct {
+	net.Conn
+}
+
+func (c halfCloseConn) CloseWrite() error {
+	return c.Conn.Close()
+}
+
 func (s *sshSuite) TestSSHJump(c *qt.C) {
 	client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
 		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
@@ -197,13 +198,36 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 	})
 	defer client.Close()
 
-	// send forward message
-	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
-		c.Check(fm.DestAddr, qt.Equals, s.virtualHostname.String())
-	}
-	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
+	// Open a tunnel to the virtual hostname, then establish the
+	// terminating SSH session over it. The session bytes are relayed by
+	// the jump server over the upgraded connection and terminated by the
+	// destination server.
+	tunnel, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
 	c.Assert(err, qt.IsNil)
-	defer conn.Close()
+	defer tunnel.Close()
+
+	sshConn, newChan, reqs, err := gossh.NewClientConn(tunnel, "", &gossh.ClientConfig{
+		//nolint:gosec // test host key
+		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		Auth: []gossh.AuthMethod{
+			gossh.PublicKeys(s.privateKey),
+		},
+		User: "alice",
+	})
+	c.Assert(err, qt.IsNil)
+	terminatingClient := gossh.NewClient(sshConn, newChan, reqs)
+	defer terminatingClient.Close()
+
+	session, err := terminatingClient.NewSession()
+	c.Assert(err, qt.IsNil)
+	defer session.Close()
+
+	var output bytes.Buffer
+	session.Stdout = &output
+	err = session.Run("")
+	c.Assert(err, qt.IsNil)
+	c.Check(output.String(), qt.Equals, "session established\n")
+
 	select {
 	case <-s.received:
 	case <-time.After(100 * time.Millisecond):
@@ -234,11 +258,16 @@ func (s *sshSuite) TestSSHJumpClosesControllerConnection(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	// The jump server should close the controller connection in response.
-	// Wait on the controller client's underlying connection; it returns
-	// once the connection is closed.
+	// Reads on the connection return the destination server's banner
+	// first, so read until the connection is closed and returns an error.
 	done := make(chan error, 1)
 	go func() {
-		done <- s.controllerClient.Conn.Wait()
+		buf := make([]byte, 1)
+		var err error
+		for err == nil {
+			_, err = s.controllerConn.Read(buf)
+		}
+		done <- err
 	}()
 	select {
 	case <-done:
