@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -180,21 +181,40 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Since we only need the raw data to redirect, we can discard them.
 		go gossh.DiscardRequests(reqs)
 
+		// Relay each direction independently: on EOF, half-close the
+		// write side so the other direction keeps flowing. Close both
+		// connections only when both directions are done.
+		var wg sync.WaitGroup
+		wg.Add(2)
 		go func() {
-			defer clientConn.Close()
-			defer controllerConn.Close()
+			defer wg.Done()
 			if _, err := io.Copy(clientConn, controllerConn); err != nil {
 				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
 			}
-
+			closeWrite(clientConn)
 		}()
 		go func() {
-			defer clientConn.Close()
-			defer controllerConn.Close()
+			defer wg.Done()
 			if _, err := io.Copy(controllerConn, clientConn); err != nil {
 				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
 			}
+			closeWrite(controllerConn)
 		}()
+		go func() {
+			wg.Wait()
+			clientConn.Close()
+			controllerConn.Close()
+		}()
+	}
+}
+
+// closeWrite half-closes conn's write side if supported, so the
+// peer can finish reading the other direction.
+func closeWrite(conn any) {
+	if hc, ok := conn.(interface{ CloseWrite() error }); ok {
+		if err := hc.CloseWrite(); err != nil {
+			zapctx.Error(context.Background(), "failed to close write side of connection", zap.Error(err))
+		}
 	}
 }
 
