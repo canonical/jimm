@@ -11,6 +11,10 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+
+	// Registers the pprof handlers on http.DefaultServeMux (side-effect
+	// import); they are re-exposed under /debug/pprof below.
+	_ "net/http/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -733,6 +737,12 @@ func NewInternalService(addr string, corsAllowedOrigins []string) *http.Server {
 	})
 	mux.Use(corsOpts.Handler)
 	mux.Mount("/metrics", promhttp.Handler())
+	// Expose Go's pprof endpoints on the internal-only server so profiles
+	// (CPU flame graphs in particular) can be captured from a running JIMM.
+	// The internal server is not routed through traefik, so these stay
+	// ops-only. pprof registers its handlers on http.DefaultServeMux at
+	// /debug/pprof/*; chi's Mount passes the full path through unchanged.
+	mux.Mount("/debug/pprof", http.DefaultServeMux)
 	mux.Mount("/debug", jimmhttp.NewDebugHandler(
 		map[string]jimmhttp.StatusCheck{
 			"start_time": jimmhttp.ServerStartTime,

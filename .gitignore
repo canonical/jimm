@@ -12,6 +12,11 @@
 /version/version.txt
 /tmp
 
+# Local SSH benchmark output directories and aggregate CSVs.
+/benchmark-*/
+/results/
+/benchmark-summary.csv
+
 *.crt
 *.key
 *.csr
