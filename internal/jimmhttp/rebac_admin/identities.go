@@ -196,37 +196,98 @@ func (s *identitiesService) PatchIdentityRoles(ctx context.Context, identityId s
 }
 
 // GetIdentityGroups returns a page of Groups for identity `identityId`.
-//
-// JAAS groups have been removed in favour of IDP groups. This method is retained
-// to satisfy the IdentitiesService interface but always returns an error.
 func (s *identitiesService) GetIdentityGroups(ctx context.Context, identityId string, params *resources.GetIdentitiesItemGroupsParams) (*resources.PaginatedResponse[resources.Group], error) {
-	_, err := utils.GetUserFromContext(ctx)
+	user, err := utils.GetUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	_, err = s.jimm.IdentityManager().FetchIdentity(ctx, identityId)
+	objUser, err := s.jimm.IdentityManager().FetchIdentity(ctx, identityId)
 	if err != nil {
 		return nil, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 	}
-	return nil, v1.NewValidationError("JAAS groups are no longer supported; use IDP groups instead")
+	filter := utils.CreateTokenPaginationFilter(params.Size, params.NextToken, params.NextPageToken)
+	tuples, cNextToken, err := s.jimm.PermissionManager().ListRelationshipTuples(ctx, user, apiparams.RelationshipTuple{
+		Object:       objUser.ResourceTag().String(),
+		Relation:     ofganames.MemberRelation.String(),
+		TargetObject: openfga.GroupType.String(),
+	}, int32(filter.Limit()), filter.Token()) // #nosec G115 accept integer conversion
+	if err != nil {
+		return nil, err
+	}
+
+	groups := make([]resources.Group, 0, len(tuples))
+	for _, t := range tuples {
+		dbGroup, err := s.jimm.GroupManager().GetGroupByUUID(ctx, user, t.Target.ID)
+		if err != nil {
+			// Handle the case where the group was removed from the DB but a lingering OpenFGA tuple still exists.
+			// Don't return an error as that would prevent a user from viewing their groups, instead drop the group from the result.
+			if errors.ErrorCode(err) == errors.CodeNotFound {
+				continue
+			}
+			return nil, err
+		}
+		groups = append(groups, resources.Group{
+			Id:   &t.Target.ID,
+			Name: dbGroup.Name,
+		})
+	}
+
+	originalToken := filter.Token()
+	res := resources.PaginatedResponse[resources.Group]{
+		Data: groups,
+		Meta: resources.ResponseMeta{
+			Size:      len(groups),
+			PageToken: &originalToken,
+		},
+	}
+	if cNextToken != "" {
+		res.Next.PageToken = &cNextToken
+	}
+	return &res, nil
 }
 
 // PatchIdentityGroups performs addition or removal of a Group to/from an Identity.
-//
-// JAAS groups have been removed in favour of IDP groups. This method is retained
-// to satisfy the IdentitiesService interface but is a no-op that rejects any
-// patch since groups no longer exist.
 func (s *identitiesService) PatchIdentityGroups(ctx context.Context, identityId string, groupPatches []resources.IdentityGroupsPatchItem) (bool, error) {
-	_, err := utils.GetUserFromContext(ctx)
+	user, err := utils.GetUserFromContext(ctx)
 	if err != nil {
 		return false, err
 	}
-	_, err = s.jimm.IdentityManager().FetchIdentity(ctx, identityId)
+
+	objUser, err := s.jimm.IdentityManager().FetchIdentity(ctx, identityId)
 	if err != nil {
 		return false, v1.NewNotFoundError(fmt.Sprintf("User with id %s not found", identityId))
 	}
-	if len(groupPatches) > 0 {
-		return false, v1.NewValidationError("JAAS groups are no longer supported; use IDP groups instead")
+	additions := make([]apiparams.RelationshipTuple, 0)
+	deletions := make([]apiparams.RelationshipTuple, 0)
+	for _, p := range groupPatches {
+		if !jimmnames.IsValidGroupId(p.Group) {
+			return false, v1.NewValidationError(fmt.Sprintf("ID %s is not a valid group ID", p.Group))
+		}
+		t := apiparams.RelationshipTuple{
+			Object:       objUser.ResourceTag().String(),
+			Relation:     ofganames.MemberRelation.String(),
+			TargetObject: jimmnames.NewGroupTag(p.Group).String(),
+		}
+		switch p.Op {
+		case "add":
+			additions = append(additions, t)
+		case "remove":
+			deletions = append(deletions, t)
+		}
+	}
+	if len(additions) > 0 {
+		err = s.jimm.PermissionManager().AddRelation(ctx, user, additions)
+		if err != nil {
+			zapctx.Error(context.Background(), "cannot add relations", zap.Error(err))
+			return false, v1.NewUnknownError(err.Error())
+		}
+	}
+	if len(deletions) > 0 {
+		err = s.jimm.PermissionManager().RemoveRelation(ctx, user, deletions)
+		if err != nil {
+			zapctx.Error(context.Background(), "cannot remove relations", zap.Error(err))
+			return false, v1.NewUnknownError(err.Error())
+		}
 	}
 	return true, nil
 }

@@ -9,14 +9,14 @@ package jujuapi
 // It is generated from runtime registration (see SupportedFacades).
 var SupportedFacadeVersions = map[string][]int{
 	"ApplicationOffers":   []int{5, 6},
-	"Cloud":               []int{7},
+	"Cloud":               []int{7, 8},
 	"Controller":          []int{12, 14, 15},
 	"JIMM":                []int{4},
 	"MigrationTarget":     []int{6},
 	"ModelConfig":         []int{3, 4},
 	"ModelManager":        []int{10, 11},
 	"ModelSummaryWatcher": []int{1},
-	"ModelUpgrader":       []int{1},
+	"ModelUpgrader":       []int{1, 2},
 	"Pinger":              []int{1},
 	"UserManager":         []int{3},
 }

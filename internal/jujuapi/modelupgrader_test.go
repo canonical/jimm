@@ -135,3 +135,13 @@ func TestUpgradeModel_DryRun(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(result.ChosenVersion, qt.DeepEquals, targetVersion)
 }
+
+// TestModelUpgraderFacadeVersions verifies that JIMM advertises the
+// ModelUpgrader facade at both version 1 (Juju 3.6 clients) and version 2
+// (Juju 4.x clients).
+func TestModelUpgraderFacadeVersions(t *testing.T) {
+	c := qt.New(t)
+
+	supported := jujuapi.SupportedFacades()
+	c.Assert(supported["ModelUpgrader"], qt.DeepEquals, []int{1, 2})
+}

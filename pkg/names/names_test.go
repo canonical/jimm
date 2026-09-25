@@ -22,6 +22,11 @@ func TestParseTag(t *testing.T) {
 		expectedValid bool
 	}{
 		{
+			tagString:     fmt.Sprintf("group-%s", uuid),
+			expectedTag:   names.NewGroupTag(uuid),
+			expectedValid: true,
+		},
+		{
 			tagString:     fmt.Sprintf("role-%s", uuid),
 			expectedTag:   names.NewRoleTag(uuid),
 			expectedValid: true,

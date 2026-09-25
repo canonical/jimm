@@ -76,6 +76,30 @@ func TestClouds(t *testing.T) {
 	})
 }
 
+func TestModelConfigSchema(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	conn := s.Open(c, nil, "test@canonical.com", nil)
+	defer conn.Close()
+
+	client := cloudapi.NewClient(conn)
+	schema, err := client.ModelConfigSchema(t.Context(), jimmtest.TestE2EProviderType)
+	// If we have an error, it is because we're testing specifically against Juju 3 only backing controller.
+	if err != nil {
+		c.Assert(err, qt.ErrorMatches, ".*no controllers registered.*")
+		return
+	}
+	// Otherwise, 4 or 4 and 3 in which case we should be taking highest version.
+	c.Assert(err, qt.Equals, nil)
+	// Every provider's model config schema includes the common "name"
+	// attribute. We use this as a best effort that the schema is working as intended.
+	c.Assert(schema, qt.Not(qt.HasLen), 0)
+	nameField, ok := schema["name"]
+	c.Assert(ok, qt.IsTrue, qt.Commentf("schema: %#v", schema))
+	c.Assert(nameField.Type, qt.Equals, "string")
+}
+
 func TestUserCredentials(t *testing.T) {
 	c := qt.New(t)
 	s := jimmtest.SetupJimmWithControllers(c)

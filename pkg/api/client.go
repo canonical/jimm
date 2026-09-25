@@ -182,7 +182,7 @@ func (c *Client) UpdateMigratedModel(ctx context.Context, req *params.UpdateMigr
 
 // Authorisation RPC commands
 
-// User Group
+// User Groups
 // AddGroup adds the group to JIMM.
 func (c *Client) AddGroup(ctx context.Context, req *params.AddGroupRequest) (params.AddGroupResponse, error) {
 	var resp params.AddGroupResponse
@@ -434,24 +434,4 @@ func cloudFromParams(cloudName string, p jujuparams.Cloud) jujucloud.Cloud {
 		RegionConfig:      regionConfig,
 		IsControllerCloud: p.IsControllerCloud,
 	}
-}
-
-// JobInfo retrieves information about a job with the given ID.
-func (c *Client) JobInfo(ctx context.Context, req *params.JobInfoRequest) (*params.JobInfoResponse, error) {
-	var resp params.JobInfoResponse
-	err := c.caller.APICall(ctx, "JIMM", 4, "", "JobInfo", req, &resp)
-	if err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// ListJobs returns a list of jobs based on the provided parameters.
-func (c *Client) ListJobs(ctx context.Context, req *params.ListJobsRequest) (*params.ListJobsResponse, error) {
-	var resp params.ListJobsResponse
-	err := c.caller.APICall(ctx, "JIMM", 4, "", "ListJobs", req, &resp)
-	if err != nil {
-		return nil, err
-	}
-	return &resp, nil
 }

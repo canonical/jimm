@@ -16,9 +16,19 @@ func init() {
 	facadeInit["ModelUpgrader"] = func(r *controllerRoot) []int {
 		abortModelUpgradeMethod := rpc.Method(r.AbortModelUpgrade)
 		upgradeModelMethod := rpc.Method(r.UpgradeModel)
+
+		// ModelUpgrader facade version 1 (Juju 3.6 clients).
 		r.AddMethod("ModelUpgrader", 1, "AbortModelUpgrade", abortModelUpgradeMethod)
 		r.AddMethod("ModelUpgrader", 1, "UpgradeModel", upgradeModelMethod)
-		return []int{1}
+
+		// ModelUpgrader facade version 2 (Juju 4.x clients). The methods are
+		// wire-identical to version 1 (UpgradeModelParams, ModelParam and
+		// UpgradeModelResult are unchanged between Juju 3.6 and 4.x), so the
+		// same handlers are re-registered here.
+		r.AddMethod("ModelUpgrader", 2, "AbortModelUpgrade", abortModelUpgradeMethod)
+		r.AddMethod("ModelUpgrader", 2, "UpgradeModel", upgradeModelMethod)
+
+		return []int{1, 2}
 	}
 }
 

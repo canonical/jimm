@@ -10,16 +10,6 @@ myst:
 >
 > See also: {ref}`group`
 
-```{important}
-**Deprecation notice — migration to IdP groups**
-
-JAAS groups (created with `juju add-group`) are deprecated and will be **removed** in the next major release of JAAS on the `v4` track. They are replaced by **groups managed by the Identity Provider**.
-
-With Identity Provider (IdP) groups you no longer need to create groups in JAAS or assign users to them, group membership is managed by the IdP. In JAAS you only need to **assign permissions to an IdP group**, and every member of group inherits the permission automatically.
-
-JAAS groups remain fully supported on the current `v3` track. If you are starting a new deployment, prefer IdP groups from the outset. If you already use JAAS groups, see {ref}`migrate-to-IdP-groups` below for the migration path.
-```
-
 ````{dropdown} Preview an example workflow
 ```text
 # Create a group:
@@ -116,11 +106,11 @@ An **IdP group** is a group that is managed by your Identity Provider (IdP), not
 
 Compared to JAAS groups, the key difference is that **JAAS no longer creates groups or assigns users to them**. In JAAS you only assign permissions (e.g. `administrator` on a model) to an IdP group, then every user who logs in with that group claim inherits the permission automatically.
 
-IdP groups are referenced using the `IdPgroup` tag and require the `#member` userset, just like JAAS groups. For example:
+IdP groups are referenced using the `idpgroup` tag and require the `#member` userset, just like JAAS groups. For example:
 
 ```text
 # Grant administrator access on a model to every member of the "canonical" IdP group:
-juju add-permission IdPgroup-canonical#member administrator model-mycontroller/mymodel
+juju add-permission idpgroup-canonical#member administrator model-mycontroller/mymodel
 ```
 
 > See more: {doc}`juju add-permission <../reference/jaas-plugin>`
@@ -146,7 +136,7 @@ The high-level migration steps are:
 
 1. **Configure your IdP** to emit a group claim (e.g. `groups`) that contains the group names you want to use in JAAS. The exact configuration depends on your IdP (e.g. Canonical Identity Platform / Keycloak, Auth0, etc.).
 2. **Map the existing JAAS groups** in JAAS to the group names the IdP will emit. For each local group, make sure the IdP emits a group with a matching name, and assign the same users to that group in the IdP.
-3. **Re-assign permissions** from the local group to the IdP group. For every permission previously granted to `group-<name>#member`, grant the same permission to `IdPgroup-<name>#member`.
+3. **Re-assign permissions** from the local group to the IdP group. For every permission previously granted to `group-<name>#member`, grant the same permission to `idpgroup-<name>#member`.
 4. **Remove the JAAS group** permission assignments and the local group itself once the IdP group is in use and users have confirmed they inherit the expected access.
 
 ### Terraform migration example

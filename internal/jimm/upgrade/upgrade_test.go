@@ -429,7 +429,7 @@ func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {
 	})
 
 	s.dialer.EXPECT().
-		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DialControllerAsService(gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
 	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {
@@ -473,7 +473,7 @@ func TestUpgradeModel_RetriesUntilModelReportsTargetVersion(t *testing.T) {
 	})
 
 	s.dialer.EXPECT().
-		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DialControllerAsService(gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
 	modelInfoCalls := 0
@@ -531,7 +531,7 @@ func TestUpgradeModel_AlreadyUpgraded(t *testing.T) {
 	})
 
 	s.dialer.EXPECT().
-		Dial(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DialControllerAsService(gomock.Any(), gomock.Any()).
 		Return(s.api, nil)
 
 	s.api.EXPECT().ModelInfo(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, mt names.ModelTag) (jujuclient.ModelInfo, error) {

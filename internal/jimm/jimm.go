@@ -18,6 +18,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/config"
 	"github.com/canonical/jimm/v3/internal/jimm/controllerprofile"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/group"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
 	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
@@ -75,6 +76,11 @@ type Parameters struct {
 	// OAuthAuthenticator is responsible for handling authentication
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator login.OAuthAuthenticator
+
+	// IdPGroupFetcher resolves a user's IdP groups without a login session,
+	// for non-session flows such as macaroon discharge. If nil, group-based
+	// access is denied in those flows.
+	IdPGroupFetcher offer.IdPGroupFetcher
 
 	// MigrationTokenGenerator is used to generate migration tokens for
 	// authentication between Juju and JIMM during model migration.
@@ -168,6 +174,12 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.RoleManager = roleManager
 
+	groupManager, err := group.NewGroupManager(j.Database, j.OpenFGAClient)
+	if err != nil {
+		return nil, err
+	}
+	j.GroupManager = groupManager
+
 	identityManager, err := identity.NewIdentityManager(j.Database, j.OpenFGAClient)
 	if err != nil {
 		return nil, err
@@ -234,7 +246,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.ConfigManager = configManager
 
-	offerAuthorizer, err := offer.NewOfferAuthorizer(j.Database, j.OpenFGAClient)
+	offerAuthorizer, err := offer.NewOfferAuthorizer(j.Database, j.OpenFGAClient, p.IdPGroupFetcher)
 	if err != nil {
 		return nil, err
 	}
@@ -292,6 +304,9 @@ type JIMM struct {
 
 	// RoleManager provides a means to manage roles within JIMM.
 	RoleManager *role.RoleManager
+
+	// GroupManager provides a means to manage groups within JIMM.
+	GroupManager *group.GroupManager
 
 	// IdentityManager provides a means to manage identities within JIMM.
 	IdentityManager *identity.IdentityManager
@@ -360,9 +375,34 @@ func NewDialerAdapter(dialer *jujuclient.Dialer) *DialerAdapter {
 	}
 }
 
-// Dial implements the juju.Dialer interface for the DialerAdapter.
-// It uses the underlying jujuclient.Dialer to establish a connection
-// to the Juju controller and returns a juju.API connection.
-func (d *DialerAdapter) Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (juju.API, error) {
-	return d.dialer.Dial(ctx, ctl, modelTag, user)
+// DialModelAsUser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsUser(ctx, user, ctl, modelTag)
+}
+
+// DialControllerAsUser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.dialer.DialControllerAsUser(ctx, user, ctl, resourceTags...)
+}
+
+// DialModelAsSuperuser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsSuperuser(ctx, user, ctl, modelTag)
+}
+
+// DialControllerAsSuperuser implements the juju.Dialer interface for the DialerAdapter.
+func (d *DialerAdapter) DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.dialer.DialControllerAsSuperuser(ctx, user, ctl, resourceTags...)
+}
+
+// DialModelAsService implements the juju.Dialer interface for the
+// DialerAdapter. It dials the model using JIMM's own service identity.
+func (d *DialerAdapter) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (juju.API, error) {
+	return d.dialer.DialModelAsService(ctx, ctl, modelTag)
+}
+
+// DialControllerAsService implements the juju.Dialer interface for the
+// DialerAdapter. It dials the controller using JIMM's own service identity.
+func (d *DialerAdapter) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
+	return d.dialer.DialControllerAsService(ctx, ctl)
 }

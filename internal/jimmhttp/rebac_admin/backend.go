@@ -26,6 +26,8 @@ func SetupBackend(ctx context.Context, jimm jujuapi.JIMM) (*rebac_handlers.ReBAC
 		Authenticator:           nil, // Authentication is handled by internal middleware.
 		Entitlements:            newEntitlementService(),
 		EntitlementsErrorMapper: securityEventLogger,
+		Groups:                  newGroupService(jimm),
+		GroupsErrorMapper:       securityEventLogger,
 		Identities:              newidentitiesService(jimm),
 		IdentitiesErrorMapper:   securityEventLogger,
 		Resources:               newResourcesService(jimm),

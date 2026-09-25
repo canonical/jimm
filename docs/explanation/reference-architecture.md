@@ -25,11 +25,11 @@ The table below lists the main technologies used in the reference architecture w
 
 | Technology                     | Documentation                                                                 |
 |-------------------------------|---------------------------------------------------------------------------------|
-| JAAS                          | [JAAS docs](https://documentation.ubuntu.com/jaas/v3/) |
-| Juju                          | [Juju docs](https://documentation.ubuntu.com/juju/3.6/)                         |
-| Charms                        | {external+juju:ref}`Juju docs <charm>`, [Charmcraft docs](https://canonical-charmcraft.readthedocs-hosted.com/), [Ops docs](https://documentation.ubuntu.com/ops/) |
-| Rocks | [Rockcraft docs](https://documentation.ubuntu.com/rockcraft/stable/explanation/rocks/)|
-| Snaps | [Snap docs](https://snapcraft.io/docs) |
+| JAAS                          | [JAAS docs](https://canonical.com/juju/docs/jaas/v3/) |
+| Juju                          | [Juju docs](https://canonical.com/juju/docs/juju-cli/3.6/)                         |
+| Charms                        | {external+juju:ref}`Juju docs <charm>`, [Charmcraft docs](https://canonical-charmcraft.readthedocs-hosted.com/), [Ops docs](https://canonical.com/juju/docs/ops/latest/) |
+| Rocks | [Rockcraft docs](https://ubuntu.com/containers/rockcraft/docs/1/explanation/rocks/)|
+| Snaps | [Snap docs](https://snapcraft.io/docs/) |
 | Canonical Kubernetes          | [Canonical Kubernetes docs](https://documentation.ubuntu.com/canonical-kubernetes/) |
 | Canonical Observability Stack (COS) | [Canonical Observability Stack docs](https://documentation.ubuntu.com/observability/) |
 | Canonical Identity Platform (CIdP)  | [Canonical Identity Platform docs](https://charmhub.io/topics/canonical-identity-platform)     |
@@ -177,15 +177,15 @@ JIMM’s authorization system depends on data stored in OpenFGA (which also uses
 
 For disaster and recovery guidelines for PostgreSQL please refer to the documentation of the corresponding charms:
 - for the PostgreSQL VM charm:
-  - [backup](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/how-to/back-up-and-restore/create-a-backup/index.html)
-  - [restore](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/how-to/back-up-and-restore/create-a-backup/index.html)
+  - [backup](https://canonical.com/data/postgresql/docs/14/how-to/back-up-and-restore/create-a-backup/)
+  - [restore](https://canonical.com/data/postgresql/docs/14/how-to/back-up-and-restore/restore-a-backup/)
 - for the PostgreSQL K8s charm:
   - [backup](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/how-to/back-up-and-restore/create-a-backup/index.html)
   - [restore](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/how-to/back-up-and-restore/restore-a-backup/index.html)
 
 For backup and disaster recovery of the Juju controllers managed by JIMM consult Juju documentation:
-- [backup](https://documentation.ubuntu.com/juju/3.6/howto/manage-controllers/#back-up-a-controller)
-- [restore](https://documentation.ubuntu.com/juju/3.6/howto/manage-controllers/#restore-a-controller-from-a-backup)
+- [backup](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-controllers/#back-up-a-controller)
+- [restore](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-controllers/#restore-a-controller-from-a-backup)
 
 #### Recovery
 
@@ -202,7 +202,7 @@ When a new stable version of Juju is released, you should upgrade all your manag
 
 For patch version upgrades you can follow Juju’s in-place upgrade procedure to upgrade individual controllers followed by upgrades of individual models. {external+juju:ref}`See more. <upgrade-your-deployment>`
 
-Minor and major version upgrades of Juju controllers are not supported -- instead you must bootstrap a new Juju controller of a specific version, add it to JIMM, and migrate all your existing models to this controller. [See more.](https://documentation.ubuntu.com/jaas/v3/howto/manage-models/#migrate-a-model-within-jaas)
+Minor and major version upgrades of Juju controllers are not supported -- instead you must bootstrap a new Juju controller of a specific version, add it to JIMM, and migrate all your existing models to this controller. [See more.](https://canonical.com/juju/docs/jaas/v3/howto/manage-models/#migrate-a-model-within-jaas)
 
 ### Security
 
@@ -223,12 +223,12 @@ For Vault please follow the security best practices described for the relevant c
 - [Vault-k8s](https://charmhub.io/vault-k8s/docs/h-security-in-charmed-vault)
 
 For PostgreSQL please follow the security best practices described for the relevant charm:
-- [PostgreSQL](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/explanation/security/)
+- [PostgreSQL](https://canonical.com/data/postgresql/docs/14/explanation/security/)
 - [PostgreSQL-k8s](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/explanation/security/)
 
 #### OS hardening
 
-For OS hardening please follow the [security best practices for Ubuntu Server](https://documentation.ubuntu.com/security/docs/security-features/security-features-overview/).
+For OS hardening please follow the [security best practices for Ubuntu Server](https://documentation.ubuntu.com/security/security-features/security-features-overview/).
 
 #### Patching
 

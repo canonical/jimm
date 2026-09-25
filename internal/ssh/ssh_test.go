@@ -46,6 +46,10 @@ type sshSuite struct {
 	received                 chan bool
 	virtualHostname          virtualhostname.Info
 	maxConcurrentConnections int
+
+	// controllerConn holds the raw relay connection returned by the mock
+	// DialController, allowing tests to observe its lifecycle.
+	controllerConn net.Conn
 }
 
 func (s *sshSuite) Init(c *qt.C) {
@@ -134,7 +138,12 @@ func (s *sshSuite) Init(c *qt.C) {
 				// Simulate the upgraded relay connection: a raw pipe to the
 				// destination server. The user's SSH session bytes are relayed
 				// over it and terminated by the destination server.
-				return destinationServerListener.Dial()
+				conn, err := destinationServerListener.Dial()
+				if err != nil {
+					return nil, err
+				}
+				s.controllerConn = halfCloseConn{conn}
+				return s.controllerConn, nil
 			},
 		})
 	c.Assert(err, qt.IsNil)
@@ -164,6 +173,19 @@ func (s *sshSuite) Init(c *qt.C) {
 		c.Check(s.destinationJujuSSHServer.Close(), qt.IsNil)
 		c.Check(s.jumpSSHServer.Close(), qt.IsNil)
 	})
+}
+
+// halfCloseConn wraps the in-memory relay connection so it supports
+// CloseWrite like the production TLS connection does. A bufconn pipe
+// cannot signal EOF per direction, so CloseWrite closes the connection:
+// the destination server reacts to the EOF by ending the session, as
+// the real controller does.
+type halfCloseConn struct {
+	net.Conn
+}
+
+func (c halfCloseConn) CloseWrite() error {
+	return c.Conn.Close()
 }
 
 func (s *sshSuite) TestSSHJump(c *qt.C) {
@@ -210,6 +232,47 @@ func (s *sshSuite) TestSSHJump(c *qt.C) {
 	case <-s.received:
 	case <-time.After(100 * time.Millisecond):
 		c.Fail()
+	}
+}
+
+// TestSSHJumpClosesControllerConnection verifies that the connection to the
+// controller is closed once the user's tunnel is torn down, so it doesn't leak.
+func (s *sshSuite) TestSSHJumpClosesControllerConnection(c *qt.C) {
+	client := inMemoryDial(c, s.jumpServerListener, &gossh.ClientConfig{
+		HostKeyCallback: gossh.FixedHostKey(s.hostKey.PublicKey()),
+		Auth: []gossh.AuthMethod{
+			gossh.PublicKeys(s.privateKey),
+		},
+		User: "alice",
+	})
+	defer client.Close()
+
+	s.testInDestinationServerF = func(fm ssh.ForwardMessage) {
+		c.Check(fm.DestAddr, qt.Equals, s.virtualHostname.String())
+	}
+	conn, err := client.Dial("tcp", fmt.Sprintf("%s:22", s.virtualHostname))
+	c.Assert(err, qt.IsNil)
+
+	// Tear down the tunnel from the client side.
+	err = conn.Close()
+	c.Assert(err, qt.IsNil)
+
+	// The jump server should close the controller connection in response.
+	// Reads on the connection return the destination server's banner
+	// first, so read until the connection is closed and returns an error.
+	done := make(chan error, 1)
+	go func() {
+		buf := make([]byte, 1)
+		var err error
+		for err == nil {
+			_, err = s.controllerConn.Read(buf)
+		}
+		done <- err
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		c.Fatal("test timed out waiting for connection close")
 	}
 }
 

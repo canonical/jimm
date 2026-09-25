@@ -23,7 +23,7 @@ func (j *JujuManager) pollModels(ctx context.Context, models []*dbmodel.Model) e
 
 	ctrl := models[0].Controller
 
-	api, err := j.dialController(ctx, &ctrl, nil)
+	api, err := j.dialControllerAsService(ctx, &ctrl)
 	if err != nil {
 		zapctx.Error(ctx, "cannot dial controller", zap.String("controller", ctrl.UUID), zap.Error(err))
 		return nil

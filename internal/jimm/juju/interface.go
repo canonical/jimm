@@ -20,15 +20,46 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
-// A Dialer provides a connection to a controller.
+// A Dialer provides a connection to a controller. The four methods are
+// organised along two axes: connection scope (model vs controller) and
+// identity (real user vs JIMM's own service identity). After successfully
+// dialing the controller the UUID, AgentVersion and HostPorts fields in the
+// given controller should be updated to the values provided by the
+// controller.
 type Dialer interface {
-	// Dial creates an API connection to a controller. If the given
-	// model-tag is non-zero the connection will be to that model,
-	// otherwise the connection is to the controller. After successfully
-	// dialing the controller the UUID, AgentVersion and HostPorts fields
-	// in the given controller should be updated to the values provided
-	// by the controller.
-	Dial(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag, user *openfga.User) (API, error)
+	// DialModelAsUser creates a model-scoped connection for the given
+	// user with the caller's real permissions.
+	// Prefer whenever possible.
+	DialModelAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
+
+	// DialControllerAsUser creates a controller-scoped connection for
+	// the given user with the caller's real permissions. Pass
+	// resourceTags for operations tied to specific models or offers.
+	// Prefer whenever possible.
+	DialControllerAsUser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
+
+	// DialModelAsSuperuser creates a model-scoped connection for the
+	// given user with superuser permissions.
+	// Use as a workaround.
+	DialModelAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
+
+	// DialControllerAsSuperuser creates a controller-scoped connection
+	// for the given user with superuser permissions. Pass
+	// resourceTags for operations tied to specific models or offers.
+	// Use as a workaround.
+	DialControllerAsSuperuser(ctx context.Context, user *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (API, error)
+
+	// DialModelAsService creates a model-scoped API connection using
+	// JIMM's own service identity (no user). It is intended solely for
+	// internal housekeeping operations (e.g. model-status polling) that
+	// are not initiated by a real user.
+	DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, modelTag names.ModelTag) (API, error)
+
+	// DialControllerAsService creates a controller-scoped API connection
+	// using JIMM's own service identity (no user). It is intended solely
+	// for internal housekeeping operations (watcher, upgrade, controller
+	// administration, etc.) that are not initiated by a real user.
+	DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (API, error)
 }
 
 // An API is the interface JIMM uses to access the API on a controller.
@@ -122,6 +153,10 @@ type API interface {
 
 	// ListModelSummaries lists models summaries
 	ListModelSummaries(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
+
+	// ModelConfigSchema fetches the model config schema for the given
+	// provider type.
+	ModelConfigSchema(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error)
 
 	// ModelInfo fetches a model's ModelInfo.
 	ModelInfo(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)

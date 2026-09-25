@@ -7,6 +7,8 @@ import (
 	"database/sql"
 
 	"github.com/juju/names/v6"
+	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/zap"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -14,21 +16,36 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+// IdPGroupFetcher resolves a user's IdP group identifiers without a login
+// session, for non-session flows such as macaroon discharge.
+//
+// Implementations must fail closed: if the groups cannot be resolved,
+// return an error; the caller denies access.
+type IdPGroupFetcher interface {
+	// FetchGroups returns the current IdP group identifiers for the user
+	// with the given email/username.
+	FetchGroups(ctx context.Context, username string) ([]string, error)
+}
+
 type OfferAuthorizer struct {
 	store   *db.Database
 	authSvc *openfga.OFGAClient
+	// idpGroupFetcher resolves the user's IdP groups when no login
+	// session is available. May be nil, in which case group-derived
+	// access is denied.
+	idpGroupFetcher IdPGroupFetcher
 }
 
 // NewOfferAuthorizer returns a new OfferAuthorizer that provides methods to
 // check if a user is a consumer of an application offer.
-func NewOfferAuthorizer(store *db.Database, authSvc *openfga.OFGAClient) (*OfferAuthorizer, error) {
+func NewOfferAuthorizer(store *db.Database, authSvc *openfga.OFGAClient, idpGroupFetcher IdPGroupFetcher) (*OfferAuthorizer, error) {
 	if store == nil {
 		return nil, errors.New("group store cannot be nil")
 	}
 	if authSvc == nil {
 		return nil, errors.New("group authorisation service cannot be nil")
 	}
-	return &OfferAuthorizer{store, authSvc}, nil
+	return &OfferAuthorizer{store, authSvc, idpGroupFetcher}, nil
 }
 
 // IsUserConsumerForOffer checks if a user is a consumer of an application offer.
@@ -53,6 +70,18 @@ func (offerAuth *OfferAuthorizer) IsUserConsumerForOffer(ctx context.Context, us
 		identity,
 		offerAuth.authSvc,
 	)
+
+	// Resolve the user's IdP groups so group-based grants are visible to
+	// the check. On error, proceed without groups (fail closed).
+	if offerAuth.idpGroupFetcher != nil {
+		groups, err := offerAuth.idpGroupFetcher.FetchGroups(ctx, userIdentifier)
+		if err != nil {
+			zapctx.Error(ctx, "failed to fetch identity groups for discharge check", zap.Error(err), zap.String("user", userIdentifier))
+		} else {
+			user.SetIDPGroups(groups)
+		}
+	}
+
 	return user.IsApplicationOfferConsumer(ctx, offerTag)
 }
 

@@ -48,13 +48,6 @@ var allRelations = []cofga.Relation{MemberRelation, AdministratorRelation, Contr
 // EveryoneUser is the username representing all users and is treated uniquely when used in OpenFGA tuples.
 const EveryoneUser = "everyone@external"
 
-// GroupTagKind is the kind string for JAAS groups. The group type has been
-// removed from the OpenFGA authorisation model and the groups table has been
-// dropped from JIMM's database, but this constant is retained so that
-// OpenFGACleanup can recognise leftover group tuples and remove them as
-// orphaned (see PermissionManager.ToJAASTag).
-const GroupTagKind = "group"
-
 // Tag represents an entity tag as used by JIMM in OpenFGA.
 type Tag = cofga.Entity
 
@@ -62,6 +55,7 @@ type Tag = cofga.Entity
 // a method returning entity's id and kind.
 type ResourceTagger interface {
 	names.UserTag |
+		jimmnames.GroupTag |
 		jimmnames.IdPGroupTag |
 		names.ControllerTag |
 		names.ModelTag |
@@ -111,6 +105,7 @@ func ConvertGenericTag(t names.Tag) *Tag {
 func BlankKindTag(kind string) (*Tag, error) {
 	switch kind {
 	case names.UserTagKind,
+		jimmnames.GroupTagKind,
 		jimmnames.IdPGroupTagKind,
 		jimmnames.RoleTagKind,
 		names.ControllerTagKind,

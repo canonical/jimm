@@ -41,7 +41,7 @@ func (s *sshKeysManagerSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.db = db
-	user, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	user, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
 	// Setup OFGA
 	ofgaClient, _, _, err := jimmtest.SetupTestOFGAClient(c.Name())
 	c.Assert(err, qt.IsNil)

@@ -8,10 +8,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/servermon"
-	"github.com/google/uuid"
 )
-
-var newUUID = uuid.NewString
 
 // AddRole adds a new role.
 func (d *Database) AddRole(ctx context.Context, name string) (re *dbmodel.RoleEntry, err error) {

@@ -50,6 +50,7 @@ var resourceAdminRelations = map[ofga.Relation]bool{
 // writing a structural tuple.
 var grantableObjectKinds = map[openfga.Kind]bool{
 	openfga.UserType:     true,
+	openfga.GroupType:    true,
 	openfga.IdPGroupType: true,
 	openfga.RoleType:     true,
 }
@@ -97,8 +98,8 @@ func (j *PermissionManager) authorizeRelationTargetAdmin(ctx context.Context, us
 		if allowed {
 			return nil
 		}
-	case openfga.RoleType:
-		// Membership changes for roles are restricted to JIMM admins.
+	case openfga.GroupType, openfga.RoleType:
+		// Membership changes for groups and roles are restricted to JIMM admins.
 	default:
 		// Unsupported relation-management targets are rejected for non-admins.
 	}

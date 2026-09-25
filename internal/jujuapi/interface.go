@@ -24,7 +24,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
-	"github.com/canonical/jimm/v3/internal/jimm/jobs"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
@@ -38,6 +37,7 @@ import (
 // JIMM defines a comprehensive interface for all sort of operations with our application logic.
 type JIMM interface {
 	RoleManager() RoleManager
+	GroupManager() GroupManager
 	IdentityManager() IdentityManager
 	LoginManager() LoginManager
 	PermissionManager() PermissionManager
@@ -70,6 +70,25 @@ type RoleManager interface {
 	ListRoles(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.RoleEntry, error)
 	// CountRoles returns the number of roles that exist.
 	CountRoles(ctx context.Context, user *openfga.User) (int, error)
+}
+
+// GroupManager provides a means to manage groups within JIMM.
+type GroupManager interface {
+	// AddGroup adds a role to JIMM.
+	AddGroup(ctx context.Context, user *openfga.User, roleName string) (*dbmodel.GroupEntry, error)
+	// GetGroupByUUID returns a role based on the provided UUID.
+	GetGroupByUUID(ctx context.Context, user *openfga.User, uuid string) (*dbmodel.GroupEntry, error)
+	// GetGroupByName returns a role based on the provided name.
+	GetGroupByName(ctx context.Context, user *openfga.User, name string) (*dbmodel.GroupEntry, error)
+	// RemoveGroup removes the role from JIMM in both the store and authorisation store.
+	RemoveGroup(ctx context.Context, user *openfga.User, roleName string) error
+	// RenameGroup renames a role in JIMM's DB.
+	RenameGroup(ctx context.Context, user *openfga.User, uuid, newName string) error
+	// ListGroups returns a list of roles known to JIMM.
+	// `match` will filter the list fuzzy matching role's name or uuid.
+	ListGroups(ctx context.Context, user *openfga.User, pagination pagination.LimitOffsetPagination, match string) ([]dbmodel.GroupEntry, error)
+	// CountGroups returns the number of roles that exist.
+	CountGroups(ctx context.Context, user *openfga.User) (int, error)
 }
 
 // IdentityManager provides a means to fetch identities in JIMM.
@@ -277,6 +296,7 @@ type JujuManager interface {
 	GetCloud(ctx context.Context, u *openfga.User, tag names.CloudTag) (dbmodel.Cloud, error)
 	GetCloudCredential(ctx context.Context, user *openfga.User, tag names.CloudCredentialTag) (*dbmodel.CloudCredential, error)
 	GetCloudCredentialAttributes(ctx context.Context, u *openfga.User, cred *dbmodel.CloudCredential, hidden bool) (attrs map[string]string, redacted []string, err error)
+	ModelConfigSchema(ctx context.Context, user *openfga.User, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error)
 	ControllerDetailsForModel(ctx context.Context, modelUUID string) (juju.ControllerConnectionDetails, error)
 	InitiateInternalMigration(ctx context.Context, user *openfga.User, modelNameOrUUID string, targetController string) (jujuparams.InitiateMigrationResult, error)
 	InitiateMigration(ctx context.Context, user *openfga.User, spec jujuparams.MigrationSpec) (jujuparams.InitiateMigrationResult, error)
@@ -327,9 +347,7 @@ type UpgradeManager interface {
 
 // JobManager provides methods to manage long-running jobs such as bootstrapping and upgrading.
 type JobManager interface {
-	GetJobInfo(ctx context.Context, jobID int64) (jobs.JobInfo, error)
 	GetActiveBootstrapStatusForController(ctx context.Context, controllerName string) (*params.BootstrapJobStatus, error)
 	GetUpgradeToStatusForModel(ctx context.Context, modelUUID string) (*params.UpgradeToJobStatus, error)
 	ListUpgradeToJobsForModels(ctx context.Context, modelUUIDs []string) (map[string]string, error)
-	ListJobs(ctx context.Context, params params.ListJobsRequest) (params.ListJobsResponse, error)
 }

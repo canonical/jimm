@@ -103,6 +103,15 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 			return "", fmt.Errorf("failed to fetch application offer information: %s: %w", ao.UUID, err)
 		}
 		return tagToString(names.ApplicationOfferTagKind, ao.URL), nil
+	case jimmnames.GroupTagKind:
+		group := dbmodel.GroupEntry{
+			UUID: tag.ID,
+		}
+		err := j.store.GetGroup(ctx, &group)
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch group information: %s: %w", group.UUID, err)
+		}
+		return tagToString(jimmnames.GroupTagKind, group.Name), nil
 	case jimmnames.IdPGroupTagKind:
 		return tagToString(jimmnames.IdPGroupTagKind, tag.ID), nil
 	case jimmnames.RoleTagKind:
@@ -114,13 +123,6 @@ func (j *PermissionManager) ToJAASTag(ctx context.Context, tag *ofganames.Tag, r
 			return "", fmt.Errorf("failed to fetch role information: %s: %w", role.UUID, err)
 		}
 		return tagToString(jimmnames.RoleTagKind, role.Name), nil
-	case ofganames.GroupTagKind:
-		// The JAAS group type has been removed from the OpenFGA
-		// authorisation model and the groups table has been dropped
-		// from JIMM's database. Any tuple still referencing a group
-		// object is orphaned and must be cleaned up by OpenFGACleanup,
-		// so report it as not found.
-		return "", errors.Codef(errors.CodeNotFound, "group %s not found", tag.ID)
 	case names.CloudTagKind:
 		cloud := dbmodel.Cloud{
 			Name: tag.ID,
@@ -182,6 +184,25 @@ func (t *tagResolver) userTag(ctx context.Context) (*ofga.Entity, error) {
 		return nil, errors.New("invalid user")
 	}
 	return ofganames.ConvertTagWithRelation(names.NewUserTag(t.trailer), t.relation), nil
+}
+
+func (t *tagResolver) groupTag(ctx context.Context, db *db.Database) (*ofga.Entity, error) {
+	zapctx.Debug(
+		ctx,
+		"Resolving JIMM tags to Juju tags for tag kind: group",
+		zap.String("group-name", t.trailer),
+	)
+	if t.resourceUUID != "" {
+		return ofganames.ConvertTagWithRelation(jimmnames.NewGroupTag(t.resourceUUID), t.relation), nil
+	}
+	entry := dbmodel.GroupEntry{Name: t.trailer}
+
+	err := db.GetGroup(ctx, &entry)
+	if err != nil {
+		return nil, fmt.Errorf("group %s not found", t.trailer)
+	}
+
+	return ofganames.ConvertTagWithRelation(entry.ResourceTag(), t.relation), nil
 }
 
 func (t *tagResolver) idpGroupTag(ctx context.Context) (*ofga.Entity, error) {
@@ -325,6 +346,8 @@ func resolveTag(jimmUUID string, db *db.Database, tag string) (*ofganames.Tag, e
 	switch tagKind {
 	case names.UserTagKind:
 		return resolver.userTag(ctx)
+	case jimmnames.GroupTagKind:
+		return resolver.groupTag(ctx, db)
 	case jimmnames.IdPGroupTagKind:
 		return resolver.idpGroupTag(ctx)
 	case jimmnames.RoleTagKind:

@@ -104,7 +104,7 @@ func TestRemoveRoleRemovesTuples(t *testing.T) {
 	ctx := context.Background()
 	db := s.JIMM.Database
 
-	user, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
+	user, _, controller, model, _, _, _, client, closeClient := createTestControllerEnvironment(c, s)
 	defer closeClient()
 
 	_, err := db.AddRole(ctx, "test-role2")

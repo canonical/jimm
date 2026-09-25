@@ -46,6 +46,11 @@ func init() {
 		addCloudToControllerMethod := rpc.Method(r.AddCloudToController)
 		addModelToControllerMethod := rpc.Method(r.AddModelToController)
 		removeCloudFromControllerMethod := rpc.Method(r.RemoveCloudFromController)
+		addGroupMethod := rpc.Method(r.AddGroup)
+		getGroupMethod := rpc.Method(r.GetGroup)
+		renameGroupMethod := rpc.Method(r.RenameGroup)
+		removeGroupMethod := rpc.Method(r.RemoveGroup)
+		listGroupsMethod := rpc.Method(r.ListGroups)
 		addRelationMethod := rpc.Method(r.AddRelation)
 		removeRelationMethod := rpc.Method(r.RemoveRelation)
 		checkRelationMethod := rpc.Method(r.CheckRelation)
@@ -76,9 +81,7 @@ func init() {
 		listModelsMethod := rpc.Method(r.ListModelControllerInfo)
 		modelControllerInfoMethod := rpc.Method(r.ModelControllerInfo)
 		showControllerMethod := rpc.Method(r.ShowController)
-		jobInfoMethod := rpc.Method(r.JobInfo)
-		listJobsMethod := rpc.Method(r.ListJobs)
-		supportedVersionMethod := rpc.Method(r.SupportedJujuVersions)
+		supportedVersionMethd := rpc.Method(r.SupportedJujuVersions)
 
 		// JIMM Generic RPC
 		r.AddMethod("JIMM", 4, "AddCloudToController", addCloudToControllerMethod)
@@ -104,15 +107,20 @@ func init() {
 		r.AddMethod("JIMM", 4, "UpdateMigratedModel", updateMigratedModelMethod)
 
 		// JIMM ReBAC RPC
+		r.AddMethod("JIMM", 4, "AddGroup", addGroupMethod)
 		r.AddMethod("JIMM", 4, "AddRelation", addRelationMethod)
 		r.AddMethod("JIMM", 4, "AddRole", addRoleMethod)
 		r.AddMethod("JIMM", 4, "CheckRelation", checkRelationMethod)
 		r.AddMethod("JIMM", 4, "CheckRelations", checkRelationsMethod)
+		r.AddMethod("JIMM", 4, "GetGroup", getGroupMethod)
 		r.AddMethod("JIMM", 4, "GetRole", getRoleMethod)
+		r.AddMethod("JIMM", 4, "ListGroups", listGroupsMethod)
 		r.AddMethod("JIMM", 4, "ListRelationshipTuples", listRelationshipTuplesMethod)
 		r.AddMethod("JIMM", 4, "ListRoles", listRolesMethod)
+		r.AddMethod("JIMM", 4, "RemoveGroup", removeGroupMethod)
 		r.AddMethod("JIMM", 4, "RemoveRelation", removeRelationMethod)
 		r.AddMethod("JIMM", 4, "RemoveRole", removeRoleMethod)
+		r.AddMethod("JIMM", 4, "RenameGroup", renameGroupMethod)
 		r.AddMethod("JIMM", 4, "RenameRole", renameRoleMethod)
 		// JIMM Cross-model queries
 		r.AddMethod("JIMM", 4, "CrossModelQuery", crossModelQueryMethod)
@@ -128,11 +136,8 @@ func init() {
 		// JIMM Upgrades
 		r.AddMethod("JIMM", 4, "UpgradeController", upgradeControllerMethod)
 		r.AddMethod("JIMM", 4, "UpgradeTo", upgradeToMethod)
-		// Job management
-		r.AddMethod("JIMM", 4, "JobInfo", jobInfoMethod)
-		r.AddMethod("JIMM", 4, "ListJobs", listJobsMethod)
 		// Versions
-		r.AddMethod("JIMM", 4, "SupportedJujuVersions", supportedVersionMethod)
+		r.AddMethod("JIMM", 4, "SupportedJujuVersions", supportedVersionMethd)
 		// JIMM Controller Profiles
 		r.AddMethod("JIMM", 4, "GetControllerProfile", getControllerProfile)
 		r.AddMethod("JIMM", 4, "ListControllerProfiles", listControllerProfiles)
@@ -993,34 +998,6 @@ func (r *controllerRoot) ShowController(ctx context.Context, req apiparams.ShowC
 	response.BootstrapJobStatus = status
 
 	return response, nil
-}
-
-// JobInfo returns information about a job given its ID.
-func (r *controllerRoot) JobInfo(ctx context.Context, req apiparams.JobInfoRequest) (apiparams.JobInfoResponse, error) {
-	if !r.user.JimmAdmin {
-		return apiparams.JobInfoResponse{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
-
-	jobID, err := strconv.ParseInt(req.JobID, 10, 64)
-	if err != nil {
-		return apiparams.JobInfoResponse{}, errors.Codef(errors.CodeBadRequest, "invalid job ID: %s", req.JobID)
-	}
-
-	jobInfo, err := r.jimm.JobManager().GetJobInfo(ctx, jobID)
-	if err != nil {
-		return apiparams.JobInfoResponse{}, fmt.Errorf("failed to get job info: %v", err)
-	}
-
-	return toJobInfoParams(jobInfo), nil
-}
-
-// ListJobs returns the list of all jobs matching the given filter.
-func (r *controllerRoot) ListJobs(ctx context.Context, req apiparams.ListJobsRequest) (apiparams.ListJobsResponse, error) {
-	if !r.user.JimmAdmin {
-		return apiparams.ListJobsResponse{}, errors.Codef(errors.CodeUnauthorized, "unauthorized")
-	}
-
-	return r.jimm.JobManager().ListJobs(ctx, req)
 }
 
 // SupportedJujuVersions returns the list of Juju versions supported by JIMM for bootstrapping new controllers and upgrading existing ones.

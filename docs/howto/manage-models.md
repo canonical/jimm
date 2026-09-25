@@ -81,7 +81,7 @@ This section describes how to migrate a model to JAAS from an existing Juju cont
 ### Prerequisites
 
 - A standalone Juju controller with a model (optionally with a running application).
-- A basic understanding of Juju model migrations, see the [docs](https://juju.is/docs/juju/manage-models).
+- A basic understanding of Juju model migrations, see the [docs](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-models/).
 - A running JAAS, see the {doc}`the tutorial <../tutorial/index>`.
 - Administrator permissions for JAAS, see our {doc}`how-to <./manage-your-jaas-deployment>`.
 
@@ -166,7 +166,7 @@ Revoking access from "alice@canonical.com" will result in the relation encounter
 
 It may not be possible to know all users that have have consumed offers when you wish to migrate a model,
 especially if the `everyone@external` user was granted consume access but, using
-[juju show-offer](https://documentation.ubuntu.com/juju/3.6/howto/manage-offers/#view-an-offers-details)
+[juju show-offer](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-offers/#view-an-offers-details)
 will help you to see all users that currently have access to an offer.
 
 With a user mapping created, we can move onto the next step.
@@ -189,7 +189,7 @@ Using the credential details above as an example - if model `admin/foo` is being
 and the user mapping contains the row `admin: joe@canonical` then `joe@canonical` must have a
 credential (`juju show-credentials --controller`) named `lxd-creds` for cloud `localhost` in JIMM.
 
-If you do not see a matching cloud-credential, you can add one by following the instructions in [managing cloud-credentials](https://juju.is/docs/juju/manage-credentials).
+If you do not see a matching cloud-credential, you can add one by following the instructions in [managing cloud-credentials](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-credentials/).
 
 ### 4. Migrate desired models
 
@@ -214,7 +214,7 @@ At this point we should see the model has been migrated. If the model migration 
 and the migration will be aborted, leaving the model on the original controller.
 
 After a successful migration, it is now possible to grant other users access to the model.
-See Juju documentation for [more info](https://juju.is/docs/juju/user-permissions).
+See Juju documentation for [more info](https://canonical.com/juju/docs/juju-cli/3.6/reference/user/).
 
 (migrate-a-model-within-jaas)=
 ## Migrate a model within JAAS
@@ -225,7 +225,7 @@ The below is also useful if you want to move a model to a specific controller.
 
 ### Prerequisites
 
-- A basic understanding of Juju model migrations, see the [docs](https://juju.is/docs/juju/manage-models).
+- A basic understanding of Juju model migrations, see the [docs](https://canonical.com/juju/docs/juju-cli/3.6/howto/manage-models/).
 - A running JAAS with with multiple controllers attached, see the {doc}`the tutorial <../tutorial/index>` for deploying JAAS.
 - Administrator permissions for JAAS. See more: {ref}`add-a-juju-controller`.
 

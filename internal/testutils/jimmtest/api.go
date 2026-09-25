@@ -54,8 +54,8 @@ type Dialer struct {
 	open int64
 }
 
-// Dialer implements juju.Dialer.
-func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelTag, _ *openfga.User) (juju.API, error) {
+// DialModelAsSuperuser implements juju.Dialer.
+func (d *Dialer) DialModelAsSuperuser(_ context.Context, _ *openfga.User, ctl *dbmodel.Controller, _ names.ModelTag) (juju.API, error) {
 	if d.Err != nil {
 		return nil, d.Err
 	}
@@ -76,6 +76,39 @@ func (d *Dialer) Dial(_ context.Context, ctl *dbmodel.Controller, _ names.ModelT
 		API:  d.API,
 		open: &d.open,
 	}, nil
+}
+
+// DialModelAsUser implements juju.Dialer. The test double does not
+// distinguish real vs superuser permissions; it delegates to
+// DialModelAsSuperuser.
+func (d *Dialer) DialModelAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, u, ctl, mt)
+}
+
+// DialControllerAsSuperuser implements juju.Dialer. The test double does not
+// distinguish connection scope or resource tags; it delegates to
+// DialModelAsSuperuser with no model tag.
+func (d *Dialer) DialControllerAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, u, ctl, names.ModelTag{})
+}
+
+// DialControllerAsUser implements juju.Dialer. The test double does not
+// distinguish real vs superuser permissions; it delegates to
+// DialControllerAsSuperuser.
+func (d *Dialer) DialControllerAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	return d.DialControllerAsSuperuser(ctx, u, ctl, resourceTags...)
+}
+
+// DialModelAsService implements juju.Dialer. It dials as JIMM's service identity.
+func (d *Dialer) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	// Delegate to DialModelAsSuperuser with a nil user since the Dialer test double
+	// does not distinguish user vs service identity for JWT minting.
+	return d.DialModelAsSuperuser(ctx, nil, ctl, mt)
+}
+
+// DialControllerAsService implements juju.Dialer. It dials as JIMM's service identity.
+func (d *Dialer) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
+	return d.DialModelAsSuperuser(ctx, nil, ctl, names.ModelTag{})
 }
 
 // IsClosed returns true if all opened connections have been closed.
@@ -99,10 +132,50 @@ func (w apiWrapper) Close() error {
 // it is designed such that should you need to query multiple models, you can.
 type ModelDialerMap map[string]juju.Dialer
 
-// Dial implements juju.Dialer.
-func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, u *openfga.User) (juju.API, error) {
+// DialModelAsSuperuser implements juju.Dialer.
+func (m ModelDialerMap) DialModelAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
 	if d, ok := m[mt.Id()]; ok {
-		return d.Dial(ctx, ctl, mt, u)
+		return d.DialModelAsSuperuser(ctx, u, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialModelAsUser implements juju.Dialer.
+func (m ModelDialerMap) DialModelAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	if d, ok := m[mt.Id()]; ok {
+		return d.DialModelAsUser(ctx, u, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsSuperuser implements juju.Dialer.
+func (m ModelDialerMap) DialControllerAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	if d, ok := m[""]; ok {
+		return d.DialControllerAsSuperuser(ctx, u, ctl, resourceTags...)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsUser implements juju.Dialer.
+func (m ModelDialerMap) DialControllerAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	if d, ok := m[""]; ok {
+		return d.DialControllerAsUser(ctx, u, ctl, resourceTags...)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialModelAsService implements juju.Dialer.
+func (m ModelDialerMap) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	if d, ok := m[mt.Id()]; ok {
+		return d.DialModelAsService(ctx, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsService implements juju.Dialer.
+func (m ModelDialerMap) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
+	for _, d := range m {
+		return d.DialControllerAsService(ctx, ctl)
 	}
 	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
 }
@@ -111,10 +184,50 @@ func (m ModelDialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt na
 // each controller. The DialerMap is keyed by controller name.
 type DialerMap map[string]juju.Dialer
 
-// Dial implements juju.Dialer.
-func (m DialerMap) Dial(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag, u *openfga.User) (juju.API, error) {
+// DialModelAsSuperuser implements juju.Dialer.
+func (m DialerMap) DialModelAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
 	if d, ok := m[ctl.Name]; ok {
-		return d.Dial(ctx, ctl, mt, u)
+		return d.DialModelAsSuperuser(ctx, u, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialModelAsUser implements juju.Dialer.
+func (m DialerMap) DialModelAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialModelAsUser(ctx, u, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsSuperuser implements juju.Dialer.
+func (m DialerMap) DialControllerAsSuperuser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialControllerAsSuperuser(ctx, u, ctl, resourceTags...)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsUser implements juju.Dialer.
+func (m DialerMap) DialControllerAsUser(ctx context.Context, u *openfga.User, ctl *dbmodel.Controller, resourceTags ...names.Tag) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialControllerAsUser(ctx, u, ctl, resourceTags...)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialModelAsService implements juju.Dialer.
+func (m DialerMap) DialModelAsService(ctx context.Context, ctl *dbmodel.Controller, mt names.ModelTag) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialModelAsService(ctx, ctl, mt)
+	}
+	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
+}
+
+// DialControllerAsService implements juju.Dialer.
+func (m DialerMap) DialControllerAsService(ctx context.Context, ctl *dbmodel.Controller) (juju.API, error) {
+	if d, ok := m[ctl.Name]; ok {
+		return d.DialControllerAsService(ctx, ctl)
 	}
 	return nil, fmt.Errorf("dialer not configured for controller %s", ctl.Name)
 }
@@ -151,6 +264,7 @@ type API struct {
 	IsBroken_                          bool
 	LatestLogTime_                     func(context.Context, string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
+	ModelConfigSchema_                 func(context.Context, string) (map[string]jujuparams.ModelConfigSchemaField, error)
 	ModelInfo_                         func(context.Context, names.ModelTag) (jujuclient.ModelInfo, error)
 	ModelStatus_                       func(context.Context, names.ModelTag) (base.ModelStatus, error)
 	ListModelSummaries_                func(context.Context, jujuparams.ModelSummariesRequest) ([]base.UserModelSummary, error)
@@ -325,6 +439,14 @@ func (a *API) ListApplicationOffers(ctx context.Context, f []crossmodel.Applicat
 		return nil, errors.New("not implemented")
 	}
 	return a.ListApplicationOffers_(ctx, f)
+}
+
+// ModelConfigSchema returns the model config schema for the given provider type.
+func (a *API) ModelConfigSchema(ctx context.Context, providerType string) (map[string]jujuparams.ModelConfigSchemaField, error) {
+	if a.ModelConfigSchema_ == nil {
+		return nil, errors.New("not implemented")
+	}
+	return a.ModelConfigSchema_(ctx, providerType)
 }
 
 func (a *API) ModelInfo(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {

@@ -29,6 +29,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
+	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
+	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimmhttp"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
@@ -107,7 +109,10 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		JWKS:   jwksService,
 	})
 
-	dialer := jujuclient.NewDialer(jwtService, ControllerUUID)
+	dialerPermManager, err := permissions.NewManager(database, s.OFGAClient, ControllerUUID, names.NewControllerTag(ControllerUUID))
+	c.Assert(err, qt.IsNil)
+	dialerFactory := jujuauth.NewFactory(database, jwtService, dialerPermManager)
+	dialer := jujuclient.NewDialer(jwtService, dialerFactory, ControllerUUID)
 
 	deps := &jimmsvc.ServiceDependencies{
 		ControllerUUID:                params.ControllerUUID,
@@ -380,6 +385,13 @@ func (s *JIMMEnv) DestroyModelAndDeleteFromDatabase(c *qt.C, modelTag names.Mode
 func (s *JIMMEnv) RemoveCloud(c *qt.C, cloudName string) {
 	err := s.JIMM.JujuManager.RemoveCloud(context.Background(), s.AdminUser, names.NewCloudTag(cloudName))
 	c.Assert(err, qt.Equals, nil)
+}
+
+func (s *JIMMEnv) AddGroup(c *qt.C, groupName string) dbmodel.GroupEntry {
+	ctx := context.Background()
+	group, err := s.JIMM.GroupManager.AddGroup(ctx, s.AdminUser, groupName)
+	c.Assert(err, qt.Equals, nil)
+	return *group
 }
 
 func (s *JIMMEnv) AddRole(c *qt.C, roleName string) dbmodel.RoleEntry {

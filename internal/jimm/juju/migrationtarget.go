@@ -49,7 +49,7 @@ func (j *JujuManager) AbortMigration(ctx context.Context, user *openfga.User, mo
 		return fmt.Errorf("failed to get model migration %q: %w", modelUUID, err)
 	}
 
-	api, err := j.dialController(ctx, &incomingModel.TargetController, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &incomingModel.TargetController)
 	if err != nil {
 		return fmt.Errorf("failed to dial controller: %w", err)
 	}
@@ -102,7 +102,7 @@ func (j *JujuManager) CheckMachines(ctx context.Context, user *openfga.User, mod
 		return nil, fmt.Errorf("failed to get model migration %q: %w", modelUUID, err)
 	}
 
-	api, err := j.dialController(ctx, &incomingModel.TargetController, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &incomingModel.TargetController)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial controller: %w", err)
 	}
@@ -190,7 +190,7 @@ func (j *JujuManager) Prechecks(ctx context.Context, user *openfga.User, model M
 		return err
 	}
 
-	api, err := j.dialController(ctx, &incomingModel.TargetController, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &incomingModel.TargetController)
 	if err != nil {
 		return fmt.Errorf("failed to dial controller: %w", err)
 	}
@@ -270,7 +270,7 @@ func (j *JujuManager) AdoptResources(ctx context.Context, user *openfga.User, mo
 		return fmt.Errorf("failed to get model migration for model %q: %w", modelUUID, err)
 	}
 
-	api, err := j.dialController(ctx, &model.Controller, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
 	if err != nil {
 		return fmt.Errorf("failed to dial controller: %w", err)
 	}
@@ -397,7 +397,7 @@ func (j *JujuManager) LatestLogTime(ctx context.Context, user *openfga.User, mod
 		return time.Time{}, fmt.Errorf("failed to get model %q: %w", modelUUID, err)
 	}
 
-	api, err := j.dialController(ctx, &model.Controller, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &model.Controller)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("failed to dial controller: %w", err)
 	}
@@ -424,7 +424,7 @@ func (j *JujuManager) Activate(ctx context.Context, user *openfga.User, modelTag
 	if err != nil {
 		return fmt.Errorf("failed to get model migration for model %q: %w", modelTag.Id(), err)
 	}
-	api, err := j.dialController(ctx, &modelMigration.TargetController, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &modelMigration.TargetController)
 	if err != nil {
 		return fmt.Errorf("failed to dial controller: %w", err)
 	}
@@ -558,7 +558,7 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 	}
 
 	// Call the import method on the target controller to import the model.
-	api, err := j.dialController(ctx, &incomingMigration.TargetController, user)
+	api, err := j.dialControllerAsSuperuser(ctx, user, &incomingMigration.TargetController)
 	if err != nil {
 		return fmt.Errorf("failed to dial controller: %w", err)
 	}
