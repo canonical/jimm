@@ -11,15 +11,22 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"github.com/juju/names/v6"
+	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/offer"
+	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
+	"github.com/canonical/jimm/v3/internal/openfga"
+	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/internal/testutils/testdb"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 type offerAuthorizerDeps struct {
+	db              *db.Database
+	ofgaClient      *openfga.OFGAClient
 	offerAuthorizer *offer.OfferAuthorizer
 
 	offerUUID string
@@ -89,8 +96,11 @@ func SetupOfferAuthorizerTests(c *qt.C) offerAuthorizerDeps {
 	err = db.AddUserMapping(c.Context(), &migration)
 	c.Assert(err, qt.IsNil)
 
-	deps := offerAuthorizerDeps{}
-	deps.offerAuthorizer, err = offer.NewOfferAuthorizer(db, ofgaClient)
+	deps := offerAuthorizerDeps{
+		db:         db,
+		ofgaClient: ofgaClient,
+	}
+	deps.offerAuthorizer, err = offer.NewOfferAuthorizer(db, ofgaClient, nil)
 	c.Assert(err, qt.IsNil)
 
 	deps.offerUUID = env.ApplicationOffers[0].UUID
@@ -157,5 +167,57 @@ func TestIsUserConsumerForOffer(t *testing.T) {
 		} else {
 			c.Assert(err, qt.IsNil)
 		}
+	}
+}
+
+// TestIsUserConsumerForOfferViaIdPGroup verifies that a user whose consume
+// access comes only from IdP group membership is authorized when the
+// IdPGroupFetcher returns that group, and denied when it returns none.
+func TestIsUserConsumerForOfferViaIdPGroup(t *testing.T) {
+	c := qt.New(t)
+	deps := SetupOfferAuthorizerTests(c)
+	ctx := c.Context()
+
+	user := "group-member@canonical.com"
+	idpGroupName := "canonical"
+
+	// Grant consume access on the offer to the IdP group.
+	err := deps.ofgaClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag(idpGroupName), ofganames.MemberRelation),
+		Relation: ofganames.ConsumerRelation,
+		Target:   ofganames.ConvertTag(names.NewApplicationOfferTag(deps.offerUUID)),
+	})
+	c.Assert(err, qt.IsNil)
+
+	tests := []struct {
+		name    string
+		groups  []string
+		allowed bool
+	}{
+		{
+			name:    "authorized because the group fetcher returns the group with consume access",
+			groups:  []string{idpGroupName},
+			allowed: true,
+		},
+		{
+			name:    "not authorized because the group fetcher returns no groups",
+			groups:  nil,
+			allowed: false,
+		},
+	}
+
+	for _, test := range tests {
+		c.Run(test.name, func(c *qt.C) {
+			ctrl := gomock.NewController(c)
+			fetcher := offermocks.NewMockIdPGroupFetcher(ctrl)
+			fetcher.EXPECT().FetchGroups(gomock.Any(), user).Return(test.groups, nil).Times(1)
+
+			authorizer, err := offer.NewOfferAuthorizer(deps.db, deps.ofgaClient, fetcher)
+			c.Assert(err, qt.IsNil)
+
+			allowed, err := authorizer.IsUserConsumerForOffer(c.Context(), names.NewUserTag(user), names.NewApplicationOfferTag(deps.offerUUID))
+			c.Assert(err, qt.IsNil)
+			c.Assert(allowed, qt.Equals, test.allowed)
+		})
 	}
 }
