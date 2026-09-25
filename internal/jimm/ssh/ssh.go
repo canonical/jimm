@@ -103,6 +103,13 @@ func (d *BasicDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls
 		return nil, fmt.Errorf("dialing controller %s: %w", addr, err)
 	}
 
+	// Fail the handshake if it takes longer than relayDialTimeout,
+	// instead of hanging on an unresponsive controller.
+	if err := conn.SetDeadline(time.Now().Add(relayDialTimeout)); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("setting relay handshake deadline: %w", err)
+	}
+
 	target := &url.URL{
 		Scheme: "https",
 		Host:   addr,
@@ -137,6 +144,11 @@ func (d *BasicDialer) DialRelay(ctx context.Context, addr string, tlsConfig *tls
 		return nil, fmt.Errorf("relay upgrade rejected: %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	_ = resp.Body.Close()
+	// Remove the deadline: the SSH session may idle indefinitely.
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("clearing relay handshake deadline: %w", err)
+	}
 	// If the reader buffered bytes past the response head (e.g. the
 	// controller's SSH banner), prepend them to the returned connection.
 	if buffered := reader.Buffered(); buffered > 0 {
