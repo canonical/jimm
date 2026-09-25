@@ -151,6 +151,34 @@ services:
       timeout: 10s
       retries: 30
 
+  # Minimal hook-service (Canonical IDP group store) for integration testing
+  # the IdP group fetcher. Only needs its own postgres; Kratos/Hydra/OpenFGA
+  # are not required (authentication and authorization are disabled).
+  # Groups and members are seeded by local/hook-service/entrypoint.sh.
+  hook-service-db:
+    image: postgres:16-alpine
+    container_name: hook-service-db
+    environment:
+      POSTGRES_DB: groups
+      POSTGRES_USER: groups
+      POSTGRES_PASSWORD: groups
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U groups" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  hook-service:
+    build:
+      context: ./local/hook-service/
+      dockerfile: Dockerfile
+    container_name: hook-service
+    ports:
+      - 9091:9090
+    depends_on:
+      hook-service-db:
+        condition: service_healthy
+
   juju-dashboard:
     image: ${JUJU_DASHBOARD_IMAGE:-ghcr.io/canonical/juju-dashboard:0.16.0}
     container_name: juju-dashboard
