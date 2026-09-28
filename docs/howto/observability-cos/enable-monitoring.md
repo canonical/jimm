@@ -9,7 +9,11 @@ myst:
 
 This guide walks through enabling Grafana dashboards for your JAAS deployment.
 
-JAAS ships three Grafana dashboards — **JAAS Metrics**, **JAAS Logs**, and **JAAS Traces** — which are provisioned automatically once JIMM is integrated with a Grafana instance. Metrics are collected by Prometheus, logs are collected by Loki, and traces are collected by Tempo. The monitoring dashboards are described below; for the tracing dashboard see {ref}`Enable tracing <enable-tracing>`.
+The JIMM application ships three Grafana dashboards — **JAAS Metrics**, **JAAS Logs**, and **JAAS Traces** — which are provisioned automatically once JIMM is integrated with a Grafana instance. Metrics are collected by Prometheus, logs are collected by Loki, and traces are collected by Tempo. The monitoring dashboards are described below; for the tracing dashboard see {ref}`Enable tracing <enable-tracing>`.
+
+```{note}
+This guide covers monitoring for JIMM only. For monitoring the other components of your deployment — for example OpenFGA, PostgreSQL or Vault — see the documentation of the corresponding charms.
+```
 
 ## Prerequisites
 
@@ -34,10 +38,10 @@ Once the relations settle, Grafana automatically provisions the JAAS dashboards 
 
 Open the Grafana UI of your COS deployment and log in. In the Grafana UI, open **Dashboards**. You should see the JAAS dashboards listed alongside the operator overview dashboards:
 
-| Dashboard    | Description                                       |
-| ------------ | ------------------------------------------------- |
-| JAAS Metrics | JIMM operational metrics collected via Prometheus |
-| JAAS Logs    | JIMM workload logs collected via Loki             |
+| Dashboard    | Description                                  |
+| ------------ | -------------------------------------------- |
+| JAAS Metrics | Operational metrics collected via Prometheus |
+| JAAS Logs    | Workload logs collected via Loki             |
 
 ### What to expect in the JAAS Metrics dashboard
 

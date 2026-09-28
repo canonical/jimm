@@ -9,7 +9,11 @@ myst:
 
 This guide walks through enabling Prometheus and Loki alert rules for your JAAS deployment.
 
-JIMM ships a set of alert rules that are provisioned automatically to Prometheus through the same relation used for monitoring. The rules travel over the `metrics-endpoint` relation, so no integration is required beyond the ones described in {ref}`Enable monitoring <enable-monitoring>`.
+The JIMM application ships a set of alert rules that are provisioned automatically to Prometheus through the same relation used for monitoring. The rules travel over the `metrics-endpoint` relation, so no integration is required beyond the ones described in {ref}`Enable monitoring <enable-monitoring>`.
+
+```{note}
+This guide covers alert rules for JIMM only. For alert rules for the other components of your deployment — for example OpenFGA, PostgreSQL or Vault — see the documentation of the corresponding charms.
+```
 
 The current alert rules cover:
 

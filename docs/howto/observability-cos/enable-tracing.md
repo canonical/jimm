@@ -59,6 +59,10 @@ JIMM samples traces according to the `tracing-sample-ratio` charm configuration,
 juju config jimm tracing-sample-ratio=1.0
 ```
 
+```{warning}
+Sampling all traces has a performance impact: every Juju API call produces a trace that must be exported to Tempo. Keep the ratio at `1.0` only while testing or debugging, and restore a lower value (for example the default `0.1`) in production.
+```
+
 ## Verify
 
 Open the Grafana UI of your COS deployment and log in. In the Grafana UI, open **Dashboards** and select **JAAS Traces**. The dashboard lists the most recent JIMM traces:
