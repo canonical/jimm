@@ -3,7 +3,6 @@
 package ssh
 
 import (
-	"context"
 	"io"
 	"net"
 	"testing"
@@ -29,7 +28,7 @@ func TestRelayHalfCloseDoesNotTruncate(t *testing.T) {
 	client, a := tcpPair(c)
 	b, server := tcpPair(c)
 
-	go relay(context.Background(), a, b)
+	go relay(a, b)
 
 	// The server drains until the client half-closes (EOF), then streams the
 	// payload back. With full-close, the client's CloseWrite would tear down

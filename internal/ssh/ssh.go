@@ -182,7 +182,7 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Since we only need the raw data to redirect, we can discard them.
 		go gossh.DiscardRequests(reqs)
 
-		relay(ctx, clientConn, controllerConn)
+		relay(clientConn, controllerConn)
 	}
 }
 
@@ -191,23 +191,20 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 // write side (via CloseWrite) so the other direction can finish, then
 // closes both. This avoids truncating an in-flight direction when the
 // peer half-closes.
-func relay(ctx context.Context, a, b io.ReadWriteCloser) {
+// Errors are deilberately discarded.
+func relay(a, b io.ReadWriteCloser) {
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		if _, err := io.Copy(a, b); err != nil {
-			zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
-		}
-		closeWrite(ctx, a)
+		_, _ = io.Copy(a, b)
+		closeWrite(a)
 	})
 	wg.Go(func() {
-		if _, err := io.Copy(b, a); err != nil {
-			zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
-		}
-		closeWrite(ctx, b)
+		_, _ = io.Copy(b, a)
+		closeWrite(b)
 	})
 	wg.Wait()
-	closeConn(ctx, a)
-	closeConn(ctx, b)
+	_ = a.Close()
+	_ = b.Close()
 }
 
 // halfCloser is a connection that supports closing its write side while
@@ -217,18 +214,9 @@ type halfCloser interface {
 }
 
 // closeWrite half-closes conn's write side if it supports half-close.
-func closeWrite(ctx context.Context, conn io.ReadWriteCloser) {
+func closeWrite(conn io.ReadWriteCloser) {
 	if hc, ok := conn.(halfCloser); ok {
-		if err := hc.CloseWrite(); err != nil {
-			zapctx.Error(ctx, "failed to close write side of connection", zap.Error(err))
-		}
-	}
-}
-
-// closeConn closes conn, logging any error.
-func closeConn(ctx context.Context, conn io.Closer) {
-	if err := conn.Close(); err != nil {
-		zapctx.Error(ctx, "failed to close connection", zap.Error(err))
+		_ = hc.CloseWrite()
 	}
 }
 
