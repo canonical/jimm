@@ -838,7 +838,7 @@ var addHostedCloudToControllerTests = []struct {
 		IdentityEndpoint: "https://example.com/identity",
 		StorageEndpoint:  "https://example.com/storage",
 	},
-	expectError:     `controller not found`,
+	expectError:     `failed to get controller "no-such-controller": controller not found`,
 	expectErrorCode: errors.CodeNotFound,
 }, {
 	name:           "CloudWithReservedName",

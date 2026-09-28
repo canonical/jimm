@@ -442,7 +442,7 @@ func TestControllerConfig(t *testing.T) {
 	c.Assert(config.SSHServerPort(), qt.Equals, 17022)
 
 	_, err = j.ControllerConfig(ctx, alice, "not-found")
-	c.Assert(err, qt.ErrorMatches, "controller not found")
+	c.Assert(err, qt.ErrorMatches, `failed to get controller "not-found": controller not found`)
 }
 
 const testImportModelEnv = `
