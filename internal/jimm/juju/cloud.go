@@ -189,7 +189,7 @@ func (j *JujuManager) determineHostCloudRegion(ctx context.Context, hostCloudReg
 			Name: hostCloudRegion,
 		}
 		if err := j.Database.GetCloud(ctx, &cl); err != nil {
-			return nil, errors.Codef(errors.CodeNotFound, "unable to find host cloud %q", hostCloudRegion)
+			return nil, fmt.Errorf("unable to find host cloud %q: %w", hostCloudRegion, err)
 		}
 		if len(cl.Regions) > 1 {
 			return nil, errors.Codef(errors.CodeBadRequest, "unable to determine a unique region for host cloud %q - consider specifying the host cloud region", hostCloudRegion)

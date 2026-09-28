@@ -170,7 +170,7 @@ func (j *JujuManager) GetModel(ctx context.Context, uuid string) (dbmodel.Model,
 	}
 	if err := j.Database.GetModel(context.Background(), &model); err != nil {
 		zapctx.Error(ctx, "failed to find model", zap.String("uuid", uuid), zap.Error(err))
-		return dbmodel.Model{}, fmt.Errorf("failed to get model: %s", err.Error())
+		return dbmodel.Model{}, fmt.Errorf("failed to get model: %w", err)
 	}
 	return model, nil
 }
