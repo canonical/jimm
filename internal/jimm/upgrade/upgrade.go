@@ -98,7 +98,7 @@ func (u *UpgradeManager) UpgradeModel(ctx context.Context, modelUUID string, tar
 
 	model := &dbmodel.Model{UUID: sql.NullString{Valid: true, String: modelUUID}}
 	if err := u.store.GetModel(ctx, model); err != nil {
-		return errors.Codef(errors.CodeNotFound, "model not found: %w", err)
+		return fmt.Errorf("failed to get model: %w", err)
 	}
 
 	api, err := u.dialer.DialControllerAsService(ctx, &model.Controller)
