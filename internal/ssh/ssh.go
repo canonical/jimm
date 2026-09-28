@@ -39,8 +39,10 @@ type SSHManager interface {
 	// returns a struct with parameters to connect and authenticate to the controller.
 	DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (jimmssh.DialInfo, error)
 
-	// DialController dials a controller's SSH server using the provided info.
-	DialController(ctx context.Context, dialInfo jimmssh.DialInfo, user *openfga.User) (*gossh.Client, error)
+	// DialController dials a controller's SSH relay endpoint using the
+	// provided info and virtual hostname, returning the raw upgraded
+	// connection.
+	DialController(ctx context.Context, dialInfo jimmssh.DialInfo, virtualHostname string) (net.Conn, error)
 }
 
 // forwardMessage is the struct holding the information about the jump message received by the ssh client.
@@ -161,21 +163,14 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			return
 		}
 
-		client, err := sshManager.DialController(ctx, dialInfo, user)
+		// The virtual hostname identifies the destination within the
+		// controller; the relay upgrade request carries it in its URL path.
+		controllerConn, err := sshManager.DialController(ctx, dialInfo, d.DestAddr)
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to dial controller", err)
 			return
 		}
-		// The connection to the controller is closed when this handler
-		// returns, which happens once the tunnel below is torn down.
-		defer client.Close()
 
-		// The port below is arbitrary as the controller ignores it.
-		controllerConn, err := client.Dial("tcp", fmt.Sprintf("%s:22", d.DestAddr))
-		if err != nil {
-			rejectConnectionAndLogError(ctx, newChan, "failed to create tunnel to controller", err)
-			return
-		}
 		clientConn, reqs, err := newChan.Accept()
 		if err != nil {
 			rejectConnectionAndLogError(ctx, newChan, "failed to accept channel creation request", err)
@@ -187,24 +182,26 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		go gossh.DiscardRequests(reqs)
 
 		// Copy data in both directions until the tunnel is torn down.
-		// Closing either connection unblocks the other copy, and the
-		// deferred client.Close above then tears down the connection
-		// to the controller.
+		// Closing either connection unblocks the other copy, and both
+		// connections are closed once either direction ends.
 		var wg sync.WaitGroup
-		wg.Go(func() {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
 			defer clientConn.Close()
 			defer controllerConn.Close()
 			if _, err := io.Copy(clientConn, controllerConn); err != nil {
 				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
 			}
-		})
-		wg.Go(func() {
+		}()
+		go func() {
+			defer wg.Done()
 			defer clientConn.Close()
 			defer controllerConn.Close()
 			if _, err := io.Copy(controllerConn, clientConn); err != nil {
 				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
 			}
-		})
+		}()
 		wg.Wait()
 	}
 }
