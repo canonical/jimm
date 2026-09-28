@@ -142,7 +142,7 @@ func (s *sshSuite) Init(c *qt.C) {
 				if err != nil {
 					return nil, err
 				}
-				s.controllerConn = conn
+				s.controllerConn = halfCloseConn{conn}
 				return s.controllerConn, nil
 			},
 		})
@@ -173,6 +173,16 @@ func (s *sshSuite) Init(c *qt.C) {
 		c.Check(s.destinationJujuSSHServer.Close(), qt.IsNil)
 		c.Check(s.jumpSSHServer.Close(), qt.IsNil)
 	})
+}
+
+// halfCloseConn adds CloseWrite to a bufconn pipe, which cannot signal
+// EOF per direction, by closing the connection so the server sees EOF.
+type halfCloseConn struct {
+	net.Conn
+}
+
+func (c halfCloseConn) CloseWrite() error {
+	return c.Conn.Close()
 }
 
 func (s *sshSuite) TestSSHJump(c *qt.C) {

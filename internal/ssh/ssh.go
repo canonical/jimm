@@ -182,25 +182,53 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Since we only need the raw data to redirect, we can discard them.
 		go gossh.DiscardRequests(reqs)
 
-		// Copy data in both directions until the tunnel is torn down.
-		// Closing either connection unblocks the other copy, and both
-		// connections are closed once either direction ends.
-		var wg sync.WaitGroup
-		wg.Go(func() {
-			defer clientConn.Close()
-			defer controllerConn.Close()
-			if _, err := io.Copy(clientConn, controllerConn); err != nil {
-				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
-			}
-		})
-		wg.Go(func() {
-			defer clientConn.Close()
-			defer controllerConn.Close()
-			if _, err := io.Copy(controllerConn, clientConn); err != nil {
-				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
-			}
-		})
-		wg.Wait()
+		relay(ctx, clientConn, controllerConn)
+	}
+}
+
+// relay copies bytes in both directions between a and b, blocking until
+// both directions end. On EOF in one direction it half-closes only that
+// write side (via CloseWrite) so the other direction can finish, then
+// closes both. This avoids truncating an in-flight direction when the
+// peer half-closes.
+func relay(ctx context.Context, a, b io.ReadWriteCloser) {
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		if _, err := io.Copy(a, b); err != nil {
+			zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
+		}
+		closeWrite(ctx, a)
+	})
+	wg.Go(func() {
+		if _, err := io.Copy(b, a); err != nil {
+			zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
+		}
+		closeWrite(ctx, b)
+	})
+	wg.Wait()
+	closeConn(ctx, a)
+	closeConn(ctx, b)
+}
+
+// halfCloser is a connection that supports closing its write side while
+// leaving the read side open, so the peer can finish sending.
+type halfCloser interface {
+	CloseWrite() error
+}
+
+// closeWrite half-closes conn's write side if it supports half-close.
+func closeWrite(ctx context.Context, conn io.ReadWriteCloser) {
+	if hc, ok := conn.(halfCloser); ok {
+		if err := hc.CloseWrite(); err != nil {
+			zapctx.Error(ctx, "failed to close write side of connection", zap.Error(err))
+		}
+	}
+}
+
+// closeConn closes conn, logging any error.
+func closeConn(ctx context.Context, conn io.Closer) {
+	if err := conn.Close(); err != nil {
+		zapctx.Error(ctx, "failed to close connection", zap.Error(err))
 	}
 }
 
