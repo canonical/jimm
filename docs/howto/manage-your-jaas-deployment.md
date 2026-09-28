@@ -248,6 +248,18 @@ juju integrate postgresql admin/cos-model.prometheus-scrape
 juju integrate vault admin/cos-model.prometheus-scrape
 ```
 
+#### Tempo integration
+
+Assuming you deployed the COS-Lite bundle in model `cos-model` with user admin, use the following commands to integrate JAAS by means of an application offer.
+The offer must be created over the `tracing` endpoint of the Tempo coordinator.
+
+```text
+juju integrate jimm admin/cos-model.tempo-tracing
+```
+
+Once the relation settles, JIMM starts exporting traces to Tempo and Grafana receives the JAAS Traces dashboard.
+See {ref}`Enable tracing <enable-tracing>` for what is traced and how to verify the integration.
+
 ### Integrate JAAS with COS-Lite through Grafana-Agent
 
 You first need to deploy the [Grafana-Agent operator](https://charmhub.io/grafana-agent-k8s), which is a telemetry collector used

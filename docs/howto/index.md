@@ -22,6 +22,7 @@ Manage groups <manage-groups>
 Manage permissions <manage-permissions>
 Manage models <manage-models>
 Manage offers <manage-offers>
+Observability (COS) <observability-cos/index>
 
 ```
 
@@ -31,6 +32,12 @@ Manage offers <manage-offers>
 Get a quick sense of how to manage your JAAS deployment, from initial deployment and configuration through observability and hardening.
 
 - {ref}`Manage your JAAS deployment <manage-your-jaas-deployment>`
+
+## Observe your JAAS deployment
+
+Integrate JAAS with the Canonical Observability Stack (COS) to collect and visualize telemetry data.
+
+- {ref}`Observability (COS) <observability-cos>`
 
 ## Set up JAAS
 
