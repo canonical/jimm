@@ -5,10 +5,27 @@
 #
 # To add users or groups, edit GROUP_NAME/GROUP_MEMBERS below and
 # recreate the container: docker compose up -d --build hook-service
+#
+# Usage: entrypoint.sh <DSN>
+#   DSN is the hook-service's database DSN on the shared compose postgres
+#   (see the db service), e.g.
+#   "postgresql://jimm:jimm@db:5432/groups?sslmode=disable".
 
 set -e
 
-DSN="postgres://groups:groups@hook-service-db:5432/groups?sslmode=disable"
+if [ "$#" -lt 1 ]; then
+  echo "usage: $0 <DSN>" >&2
+  exit 1
+fi
+DSN="$1"
+
+# The hook-service shares the compose postgres with JIMM (see the db
+# service), which only initializes the "jimm" database. Create the
+# hook-service's "groups" database on first run. Connect to the maintenance
+# database for this (it always exists); the dbname query parameter overrides
+# the database in the DSN path.
+psql "$DSN&dbname=postgres" -tAc "SELECT 1 FROM pg_database WHERE datname = 'groups'" | grep -q 1 \
+  || psql "$DSN&dbname=postgres" -c "CREATE DATABASE groups"
 
 # Migrate the database
 /usr/bin/hook-service migrate --dsn "$DSN" up

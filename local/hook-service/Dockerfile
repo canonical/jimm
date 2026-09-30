@@ -16,13 +16,5 @@ WORKDIR /app
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# The DSN is passed as the first argument (see docker-compose.yaml).
 ENTRYPOINT [ "/app/entrypoint.sh" ]
-
-# Opt to check for a file rather than the hook-service itself
-# because we perform migrations and seeding after starting the server.
-HEALTHCHECK \
-    --start-period=5s \
-    --interval=1s \
-    --timeout=1s \
-    --retries=30 \
-    CMD [ "/bin/sh", "-c", "[ -f /tmp/healthy ]" ]

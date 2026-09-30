@@ -152,32 +152,33 @@ services:
       retries: 30
 
   # Minimal hook-service (Canonical IDP group store) for integration testing
-  # the IdP group fetcher. Only needs its own postgres; Kratos/Hydra/OpenFGA
-  # are not required (authentication and authorization are disabled).
-  # Groups and members are seeded by local/hook-service/entrypoint.sh.
-  hook-service-db:
-    image: postgres:16-alpine
-    container_name: hook-service-db
-    environment:
-      POSTGRES_DB: groups
-      POSTGRES_USER: groups
-      POSTGRES_PASSWORD: groups
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U groups" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+  # the IdP group fetcher. Kratos/Hydra/OpenFGA are not required
+  # (authentication and authorization are disabled); it shares the existing
+  # postgres, using its own "groups" database. Groups and members are
+  # seeded by local/hook-service/entrypoint.sh.
   hook-service:
     build:
       context: ./local/hook-service/
       dockerfile: Dockerfile
     container_name: hook-service
+    # The DSN uses the shared postgres's jimm superuser (see the db service);
+    # the entrypoint creates the "groups" database on first run.
+    command:
+      - postgresql://jimm:jimm@db:5432/groups?sslmode=disable
     ports:
       - 9091:9090
     depends_on:
-      hook-service-db:
+      db:
         condition: service_healthy
+    healthcheck:
+      # The entrypoint performs migrations and seeding after starting the
+      # server, so the container is healthy only once it touches this file
+      # (same convention as the vault service).
+      test: [ "CMD", "/bin/sh", "-c", "[ -f /tmp/healthy ]" ]
+      start_period: 5s
+      interval: 1s
+      timeout: 1s
+      retries: 30
 
   juju-dashboard:
     image: ${JUJU_DASHBOARD_IMAGE:-ghcr.io/canonical/juju-dashboard:0.16.0}

@@ -498,7 +498,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	dialerFactory := jujuauth.NewFactory(db, jwtService, dialerPermManager)
 	dialer := jujuclient.NewDialer(jwtService, dialerFactory, controllerUUID)
 
-	groupFetcher, err := idpgroupfetcher.New(ctx, p.IdPGroupFetcherParams)
+	groupFetcher, err := idpgroupfetcher.New(p.IdPGroupFetcherParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create idp group fetcher: %w", err)
 	}

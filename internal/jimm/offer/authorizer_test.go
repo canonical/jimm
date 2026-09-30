@@ -174,7 +174,7 @@ func TestIsUserConsumerForOffer(t *testing.T) {
 // TestIsUserConsumerForOfferViaHookServiceGroupFetcher verifies the
 // authorization path with the real hook-service IdPGroupFetcher
 // (docker compose up -d hook-service).
-func TestIsUserConsumerForOfferViaHookServiceGroupFetcher(t *testing.T) {
+func TestUserIsConsumerForOfferViaHookServiceGroupFetcher(t *testing.T) {
 	addr := jimmtest.HookServiceAddress()
 
 	c := qt.New(t)
@@ -218,7 +218,7 @@ func TestIsUserConsumerForOfferViaHookServiceGroupFetcher(t *testing.T) {
 // TestIsUserConsumerForOfferViaIdPGroup verifies that a user whose consume
 // access comes only from IdP group membership is authorized when the
 // IdPGroupFetcher returns that group, and denied when it returns none.
-func TestIsUserConsumerForOfferViaIdPGroup(t *testing.T) {
+func TestUserIsConsumerForOfferViaIdPGroup(t *testing.T) {
 	c := qt.New(t)
 	deps := SetupOfferAuthorizerTests(c)
 	ctx := c.Context()

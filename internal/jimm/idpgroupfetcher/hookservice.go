@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 
-	pb "github.com/canonical/hook-service/gen/hook/groups/v1"
+	groupspb "github.com/canonical/hook-service/gen/hook/groups/v1"
 )
 
 // serviceAccountSuffix is appended to service account usernames by the
@@ -23,7 +23,7 @@ const serviceAccountSuffix = "@serviceaccount"
 // HookService resolves IdP groups from the Canonical identity platform's
 // hook-service via its GroupsMappingService gRPC API.
 type HookService struct {
-	client pb.GroupsMappingServiceClient
+	client groupspb.GroupsMappingServiceClient
 	// token is sent as a Bearer token on every call; the hook-service
 	// gRPC interceptor requires the header even when authentication is
 	// disabled.
@@ -38,7 +38,7 @@ func NewHookService(address, token string) (*HookService, error) {
 		return nil, fmt.Errorf("failed to create hook-service client: %w", err)
 	}
 	return &HookService{
-		client: pb.NewGroupsMappingServiceClient(conn),
+		client: groupspb.NewGroupsMappingServiceClient(conn),
 		token:  token,
 	}, nil
 }
@@ -49,25 +49,25 @@ func (h *HookService) FetchGroups(ctx context.Context, username string) ([]strin
 	userID := strings.TrimSuffix(username, serviceAccountSuffix)
 
 	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+h.token)
-	stream, err := h.client.GetGroupsForUser(ctx, &pb.GetGroupsForUserReq{
+	stream, err := h.client.GetGroupsForUser(ctx, &groupspb.GetGroupsForUserReq{
 		UserId: userID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch groups for user %q: %w", username, err)
 	}
 
-	var groups []string
+	var groupNames []string
 	for {
-		mapping, err := stream.Recv()
+		group, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch groups for user %q: %w", username, err)
 		}
-		if name := mapping.GetName(); name != "" {
-			groups = append(groups, name)
+		if name := group.GetName(); name != "" {
+			groupNames = append(groupNames, name)
 		}
 	}
-	return groups, nil
+	return groupNames, nil
 }
