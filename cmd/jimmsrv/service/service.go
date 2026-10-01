@@ -232,8 +232,7 @@ type Params struct {
 	// <scheme><ip/dns>[<port>]/.well-known/jwks.json"
 	BootstrapLoginTokenRefreshURL string
 
-	// IdPGroupFetcherParams holds parameters needed to configure an
-	// IdPGroupFetcher implementation.
+	// IdPGroupFetcherParams configures the IdPGroupFetcher implementation.
 	IdPGroupFetcherParams idpgroupfetcher.Params
 }
 
@@ -499,7 +498,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	dialerFactory := jujuauth.NewFactory(db, jwtService, dialerPermManager)
 	dialer := jujuclient.NewDialer(jwtService, dialerFactory, controllerUUID)
 
-	groupFetcher, err := idpgroupfetcher.New(ctx, p.IdPGroupFetcherParams)
+	groupFetcher, err := idpgroupfetcher.New(p.IdPGroupFetcherParams)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create idp group fetcher: %w", err)
 	}

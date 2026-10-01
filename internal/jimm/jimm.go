@@ -77,9 +77,8 @@ type Parameters struct {
 	// via OAuth2.0 AND JWT access tokens to JIMM.
 	OAuthAuthenticator login.OAuthAuthenticator
 
-	// IdPGroupFetcher resolves a user's IdP groups without a login session,
-	// for non-session flows such as macaroon discharge. If nil, group-based
-	// access is denied in those flows.
+	// IdPGroupFetcher resolves a user's IdP groups without a login
+	// session, for non-session flows such as macaroon discharge.
 	IdPGroupFetcher offer.IdPGroupFetcher
 
 	// MigrationTokenGenerator is used to generate migration tokens for
