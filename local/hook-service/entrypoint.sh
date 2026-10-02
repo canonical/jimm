@@ -52,9 +52,9 @@ GROUP_ID=$(psql -At "$DSN" -c "
 # Add members via the hook-service CLI (idempotent upserts).
 /usr/bin/hook-service groups add-users "$GROUP_ID" --dsn "$DSN" -u "$GROUP_MEMBERS"
 
-# Start the hook-service
+# Start the hook-service. Authentication is configured via the compose
+# environment (see docker-compose.yaml).
 export DSN="$DSN"
-export AUTHENTICATION_ENABLED="false"
 export AUTHORIZATION_ENABLED="false"
 export TRACING_ENABLED="false"
 export LOG_LEVEL="debug"

@@ -153,9 +153,13 @@ services:
 
   # Minimal hook-service (Canonical IDP group store) for integration testing
   # the IdP group fetcher. Kratos/Hydra/OpenFGA are not required
-  # (authentication and authorization are disabled); it shares the existing
-  # postgres, using its own "groups" database. Groups and members are
-  # seeded by local/hook-service/entrypoint.sh.
+  # (authorization is disabled); it shares the existing postgres, using its
+  # own "groups" database. Groups and members are seeded by
+  # local/hook-service/entrypoint.sh.
+  #
+  # JWT authentication is enabled against the keycloak realm: callers must
+  # send a client_credentials access token for jimm-device, whose sub is the
+  # fixed id of its service account user (see local/keycloak/jimm-realm.json).
   hook-service:
     build:
       context: ./local/hook-service/
@@ -165,10 +169,17 @@ services:
     # the entrypoint creates the "groups" database on first run.
     command:
       - postgresql://jimm:jimm@db:5432/groups?sslmode=disable
+    environment:
+      AUTHENTICATION_ENABLED: "true"
+      AUTHENTICATION_ISSUER: "http://keycloak.localhost:8082/realms/jimm"
+      AUTHENTICATION_ALLOWED_SUBJECTS: "123e4567-e89b-12d3-a456-426614174001"
     ports:
-      - 9091:9090
+      - 8083:8080 # HTTP API (host 8080 is used by openfga)
+      - 9091:9090 # gRPC API
     depends_on:
       db:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     healthcheck:
       # The entrypoint performs migrations and seeding after starting the
