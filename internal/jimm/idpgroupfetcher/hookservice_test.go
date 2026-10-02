@@ -6,15 +6,31 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"go.uber.org/mock/gomock"
+	"golang.org/x/oauth2"
+	"google.golang.org/grpc/metadata"
 
 	groupspb "github.com/canonical/hook-service/gen/hook/groups/v1"
 )
 
 const testHookServiceAddress = "localhost:9091"
+
+// testTokenSource returns a token source that always yields the same
+// access token.
+func testTokenSource() oauth2.TokenSource {
+	return oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "test-token"})
+}
+
+// errTokenSource is an oauth2.TokenSource that always fails.
+type errTokenSource struct{}
+
+func (errTokenSource) Token() (*oauth2.Token, error) {
+	return nil, errors.New("token endpoint unavailable")
+}
 
 // newMockHookService returns a HookService whose gRPC client and stream
 // are gomock mocks, plus their recorders for scripting calls.
@@ -22,15 +38,41 @@ func newMockHookService(c *qt.C) (*HookService, *MockGroupsMappingServiceClientM
 	ctrl := gomock.NewController(c)
 	client := NewMockGroupsMappingServiceClient(ctrl)
 	stream := NewMockGroupStream[groupspb.GroupMapping](ctrl)
-	return &HookService{client: client, token: "dummy-token"}, client.EXPECT(), stream.EXPECT()
+	return &HookService{client: client, tokenSource: testTokenSource()}, client.EXPECT(), stream.EXPECT()
 }
 
 func TestNewHookServiceReturnsErrorForInvalidAddress(t *testing.T) {
 	c := qt.New(t)
 	// "%" is an invalid URL escape, so grpc.NewClient fails while
 	// parsing the target.
-	_, err := NewHookService("%", "dummy-token")
+	_, err := NewHookService("%", testTokenSource())
 	c.Assert(err, qt.ErrorMatches, `failed to create hook-service client: .*invalid.*`)
+}
+
+// TestHookServiceFetchGroupsSendsBearerToken verifies the access token from
+// the token source is sent as a Bearer token in the authorization metadata.
+func TestHookServiceFetchGroupsSendsBearerToken(t *testing.T) {
+	c := qt.New(t)
+	fetcher, client, stream := newMockHookService(c)
+	client.GetGroupsForUser(gomock.Cond(func(ctx context.Context) bool {
+		md, _ := metadata.FromOutgoingContext(ctx)
+		return slices.Equal(md.Get("authorization"), []string{"Bearer test-token"})
+	}), gomock.Any()).Return(stream.mock, nil)
+	stream.Recv().Return(nil, io.EOF)
+
+	_, err := fetcher.FetchGroups(context.Background(), "alice@example.com")
+	c.Assert(err, qt.IsNil)
+}
+
+// TestHookServiceFetchGroupsTokenError verifies the fetcher fails closed,
+// without calling the hook-service, when no access token can be obtained.
+func TestHookServiceFetchGroupsTokenError(t *testing.T) {
+	c := qt.New(t)
+	fetcher, _, _ := newMockHookService(c)
+	fetcher.tokenSource = errTokenSource{}
+
+	_, err := fetcher.FetchGroups(context.Background(), "alice@example.com")
+	c.Assert(err, qt.ErrorMatches, `failed to obtain hook-service access token: token endpoint unavailable`)
 }
 
 func TestHookServiceFetchGroupsGetGroupsError(t *testing.T) {
@@ -92,7 +134,16 @@ func TestNewUnknownType(t *testing.T) {
 func TestNewHookServiceType(t *testing.T) {
 	c := qt.New(t)
 
-	fetcher, err := New(Params{Type: TypeHookService, HookServiceAddress: testHookServiceAddress, HookServiceToken: "dummy-token"})
+	fetcher, err := New(Params{Type: TypeHookService, HookServiceAddress: testHookServiceAddress, HookServiceTokenSource: testTokenSource()})
 	c.Assert(err, qt.IsNil)
 	c.Assert(fetcher != nil, qt.IsTrue)
+}
+
+// TestNewHookServiceTypeRequiresTokenSource verifies the factory fails for
+// the hook-service type when no token source is configured.
+func TestNewHookServiceTypeRequiresTokenSource(t *testing.T) {
+	c := qt.New(t)
+
+	_, err := New(Params{Type: TypeHookService, HookServiceAddress: testHookServiceAddress})
+	c.Assert(err, qt.ErrorMatches, `hook-service token source is required`)
 }

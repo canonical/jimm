@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -24,22 +25,23 @@ const serviceAccountSuffix = "@serviceaccount"
 // hook-service via its GroupsMappingService gRPC API.
 type HookService struct {
 	client groupspb.GroupsMappingServiceClient
-	// token is sent as a Bearer token on every call; the hook-service
-	// gRPC interceptor requires the header even when authentication is
-	// disabled.
-	token string
+	// tokenSource provides the access token sent as a Bearer token on
+	// every call. The hook-service verifies it as a JWT issued by the
+	// identity provider for JIMM's own OAuth client.
+	tokenSource oauth2.TokenSource
 }
 
 // NewHookService returns a HookService fetcher connected to the
-// hook-service gRPC API at the given address.
-func NewHookService(address, token string) (*HookService, error) {
+// hook-service gRPC API at the given address, authenticating with access
+// tokens from the given token source.
+func NewHookService(address string, tokenSource oauth2.TokenSource) (*HookService, error) {
 	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create hook-service client: %w", err)
 	}
 	return &HookService{
-		client: groupspb.NewGroupsMappingServiceClient(conn),
-		token:  token,
+		client:      groupspb.NewGroupsMappingServiceClient(conn),
+		tokenSource: tokenSource,
 	}, nil
 }
 
@@ -48,7 +50,12 @@ func NewHookService(address, token string) (*HookService, error) {
 func (h *HookService) FetchGroups(ctx context.Context, username string) ([]string, error) {
 	userID := strings.TrimSuffix(username, serviceAccountSuffix)
 
-	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+h.token)
+	token, err := h.tokenSource.Token()
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain hook-service access token: %w", err)
+	}
+
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token.AccessToken)
 	stream, err := h.client.GetGroupsForUser(ctx, &groupspb.GetGroupsForUserReq{
 		UserId: userID,
 	})

@@ -679,6 +679,19 @@ func (as *AuthenticationService) VerifyClientCredentials(ctx context.Context, cl
 	return groups, nil
 }
 
+// ClientCredentialsTokenSource returns a token source that obtains access
+// tokens for JIMM's own OAuth client via the client credentials grant. Tokens
+// are cached and only refreshed once they expire.
+func (as *AuthenticationService) ClientCredentialsTokenSource(ctx context.Context) oauth2.TokenSource {
+	cfg := clientcredentials.Config{
+		ClientID:     as.oauthConfig.ClientID,
+		ClientSecret: as.oauthConfig.ClientSecret,
+		TokenURL:     as.oauthConfig.Endpoint.TokenURL,
+		AuthStyle:    as.oauthConfig.Endpoint.AuthStyle,
+	}
+	return cfg.TokenSource(ctx)
+}
+
 // sessionCrossOriginSafe sets parameters on the session that allow its use in cross-origin requests.
 // Options are not saved to the database so this must be called whenever a session cookie will be returned to a client.
 //
