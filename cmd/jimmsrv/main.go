@@ -261,7 +261,6 @@ func start(ctx context.Context, s *service.Service) error {
 		IdPGroupFetcherParams: idpgroupfetcher.Params{
 			Type:               idpgroupfetcher.Type(os.Getenv("JIMM_IDP_GROUP_FETCHER_TYPE")),
 			HookServiceAddress: os.Getenv("JIMM_IDP_HOOK_SERVICE_ADDRESS"),
-			HookServiceToken:   os.Getenv("JIMM_IDP_HOOK_SERVICE_TOKEN"),
 		},
 	})
 	if err != nil {

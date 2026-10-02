@@ -195,7 +195,7 @@ func TestUserIsConsumerForOfferViaHookServiceGroupFetcher(t *testing.T) {
 	})
 	c.Assert(err, qt.IsNil)
 
-	fetcher, err := idpgroupfetcher.NewHookService(addr, "dummy-token")
+	fetcher, err := idpgroupfetcher.NewHookService(addr, jimmtest.HookServiceTokenSource(ctx))
 	c.Assert(err, qt.IsNil)
 
 	authorizer, err := offer.NewOfferAuthorizer(deps.db, deps.ofgaClient, fetcher)

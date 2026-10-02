@@ -498,11 +498,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	dialerFactory := jujuauth.NewFactory(db, jwtService, dialerPermManager)
 	dialer := jujuclient.NewDialer(jwtService, dialerFactory, controllerUUID)
 
-	groupFetcher, err := idpgroupfetcher.New(p.IdPGroupFetcherParams)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create idp group fetcher: %w", err)
-	}
-
 	deps := &ServiceDependencies{
 		ControllerUUID:                controllerUUID,
 		PublicDNSName:                 p.PublicDNSName,
@@ -524,7 +519,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		CredentialStore:               credentialStore,
 		JWTService:                    jwtService,
 		JWKSService:                   jwksService,
-		IdPGroupFetcher:               groupFetcher,
 	}
 
 	sessionStore, cleanupFuncs, err := setupSessionStore(p.CookieSessionKey, db)
@@ -573,6 +567,19 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	}
 	deps.OAuthAuthenticator = authSvc
 	deps.MigrationTokenGenerator = authSvc
+
+	// The hook-service authenticates JIMM via access tokens obtained with
+	// JIMM's own client credentials. The token source outlives startup, so
+	// it must not be cancelled with ctx.
+	groupFetcherParams := p.IdPGroupFetcherParams
+	if groupFetcherParams.Type == idpgroupfetcher.TypeHookService {
+		groupFetcherParams.HookServiceTokenSource = authSvc.ClientCredentialsTokenSource(context.WithoutCancel(ctx))
+	}
+	deps.IdPGroupFetcher, err = idpgroupfetcher.New(groupFetcherParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create idp group fetcher: %w", err)
+	}
+
 	deps.OAuthHandler = nil
 	if p.DashboardFinalRedirectURL != "" {
 		var err error
