@@ -93,8 +93,8 @@ services:
         -----END OPENSSH PRIVATE KEY-----
       # To Q/A this, use any reachable address for this compose JIMM. 
       JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL:  "${JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL:-https://jimm.localhost/.well-known/jwks.json}"
-      JIMM_IDP_GROUP_FETCHER_TYPE: "${JIMM_IDP_GROUP_FETCHER_TYPE:-}" # set to "hook-service" to enable
-      JIMM_IDP_HOOK_SERVICE_ADDRESS: "${JIMM_IDP_HOOK_SERVICE_ADDRESS:-}"
+      JIMM_IDP_GROUP_FETCHER_TYPE: "${JIMM_IDP_GROUP_FETCHER_TYPE-hook-service}" # set to "" to disable
+      JIMM_IDP_HOOK_SERVICE_ADDRESS: "${JIMM_IDP_HOOK_SERVICE_ADDRESS:-hook-service:9090}"
       GOTOOLCHAIN: auto
     healthcheck:
       test: [ "CMD", "curl", "http://jimm.localhost/.well-known/jwks.json" ]
@@ -111,6 +111,8 @@ services:
       keycloak:
         condition: service_healthy
       vault:
+        condition: service_healthy
+      hook-service:
         condition: service_healthy
     deploy:
       restart_policy:
