@@ -165,7 +165,7 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.New("cannot parse hostkey from env variable")
 	}
 
-	corsAllowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), " ")
+	corsAllowedOrigins := strings.Fields(os.Getenv("CORS_ALLOWED_ORIGINS"))
 
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
 
