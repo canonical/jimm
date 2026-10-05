@@ -681,10 +681,10 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 
 	// Websockets require extra care when cookies are used for authentication
 	// to avoid CSRF attacks. https://portswigger.net/web-security/websockets/cross-site-websocket-hijacking
-	websocketCors := middleware.NewWebsocketCors(deps.CorsAllowedOrigins)
+	websocketCsrf := middleware.NewWebsocketCSRF(deps.CorsAllowedOrigins)
 	// Juju API handlers
-	s.mux.Handle("/api", websocketCors.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
-	s.mux.Handle("/model/*", websocketCors.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
+	s.mux.Handle("/api", websocketCsrf.Handler(jujuapi.APIHandler(ctx, s.jimm, params)))
+	s.mux.Handle("/model/*", websocketCsrf.Handler(http.StripPrefix("/model", jujuapi.ModelHandler(ctx, s.jimm, params))))
 	// Uploading local charms (s3 compatible endpoint and legacy HTTP endpoint, respectively)
 	proxyHandler := jimmhttp.NewHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager, s.jimm.JujuAuthFactory)
 	mountHandler("/model-{uuid}/charms/{charmref}", proxyHandler)
