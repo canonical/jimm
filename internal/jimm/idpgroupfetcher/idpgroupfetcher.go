@@ -4,7 +4,10 @@ package idpgroupfetcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/jimm/offer"
 )
@@ -29,9 +32,9 @@ type Params struct {
 	// HookServiceAddress is the address of the hook-service gRPC API;
 	// required when Type is TypeHookService.
 	HookServiceAddress string
-	// HookServiceToken is the Bearer token sent to the hook-service;
-	// required when Type is TypeHookService.
-	HookServiceToken string
+	// HookServiceTokenSource provides the access tokens sent as Bearer
+	// tokens to the hook-service; required when Type is TypeHookService.
+	HookServiceTokenSource oauth2.TokenSource
 }
 
 // New returns an offer.IdPGroupFetcher configured by the given params.
@@ -43,7 +46,10 @@ func New(p Params) (offer.IdPGroupFetcher, error) {
 	case TypeNone:
 		return NoOp{}, nil
 	case TypeHookService:
-		return NewHookService(p.HookServiceAddress, p.HookServiceToken)
+		if p.HookServiceTokenSource == nil {
+			return nil, errors.New("hook-service token source is required")
+		}
+		return NewHookService(p.HookServiceAddress, p.HookServiceTokenSource)
 	default:
 		return nil, fmt.Errorf("unknown idp group fetcher type %q", p.Type)
 	}
