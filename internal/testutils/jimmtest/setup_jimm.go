@@ -28,6 +28,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
@@ -150,6 +151,11 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		deps.OAuthAuthenticator = &a
 		deps.MigrationTokenGenerator = mockMigrationTokenGenerator{}
 		deps.OAuthHandler = nil // This field can be nil to disable browser auth.
+	}
+
+	if o.useHookServiceGroupFetcher {
+		deps.IdPGroupFetcher, err = idpgroupfetcher.NewHookService(HookServiceAddress(), HookServiceTokenSource(ctx))
+		c.Assert(err, qt.IsNil)
 	}
 
 	s.service, err = jimmsvc.NewServiceFromDependencies(ctx, deps)

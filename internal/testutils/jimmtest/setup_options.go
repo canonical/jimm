@@ -11,7 +11,8 @@ type SetupOption func(*SetupOptions)
 //
 // Fields are unexported; callers should use the With* helpers.
 type SetupOptions struct {
-	useRealAuthN bool
+	useRealAuthN               bool
+	useHookServiceGroupFetcher bool
 }
 
 func applySetupOptions(opts []SetupOption) SetupOptions {
@@ -30,5 +31,14 @@ func applySetupOptions(opts []SetupOption) SetupOptions {
 func WithRealAuthN() SetupOption {
 	return func(o *SetupOptions) {
 		o.useRealAuthN = true
+	}
+}
+
+// WithHookServiceGroupFetcher configures the test env to resolve IdP groups
+// from the compose hook-service, authenticating with Keycloak client
+// credentials tokens (see HookServiceTokenSource).
+func WithHookServiceGroupFetcher() SetupOption {
+	return func(o *SetupOptions) {
+		o.useHookServiceGroupFetcher = true
 	}
 }
