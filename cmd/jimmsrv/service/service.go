@@ -573,7 +573,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	// it must not be cancelled with ctx.
 	groupFetcherParams := p.IdPGroupFetcherParams
 	if groupFetcherParams.Type == idpgroupfetcher.TypeHookService {
-		groupFetcherParams.HookServiceTokenSource = authSvc.ClientCredentialsTokenSource(context.WithoutCancel(ctx))
+		groupFetcherParams.HookServiceTokenSource = authSvc.ClientCredentialsTokenSource(ctx)
 	}
 	deps.IdPGroupFetcher, err = idpgroupfetcher.New(groupFetcherParams)
 	if err != nil {
