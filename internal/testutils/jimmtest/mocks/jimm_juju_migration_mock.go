@@ -18,11 +18,13 @@ import (
 
 type MigrationMocks struct {
 	Prechecks_            func(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error
+	PrechecksV2_          func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error
 	AdoptResources_       func(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion semversion.Number) error
 	Activate_             func(ctx context.Context, user *openfga.User, modelUUID names.ModelTag, sourceControllerInfo migration.SourceControllerInfo, relatedModels []string) error
 	AbortMigration_       func(ctx context.Context, user *openfga.User, modelUUID string) error
 	CheckMachines_        func(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	Import_               func(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
+	ImportV2_             func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error
 	LatestLogTime_        func(ctx context.Context, user *openfga.User, modelUUID string) (time.Time, error)
 	ListMigrationTargets_ func(ctx context.Context, user *openfga.User, modelTag names.ModelTag) ([]dbmodel.Controller, error)
 }
@@ -81,4 +83,18 @@ func (j *MigrationMocks) ListMigrationTargets(ctx context.Context, user *openfga
 		return nil, errors.New("not implemented")
 	}
 	return j.ListMigrationTargets_(ctx, user, modelTag)
+}
+
+func (j *MigrationMocks) PrechecksV2(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+	if j.PrechecksV2_ == nil {
+		return errors.New("not implemented")
+	}
+	return j.PrechecksV2_(ctx, user, envelope)
+}
+
+func (j *MigrationMocks) ImportV2(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+	if j.ImportV2_ == nil {
+		return errors.New("not implemented")
+	}
+	return j.ImportV2_(ctx, user, envelope)
 }

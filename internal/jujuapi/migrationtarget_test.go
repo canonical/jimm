@@ -5,6 +5,7 @@ package jujuapi_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -499,4 +500,224 @@ func TestImportUnauthorized(t *testing.T) {
 	// Validate access denied without JIMM admin permissions.
 	err := cr.Import(ctx, jujuparams.SerializedModel{})
 	c.Assert(err, qt.ErrorMatches, `unauthorized`)
+}
+
+func TestPrechecksV2(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	preChecksCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			PrechecksV2_: func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+				preChecksCalled = true
+				c.Check(user.Name, qt.Equals, "alice@canonical.com")
+				c.Check(envelope.ModelInfo.UUID, qt.Equals, "00000001-0000-0000-0000-000000000001")
+				c.Check(envelope.ModelInfo.Qualifier, qt.Equals, "bob")
+				return nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	envelope := jujuparams.SerializedModelV2{
+		ModelInfo: jujuparams.SerializedModelInfo{
+			UUID:      "00000001-0000-0000-0000-000000000001",
+			Name:      "test-model",
+			Qualifier: "bob",
+		},
+	}
+
+	// Validate access denied without JIMM admin permissions.
+	err := cr.PrechecksV2(ctx, envelope)
+	c.Assert(err, qt.ErrorMatches, `unauthorized`)
+	c.Assert(preChecksCalled, qt.Equals, false)
+
+	// Validate the precheck method is called when the user is a JIMM admin.
+	user.JimmAdmin = true
+	err = cr.PrechecksV2(ctx, envelope)
+	c.Assert(err, qt.IsNil)
+	c.Assert(preChecksCalled, qt.Equals, true)
+}
+
+func TestPrechecksV2Error(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			PrechecksV2_: func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+				return errors.New("precheck failed")
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+	user.JimmAdmin = true
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	// Validate errors from the manager are returned to the caller.
+	err := cr.PrechecksV2(ctx, jujuparams.SerializedModelV2{})
+	c.Assert(err, qt.ErrorMatches, `precheck failed`)
+}
+
+func TestImportV2Valid(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	importCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			ImportV2_: func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+				importCalled = true
+				c.Check(user.Name, qt.Equals, "alice@canonical.com")
+				c.Check(envelope.ModelInfo.UUID, qt.Equals, "00000001-0000-0000-0000-000000000001")
+				c.Check(envelope.Payload, qt.DeepEquals, []byte("payload"))
+				return nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	envelope := jujuparams.SerializedModelV2{
+		ModelInfo: jujuparams.SerializedModelInfo{
+			UUID: "00000001-0000-0000-0000-000000000001",
+		},
+		Payload: []byte("payload"),
+	}
+
+	// Validate the import method is called when the user is a JIMM admin.
+	user.JimmAdmin = true
+	err := cr.ImportV2(ctx, envelope)
+	c.Assert(err, qt.IsNil)
+	c.Assert(importCalled, qt.Equals, true)
+}
+
+func TestImportV2Unauthorized(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	importCalled := false
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			ImportV2_: func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+				importCalled = true
+				return nil
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	// Validate access denied without JIMM admin permissions.
+	err := cr.ImportV2(ctx, jujuparams.SerializedModelV2{})
+	c.Assert(err, qt.ErrorMatches, `unauthorized`)
+	c.Assert(importCalled, qt.Equals, false)
+}
+
+func TestImportV2Error(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	jujuManager := mocks.JujuManager{
+		MigrationMocks: mocks.MigrationMocks{
+			ImportV2_: func(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+				return errors.New("import failed")
+			},
+		}}
+	jimm := &jimmtest.JIMM{
+		JujuManager_: func() jujuapi.JujuManager {
+			return &jujuManager
+		},
+	}
+
+	var u dbmodel.Identity
+	u.SetTag(names.NewUserTag("alice@canonical.com"))
+	user := openfga.NewUser(&u, nil)
+	user.JimmAdmin = true
+
+	cr := jujuapi.NewControllerRoot(jimm, jujuapi.Params{})
+	jujuapi.SetUser(cr, user)
+
+	// Validate errors from the manager are wrapped and returned to the caller.
+	err := cr.ImportV2(ctx, jujuparams.SerializedModelV2{})
+	c.Assert(err, qt.ErrorMatches, `failed to import model: import failed`)
+}
+
+func TestMigrationTargetFacadeVersions(t *testing.T) {
+	c := qt.New(t)
+
+	// JIMM offers v6 and v8. v7 is deliberately not implemented as it is only required
+	// for 4.0.0-4.0.11 with was effectively DOA.
+	c.Assert(jujuapi.SupportedFacades()["MigrationTarget"], qt.DeepEquals, []int{6, 8})
+
+	cr := jujuapi.NewControllerRoot(&jimmtest.JIMM{}, jujuapi.Params{})
+	jujuapi.SetupFacades(cr)
+
+	// Prechecks and Import take a model description in v6 and a
+	// SerializedModelV2 envelope in v8.
+	paramsTypes := []struct {
+		version    int
+		method     string
+		paramsType reflect.Type
+	}{
+		{6, "Prechecks", reflect.TypeFor[jujuparams.MigrationModelInfoLegacy]()},
+		{6, "Import", reflect.TypeFor[jujuparams.SerializedModel]()},
+		{8, "Prechecks", reflect.TypeFor[jujuparams.SerializedModelV2]()},
+		{8, "Import", reflect.TypeFor[jujuparams.SerializedModelV2]()},
+	}
+	for _, test := range paramsTypes {
+		m, err := cr.FindMethod("MigrationTarget", test.version, test.method)
+		c.Assert(err, qt.IsNil, qt.Commentf("v%d %s", test.version, test.method))
+		c.Check(m.ParamsType(), qt.Equals, test.paramsType, qt.Commentf("v%d %s", test.version, test.method))
+	}
+
+	// The remaining methods are unchanged between v6 and v8.
+	for _, method := range []string{"CACert", "Activate", "AdoptResources", "Abort", "CheckMachines", "LatestLogTime"} {
+		v6, err := cr.FindMethod("MigrationTarget", 6, method)
+		c.Assert(err, qt.IsNil, qt.Commentf("v6 %s", method))
+		v8, err := cr.FindMethod("MigrationTarget", 8, method)
+		c.Assert(err, qt.IsNil, qt.Commentf("v8 %s", method))
+		c.Check(v8.ParamsType(), qt.Equals, v6.ParamsType(), qt.Commentf("%s", method))
+	}
+
+	_, err := cr.FindMethod("MigrationTarget", 7, "Prechecks")
+	c.Assert(err, qt.ErrorMatches, `unknown method "Prechecks" at version 7 for facade type "MigrationTarget"`)
 }

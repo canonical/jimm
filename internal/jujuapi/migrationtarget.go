@@ -35,12 +35,25 @@ func init() {
 		r.AddMethod("MigrationTarget", 6, "CheckMachines", checkMachines)
 		r.AddMethod("MigrationTarget", 6, "Import", importMethod)
 		r.AddMethod("MigrationTarget", 6, "LatestLogTime", latestLogTime)
-		// Avoid implementing v7 of the MigrationTarget facade as this version
-		// only changes OwnerTag -> ModelQualifier for Juju 4. But Juju 4 -> Juju 4
-		// migrations will use a newer version or totally different facade and Juju 3 -> Juju 4
-		// migrations will continue using v6, the last version that Juju 3 supports.
 
-		return []int{6}
+		// v8 replaces the model description with the SerializedModelV2
+		// envelope for Prechecks and Import. The remaining methods are unchanged.
+		r.AddMethod("MigrationTarget", 8, "Prechecks", rpc.Method(r.PrechecksV2))
+		r.AddMethod("MigrationTarget", 8, "CACert", caCert)
+		r.AddMethod("MigrationTarget", 8, "Activate", activate)
+		r.AddMethod("MigrationTarget", 8, "AdoptResources", adoptResources)
+		r.AddMethod("MigrationTarget", 8, "Abort", abort)
+		r.AddMethod("MigrationTarget", 8, "CheckMachines", checkMachines)
+		r.AddMethod("MigrationTarget", 8, "Import", rpc.Method(r.ImportV2))
+		r.AddMethod("MigrationTarget", 8, "LatestLogTime", latestLogTime)
+
+		// Avoid implementing v7 of the MigrationTarget facade as this version
+		// only changes OwnerTag -> ModelQualifier. Juju 3.6 sources use v6, and
+		// Juju 4.0.0-4.0.11 sources (which prefer v7) fall back to v6 when it's the
+		// highest version offered. Juju 4.0.12+ and 4.1 sources require v8, which
+		// replaces the model description with the SerializedModelV2 envelope.
+
+		return []int{6, 8}
 	}
 }
 
@@ -210,6 +223,31 @@ func (r *controllerRoot) Import(ctx context.Context, serialized jujuparams.Seria
 	}
 
 	err := r.jimm.JujuManager().Import(ctx, r.user, serialized)
+	if err != nil {
+		return fmt.Errorf("failed to import model: %w", err)
+	}
+	return nil
+}
+
+// PrechecksV2 implements the Prechecks method of version 8 of the MigrationTarget
+// facade, which takes a SerializedModelV2 envelope rather than a model description.
+func (r *controllerRoot) PrechecksV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	if !r.user.JimmAdmin {
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
+	}
+
+	return r.jimm.JujuManager().PrechecksV2(ctx, r.user, envelope)
+}
+
+// ImportV2 implements the Import method of version 8 of the MigrationTarget
+// facade, which takes a SerializedModelV2 envelope rather than a model description.
+// It imports resources into JIMM and proxies the import request to the target Juju controller.
+func (r *controllerRoot) ImportV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	if !r.user.JimmAdmin {
+		return errors.Codef(errors.CodeUnauthorized, "unauthorized")
+	}
+
+	err := r.jimm.JujuManager().ImportV2(ctx, r.user, envelope)
 	if err != nil {
 		return fmt.Errorf("failed to import model: %w", err)
 	}
