@@ -273,8 +273,10 @@ type JujuManager interface {
 
 	PrepareModelMigration(ctx context.Context, user *openfga.User, modelUUID string, targetControllerName string, userMapping map[string]string) (string, error)
 	Prechecks(ctx context.Context, user *openfga.User, model juju.MigratingModelInfo) error
+	PrechecksV2(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error
 	CheckMachines(ctx context.Context, user *openfga.User, modelUUID string) ([]error, error)
 	Import(ctx context.Context, user *openfga.User, serialized jujuparams.SerializedModel) error
+	ImportV2(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error
 	Activate(ctx context.Context, user *openfga.User, modelTag names.ModelTag, migrationInfo coremigration.SourceControllerInfo, relatedModels []string) error
 	AdoptResources(ctx context.Context, user *openfga.User, modelUUID string, sourceControllerVersion semversion.Number) error
 	LatestLogTime(ctx context.Context, user *openfga.User, modelUUID string) (time.Time, error)
