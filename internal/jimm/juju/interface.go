@@ -97,6 +97,9 @@ type API interface {
 	// Import imports a model from a serialized format.
 	Import(context.Context, []byte) error
 
+	// ImportV2 imports a model from a SerializedModelV2 envelope.
+	ImportV2(context.Context, jujuparams.SerializedModelV2) error
+
 	// Close closes the API connection.
 	Close() error
 
@@ -169,6 +172,10 @@ type API interface {
 
 	// PreChecks runs pre-checks for a model migration.
 	Prechecks(ctx context.Context, model jujuparams.MigrationModelInfo) error
+
+	// PrechecksV2 runs pre-checks for a model migration using a
+	// SerializedModelV2 envelope.
+	PrechecksV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error
 
 	// RemoveCloud removes a cloud.
 	RemoveCloud(context.Context, names.CloudTag) error
