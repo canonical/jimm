@@ -77,7 +77,7 @@ Any tools/scripts that refer to models by their full name (owner/name) will need
 updated after migration to use the new external username or refer to models by their UUID.
 `
 	migrateModelCommandExample = `
-    juju migrate alice/my-model my-jaas --backing-controller=controller-1 --user-mapping=./user-mapping.yaml
+    juju jaas migrate alice/my-model my-jaas --backing-controller=controller-1 --user-mapping=./user-mapping.yaml
 `
 )
 
@@ -135,7 +135,7 @@ func (c *migrateModelCommand) SetFlags(f *gnuflag.FlagSet) {
 		"json": cmd.FormatJson,
 	})
 	f.StringVar(&c.backingController, "backing-controller", "", "Specify the name of the controller that will host the model in JIMM.")
-	f.StringVar(&c.userMappingFile, "user-mapping", "", "Specify a comma-separated user mapping of local users to external users")
+	f.StringVar(&c.userMappingFile, "user-mapping", "", "Path to a YAML file mapping local users to external users")
 }
 
 // Init implements the cmd.Command interface.
