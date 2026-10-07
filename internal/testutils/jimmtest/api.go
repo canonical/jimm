@@ -261,6 +261,7 @@ type API struct {
 	GetApplicationOfferConsumeDetails_ func(context.Context, string) (jujuparams.ConsumeOfferDetails, error)
 	GrantJIMMModelAdmin_               func(context.Context, names.ModelTag) error
 	Import_                            func(context.Context, []byte) error
+	ImportV2_                          func(context.Context, jujuparams.SerializedModelV2) error
 	IsBroken_                          bool
 	LatestLogTime_                     func(context.Context, string) (time.Time, error)
 	ListApplicationOffers_             func(context.Context, []crossmodel.ApplicationOfferFilter) ([]*crossmodel.ApplicationOfferDetails, error)
@@ -272,6 +273,7 @@ type API struct {
 	Ping_                              func(context.Context) error
 	RemoveCloud_                       func(context.Context, names.CloudTag) error
 	Prechecks_                         func(context.Context, jujuparams.MigrationModelInfo) error
+	PrechecksV2_                       func(context.Context, jujuparams.SerializedModelV2) error
 	RevokeCredential_                  func(context.Context, names.CloudCredentialTag) error
 	SupportsModelSummaryWatcher_       bool
 	Status_                            func(context.Context, []string) (*jujuparams.FullStatus, error)
@@ -498,6 +500,13 @@ func (a *API) Prechecks(ctx context.Context, model jujuparams.MigrationModelInfo
 	return a.Prechecks_(ctx, model)
 }
 
+func (a *API) PrechecksV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	if a.PrechecksV2_ == nil {
+		return errors.New("not implemented")
+	}
+	return a.PrechecksV2_(ctx, envelope)
+}
+
 func (a *API) RemoveCloud(ctx context.Context, tag names.CloudTag) error {
 	if a.RemoveCloud_ == nil {
 		return errors.New("not implemented")
@@ -591,6 +600,13 @@ func (a *API) Import(ctx context.Context, bytes []byte) error {
 		return errors.New("not implemented")
 	}
 	return a.Import_(ctx, bytes)
+}
+
+func (a *API) ImportV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	if a.ImportV2_ == nil {
+		return errors.New("not implemented")
+	}
+	return a.ImportV2_(ctx, envelope)
 }
 
 func (a *API) CredentialContents(ctx context.Context, cloud string, credential string, withSecrets bool) ([]jujuparams.CredentialContentResult, error) {

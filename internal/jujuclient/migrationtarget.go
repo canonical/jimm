@@ -11,6 +11,8 @@ import (
 	"github.com/juju/juju/core/semversion"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v6"
+
+	"github.com/canonical/jimm/v3/internal/errors"
 )
 
 // PreChecks checks that the target controller is able to accept the
@@ -36,6 +38,30 @@ func (c Connection) Prechecks(ctx context.Context, model jujuparams.MigrationMod
 	}
 	return nil
 }
+
+// PrechecksV2 checks that the target controller is able to accept the
+// model described by the given SerializedModelV2 envelope. The envelope
+// format is only served by version 8 of the MigrationTarget facade,
+// which requires a Juju 4.1+ controller.
+func (c Connection) PrechecksV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	if !c.hasFacadeVersion("MigrationTarget", 8) {
+		return errMigrationTargetV8Unsupported
+	}
+	return c.Call(ctx, "MigrationTarget", 8, "", "Prechecks", &envelope, nil)
+}
+
+// ImportV2 imports the model described by the given SerializedModelV2
+// envelope into the target controller. The envelope format is only
+// served by version 8 of the MigrationTarget facade, which requires
+// a Juju 4.1+ controller.
+func (c Connection) ImportV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	if !c.hasFacadeVersion("MigrationTarget", 8) {
+		return errMigrationTargetV8Unsupported
+	}
+	return c.Call(ctx, "MigrationTarget", 8, "", "Import", &envelope, nil)
+}
+
+var errMigrationTargetV8Unsupported = errors.New("target controller does not support MigrationTarget facade version 8, Juju 4.1 or later is required to import models from Juju 4.1+ controllers")
 
 // AdoptResources asks the cloud provider to update the controller
 // tags for a model's resources. This prevents the resources from
