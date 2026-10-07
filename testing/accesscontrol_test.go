@@ -22,6 +22,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
 	"github.com/canonical/jimm/v3/pkg/api"
 	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 /*
@@ -41,6 +42,36 @@ func TestAddGroup(t *testing.T) {
 
 	_, err = client.AddGroup(&apiparams.AddGroupRequest{Name: "test-group"})
 	c.Assert(err, qt.ErrorMatches, ".*already exists.*")
+}
+
+// TestCheckPermissionViaIdPGroup verifies that CheckRelation fetches the
+// target user's groups and applies group-derived model access.
+func TestCheckRelationViaIdPGroup(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithHookServiceGroupFetcher())
+	model := s.CreateModelForBob(c)
+	userTag := names.NewUserTag("jimm-group-user@canonical.com")
+
+	// The hook-service fixture makes this user a canonical group member. Its
+	// model reader access exists only through this IDP group userset.
+	err := s.OFGAClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("canonical"), ofganames.MemberRelation),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(model.ResourceTag()),
+	})
+	c.Assert(err, qt.IsNil)
+
+	conn := s.Open(c, nil, "alice@canonical.com", nil)
+	defer conn.Close()
+	client := api.NewClient(conn)
+	check, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: apiparams.RelationshipTuple{
+		Object:       userTag.String(),
+		Relation:     ofganames.ReaderRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}})
+	c.Assert(err, qt.IsNil)
+	c.Check(check.Allowed, qt.IsTrue)
 }
 
 func TestGetGroup(t *testing.T) {

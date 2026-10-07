@@ -489,15 +489,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		JWKS:   jwksService,
 	})
 
-	// Build a PermissionManager and JujuAuthFactory so the dialer can
-	// mint caller-scoped JWT tokens.
-	dialerPermManager, err := permissions.NewManager(db, openFGAclient, controllerUUID, names.NewControllerTag(controllerUUID))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create dialer permission manager: %w", err)
-	}
-	dialerFactory := jujuauth.NewFactory(db, jwtService, dialerPermManager)
-	dialer := jujuclient.NewDialer(jwtService, dialerFactory, controllerUUID)
-
 	deps := &ServiceDependencies{
 		ControllerUUID:                controllerUUID,
 		PublicDNSName:                 p.PublicDNSName,
@@ -513,7 +504,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		DischargerPrivateKey:          p.PrivateKey,
 		DischargerPublicKey:           p.PublicKey,
 		Database:                      db,
-		Client:                        jimm.NewDialerAdapter(dialer),
 		RiverClient:                   riverClient,
 		OpenFGAClient:                 openFGAclient,
 		CredentialStore:               credentialStore,
@@ -579,6 +569,16 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	if err != nil {
 		return nil, fmt.Errorf("failed to create idp group fetcher: %w", err)
 	}
+
+	// Build a PermissionManager and JujuAuthFactory so the dialer can
+	// mint caller-scoped JWT tokens using the configured group fetcher.
+	dialerPermManager, err := permissions.NewManager(db, openFGAclient, controllerUUID, names.NewControllerTag(controllerUUID), deps.IdPGroupFetcher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create dialer permission manager: %w", err)
+	}
+	dialerFactory := jujuauth.NewFactory(db, jwtService, dialerPermManager)
+	dialer := jujuclient.NewDialer(jwtService, dialerFactory, controllerUUID)
+	deps.Client = jimm.NewDialerAdapter(dialer)
 
 	deps.OAuthHandler = nil
 	if p.DashboardFinalRedirectURL != "" {

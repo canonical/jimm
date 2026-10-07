@@ -191,7 +191,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.LoginManager = loginManager
 
-	permissionManager, err := permissions.NewManager(j.Database, j.OpenFGAClient, j.UUID, jimmResourceTag)
+	permissionManager, err := permissions.NewManager(j.Database, j.OpenFGAClient, j.UUID, jimmResourceTag, p.IdPGroupFetcher)
 	if err != nil {
 		return nil, err
 	}
@@ -230,6 +230,8 @@ func New(p Parameters) (*JIMM, error) {
 		IdentityManager: j.IdentityManager,
 		JujuManager:     j.JujuManager,
 		SSHKeyManager:   j.SSHKeyManager,
+		IdPGroupFetcher: p.IdPGroupFetcher,
+		OpenFGAClient:   j.OpenFGAClient,
 		JWTFactory:      j.JujuAuthFactory,
 		Dialer:          &ssh.BasicDialer{},
 	}

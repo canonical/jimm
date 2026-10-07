@@ -115,11 +115,11 @@ juju add-permission idpgroup-canonical#member administrator model-mycontroller/m
 
 > See more: {doc}`juju add-permission <../reference/jaas-plugin>`
 
-### Limitations when checking indirect access
+### Checking indirect access
 
-IdP group membership is provided in the group claim when a user logs in. As a result, commands that need to evaluate another user's permissions cannot determine that user's indirect access through an IdP. 
+IdP group membership is provided in the group claim when a user logs in. When `check-permission` evaluates a user object, JIMM fetches that user's current IdP groups and includes them in the permission check. This allows the command to resolve access inherited from an IdP group, including when an administrator checks another user.
 
-For example, `juju jaas check-permission` cannot reliably check a user's access inherited from an IdP group, and `juju show-model` does not list users whose access comes through IdP group membership. The same limitation applies to any command that relies on another user's permissions.
+The remaining known limitation is `juju show-model`, which does not list users whose access comes through IdP group membership.
 
 (configure-jimm-IdP-groups)=
 ## Configure JIMM's charm to accept group claims

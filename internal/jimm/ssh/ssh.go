@@ -12,12 +12,14 @@ import (
 
 	"github.com/gliderlabs/ssh"
 	jujucontroller "github.com/juju/juju/controller"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
+	"github.com/canonical/jimm/v3/internal/jimm/offer"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/rpc"
 )
@@ -70,6 +72,8 @@ type SSHManagerParams struct {
 	IdentityManager IdentityManager
 	JujuManager     JujuManager
 	SSHKeyManager   SSHKeyManager
+	IdPGroupFetcher offer.IdPGroupFetcher
+	OpenFGAClient   *openfga.OFGAClient
 	JWTFactory      *jujuauth.Factory
 	Dialer          SSHDialer
 }
@@ -83,6 +87,12 @@ func (p *SSHManagerParams) validate() error {
 	}
 	if p.SSHKeyManager == nil {
 		return errors.New("sshManager cannot be nil")
+	}
+	if p.IdPGroupFetcher == nil {
+		return errors.New("idp group fetcher cannot be nil")
+	}
+	if p.OpenFGAClient == nil {
+		return errors.New("openfga client cannot be nil")
 	}
 	if p.JWTFactory == nil {
 		return errors.New("jwtFactory cannot be nil")
@@ -102,6 +112,8 @@ func NewSSHManager(p SSHManagerParams) (*SSHManager, error) {
 		jujuManager:     p.JujuManager,
 		identityManager: p.IdentityManager,
 		sshKeyManager:   p.SSHKeyManager,
+		idpGroupFetcher: p.IdPGroupFetcher,
+		openfgaClient:   p.OpenFGAClient,
 		jwtFactory:      p.JWTFactory,
 		dialer:          p.Dialer,
 	}, nil
@@ -112,6 +124,8 @@ type SSHManager struct {
 	jujuManager     JujuManager
 	identityManager IdentityManager
 	sshKeyManager   SSHKeyManager
+	idpGroupFetcher offer.IdPGroupFetcher
+	openfgaClient   *openfga.OFGAClient
 	jwtFactory      *jujuauth.Factory
 	dialer          SSHDialer
 }
@@ -123,10 +137,13 @@ func (s *SSHManager) PublicKeyHandler(ctx context.Context, claimUser string, key
 	if ok, err := s.sshKeyManager.VerifyPublicKey(ctx, claimUser, key); !ok || err != nil {
 		return nil, fmt.Errorf("cannot verify key for user %s: %v", claimUser, err)
 	}
-	user, err := s.identityManager.FetchIdentity(ctx, claimUser)
+	if !names.IsValidUser(claimUser) {
+		return nil, fmt.Errorf("cannot parse user %s: invalid username", claimUser)
+	}
+	tag := names.NewUserTag(claimUser)
+	user, err := openfga.NewUserFromTag(ctx, tag, s.openfgaClient, s.idpGroupFetcher)
 	if err != nil {
-		zapctx.Info(ctx, fmt.Sprintf("cannot find user %s", claimUser))
-		return nil, fmt.Errorf("cannot find user %s: %v", claimUser, err)
+		return nil, err
 	}
 	return user, nil
 }
