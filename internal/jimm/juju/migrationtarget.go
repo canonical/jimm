@@ -596,65 +596,106 @@ func importFromDescription(ctx context.Context, tx *db.Database, targetControlle
 	if description.CloudCredential() == nil {
 		return nil, nil, fmt.Errorf("model description must contain a cloud credential")
 	}
+
+	var offers []importingOffer
+	for _, app := range description.Applications() {
+		for _, offer := range app.Offers() {
+			offers = append(offers, importingOffer{UUID: offer.OfferUUID(), Name: offer.OfferName()})
+		}
+	}
+
+	return addImportingModel(ctx, tx, importingModel{
+		UUID:               modelUUIDStr,
+		Name:               modelNameStr,
+		Owner:              description.Owner().Id(),
+		TargetControllerID: targetControllerID,
+		Cloud:              description.CloudCredential().Cloud(),
+		CloudRegion:        description.CloudRegion(),
+		CredentialOwner:    description.Owner().Id(),
+		CredentialName:     description.CloudCredential().Name(),
+		Offers:             offers,
+	})
+}
+
+// importingModel holds the details needed to record an incoming model
+// and its application offers in JIMM's state.
+type importingModel struct {
+	UUID               string
+	Name               string
+	Owner              string
+	TargetControllerID uint
+	Cloud              string
+	CloudRegion        string
+	CredentialOwner    string
+	CredentialName     string
+	Offers             []importingOffer
+}
+
+// importingOffer identifies an application offer hosted by an incoming model.
+type importingOffer struct {
+	UUID string
+	Name string
+}
+
+// addImportingModel creates a model record in the importing migration mode,
+// along with records for its application offers. It requires the model's
+// cloud credential and cloud region to already be known to JIMM.
+func addImportingModel(ctx context.Context, tx *db.Database, args importingModel) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
 	cloudCredential := &dbmodel.CloudCredential{
-		CloudName:         description.CloudCredential().Cloud(),
-		OwnerIdentityName: description.Owner().Id(),
-		Name:              description.CloudCredential().Name(),
+		CloudName:         args.Cloud,
+		OwnerIdentityName: args.CredentialOwner,
+		Name:              args.CredentialName,
 	}
 
 	err := tx.GetCloudCredential(ctx, cloudCredential)
 	if err != nil {
 		return nil, nil, err
 	}
-	region, err := tx.FindRegionByCloudName(ctx, description.CloudCredential().Cloud(), description.CloudRegion())
+	region, err := tx.FindRegionByCloudName(ctx, args.Cloud, args.CloudRegion)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var importedModel *dbmodel.Model
 	var importedOffers []*dbmodel.ApplicationOffer
 
 	model := dbmodel.Model{
 		UUID: sql.NullString{
-			String: modelUUIDStr,
+			String: args.UUID,
 			Valid:  true,
 		},
-		Name:              modelNameStr,
-		OwnerIdentityName: description.Owner().Id(),
-		ControllerID:      targetControllerID,
+		Name:              args.Name,
+		OwnerIdentityName: args.Owner,
+		ControllerID:      args.TargetControllerID,
 		CloudCredentialID: cloudCredential.ID,
 		CloudRegionID:     region.ID,
 		MigrationMode:     dbmodel.MigrationModeImporting,
 	}
 	err = tx.AddModel(ctx, &model)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to add model %q: %w", modelUUIDStr, err)
+		return nil, nil, fmt.Errorf("failed to add model %q: %w", args.UUID, err)
 	}
-	importedModel = &model
 
-	for _, app := range description.Applications() {
-		for _, offer := range app.Offers() {
-			// construct the offer URL with the same logic as Juju (modelOwner, modelName, offerName, <blank-controller-name>)
-			offerURL := jujucrossmodel.MakeURL(description.Owner().Id(), modelNameStr, offer.OfferName(), "")
+	for _, offer := range args.Offers {
+		// construct the offer URL with the same logic as Juju (modelOwner, modelName, offerName, <blank-controller-name>)
+		offerURL := jujucrossmodel.MakeURL(args.Owner, args.Name, offer.Name, "")
 
-			dbOffer := dbmodel.ApplicationOffer{
-				UUID:    offer.OfferUUID(),
-				Name:    offer.OfferName(),
-				URL:     offerURL,
-				ModelID: model.ID,
-			}
-			if err := tx.AddApplicationOffer(ctx, &dbOffer); err != nil {
-				if errors.ErrorCode(err) == errors.CodeAlreadyExists {
-					return nil, nil, errors.Codef(errors.CodeAlreadyExists, "offer with URL %s already exists", dbOffer.URL)
-				}
-				return nil, nil, fmt.Errorf("failed to add application offer %q: %w", dbOffer.Name, err)
-			}
-
-			importedOffers = append(importedOffers, &dbOffer)
+		dbOffer := dbmodel.ApplicationOffer{
+			UUID:    offer.UUID,
+			Name:    offer.Name,
+			URL:     offerURL,
+			ModelID: model.ID,
 		}
+		if err := tx.AddApplicationOffer(ctx, &dbOffer); err != nil {
+			if errors.ErrorCode(err) == errors.CodeAlreadyExists {
+				return nil, nil, errors.Codef(errors.CodeAlreadyExists, "offer with URL %s already exists", dbOffer.URL)
+			}
+			return nil, nil, fmt.Errorf("failed to add application offer %q: %w", dbOffer.Name, err)
+		}
+
+		importedOffers = append(importedOffers, &dbOffer)
 	}
 
-	return importedModel, importedOffers, nil
+	return &model, importedOffers, nil
 }
 
 // addModelAndOfferPermissions grants the user access to the model
