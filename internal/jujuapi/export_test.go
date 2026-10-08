@@ -16,6 +16,7 @@ var (
 	AuditParamsToFilter   = auditParamsToFilter
 	AuditLogDefaultLimit  = limitDefault
 	AuditLogUpperLimit    = maxLimit
+	SetupFacades          = setupFacades
 )
 
 func NewModelSummaryWatcher() *modelSummaryWatcher {

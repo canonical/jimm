@@ -1248,6 +1248,44 @@ func (c *MockAPIImportCall) DoAndReturn(f func(context.Context, []byte) error) *
 	return c
 }
 
+// ImportV2 mocks base method.
+func (m *MockAPI) ImportV2(arg0 context.Context, arg1 params.SerializedModelV2) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ImportV2", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ImportV2 indicates an expected call of ImportV2.
+func (mr *MockAPIMockRecorder) ImportV2(arg0, arg1 any) *MockAPIImportV2Call {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ImportV2", reflect.TypeOf((*MockAPI)(nil).ImportV2), arg0, arg1)
+	return &MockAPIImportV2Call{Call: call}
+}
+
+// MockAPIImportV2Call wrap *gomock.Call
+type MockAPIImportV2Call struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPIImportV2Call) Return(arg0 error) *MockAPIImportV2Call {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPIImportV2Call) Do(f func(context.Context, params.SerializedModelV2) error) *MockAPIImportV2Call {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPIImportV2Call) DoAndReturn(f func(context.Context, params.SerializedModelV2) error) *MockAPIImportV2Call {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // IsBroken mocks base method.
 func (m *MockAPI) IsBroken() bool {
 	m.ctrl.T.Helper()
@@ -1787,6 +1825,44 @@ func (c *MockAPIPrechecksCall) Do(f func(context.Context, params.MigrationModelI
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAPIPrechecksCall) DoAndReturn(f func(context.Context, params.MigrationModelInfo) error) *MockAPIPrechecksCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// PrechecksV2 mocks base method.
+func (m *MockAPI) PrechecksV2(ctx context.Context, envelope params.SerializedModelV2) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrechecksV2", ctx, envelope)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrechecksV2 indicates an expected call of PrechecksV2.
+func (mr *MockAPIMockRecorder) PrechecksV2(ctx, envelope any) *MockAPIPrechecksV2Call {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrechecksV2", reflect.TypeOf((*MockAPI)(nil).PrechecksV2), ctx, envelope)
+	return &MockAPIPrechecksV2Call{Call: call}
+}
+
+// MockAPIPrechecksV2Call wrap *gomock.Call
+type MockAPIPrechecksV2Call struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAPIPrechecksV2Call) Return(arg0 error) *MockAPIPrechecksV2Call {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAPIPrechecksV2Call) Do(f func(context.Context, params.SerializedModelV2) error) *MockAPIPrechecksV2Call {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAPIPrechecksV2Call) DoAndReturn(f func(context.Context, params.SerializedModelV2) error) *MockAPIPrechecksV2Call {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
