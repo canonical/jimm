@@ -37,6 +37,28 @@ func (c Connection) Prechecks(ctx context.Context, model jujuparams.MigrationMod
 	return nil
 }
 
+// PrechecksV2 checks that the target controller is able to accept the
+// model described by the given SerializedModelV2 envelope. The envelope
+// format is only served by version 8 of the MigrationTarget facade,
+// which requires a Juju 4.1+ controller.
+//
+// The Juju client calls the target controller's highest MigrationTarget
+// version, so callers must ensure the target supports version 8.
+func (c Connection) PrechecksV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	return migrationtarget.NewClient(&c).PrechecksV2(ctx, envelope)
+}
+
+// ImportV2 imports the model described by the given SerializedModelV2
+// envelope into the target controller. The envelope format is only
+// served by version 8 of the MigrationTarget facade, which requires
+// a Juju 4.1+ controller.
+//
+// The Juju client calls the target controller's highest MigrationTarget
+// version, so callers must ensure the target supports version 8.
+func (c Connection) ImportV2(ctx context.Context, envelope jujuparams.SerializedModelV2) error {
+	return migrationtarget.NewClient(&c).ImportV2(ctx, envelope)
+}
+
 // AdoptResources asks the cloud provider to update the controller
 // tags for a model's resources. This prevents the resources from
 // being destroyed if the source controller is destroyed after the
