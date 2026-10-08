@@ -170,6 +170,7 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 			rejectConnectionAndLogError(ctx, newChan, "failed to dial controller", err)
 			return
 		}
+		defer controllerConn.Close()
 
 		clientConn, reqs, err := newChan.Accept()
 		if err != nil {
