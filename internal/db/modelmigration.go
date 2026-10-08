@@ -35,6 +35,10 @@ func (d *Database) AddOrUpdateIncomingModelMigration(ctx context.Context, modelM
 		if err == nil {
 			// If the model migration already exists, update it.
 			modelMigration.ID = lookup.ID
+			// Save updates every column, so keep the original creation time.
+			// Otherwise a zero CreatedAt would be written and the migration
+			// would be deleted by the cleanup of stale migrations.
+			modelMigration.CreatedAt = lookup.CreatedAt
 		} else if err != nil && errors.ErrorCode(err) != errors.CodeNotFound {
 			return err
 		}
