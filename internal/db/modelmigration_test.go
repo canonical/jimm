@@ -78,6 +78,48 @@ func (s *dbSuite) TestReplaceModelMigration(c *qt.C) {
 	c.Assert(dbMigration.UserMapping, qt.DeepEquals, newUserMapping)
 }
 
+// TestReplaceModelMigrationKeepsCreatedAt checks that updating an existing
+// migration with a new struct, as PrepareModelMigration does on a retry, keeps
+// the original creation time rather than overwriting it with a zero value.
+func (s *dbSuite) TestReplaceModelMigrationKeepsCreatedAt(c *qt.C) {
+	controller := s.setupModelMigrationTest(c)
+	ctx := context.Background()
+	modelUUID := sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true}
+
+	migration := dbmodel.IncomingModelMigration{
+		ModelUUID:          modelUUID,
+		TargetControllerID: controller.ID,
+		UserMapping:        dbmodel.StringMap{"local": "external"},
+	}
+	err := s.Database.AddOrUpdateIncomingModelMigration(ctx, &migration)
+	c.Assert(err, qt.Equals, nil)
+
+	var original dbmodel.IncomingModelMigration
+	result := s.Database.DB.Where("model_uuid = ?", modelUUID).First(&original)
+	c.Assert(result.Error, qt.Equals, nil)
+	c.Assert(original.CreatedAt.IsZero(), qt.IsFalse)
+
+	// Update the migration using a new struct, leaving CreatedAt unset.
+	update := dbmodel.IncomingModelMigration{
+		ModelUUID:          modelUUID,
+		TargetControllerID: controller.ID,
+		UserMapping:        dbmodel.StringMap{"local": "new-external"},
+	}
+	err = s.Database.AddOrUpdateIncomingModelMigration(ctx, &update)
+	c.Assert(err, qt.Equals, nil)
+
+	var dbMigration dbmodel.IncomingModelMigration
+	result = s.Database.DB.Where("model_uuid = ?", modelUUID).First(&dbMigration)
+	c.Assert(result.Error, qt.Equals, nil)
+	c.Assert(dbMigration.UserMapping, qt.DeepEquals, update.UserMapping)
+	c.Assert(dbMigration.CreatedAt.Equal(original.CreatedAt), qt.IsTrue)
+
+	// The migration must not be considered stale by the cleanup routine.
+	stale, err := s.Database.GetIncomingModelMigrationsCreatedBefore(ctx, time.Now().Add(-time.Hour))
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(stale, qt.HasLen, 0)
+}
+
 func (s *dbSuite) TestGetModelMigration(c *qt.C) {
 	controller := s.setupModelMigrationTest(c)
 
