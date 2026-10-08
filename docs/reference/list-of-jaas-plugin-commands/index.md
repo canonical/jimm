@@ -1061,11 +1061,11 @@ jaas migrate [options] <model-name> <jaas-name>
 | `--backing-controller` |  | Specify the name of the controller that will host the model in JIMM. |
 | `--format` | yaml | Specify output format (json&#x7c;yaml) |
 | `-o`, `--output` |  | Specify an output file |
-| `--user-mapping` |  | Specify a comma-separated user mapping of local users to external users |
+| `--user-mapping` |  | Path to a YAML file mapping local users to external users |
 
 ## Examples
 
-    juju migrate alice/my-model my-jaas --backing-controller=controller-1 --user-mapping=./user-mapping.yaml
+    juju jaas migrate alice/my-model my-jaas --backing-controller=controller-1 --user-mapping=./user-mapping.yaml
 
 
 ## Details
