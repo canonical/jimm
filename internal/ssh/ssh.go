@@ -185,23 +185,20 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Closing either connection unblocks the other copy, and both
 		// connections are closed once either direction ends.
 		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer clientConn.Close()
 			defer controllerConn.Close()
 			if _, err := io.Copy(clientConn, controllerConn); err != nil {
 				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
 			}
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			defer clientConn.Close()
 			defer controllerConn.Close()
 			if _, err := io.Copy(controllerConn, clientConn); err != nil {
 				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
 			}
-		}()
+		})
 		wg.Wait()
 	}
 }
