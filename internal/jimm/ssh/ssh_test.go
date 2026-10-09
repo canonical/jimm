@@ -18,12 +18,15 @@ import (
 	jujucontroller "github.com/juju/juju/controller"
 	jujutesting "github.com/juju/juju/testing"
 	"github.com/juju/names/v5"
+	"go.uber.org/mock/gomock"
 	gossh "golang.org/x/crypto/ssh"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/jimm/identity"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
+	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
@@ -39,6 +42,7 @@ type sshManagerSuite struct {
 	allowedModelUUID string
 	database         *db.Database
 	mockDialer       *mockDialer
+	groupFetcher     *offermocks.MockIdPGroupFetcher
 
 	sshManager *ssh.SSHManager
 
@@ -125,7 +129,7 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 		ModelManager:      modelManager,
 		ControllerService: controllerService,
 	}
-	permissionManager, err := permissions.NewManager(s.database, ofgaClient, uuid, jimmTag)
+	permissionManager, err := permissions.NewManager(s.database, ofgaClient, uuid, jimmTag, idpgroupfetcher.NoOp{})
 	c.Assert(err, qt.IsNil)
 	jwtFactory := jujuauth.NewFactory(s.database, mocks.JWTService{
 		NewJWT_: func(ctx context.Context, j jimmjwx.JWTParams) ([]byte, error) {
@@ -137,11 +141,14 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.mockDialer = &mockDialer{}
+	s.groupFetcher = offermocks.NewMockIdPGroupFetcher(gomock.NewController(c))
 
 	params := ssh.SSHManagerParams{
 		IdentityManager: identityManager,
 		JujuManager:     &jujuManager,
 		SSHKeyManager:   sshKeyManager,
+		IdPGroupFetcher: s.groupFetcher,
+		OpenFGAClient:   ofgaClient,
 		JWTFactory:      jwtFactory,
 		Dialer:          s.mockDialer,
 	}
@@ -175,11 +182,13 @@ func (s *sshManagerSuite) Init(c *qt.C) {
 
 func (s *sshManagerSuite) TestPublicKeyHandler(c *qt.C) {
 	ctx := context.Background()
+	s.groupFetcher.EXPECT().FetchGroups(gomock.Any(), "alice@canonical.com").Return([]string{"engineering-team"}, nil)
 
 	// Test that the PublicKeyHandler returns the correct user when the public key is valid.
 	user, err := s.sshManager.PublicKeyHandler(ctx, s.userWithAccess.Name, s.publicKey.Marshal())
 	c.Assert(err, qt.IsNil)
 	c.Assert(user.Name, qt.Equals, "alice@canonical.com")
+	c.Assert(user.IDPGroupIDs, qt.DeepEquals, []string{"engineering-team"})
 
 	// Test that the PublicKeyHandler returns an error when the public key is invalid.
 	_, err = s.sshManager.PublicKeyHandler(ctx, s.userWithoutAccess.Name, s.publicKey.Marshal())

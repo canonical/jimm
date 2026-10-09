@@ -4,19 +4,26 @@ package testing
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v12"
 	"github.com/juju/juju/api/client/applicationoffers"
 	"github.com/juju/juju/core/crossmodel"
 	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v5"
+	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	jimmnames "github.com/canonical/jimm/v3/pkg/names"
 )
 
 func SetupAppOfferTest(c *qt.C) (jimmtest.JimmWithControllers, *dbmodel.Model) {
@@ -742,4 +749,71 @@ func TestApplicationOfferDanglingOnCreate(t *testing.T) {
 	details, err := client.ApplicationOffer(url)
 	c.Assert(err, qt.IsNil)
 	c.Assert(details.OfferName, qt.Equals, "test-offer1")
+}
+
+// TestDischargeOfferConsumeViaIdPGroup verifies JIMM's macaroon discharger
+// grants consume access to an offer via IdP group membership resolved from
+// the hook-service, as requested by a Juju controller when a cross-model
+// relation is established.
+func TestDischargeOfferConsumeViaIdPGroup(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	// Step 1. Create app and offers it out via bob.
+	s := jimmtest.SetupJimmWithControllers(c, jimmtest.WithHookServiceGroupFetcher())
+	model := s.CreateModelForBob(c)
+
+	s.DeployApplication(c, s.AdminUser, model.Tag(), jimmtest.DeployApplicationParams{
+		App:   "test-app",
+		Charm: "juju-qa-dummy-sink",
+	})
+
+	conn := s.Open(c, nil, "bob@canonical.com", nil)
+	defer conn.Close()
+	client := applicationoffers.NewClient(conn)
+
+	results, err := client.Offer(model.UUID.String, "test-app", []string{"source"}, "bob@canonical.com", "test-offer", "test offer description")
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(results, qt.HasLen, 1)
+	c.Assert(results[0].Error, qt.Equals, (*jujuparams.Error)(nil))
+
+	offer := dbmodel.ApplicationOffer{URL: "bob@canonical.com/" + model.Name + ".test-offer"}
+	err = s.JIMM.Database.GetApplicationOffer(ctx, &offer)
+	c.Assert(err, qt.IsNil)
+
+	// Step 2.  Grant consume access on the offer to the "canonical" IdP
+	// group (seeded our by local/hook-service/entrypoint.sh).
+	// Its members hold no direc tuples on the offer.
+	err = s.OFGAClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(jimmnames.NewIdPGroupTag("canonical"), ofganames.MemberRelation),
+		Relation: ofganames.ConsumerRelation,
+		Target:   ofganames.ConvertTag(offer.ResourceTag()),
+	})
+	c.Assert(err, qt.IsNil)
+
+	// Step 3. Setup discharger and hit discharge endpoint
+	// with the correct condition and tuples for auth.
+	locator := httpbakery.NewThirdPartyLocator(nil, nil)
+	locator.AllowInsecure()
+	oven := bakery.NewOven(bakery.OvenParams{
+		Key:      bakery.MustGenerateKey(),
+		Locator:  locator,
+		Location: "test-controller",
+	})
+	discharge := func(user string) (macaroon.Slice, error) {
+		m, err := oven.NewMacaroon(ctx, bakery.LatestVersion, []checkers.Caveat{{
+			Location:  s.Server.URL + "/macaroons",
+			Condition: fmt.Sprintf("is-consumer %s %s", names.NewUserTag(user), offer.UUID),
+		}}, bakery.NoOp)
+		c.Assert(err, qt.IsNil)
+		return httpbakery.NewClient().DischargeAll(ctx, m)
+	}
+
+	// Step 4. Test 2 scenarios, happy and unhappy paths.
+	ms, err := discharge("jimm-group-user@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(checkers.InferDeclared(nil, ms), qt.DeepEquals, map[string]string{"offer-uuid": offer.UUID})
+
+	_, err = discharge("nobody@canonical.com")
+	c.Assert(err, qt.ErrorMatches, ".*cannot discharge: permission denied")
 }

@@ -349,6 +349,19 @@ func TestVerifyClientCredentialsInGroups(t *testing.T) {
 	c.Assert(groups, qt.DeepEquals, []string{jimmtest.OIDCGroupsTestGroupName})
 }
 
+func TestClientCredentialsTokenSource(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	authSvc, _, _, cleanup := setupTestAuthSvc(ctx, c, time.Hour)
+	defer cleanup()
+
+	// jimm-device has service accounts enabled in the jimm realm.
+	token, err := authSvc.ClientCredentialsTokenSource(ctx).Token()
+	c.Assert(err, qt.IsNil)
+	c.Assert(token.AccessToken, qt.Not(qt.Equals), "")
+}
+
 func assertSetCookiesIsCorrect(c *qt.C, parsedCookies []*http.Cookie) {
 	assertHasCookie := func(name string, cookies []*http.Cookie) {
 		found := false

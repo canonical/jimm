@@ -13,10 +13,12 @@ import (
 	"github.com/google/uuid"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
+	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -94,6 +96,26 @@ func (s *permissionManagerSuite) TestGetControllerAccess(c *qt.C) {
 
 	_, err = s.manager.GetJimmControllerAccess(ctx, s.user, names.NewUserTag("alice@canonical.com"))
 	c.Assert(err, qt.ErrorMatches, "unauthorized")
+}
+
+func (s *permissionManagerSuite) TestGetControllerAccessUsesTargetIDPGroups(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+	groupTag := jimmnames.NewIdPGroupTag("controller-admins")
+	err := s.ofgaClient.AddRelation(ctx, openfga.Tuple{
+		Object:   ofganames.ConvertTagWithRelation(groupTag, ofganames.MemberRelation),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(s.ctlTag),
+	})
+	c.Assert(err, qt.IsNil)
+
+	groupFetcher := offermocks.NewMockIdPGroupFetcher(gomock.NewController(c))
+	groupFetcher.EXPECT().FetchGroups(gomock.Any(), s.user.Name).Return([]string{"controller-admins"}, nil)
+	manager, err := permissions.NewManager(s.db, s.ofgaClient, s.ctlTag.Id(), s.ctlTag, groupFetcher)
+	c.Assert(err, qt.IsNil)
+	access, err := manager.GetJimmControllerAccess(ctx, s.adminUser, s.user.ResourceTag())
+	c.Assert(err, qt.IsNil)
+	c.Check(access, qt.Equals, "superuser")
 }
 
 const grantModelAccessTestEnv = `clouds:
