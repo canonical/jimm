@@ -166,8 +166,14 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.New("cannot parse hostkey from env variable")
 	}
 
-	corsAllowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), " ")
-
+	// CORS_ALLOWED_ORIGINS is used to set the CORS and CSFR middleware for JIMM's
+	// HTTP and WS server.
+	corsAllowedOrigins := strings.Fields(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	// If no CORS is specified, we set a slice with a single empty value.
+	// This is the easiest way to effectively disallow all origins.
+	if len(corsAllowedOrigins) == 0 {
+		corsAllowedOrigins = []string{""}
+	}
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
 
 	sshPort := os.Getenv("JIMM_SSH_PORT")

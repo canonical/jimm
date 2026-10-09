@@ -53,6 +53,13 @@ func TestWebsocketCors(t *testing.T) {
 			expectedStatus: http.StatusForbidden,
 		},
 		{
+			name:           "failure with slice with empty string origin",
+			method:         http.MethodGet,
+			allowedOrigins: []string{""},
+			origin:         "my-host.com",
+			expectedStatus: http.StatusForbidden,
+		},
+		{
 			name:           "get method returns bad request",
 			method:         http.MethodConnect,
 			expectedStatus: http.StatusBadRequest,
@@ -81,8 +88,8 @@ func TestWebsocketCors(t *testing.T) {
 				_, _ = w.Write([]byte("the-body"))
 			})
 
-			cors := middleware.NewWebsocketCors(tt.allowedOrigins)
-			handlerWithCors := cors.Handler(handler)
+			csrf := middleware.NewWebsocketCSRF(tt.allowedOrigins)
+			handlerWithCors := csrf.Handler(handler)
 			handlerWithCors.ServeHTTP(w, req)
 
 			c.Assert(w.Code, qt.Equals, tt.expectedStatus)
