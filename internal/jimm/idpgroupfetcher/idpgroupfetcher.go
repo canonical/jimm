@@ -46,6 +46,9 @@ func New(p Params) (offer.IdPGroupFetcher, error) {
 	case TypeNone:
 		return NoOp{}, nil
 	case TypeHookService:
+		if p.HookServiceAddress == "" {
+			return nil, errors.New("hook-service address is required")
+		}
 		if p.HookServiceTokenSource == nil {
 			return nil, errors.New("hook-service token source is required")
 		}
