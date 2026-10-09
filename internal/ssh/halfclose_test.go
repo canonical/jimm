@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 )
@@ -27,6 +28,11 @@ func TestRelayHalfCloseDoesNotTruncate(t *testing.T) {
 	// test's handles to the far ends of each.
 	client, a := tcpPair(c)
 	b, server := tcpPair(c)
+
+	// Fail instead of hanging if relay never delivers EOF.
+	deadline := time.Now().Add(10 * time.Second)
+	c.Assert(client.SetDeadline(deadline), qt.IsNil)
+	c.Assert(server.SetDeadline(deadline), qt.IsNil)
 
 	go relay(t.Context(), a, b)
 
