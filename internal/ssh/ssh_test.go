@@ -181,6 +181,7 @@ type halfCloseConn struct {
 	net.Conn
 }
 
+// CloseWrite closes the whole pipe, as bufconn has no half-close.
 func (c halfCloseConn) CloseWrite() error {
 	return c.Conn.Close()
 }

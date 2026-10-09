@@ -28,7 +28,7 @@ func TestRelayHalfCloseDoesNotTruncate(t *testing.T) {
 	client, a := tcpPair(c)
 	b, server := tcpPair(c)
 
-	go relay(a, b)
+	go relay(t.Context(), a, b)
 
 	// The server drains until the client half-closes (EOF), then streams the
 	// payload back. With full-close, the client's CloseWrite would tear down

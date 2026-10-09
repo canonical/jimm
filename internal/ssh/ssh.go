@@ -4,6 +4,7 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -182,38 +183,39 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Since we only need the raw data to redirect, we can discard them.
 		go gossh.DiscardRequests(reqs)
 
-		relay(clientConn, controllerConn)
+		relay(ctx, clientConn, controllerConn)
 	}
 }
 
 // relay copies between a and b until both directions end, half-closing
 // each side on EOF so the other direction isn't truncated.
-func relay(a, b io.ReadWriteCloser) {
+func relay(ctx context.Context, a, b io.ReadWriteCloser) {
 	var wg sync.WaitGroup
-	wg.Go(func() {
-		_, _ = io.Copy(a, b)
-		closeWrite(a)
-	})
-	wg.Go(func() {
-		_, _ = io.Copy(b, a)
-		closeWrite(b)
-	})
+	wg.Go(func() { pipe(ctx, a, b) })
+	wg.Go(func() { pipe(ctx, b, a) })
 	wg.Wait()
 	_ = a.Close()
 	_ = b.Close()
+}
+
+// pipe copies src to dst, then half-closes dst so its peer sees EOF.
+// It fully closes dst if half-close isn't supported.
+func pipe(ctx context.Context, dst io.ReadWriteCloser, src io.Reader) {
+	_, err := io.Copy(dst, src)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+		zapctx.Error(ctx, "ssh relay copy failed", zap.Error(err))
+	}
+	if hc, ok := dst.(halfCloser); ok {
+		_ = hc.CloseWrite()
+		return
+	}
+	_ = dst.Close()
 }
 
 // halfCloser is a connection that supports closing its write side while
 // leaving the read side open, so the peer can finish sending.
 type halfCloser interface {
 	CloseWrite() error
-}
-
-// closeWrite half-closes conn's write side if it supports half-close.
-func closeWrite(conn io.ReadWriteCloser) {
-	if hc, ok := conn.(halfCloser); ok {
-		_ = hc.CloseWrite()
-	}
 }
 
 // fetchAndAuthorizeUser extracts the user from the context and checks the user has permission to ssh.
