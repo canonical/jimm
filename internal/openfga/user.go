@@ -39,9 +39,6 @@ func NewUser(u *dbmodel.Identity, client *OFGAClient) *User {
 // the target user's current IDP groups. Use this instead of NewUser whenever
 // evaluating the effective permission of a user outside their login session.
 func NewUserFromTag(ctx context.Context, tag names.UserTag, client *OFGAClient, fetcher GroupFetcher) (*User, error) {
-	if fetcher == nil {
-		return nil, errors.New("group fetcher cannot be nil")
-	}
 	identity, err := dbmodel.NewIdentity(tag.Id())
 	if err != nil {
 		return nil, err
