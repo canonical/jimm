@@ -110,7 +110,7 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		JWKS:   jwksService,
 	})
 
-	dialerPermManager, err := permissions.NewManager(database, s.OFGAClient, ControllerUUID, names.NewControllerTag(ControllerUUID))
+	dialerPermManager, err := permissions.NewManager(database, s.OFGAClient, ControllerUUID, names.NewControllerTag(ControllerUUID), idpgroupfetcher.NoOp{})
 	c.Assert(err, qt.IsNil)
 	dialerFactory := jujuauth.NewFactory(database, jwtService, dialerPermManager)
 	dialer := jujuclient.NewDialer(jwtService, dialerFactory, ControllerUUID)
@@ -131,6 +131,7 @@ func SetupJimmEnv(c *qt.C, opts ...SetupOption) JIMMEnv {
 		CredentialStore:               credentialStore,
 		JWTService:                    jwtService,
 		JWKSService:                   jwksService,
+		IdPGroupFetcher:               idpgroupfetcher.NoOp{},
 	}
 
 	if o.useRealAuthN {

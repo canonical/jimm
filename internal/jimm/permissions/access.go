@@ -277,9 +277,10 @@ func (j *PermissionManager) GetJimmControllerAccess(ctx context.Context, user *o
 		return "", errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
 
-	var targetUser dbmodel.Identity
-	targetUser.SetTag(tag)
-	targetUserTag := openfga.NewUser(&targetUser, j.authSvc)
+	targetUserTag, err := openfga.NewUserFromTag(ctx, tag, j.authSvc, j.groupFetcher)
+	if err != nil {
+		return "", err
+	}
 
 	// Check if the user is jimm administrator.
 	isAdmin, err := openfga.IsAdministrator(ctx, targetUserTag, j.jimmTag)

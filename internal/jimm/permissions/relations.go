@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/canonical/ofga"
+	"github.com/juju/names/v5"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
 
@@ -168,9 +169,22 @@ func (j *PermissionManager) CheckRelation(ctx context.Context, user *openfga.Use
 		return false, err
 	}
 
-	contextualTuples, err := user.ContextualTuples()
-	if err != nil {
-		return false, err
+	var contextualTuples []openfga.Tuple
+	// A check about another user needs that target user's current IDP groups.
+	if parsedTuple.Object != nil && parsedTuple.Object.Kind == openfga.UserType && user.Name != parsedTuple.Object.ID {
+		targetUser, err := openfga.NewUserFromTag(ctx, names.NewUserTag(parsedTuple.Object.ID), j.authSvc, j.groupFetcher)
+		if err != nil {
+			return false, err
+		}
+		contextualTuples, err = targetUser.ContextualTuples()
+		if err != nil {
+			return false, err
+		}
+	} else {
+		contextualTuples, err = user.ContextualTuples()
+		if err != nil {
+			return false, err
+		}
 	}
 	allowed, err := j.authSvc.CheckRelation(ctx, *parsedTuple, trace, contextualTuples...)
 	if err != nil {
