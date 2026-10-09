@@ -3,6 +3,7 @@
 package ssh
 
 import (
+	"context"
 	"io"
 	"net"
 	"testing"
@@ -50,6 +51,38 @@ func TestRelayHalfCloseDoesNotTruncate(t *testing.T) {
 	received, err := io.Copy(io.Discard, client)
 	c.Assert(err, qt.IsNil)
 	c.Check(received, qt.Equals, int64(payloadSize))
+}
+
+// TestRelayClosesOnDisconnect verifies that relay tears down both
+// connections when the client disconnects, even if the controller never
+// closes its side.
+func TestRelayClosesOnDisconnect(t *testing.T) {
+	c := qt.New(t)
+
+	client, a := tcpPair(c)
+	b, controller := tcpPair(c)
+
+	// gliderlabs cancels the connection context when the client disconnects.
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		relay(ctx, a, b)
+		close(done)
+	}()
+
+	c.Assert(client.Close(), qt.IsNil)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		c.Fatal("relay did not return after the client disconnected")
+	}
+
+	// The controller should see its connection closed, not left open.
+	c.Assert(controller.SetReadDeadline(time.Now().Add(10*time.Second)), qt.IsNil)
+	_, err := io.Copy(io.Discard, controller)
+	c.Check(err, qt.IsNil)
 }
 
 // tcpPair returns a connected pair of TCP connections. Both support

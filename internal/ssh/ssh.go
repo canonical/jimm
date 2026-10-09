@@ -189,7 +189,14 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 
 // relay copies between a and b until both directions end, half-closing
 // each side on EOF so the other direction isn't truncated.
+// Both are closed when ctx ends, even if one side never closes.
 func relay(ctx context.Context, a, b io.ReadWriteCloser) {
+	stop := context.AfterFunc(ctx, func() {
+		_ = a.Close()
+		_ = b.Close()
+	})
+	defer stop()
+
 	var wg sync.WaitGroup
 	wg.Go(func() { pipe(ctx, a, b) })
 	wg.Go(func() { pipe(ctx, b, a) })
