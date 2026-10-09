@@ -186,12 +186,8 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 	}
 }
 
-// relay copies bytes in both directions between a and b, blocking until
-// both directions end. On EOF in one direction it half-closes only that
-// write side (via CloseWrite) so the other direction can finish, then
-// closes both. This avoids truncating an in-flight direction when the
-// peer half-closes.
-// Errors are deilberately discarded.
+// relay copies between a and b until both directions end, half-closing
+// each side on EOF so the other direction isn't truncated.
 func relay(a, b io.ReadWriteCloser) {
 	var wg sync.WaitGroup
 	wg.Go(func() {
