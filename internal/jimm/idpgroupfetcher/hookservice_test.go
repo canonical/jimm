@@ -147,3 +147,10 @@ func TestNewHookServiceTypeRequiresTokenSource(t *testing.T) {
 	_, err := New(Params{Type: TypeHookService, HookServiceAddress: testHookServiceAddress})
 	c.Assert(err, qt.ErrorMatches, `hook-service token source is required`)
 }
+
+func TestNewHookServiceTypeRequiresAddress(t *testing.T) {
+	c := qt.New(t)
+
+	_, err := New(Params{Type: TypeHookService, HookServiceTokenSource: testTokenSource()})
+	c.Assert(err, qt.ErrorMatches, `hook-service address is required`)
+}
