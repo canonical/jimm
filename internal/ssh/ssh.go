@@ -4,6 +4,7 @@ package ssh
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -182,26 +183,46 @@ func directTCPIPHandler(sshManager SSHManager) func(srv *ssh.Server, conn *gossh
 		// Since we only need the raw data to redirect, we can discard them.
 		go gossh.DiscardRequests(reqs)
 
-		// Copy data in both directions until the tunnel is torn down.
-		// Closing either connection unblocks the other copy, and both
-		// connections are closed once either direction ends.
-		var wg sync.WaitGroup
-		wg.Go(func() {
-			defer clientConn.Close()
-			defer controllerConn.Close()
-			if _, err := io.Copy(clientConn, controllerConn); err != nil {
-				zapctx.Error(ctx, "ssh client to controller error", zap.Error(err))
-			}
-		})
-		wg.Go(func() {
-			defer clientConn.Close()
-			defer controllerConn.Close()
-			if _, err := io.Copy(controllerConn, clientConn); err != nil {
-				zapctx.Error(ctx, "ssh controller to client error", zap.Error(err))
-			}
-		})
-		wg.Wait()
+		relay(ctx, clientConn, controllerConn)
 	}
+}
+
+// relay copies between a and b until both directions end, half-closing
+// each side on EOF so the other direction isn't truncated.
+// Both are closed when ctx ends, even if one side never closes.
+func relay(ctx context.Context, a, b io.ReadWriteCloser) {
+	stop := context.AfterFunc(ctx, func() {
+		_ = a.Close()
+		_ = b.Close()
+	})
+	defer stop()
+
+	var wg sync.WaitGroup
+	wg.Go(func() { pipe(ctx, a, b) })
+	wg.Go(func() { pipe(ctx, b, a) })
+	wg.Wait()
+	_ = a.Close()
+	_ = b.Close()
+}
+
+// pipe copies src to dst, then half-closes dst so its peer sees EOF.
+// It fully closes dst if half-close isn't supported.
+func pipe(ctx context.Context, dst io.ReadWriteCloser, src io.Reader) {
+	_, err := io.Copy(dst, src)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
+		zapctx.Error(ctx, "ssh relay copy failed", zap.Error(err))
+	}
+	if hc, ok := dst.(halfCloser); ok {
+		_ = hc.CloseWrite()
+		return
+	}
+	_ = dst.Close()
+}
+
+// halfCloser is a connection that supports closing its write side while
+// leaving the read side open, so the peer can finish sending.
+type halfCloser interface {
+	CloseWrite() error
 }
 
 // fetchAndAuthorizeUser extracts the user from the context and checks the user has permission to ssh.
