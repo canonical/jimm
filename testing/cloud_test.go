@@ -21,6 +21,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
+	apiparams "github.com/canonical/jimm/v3/pkg/api/params"
 )
 
 func addCloud(c *qt.C, s jimmtest.JimmWithControllers, username string, cloud cloud.Cloud, force, cleanup bool) {
@@ -828,6 +829,60 @@ func TestRemoveCloud(t *testing.T) {
 	clouds, err = client.Clouds(context.Background())
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(clouds[names.NewCloudTag(cloudName)], qt.DeepEquals, cloud.Cloud{})
+}
+
+// TestRecoverModelCredential verifies that a lost cloud credential can be
+// recovered by fetching its secrets from a backing controller. The recovery
+// dial is made as the credential owner (a non-admin user), so this also
+// proves that Juju's CredentialContents accepts a caller-scoped token.
+func TestRecoverModelCredential(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	// Create a model for bob so that bob's credential is used by a model
+	// hosted on a backing controller.
+	model := s.CreateModelForBob(c)
+
+	// The attributes originally stored in JIMM's credential store.
+	existingCloudCred := s.GetExistingClientCredentialsForCloud(c, jimmtest.TestE2ECloudName)
+	credTag := s.BobCredential.ResourceTag()
+
+	// Check that the credential is currently in the store.
+	_, err := s.JIMM.CredentialStore.Get(context.Background(), credTag)
+	c.Assert(err, qt.IsNil)
+
+	// Recovery requires JIMM admin access; open the connection as alice.
+	conn := s.Open(c, nil, "alice@canonical.com", nil)
+	defer conn.Close()
+
+	// A non-admin user must not be able to recover credentials.
+	nonAdminConn := s.Open(c, nil, "bob@canonical.com", nil)
+	defer nonAdminConn.Close()
+	req := apiparams.RecoverModelCredentialRequest{
+		CredentialTag: credTag.String(),
+	}
+	err = nonAdminConn.APICall(c.Context(), "JIMM", 4, "", "RecoverModelCredential", &req, nil)
+	c.Assert(err, qt.ErrorMatches, `unauthorized \(unauthorized access\)`)
+
+	// Dry-run: the secrets are fetched from the backing controller but
+	// not written back to the credential store.
+	req.DryRun = true
+	err = conn.APICall(c.Context(), "JIMM", 4, "", "RecoverModelCredential", &req, nil)
+	c.Assert(err, qt.IsNil)
+
+	// Full recovery: the secrets are fetched and written back.
+	req.DryRun = false
+	err = conn.APICall(c.Context(), "JIMM", 4, "", "RecoverModelCredential", &req, nil)
+	c.Assert(err, qt.IsNil)
+
+	// The recovered secrets must match what the controller holds for
+	// bob's credential.
+	recovered, err := s.JIMM.CredentialStore.Get(context.Background(), credTag)
+	c.Assert(err, qt.IsNil)
+	c.Check(recovered, qt.DeepEquals, existingCloudCred.Attributes)
+
+	// Sanity check: the model still uses the credential.
+	c.Check(model.CloudCredential.Name, qt.Equals, s.BobCredential.Name)
 }
 
 func TestRemoveCloudNotFound(t *testing.T) {
