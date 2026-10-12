@@ -234,20 +234,20 @@ func validateUserMappingV2(envelope jujuparams.SerializedModelV2, offers []impor
 // It replaces local user references with their external mapping:
 //   - the model qualifier (the model owner in Juju 4),
 //   - the cloud credential owner,
-//   - users with access to application offers,
-//   - the owners of authorized SSH keys.
+//   - users with access to application offers.
 //
-// Model permissions are dropped, as access to the model is managed by JIMM.
+// Only offer permissions are kept. Model and any other permissions, and SSH
+// keys, are dropped, as access is managed by JIMM.
 //
-// A Juju 4.1 target only accepts permissions and keys for users it knows, and it
-// learns users from the envelope's user list. So the user list is replaced with
-// an entry for every user referenced after mapping.
+// A Juju 4.1 target only accepts permissions for users it knows, and it learns
+// users from the envelope's user list. So the user list is replaced with an
+// entry for every user referenced after mapping.
 //
 // The returned envelope shares no modified slices with the given envelope.
 func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.StringMap) (jujuparams.SerializedModelV2, error) {
 	owner, ok := mapUser(envelope.ModelInfo.Qualifier, userMapping)
 	if !ok {
-		return jujuparams.SerializedModelV2{}, fmt.Errorf("no external user mapping found for local user %q", envelope.ModelInfo.Qualifier)
+		return jujuparams.SerializedModelV2{}, fmt.Errorf("cannot map model owner %q to an external user: not a valid user or no external user mapping found", envelope.ModelInfo.Qualifier)
 	}
 	envelope.ModelInfo.Qualifier = owner
 
@@ -256,7 +256,7 @@ func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.S
 	}
 	credentialOwner, ok := mapUser(envelope.ModelCredential.Owner, userMapping)
 	if !ok {
-		return jujuparams.SerializedModelV2{}, fmt.Errorf("no external user mapping found for cloud credential local user %q", envelope.ModelCredential.Owner)
+		return jujuparams.SerializedModelV2{}, fmt.Errorf("cannot map cloud credential owner %q to an external user: not a valid user or no external user mapping found", envelope.ModelCredential.Owner)
 	}
 	credential := *envelope.ModelCredential
 	credential.Owner = credentialOwner
@@ -270,10 +270,11 @@ func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.S
 	var permissions []jujuparams.ModelPermission
 	for _, p := range envelope.Permissions {
 		switch permission.ObjectType(p.ObjectType) {
-		case permission.Model:
-			// Access to the model is managed by JIMM.
-			continue
 		case permission.Offer:
+			// Offer permissions can't simply be dropped, as existing
+			// consumers of an offer hold macaroons that can still encode
+			// the local user. So local users are mapped to their external
+			// user instead, or dropped if they were intentionally not mapped.
 			if p.SubjectName != ofganames.EveryoneUser {
 				subject, ok := mapUser(p.SubjectName, userMapping)
 				if !ok {
@@ -283,34 +284,40 @@ func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.S
 				p.SubjectName = subject
 				users.add(subject)
 			}
+		default:
+			// All other permissions, including model permissions, are
+			// dropped, as v6 does. JIMM doesn't have local users as
+			// identities, and access is managed in OpenFGA instead. The
+			// import gives the user running the migration admin on the
+			// model, and they can grant any other access needed in JAAS,
+			// including to everyone@external.
+			continue
 		}
 		permissions = append(permissions, p)
 	}
 	envelope.Permissions = permissions
 
-	var keys []jujuparams.ModelAuthorizedKey
-	for _, k := range envelope.AuthorizedKeys {
-		keyOwner, ok := mapUser(k.Username, userMapping)
-		if !ok {
-			// Keep keys belonging to unmapped users usable by
-			// attributing them to the model owner.
-			keyOwner = owner
-		}
-		k.Username = keyOwner
-		users.add(keyOwner)
-		keys = append(keys, k)
-	}
-	envelope.AuthorizedKeys = keys
+	// SSH keys are dropped. JAAS stores SSH keys per external identity in its
+	// own key store, so keys on the target controller wouldn't be visible or
+	// manageable through JAAS, and keys belonging to local users would keep
+	// access for identities JAAS doesn't know about. Users re-add their keys
+	// through JAAS after migrating.
+	envelope.AuthorizedKeys = nil
 
 	envelope.Users = users.list
 	return envelope, nil
 }
 
 // mapUser returns the external user that a local user is mapped to.
-// Non-local users are returned unchanged. It returns false if a local user
-// has no valid mapping, including when it was intentionally left unmapped.
+// Non-local users are returned unchanged. It returns false if the name is not
+// a valid user, or if a local user has no valid mapping, including when it was
+// intentionally left unmapped.
 func mapUser(name string, userMapping dbmodel.StringMap) (string, bool) {
-	if !names.IsValidUser(name) || !names.NewUserTag(name).IsLocal() {
+	tag, err := names.ParseUserTag(names.UserTagKind + "-" + name)
+	if err != nil {
+		return "", false
+	}
+	if !tag.IsLocal() {
 		return name, true
 	}
 	mapped := userMapping[name]
@@ -320,8 +327,11 @@ func mapUser(name string, userMapping dbmodel.StringMap) (string, bool) {
 	return mapped, true
 }
 
-// modelUserList builds the user list of an envelope, reusing the source's
-// entry for a user when one exists.
+// modelUserList builds the user list of an envelope from mapped user names,
+// adding each user once. A new external user entry is created for each name,
+// except where the source already listed a user under that same name (i.e.
+// the user was already external in the source because the model is from a previous
+// JAAS controller), in which case the source's entry is kept to preserve its details
 type modelUserList struct {
 	original map[string]jujuparams.ModelUser
 	seen     map[string]bool
