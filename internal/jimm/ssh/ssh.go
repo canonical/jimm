@@ -182,6 +182,15 @@ func (c *prefixConn) Read(p []byte) (int, error) {
 	return c.Conn.Read(p)
 }
 
+// CloseWrite forwards half-close to the underlying connection, or fully
+// closes it if half-close isn't supported.
+func (c *prefixConn) CloseWrite() error {
+	if hc, ok := c.Conn.(interface{ CloseWrite() error }); ok {
+		return hc.CloseWrite()
+	}
+	return c.Conn.Close()
+}
+
 // SSHManagerParams contains the dependencies
 // needed to create the SSHManager service.
 type SSHManagerParams struct {
