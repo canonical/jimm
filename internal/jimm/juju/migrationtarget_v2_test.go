@@ -96,11 +96,8 @@ func TestPrechecksV2_ModifiesEnvelope(t *testing.T) {
 				Access:      "admin",
 			}})
 
-			// Authorized keys are remapped.
-			c.Check(envelope.AuthorizedKeys, qt.DeepEquals, []params.ModelAuthorizedKey{{
-				Username:  "alice@canonical.com",
-				PublicKey: "ssh-ed25519 AAAA bob@host",
-			}})
+			// SSH keys are dropped.
+			c.Check(envelope.AuthorizedKeys, qt.HasLen, 0)
 
 			// The user list contains only the mapped users, as external users.
 			c.Check(envelope.Users, qt.HasLen, 1)
@@ -222,7 +219,7 @@ func TestPrechecksV2_SkippedUser(t *testing.T) {
 	ctx := context.Background()
 
 	// Validate that a local user intentionally left unmapped loses
-	// their offer permissions, and their keys move to the model owner.
+	// their offer permissions.
 	api := &jimmtest.API{
 		PrechecksV2_: func(_ context.Context, envelope params.SerializedModelV2) error {
 			c.Check(envelope.Permissions, qt.DeepEquals, []params.ModelPermission{{
@@ -230,13 +227,6 @@ func TestPrechecksV2_SkippedUser(t *testing.T) {
 				GrantOn:     offerUUID,
 				SubjectName: "alice@canonical.com",
 				Access:      "admin",
-			}})
-			c.Check(envelope.AuthorizedKeys, qt.DeepEquals, []params.ModelAuthorizedKey{{
-				Username:  "alice@canonical.com",
-				PublicKey: "ssh-ed25519 AAAA bob@host",
-			}, {
-				Username:  "alice@canonical.com",
-				PublicKey: "ssh-ed25519 AAAA jack@host",
 			}})
 			for _, u := range envelope.Users {
 				c.Check(u.Name, qt.Not(qt.Equals), "jack")
@@ -269,9 +259,53 @@ func TestPrechecksV2_SkippedUser(t *testing.T) {
 		SubjectName: "jack",
 		Access:      "consume",
 	})
-	envelope.AuthorizedKeys = append(envelope.AuthorizedKeys, params.ModelAuthorizedKey{
-		Username:  "jack",
-		PublicKey: "ssh-ed25519 AAAA jack@host",
+
+	err = j.PrechecksV2(ctx, user, envelope)
+	c.Assert(err, qt.IsNil)
+}
+
+func TestPrechecksV2_UserListDeduplicated(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+
+	// Validate that when several local users are mapped to the same external
+	// user, that user appears only once in the envelope's user list. The model
+	// owner, credential owner and offer users below all map to it.
+	api := &jimmtest.API{
+		PrechecksV2_: func(_ context.Context, envelope params.SerializedModelV2) error {
+			c.Check(envelope.Users, qt.HasLen, 1)
+			if len(envelope.Users) == 1 {
+				c.Check(envelope.Users[0].Name, qt.Equals, "alice@canonical.com")
+			}
+			return nil
+		},
+	}
+
+	j := newTestJujuManager(c, &parameters{
+		Dialer: &jimmtest.Dialer{
+			API: api,
+		},
+	})
+
+	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	// Map carol to the same external user as bob.
+	incomingModel := env.IncomingMigrations[0].DBObject(c, j.Database)
+	incomingModel.UserMapping["carol"] = "alice@canonical.com"
+	err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &incomingModel)
+	c.Assert(err, qt.IsNil)
+
+	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+	user := openfga.NewUser(&dbUser, nil)
+
+	envelope := newTestEnvelope()
+	envelope.Users = append(envelope.Users, params.ModelUser{Name: "carol"})
+	envelope.Permissions = append(envelope.Permissions, params.ModelPermission{
+		ObjectType:  "offer",
+		GrantOn:     offerUUID,
+		SubjectName: "carol",
+		Access:      "consume",
 	})
 
 	err = j.PrechecksV2(ctx, user, envelope)
@@ -363,7 +397,7 @@ func TestPrechecksV2_InvalidOwner(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	err = j.PrechecksV2(ctx, user, newTestEnvelope())
-	c.Assert(err, qt.ErrorMatches, `failed to modify migration info: no external user mapping found for local user "bob"`)
+	c.Assert(err, qt.ErrorMatches, `failed to modify migration info: cannot map model owner "bob" to an external user: not a valid user or no external user mapping found`)
 }
 
 func TestPrechecksV2_InvalidPayload(t *testing.T) {
@@ -513,7 +547,7 @@ func TestImportV2_UserNotFoundInUserMapping(t *testing.T) {
 	envelope.ModelInfo.Qualifier = "not-in-mapping"
 
 	err := j.ImportV2(ctx, user, envelope)
-	c.Assert(err, qt.ErrorMatches, `failed to modify migration info: no external user mapping found for local user "not-in-mapping"`)
+	c.Assert(err, qt.ErrorMatches, `failed to modify migration info: cannot map model owner "not-in-mapping" to an external user: not a valid user or no external user mapping found`)
 
 	// Check the model is not created in the database.
 	m := &dbmodel.Model{
