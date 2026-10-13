@@ -317,7 +317,7 @@ func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
 			c.Cleanup(func() { _ = client.Close() })
 			clients = append(clients, client)
 		}
-		c.Assert(s.connectionCount(), qt.Equals, int32(s.maxConcurrentConnections))
+		c.Assert(int(s.connectionCount()), qt.Equals, s.maxConcurrentConnections)
 		jumpServerConn, err := s.jumpServerListener.Dial()
 		c.Assert(err, qt.IsNil)
 		c.Cleanup(func() { _ = jumpServerConn.Close() })
