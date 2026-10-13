@@ -286,16 +286,11 @@ func (s *sshSuite) TestInvalidVirtualHostname(c *qt.C) {
 
 func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
 	waitForConnectionsToClose := func() {
-		timer := time.NewTimer(5 * time.Second)
-		defer timer.Stop()
-		ticker := time.NewTicker(time.Millisecond)
-		defer ticker.Stop()
-
 		// Closing a client does not wait for the server's counter decrement.
 		for s.connectionCount() != 0 {
 			select {
-			case <-ticker.C:
-			case <-timer.C:
+			case <-time.After(20 * time.Millisecond):
+			case <-time.After(5 * time.Second):
 				c.Fatalf("server still counts %d connections after clients closed", s.connectionCount())
 			}
 		}
