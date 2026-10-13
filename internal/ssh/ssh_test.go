@@ -44,6 +44,7 @@ type sshSuite struct {
 	received                 chan bool
 	virtualHostname          virtualhostname.Info
 	maxConcurrentConnections int
+	connectionCount          func() int32
 }
 
 func (s *sshSuite) Init(c *qt.C) {
@@ -156,6 +157,7 @@ func (s *sshSuite) Init(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 
 	s.jumpSSHServer = jumpServer
+	s.jumpSSHServer.ConnCallback, s.connectionCount = ssh.ConnCallbackWithCount(s.maxConcurrentConnections)
 	go func() {
 		_ = s.jumpSSHServer.Serve(s.jumpServerListener)
 	}()
@@ -283,7 +285,17 @@ func (s *sshSuite) TestInvalidVirtualHostname(c *qt.C) {
 }
 
 func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
-	c.Skip("flakey test, needs to sync the client side count with the server's")
+	waitForConnectionsToClose := func() {
+		// Closing a client does not wait for the server's counter decrement.
+		for s.connectionCount() != 0 {
+			select {
+			case <-time.After(20 * time.Millisecond):
+			case <-time.After(5 * time.Second):
+				c.Fatalf("server still counts %d connections after clients closed", s.connectionCount())
+			}
+		}
+	}
+
 	// the reason we repeat this test 2 times is to make sure that closing the connections on
 	// the first iteration completely resets the counter on the ssh server side.
 	for range 2 {
@@ -297,21 +309,27 @@ func (s *sshSuite) TestSSHServerMaxConnections(c *qt.C) {
 		}
 		for range s.maxConcurrentConnections {
 			client := inMemoryDial(c, s.jumpServerListener, config)
+			c.Cleanup(func() { _ = client.Close() })
 			clients = append(clients, client)
 		}
+		c.Assert(int(s.connectionCount()), qt.Equals, s.maxConcurrentConnections)
 		jumpServerConn, err := s.jumpServerListener.Dial()
 		c.Assert(err, qt.IsNil)
+		c.Cleanup(func() { _ = jumpServerConn.Close() })
 
 		_, _, _, err = gossh.NewClientConn(jumpServerConn, "", config)
 		c.Assert(err, qt.ErrorMatches, ".*handshake failed:.*")
 
 		// close the connections
 		for _, client := range clients {
-			client.Close()
+			c.Assert(client.Close(), qt.IsNil)
 		}
+		waitForConnectionsToClose()
 		// check the next connection is accepted
 		client := inMemoryDial(c, s.jumpServerListener, config)
-		client.Close()
+		c.Cleanup(func() { _ = client.Close() })
+		c.Assert(client.Close(), qt.IsNil)
+		waitForConnectionsToClose()
 	}
 }
 

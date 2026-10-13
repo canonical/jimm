@@ -226,7 +226,10 @@ func rejectConnectionAndLogError(ctx context.Context, newChan gossh.NewChannel, 
 
 // ConnCallback returns a ConnCallback function that limits the number of concurrent connections.
 func ConnCallback(maxConcurrentConnections int) ssh.ConnCallback {
-	n := atomic.Int32{}
+	return connCallback(maxConcurrentConnections, new(atomic.Int32))
+}
+
+func connCallback(maxConcurrentConnections int, n *atomic.Int32) ssh.ConnCallback {
 	return func(ctx ssh.Context, conn net.Conn) net.Conn {
 		current := n.Add(1)
 		go func() {
