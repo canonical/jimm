@@ -3,6 +3,7 @@
 package testing
 
 import (
+	"context"
 	"database/sql"
 	"testing"
 
@@ -64,11 +65,13 @@ func TestCheckRelationViaIdPGroup(t *testing.T) {
 	conn := s.Open(c, nil, "alice@canonical.com", nil)
 	defer conn.Close()
 	client := api.NewClient(conn)
-	check, err := client.CheckRelation(&apiparams.CheckRelationRequest{Tuple: apiparams.RelationshipTuple{
-		Object:       userTag.String(),
-		Relation:     ofganames.ReaderRelation.String(),
-		TargetObject: model.ResourceTag().String(),
-	}})
+	check, err := client.CheckRelation(
+		t.Context(),
+		&apiparams.CheckRelationRequest{Tuple: apiparams.RelationshipTuple{
+			Object:       userTag.String(),
+			Relation:     ofganames.ReaderRelation.String(),
+			TargetObject: model.ResourceTag().String(),
+		}})
 	c.Assert(err, qt.IsNil)
 	c.Check(check.Allowed, qt.IsTrue)
 }

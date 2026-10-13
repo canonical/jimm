@@ -18,7 +18,7 @@ import (
 	coremodel "github.com/juju/juju/core/model"
 	"github.com/juju/juju/domain/deployment/charm"
 	jujuparams "github.com/juju/juju/rpc/params"
-	"github.com/juju/names/v5"
+	"github.com/juju/names/v6"
 	"gopkg.in/macaroon.v2"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -771,7 +771,7 @@ func TestDischargeOfferConsumeViaIdPGroup(t *testing.T) {
 	defer conn.Close()
 	client := applicationoffers.NewClient(conn)
 
-	results, err := client.Offer(model.UUID.String, "test-app", []string{"source"}, "bob@canonical.com", "test-offer", "test offer description")
+	results, err := client.Offer(t.Context(), model.UUID.String, "test-app", []string{"source"}, "bob@canonical.com", "test-offer", "test offer description")
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(results, qt.HasLen, 1)
 	c.Assert(results[0].Error, qt.Equals, (*jujuparams.Error)(nil))
