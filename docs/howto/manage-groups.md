@@ -117,21 +117,19 @@ juju add-permission idpgroup-canonical#member administrator model-mycontroller/m
 
 ### Hook-service group lookup
 
-The hook-service is a separate service in the Identity Platform's infrastructure cluster. It exposes a gRPC API that JIMM can call to retrieve a user's current IdP group memberships. JIMM connects to the service address configured on its charm and authenticates requests with a bearer token for JIMM's OAuth client, obtained from the IdP using the client-credentials grant. This connection currently uses gRPC without TLS, so JIMM must reach the hook-service directly over a protected internal network.
+The hook-service is a separate service in the Identity Platform's infrastructure cluster. It exposes a gRPC API that JIMM can call to retrieve a user's current IdP group memberships. JIMM obtains an access token from the IdP using the client ID and secret for JIMM's OAuth client and the client-credentials grant, then sends that token as a bearer token to the hook-service. The client ID and secret are used with the IdP; they are not sent to the hook-service. JIMM's current hook-service client uses gRPC without TLS, so configure a direct route to the hook-service over a protected internal network.
 
 ### Where JIMM uses the hook-service
 
 The hook-service provides JIMM with a user's current IdP groups when JIMM needs to evaluate that user outside their own login session. JIMM calls the hook-service in these cases:
 
-- When a permission or relationship check evaluates a different user, including `juju check-permission`.
-- When JIMM determines another user's JIMM controller access level.
+- When JIMM checks a different user's permissions from those of the logged-in user. This includes permission or relationship checks, such as `juju check-permission`, and looking up that user's JIMM controller access.
 - When JIMM authorizes an SSH user, so that access granted through the user's IdP groups can be considered.
 - When JIMM checks whether a user may consume a cross-model application offer during offer discharge.
 
-For each lookup, JIMM asks the hook-service for the groups associated with the user's identifier and supplies those groups as contextual membership to the authorization check. JIMM does not create or persist the groups.
-If a lookup fails during a permission/relationship check, controller access lookup, or SSH authorization, JIMM returns the error and that operation fails before it can complete the authorization check. This means a hook-service outage can interrupt those operations even if the user might otherwise have direct access.
-During offer discharge, since this path is not driven by an user but from a controller worker, we just log the failure and we check the permission without the group membership tuples.
-This is to allow consume access, in case of hook unavailabilty, if the user has the permission regardless of the idp group membership.
+For each lookup, JIMM asks the hook-service for groups associated with the user's identifier and uses them for authorization checks. JIMM does not create or persist the groups.
+
+If a lookup fails during a permission or relationship check, controller access lookup, or SSH authorization, that operation fails before it can complete the authorization check. A hook-service outage can therefore interrupt these operations even if the user might otherwise have direct access. Offer discharge is an exception: if a lookup fails, JIMM logs the failure and continues without the user's group memberships, so group-based access cannot be established for that check.
 
 The remaining known limitation is `juju show-model`, which does not list users whose access comes through IdP group membership.
 
@@ -150,9 +148,9 @@ idp-group-fetcher-type: hook-service
 idp-hook-service-address: hook-service.internal:9090
 ```
 
-`idp-group-fetcher-type` selects the group lookup implementation; set it to `hook-service`. `idp-hook-service-address` is the hook-service gRPC address in `host:port` form and is required when the fetcher type is `hook-service`. Replace the example address with the address of the hook-service that is reachable from JIMM.
+`idp-group-fetcher-type` selects the group lookup implementation; set it to `hook-service`. Leave it empty to disable hook-service group fetching. `idp-hook-service-address` is the hook-service gRPC address in `host:port` form and is required when the fetcher type is `hook-service`. Replace the example address with the address of the hook-service that is reachable from JIMM.
 
-JIMM authenticates to the hook-service with a bearer access token for JIMM's OAuth client. JIMM obtains this token from the IdP's token endpoint using the client-credentials grant. The `client_credentials` grant must be enabled on the IdP side for JIMM's OAuth client.
+The `client_credentials` grant must be enabled on the IdP side for JIMM's OAuth client. It is not a JIMM charm option.
 
 (migrate-to-IdP-groups)=
 ## Migrate from JAAS groups to IdP groups
