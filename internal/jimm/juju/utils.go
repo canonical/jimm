@@ -4,6 +4,7 @@ package juju
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -51,7 +52,7 @@ func (j *JujuManager) getControllerByName(ctx context.Context, controllerName st
 	controller := dbmodel.Controller{Name: controllerName}
 	err := j.Database.GetController(ctx, &controller)
 	if err != nil {
-		return nil, errors.Codef(errors.CodeNotFound, "controller not found")
+		return nil, fmt.Errorf("failed to get controller %q: %w", controllerName, err)
 	}
 	return &controller, nil
 }

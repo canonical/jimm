@@ -252,6 +252,21 @@ func controllerConnectionFunc(jwtGenerator *jujuauth.LoginTokenGenerator, m *dbm
 		if lookupErr != nil {
 			return rpcproxy.WebsocketConnectionWithMetadata{}, lookupErr
 		}
+		path := jimmhttp.PathElementFromContext(ctx)
+		zapctx.Debug(ctx, "grabbing model info from path", zap.String("path", path))
+		uuid, finalPath, err := modelInfoFromPath(path)
+		if err != nil {
+			return rpcproxy.WebsocketConnectionWithMetadata{}, fmt.Errorf("error parsing path: %w", err)
+		}
+		m := dbmodel.Model{
+			UUID: sql.NullString{
+				String: uuid,
+				Valid:  uuid != "",
+			},
+		}
+		if err := s.jimm.Database.GetModel(context.Background(), &m); err != nil {
+			return rpcproxy.WebsocketConnectionWithMetadata{}, fmt.Errorf("failed to find model: %w", err)
+		}
 		jwtGenerator.SetTags(m.ResourceTag(), m.Controller.ResourceTag())
 		mt := m.ResourceTag()
 		zapctx.Debug(ctx, "Dialing Controller", zap.String("model", mt.Id()))

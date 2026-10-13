@@ -71,6 +71,12 @@
       "groups": [
         "/canonical"
       ]
+    },
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174001",
+      "username": "service-account-jimm-device",
+      "enabled": true,
+      "serviceAccountClientId": "jimm-device"
     }
   ],
   "groups": [
@@ -122,7 +128,7 @@
       "publicClient": false,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": false,
+      "serviceAccountsEnabled": true,
       "fullScopeAllowed": true,
       "defaultClientScopes": [
         "profile",

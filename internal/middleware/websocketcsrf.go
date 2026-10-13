@@ -12,9 +12,9 @@ type WebsocketCors struct {
 	cors *cors.Cors
 }
 
-// NewWebsocketCors returns a new WebsocketCors object.
+// NewWebsocketCSRF returns a new WebsocketCors object.
 // If no allowedOrigins are provided, all origins will be allowed.
-func NewWebsocketCors(allowedOrigins []string) *WebsocketCors {
+func NewWebsocketCSRF(allowedOrigins []string) *WebsocketCors {
 	corsOpts := cors.New(cors.Options{
 		AllowedOrigins: allowedOrigins,
 	})

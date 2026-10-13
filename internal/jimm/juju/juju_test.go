@@ -12,6 +12,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/jimm/credentials"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/testutils/jimmtest"
@@ -50,7 +51,7 @@ func newTestJujuManager(c *qt.C, p *parameters) *juju.JujuManager {
 	jimmUUID := uuid.NewString()
 	jimmResourceTag := names.NewControllerTag(jimmUUID)
 
-	permissionManager, err := permissions.NewManager(db, ofgaClient, jimmUUID, jimmResourceTag)
+	permissionManager, err := permissions.NewManager(db, ofgaClient, jimmUUID, jimmResourceTag, idpgroupfetcher.NoOp{})
 	c.Assert(err, qt.IsNil)
 
 	if p.CredentialStore == nil {

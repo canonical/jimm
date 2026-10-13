@@ -84,7 +84,11 @@ func (s streamModelProxier) ServeWS(ctx context.Context, clientConn *websocket.C
 
 	model, err := s.jimm.JujuManager.GetModel(ctx, uuid)
 	if err != nil {
-		writeError(err.Error(), errors.CodeModelNotFound)
+		if errors.ErrorCode(err) == errors.CodeNotFound {
+			writeError(err.Error(), errors.CodeModelNotFound)
+		} else {
+			writeError(err.Error(), errors.CodeServerError)
+		}
 		return
 	}
 
