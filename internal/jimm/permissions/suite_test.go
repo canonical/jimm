@@ -14,6 +14,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
@@ -50,7 +51,7 @@ func (s *permissionManagerSuite) Init(c *qt.C) {
 	ctlTag := names.NewControllerTag(uuid.String())
 	s.ctlTag = ctlTag
 
-	s.manager, err = permissions.NewManager(db, ofgaClient, uuid.String(), ctlTag)
+	s.manager, err = permissions.NewManager(db, ofgaClient, uuid.String(), ctlTag, idpgroupfetcher.NoOp{})
 	c.Assert(err, qt.IsNil)
 
 	// Create test identity

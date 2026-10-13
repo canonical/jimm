@@ -20,6 +20,7 @@ import (
 	jimmsvc "github.com/canonical/jimm/v3/cmd/jimmsrv/service"
 	"github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
+	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/river"
 	"github.com/canonical/jimm/v3/internal/ssh"
@@ -166,8 +167,14 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.New("cannot parse hostkey from env variable")
 	}
 
-	corsAllowedOrigins := strings.Split(os.Getenv("CORS_ALLOWED_ORIGINS"), " ")
-
+	// CORS_ALLOWED_ORIGINS is used to set the CORS and CSFR middleware for JIMM's
+	// HTTP and WS server.
+	corsAllowedOrigins := strings.Fields(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	// If no CORS is specified, we set a slice with a single empty value.
+	// This is the easiest way to effectively disallow all origins.
+	if len(corsAllowedOrigins) == 0 {
+		corsAllowedOrigins = []string{""}
+	}
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
 
 	sshPort := os.Getenv("JIMM_SSH_PORT")
@@ -285,6 +292,10 @@ func start(ctx context.Context, s *service.Service) error {
 		},
 		CrossModelQueryTimeout:        crossModelQueryTimeout,
 		BootstrapLoginTokenRefreshURL: os.Getenv("JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL"),
+		IdPGroupFetcherParams: idpgroupfetcher.Params{
+			Type:               idpgroupfetcher.Type(os.Getenv("JIMM_IDP_GROUP_FETCHER_TYPE")),
+			HookServiceAddress: os.Getenv("JIMM_IDP_HOOK_SERVICE_ADDRESS"),
+		},
 	})
 	if err != nil {
 		return err

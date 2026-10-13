@@ -20,6 +20,12 @@ import (
 
 const maxContextualTuples = 20
 
+// GroupFetcher resolves the current IDP group identifiers for a user whose
+// authenticated session is not available.
+type GroupFetcher interface {
+	FetchGroups(ctx context.Context, username string) ([]string, error)
+}
+
 // NewUser returns a new user structure that can be used to check
 // user's access rights to various resources.
 func NewUser(u *dbmodel.Identity, client *OFGAClient) *User {
@@ -27,6 +33,23 @@ func NewUser(u *dbmodel.Identity, client *OFGAClient) *User {
 		Identity: u,
 		client:   client,
 	}
+}
+
+// NewUserFromTag creates a permission-check user from a user tag and injects
+// the target user's current IDP groups. Use this instead of NewUser whenever
+// evaluating the effective permission of a user outside their login session.
+func NewUserFromTag(ctx context.Context, tag names.UserTag, client *OFGAClient, fetcher GroupFetcher) (*User, error) {
+	identity, err := dbmodel.NewIdentity(tag.Id())
+	if err != nil {
+		return nil, err
+	}
+	groups, err := fetcher.FetchGroups(ctx, identity.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch IDP groups for %q: %w", identity.Name, err)
+	}
+	user := NewUser(identity, client)
+	user.SetIDPGroups(groups)
+	return user, nil
 }
 
 // User wraps dbmodel.User and implements methods that enable us

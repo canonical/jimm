@@ -10,11 +10,13 @@ import (
 	petname "github.com/dustinkirkland/golang-petname"
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/zaputil/zapctx"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
 	"github.com/canonical/jimm/v3/internal/openfga/names"
@@ -215,6 +217,52 @@ func (s *permissionManagerSuite) TestCheckRelationUsesUserIDPGroupsAsContextualT
 	c.Assert(results, qt.HasLen, 1)
 	c.Assert(results[0].Allowed, qt.IsTrue)
 	c.Assert(results[0].Error, qt.IsNil)
+}
+
+func (s *permissionManagerSuite) TestCheckRelationFetchesTargetUserIDPGroups(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+
+	targetIdentity, err := dbmodel.NewIdentity(fmt.Sprintf("target-%s", petname.Generate(2, "-")))
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.db.DB.Create(targetIdentity).Error, qt.IsNil)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	err = s.manager.AddRelation(ctx, s.adminUser, []apiparams.RelationshipTuple{{
+		Object:       "idpgroup-engineering-team#member",
+		Relation:     names.ReaderRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}})
+	c.Assert(err, qt.IsNil)
+
+	groupFetcher := offermocks.NewMockIdPGroupFetcher(gomock.NewController(c))
+	groupFetcher.EXPECT().FetchGroups(gomock.Any(), targetIdentity.Name).Return([]string{"engineering-team"}, nil)
+	manager, err := permissions.NewManager(s.db, s.ofgaClient, s.ctlTag.Id(), s.ctlTag, groupFetcher)
+	c.Assert(err, qt.IsNil)
+	allowed, err := manager.CheckRelation(ctx, s.adminUser, apiparams.RelationshipTuple{
+		Object:       targetIdentity.Tag().String(),
+		Relation:     names.ReaderRelation.String(),
+		TargetObject: model.ResourceTag().String(),
+	}, false)
+	c.Assert(err, qt.IsNil)
+	c.Check(allowed, qt.IsTrue)
+}
+
+func (s *permissionManagerSuite) TestCheckRelationFailsWhenTargetIDPGroupsCannotBeFetched(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+	targetName := fmt.Sprintf("target-%s", petname.Generate(2, "-"))
+	targetTag := "user-" + targetName
+	groupFetcher := offermocks.NewMockIdPGroupFetcher(gomock.NewController(c))
+	groupFetcher.EXPECT().FetchGroups(gomock.Any(), targetName).Return(nil, fmt.Errorf("group lookup failed"))
+	manager, err := permissions.NewManager(s.db, s.ofgaClient, s.ctlTag.Id(), s.ctlTag, groupFetcher)
+	c.Assert(err, qt.IsNil)
+
+	_, err = manager.CheckRelation(ctx, s.adminUser, apiparams.RelationshipTuple{
+		Object:       targetTag,
+		Relation:     names.ReaderRelation.String(),
+		TargetObject: s.ctlTag.String(),
+	}, false)
+	c.Assert(err, qt.ErrorMatches, `failed to fetch IDP groups for ".*": group lookup failed`)
 }
 
 func (s *permissionManagerSuite) TestCheckPermissionUsesUserIDPGroupsAsContextualTuples(c *qt.C) {
