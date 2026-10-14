@@ -543,7 +543,6 @@ func (j *JujuManager) Import(ctx context.Context, user *openfga.User, serialized
 	}
 	err = api.Import(serializedDescrition)
 	if err != nil {
-		// TODO: handle migration failure in a cleanup routine.
 		return fmt.Errorf("failed to import model: %w", err)
 	}
 
@@ -649,8 +648,8 @@ func (j *JujuManager) addModelAndOfferPermissions(ctx context.Context, user *ope
 }
 
 // CleanupPartialModelMigrations cleans up any partial model migrations that have exceeded the timeout.
-// It deletes the incoming model migration record, deletes the user mappings for the model,
-// and deletes the model record from JIMM's state.
+// It aborts the import on the backing controller, then atomically deletes the incoming model
+// migration record, user mappings and model record from JIMM's state.
 func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
 
 	// Get all incoming model migrations that have exceeded the timeout.
@@ -662,25 +661,37 @@ func (j *JujuManager) CleanupPartialModelMigrations(ctx context.Context) error {
 	for _, migration := range migrations {
 		err := j.cleanupPartialModelMigration(ctx, migration)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("failed to clean up model migration %q: %w", migration.ModelUUID.String, err))
 		}
 	}
 	return goerr.Join(errs...)
 }
 
-// cleanupPartialModelMigration cleans up a partial model migration by deleting the incoming model migration record,
-// deleting the user mappings for the model, and deleting the model record from JIMM's state.
+// cleanupPartialModelMigration attempts to abort the import on the backing controller before deleting
+// the incoming model migration record, user mappings and model record in a transaction.
+// Abort failures are logged but do not prevent database cleanup.
 func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migration dbmodel.IncomingModelMigration) error {
+	api, err := j.dialControllerAsService(ctx, &migration.TargetController)
+	if err != nil {
+		return fmt.Errorf("failed to dial controller: %w", err)
+	}
+	defer api.Close()
 
-	return j.Database.Transaction(func(db *db.Database) error {
+	// Optimistically try to cleanup a stale migration on the backing
+	// controller, but avoid failing the cleanup if the abort fails.
+	if err := api.Abort(migration.ModelUUID.String); err != nil {
+		zapctx.Error(ctx, "failed to abort migration during cleanup", zap.Error(err), zap.String("modelUUID", migration.ModelUUID.String))
+	}
+
+	return j.Database.Transaction(func(tx *db.Database) error {
 		// Delete the incoming model migration record.
-		err := j.Database.DeleteIncomingModelMigration(ctx, &migration)
+		err := tx.DeleteIncomingModelMigration(ctx, &migration)
 		if err != nil {
 			return err
 		}
 
 		// Delete user mappings for the model.
-		err = j.Database.DeleteUserMappingsByModelUUID(ctx, migration.ModelUUID.String)
+		err = tx.DeleteUserMappingsByModelUUID(ctx, migration.ModelUUID.String)
 		if err != nil {
 			return err
 		}
@@ -692,7 +703,7 @@ func (j *JujuManager) cleanupPartialModelMigration(ctx context.Context, migratio
 				Valid:  true,
 			},
 		}
-		err = j.Database.DeleteModel(ctx, &model)
+		err = tx.DeleteModel(ctx, &model)
 		if err != nil {
 			return err
 		}

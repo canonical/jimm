@@ -202,6 +202,8 @@ func (s *dbSuite) TestGetModelMigrationsCreatedBefore(c *qt.C) {
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(migrations, qt.HasLen, 1)
 	c.Assert(migrations[0].ModelUUID, qt.DeepEquals, migration.ModelUUID)
+	c.Assert(migrations[0].TargetController.ID, qt.Equals, controller.ID)
+	c.Assert(migrations[0].TargetController.UUID, qt.Equals, controller.UUID)
 
 	migrations, err = s.Database.GetIncomingModelMigrationsCreatedBefore(context.Background(), migration.CreatedAt.Add(-1*time.Hour))
 	c.Assert(err, qt.Equals, nil)
