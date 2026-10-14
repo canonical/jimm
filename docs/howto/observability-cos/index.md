@@ -21,6 +21,8 @@ JAAS supports the following COS applications:
 | {ref}`Alert rules <enable-alert-rules>` | Prometheus, Loki |
 | {ref}`Tracing <enable-tracing>`         | Tempo            |
 
+See the [JIMM metrics reference](metrics.md) for metric names, types, labels and descriptions.
+
 ```{toctree}
 :maxdepth: 1
 :hidden:
@@ -28,4 +30,5 @@ JAAS supports the following COS applications:
 Enable monitoring <enable-monitoring>
 Enable alert rules <enable-alert-rules>
 Enable tracing <enable-tracing>
+JIMM metrics reference <metrics>
 ```
