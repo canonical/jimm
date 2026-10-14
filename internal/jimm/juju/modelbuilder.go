@@ -579,6 +579,11 @@ func (b *modelBuilder) selectCloudCredentials() error {
 
 // CreateControllerModel uses provided information to create a new
 // model on the selected controller.
+//
+// The model is created as the calling user (so the controller records the
+// correct owner), but the credential update and JIMM model-admin grant
+// dial as superuser after enforcing authorisation, since users lack the
+// required permission on the backing controller.
 func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	if b.err != nil {
 		return b
@@ -589,19 +594,26 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 		return b
 	}
 
-	api, err := b.jujuManager.dialControllerAsSuperuser(b.ctx, b.ofgaUser, b.controller)
+	if b.credential != nil {
+		svcAPI, err := b.jujuManager.dialControllerAsSuperuser(b.ctx, b.ofgaUser, b.controller)
+		if err != nil {
+			b.err = err
+			return b
+		}
+		err = b.updateCredential(b.ctx, svcAPI, b.credential)
+		svcAPI.Close()
+		if err != nil {
+			b.err = fmt.Errorf("failed to update cloud credential: %w", err)
+			return b
+		}
+	}
+
+	api, err := b.jujuManager.dialControllerAsUser(b.ctx, b.ofgaUser, b.controller)
 	if err != nil {
 		b.err = err
 		return b
 	}
 	defer api.Close()
-
-	if b.credential != nil {
-		if err := b.updateCredential(b.ctx, api, b.credential); err != nil {
-			b.err = fmt.Errorf("failed to update cloud credential: %w", err)
-			return b
-		}
-	}
 
 	args, err := b.jujuModelCreateArgs()
 	if err != nil {
@@ -641,7 +653,15 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	// attempts to create a model with the same name again.
 	// TODO(JUJU-8869): We need to keep this despite encoding permissions in
 	// JWTs because Juju returns a different result on migrated models otherwise.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
+	svcAPI, err := b.jujuManager.dialControllerAsSuperuser(b.ctx, b.ofgaUser, b.controller)
+	if err != nil {
+		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
+		b.err = err
+		return b
+	}
+	err = svcAPI.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID))
+	svcAPI.Close()
+	if err != nil {
 		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
 		b.err = err
 		return b
