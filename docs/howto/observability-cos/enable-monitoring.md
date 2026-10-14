@@ -34,6 +34,8 @@ To integrate JAAS with the Grafana, Prometheus and Loki applications of your COS
 
 Once the relations settle, Grafana automatically provisions the JAAS dashboards — no manual import is needed.
 
+See the [JIMM metrics reference](metrics.md) for the available JIMM-specific metrics and their labels.
+
 ## Verify
 
 Open the Grafana UI of your COS deployment and log in. In the Grafana UI, open **Dashboards**. You should see the JAAS dashboards listed alongside the operator overview dashboards:
