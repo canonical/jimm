@@ -5,6 +5,7 @@ package juju_test
 import (
 	"context"
 	"database/sql"
+	stderr "errors"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/juju/juju/state"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
+	"gorm.io/gorm"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/errors"
@@ -110,7 +112,7 @@ func TestAbortMigration_Success(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Check the model has been deleted from the database.
 	model := &dbmodel.Model{
@@ -120,7 +122,7 @@ func TestAbortMigration_Success(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(ctx, model)
-	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Check that permissions for the user have been removed.
 	ok, err := user.IsModelAdmin(ctx, names.NewModelTag(migratingModelUUID))
@@ -144,7 +146,7 @@ func TestAbortMigration_MissingIncomingModel(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	err := j.AbortMigration(ctx, user, "foo")
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestCheckMachines_Success(t *testing.T) {
@@ -192,7 +194,7 @@ func TestCheckMachines_MissingIncomingModel(t *testing.T) {
 	user := openfga.NewUser(&dbUser, nil)
 
 	_, err := j.CheckMachines(ctx, user, "foo")
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestControllerDetailsForIncomingModel(t *testing.T) {
@@ -483,7 +485,7 @@ func TestPrechecks_MissingCloudRegion(t *testing.T) {
 	})
 
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test".*`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestPrechecks_MissingCloud(t *testing.T) {
@@ -513,7 +515,7 @@ func TestPrechecks_MissingCloud(t *testing.T) {
 	})
 
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `^failed to find region for cloud "test-not-found".*`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestPrechecks_MissingCloudCredential(t *testing.T) {
@@ -544,7 +546,7 @@ func TestPrechecks_MissingCloudCredential(t *testing.T) {
 	})
 
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `^cloudcredential "test/alice@canonical.com/test-cred-not-found" not found$`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestPrechecks_ControllerUnreachable(t *testing.T) {
@@ -553,7 +555,7 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 
 	api := &jimmtest.API{
 		Prechecks_: func(mmi params.MigrationModelInfo) error {
-			return errors.New("controller unreachable")
+			return errors.Codef(errors.CodeConnectionFailed, "controller unreachable")
 		},
 	}
 
@@ -577,7 +579,7 @@ func TestPrechecks_ControllerUnreachable(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `.*controller unreachable`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeConnectionFailed)
 }
 
 func TestPrechecks_MissingUserMapping(t *testing.T) {
@@ -651,7 +653,7 @@ func TestPrechecks_NoIncomingModelMigration(t *testing.T) {
 		CloudRegionName:     "test-region",
 	})
 	err := j.Prechecks(ctx, user, toJimmMigratingInfo(c, model, desc))
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestAdoptResources_Success(t *testing.T) {
@@ -698,7 +700,7 @@ func TestAdoptResources_NoModel(t *testing.T) {
 	j := newTestJujuManager(c, nil)
 
 	err := j.AdoptResources(ctx, nil, "foo", version.MustParse("3.6.9"))
-	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 const testEnvWithIncomingMigrationAndModel = `clouds:
@@ -798,7 +800,7 @@ func TestActivate_Success(t *testing.T) {
 	}
 	// Check the model migration has been removed from the database.
 	err = j.Database.GetIncomingModelMigration(ctx, &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	var count int64
 	err = j.Database.DB.Model(&dbmodel.UserMapping{}).Count(&count).Error
@@ -835,7 +837,7 @@ func TestActivate_APIFailure(t *testing.T) {
 	// Simulate an API failure.
 	api := &jimmtest.API{
 		Activate_: func(modelUUID string, sourceInfo migration.SourceControllerInfo, relatedModels []string) error {
-			return errors.New("API failure")
+			return errors.Codef(errors.CodeServerError, "API failure")
 		},
 	}
 
@@ -852,7 +854,7 @@ func TestActivate_APIFailure(t *testing.T) {
 	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	err := j.Activate(ctx, user, names.NewModelTag(migratingModelUUID), sourceInfo, relatedModels)
-	c.Assert(err, qt.ErrorMatches, `.*API failure`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeServerError)
 
 	modelMigration := dbmodel.IncomingModelMigration{
 		ModelUUID: sql.NullString{
@@ -878,7 +880,7 @@ func TestActivate_NoIncomingModelMigration(t *testing.T) {
 	user := openfga.NewUser(&dbUser, j.OpenFGAClient)
 
 	err := j.Activate(ctx, user, names.NewModelTag("foo"), migration.SourceControllerInfo{}, nil)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 type modelDescriptionArgs struct {
@@ -1159,7 +1161,7 @@ func TestImport_MissingCloudCredentialsFromDescription(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(ctx, m)
-	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestImport_UserNotFoundInUserMapping(t *testing.T) {
@@ -1202,7 +1204,7 @@ func TestImport_UserNotFoundInUserMapping(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(ctx, m)
-	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 //nolint:gosec // Test fixtures intentionally include cloud credential names.
@@ -1237,7 +1239,7 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, `.*failed to import model from description: cloudcredential \S+ not found$`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{
@@ -1247,7 +1249,7 @@ func TestImport_MissingCloudCredentialFromJIMMState(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(ctx, m)
-	c.Assert(err, qt.ErrorMatches, ".*not found.*")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 }
 
 func TestImport_APIFailure(t *testing.T) {
@@ -1258,7 +1260,7 @@ func TestImport_APIFailure(t *testing.T) {
 	// of the model description, where the owner is replaced with an external user.
 	api := &jimmtest.API{
 		Import_: func(bytes []byte) error {
-			return errors.New("API failure")
+			return errors.Codef(errors.CodeServerError, "API failure")
 		},
 	}
 
@@ -1287,7 +1289,7 @@ func TestImport_APIFailure(t *testing.T) {
 	err = j.Import(ctx, user, params.SerializedModel{
 		Bytes: bytes,
 	})
-	c.Assert(err, qt.ErrorMatches, `.*failed to import model: API failure$`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeServerError)
 
 	// Check the model is created in the database with migration mode set to importing.
 	m := &dbmodel.Model{
@@ -1374,13 +1376,33 @@ incoming-migrations:
 func TestCleanupPartialModelMigrations(t *testing.T) {
 	c := qt.New(t)
 
-	j := newTestJujuManager(c, nil)
+	var j *juju.JujuManager
+	var aborted []string
+	dialer := &jimmtest.Dialer{
+		API: &jimmtest.API{
+			Abort_: func(uuid string) error {
+				incoming := dbmodel.IncomingModelMigration{
+					ModelUUID: sql.NullString{String: uuid, Valid: true},
+				}
+				c.Check(j.Database.GetIncomingModelMigration(t.Context(), &incoming), qt.IsNil)
+				aborted = append(aborted, uuid)
+				return nil
+			},
+		},
+	}
+	j = newTestJujuManager(c, &parameters{Dialer: dialer})
 
 	env := jimmtest.ParseEnvironment(c, testCleanupEnv)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
 
 	err := j.CleanupPartialModelMigrations(t.Context())
 	c.Assert(err, qt.IsNil)
+	c.Assert(aborted, qt.ContentEquals, []string{
+		env.IncomingMigrations[1].ModelUUID,
+		env.IncomingMigrations[2].ModelUUID,
+		env.IncomingMigrations[3].ModelUUID,
+	})
+	c.Assert(dialer.IsClosed(), qt.IsTrue)
 
 	// Check the first incoming migration is kept.
 	modelMigration := dbmodel.IncomingModelMigration{
@@ -1400,7 +1422,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	userMapping := dbmodel.UserMapping{
 		ModelUUID:        modelMigration.ModelUUID,
@@ -1408,7 +1430,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		ExternalUserName: "alice@canonical.com",
 	}
 	err = j.Database.GetUserMapping(t.Context(), &userMapping)
-	c.Assert(err, qt.ErrorMatches, `.*user mapping not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Check the model has been deleted.
 	model := &dbmodel.Model{
@@ -1418,7 +1440,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(t.Context(), model)
-	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Check the third incoming migration has been deleted, with its model.
 	modelMigration = dbmodel.IncomingModelMigration{
@@ -1428,7 +1450,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	model = &dbmodel.Model{
 		UUID: sql.NullString{
@@ -1437,7 +1459,7 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetModel(t.Context(), model)
-	c.Assert(err, qt.ErrorMatches, `.*model not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
 
 	// Check the fourth incoming migration has been deleted.
 	modelMigration = dbmodel.IncomingModelMigration{
@@ -1447,5 +1469,153 @@ func TestCleanupPartialModelMigrations(t *testing.T) {
 		},
 	}
 	err = j.Database.GetIncomingModelMigration(t.Context(), &modelMigration)
-	c.Assert(err, qt.ErrorMatches, `.*model migration not found`)
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+}
+
+func TestCleanupPartialModelMigrations_DialFailure(t *testing.T) {
+	c := qt.New(t)
+	ctx := t.Context()
+	abortCalled := false
+	dialer := &jimmtest.Dialer{
+		Err: errors.Codef(errors.CodeConnectionFailed, "dial failure"),
+		API: &jimmtest.API{
+			Abort_: func(uuid string) error {
+				abortCalled = true
+				return nil
+			},
+		},
+	}
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+	env := jimmtest.ParseEnvironment(c, testCleanupEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	err := j.CleanupPartialModelMigrations(ctx)
+	var cleanupErr *errors.Error
+	c.Assert(stderr.As(err, &cleanupErr), qt.IsTrue)
+	c.Assert(errors.ErrorCode(cleanupErr), qt.Equals, errors.CodeConnectionFailed)
+	c.Assert(dialer.IsClosed(), qt.IsTrue)
+	c.Assert(abortCalled, qt.IsFalse)
+
+	for _, migration := range env.IncomingMigrations {
+		incoming := dbmodel.IncomingModelMigration{
+			ModelUUID: sql.NullString{String: migration.ModelUUID, Valid: true},
+		}
+		c.Assert(j.Database.GetIncomingModelMigration(ctx, &incoming), qt.IsNil)
+	}
+	mapping := dbmodel.UserMapping{
+		ModelUUID:        sql.NullString{String: env.IncomingMigrations[1].ModelUUID, Valid: true},
+		LocalUser:        "bob",
+		ExternalUserName: "alice@canonical.com",
+	}
+	c.Assert(j.Database.GetUserMapping(ctx, &mapping), qt.IsNil)
+	model := dbmodel.Model{UUID: mapping.ModelUUID}
+	c.Assert(j.Database.GetModel(ctx, &model), qt.IsNil)
+}
+
+func TestCleanupPartialModelMigrations_AbortFailure(t *testing.T) {
+	c := qt.New(t)
+	ctx := t.Context()
+	failedUUID := "00000000-0000-0000-0000-000000000002"
+	var aborted []string
+	dialer := &jimmtest.Dialer{
+		API: &jimmtest.API{
+			Abort_: func(uuid string) error {
+				aborted = append(aborted, uuid)
+				if uuid == failedUUID {
+					return errors.New("abort failure")
+				}
+				return nil
+			},
+		},
+	}
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+	env := jimmtest.ParseEnvironment(c, testCleanupEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	err := j.CleanupPartialModelMigrations(ctx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(dialer.IsClosed(), qt.IsTrue)
+	c.Assert(aborted, qt.ContentEquals, []string{
+		env.IncomingMigrations[1].ModelUUID,
+		env.IncomingMigrations[2].ModelUUID,
+		env.IncomingMigrations[3].ModelUUID,
+	})
+
+	for _, migration := range env.IncomingMigrations[1:] {
+		incoming := dbmodel.IncomingModelMigration{
+			ModelUUID: sql.NullString{String: migration.ModelUUID, Valid: true},
+		}
+		c.Assert(errors.ErrorCode(j.Database.GetIncomingModelMigration(ctx, &incoming)), qt.Equals, errors.CodeNotFound)
+	}
+	mapping := dbmodel.UserMapping{
+		ModelUUID:        sql.NullString{String: failedUUID, Valid: true},
+		LocalUser:        "bob",
+		ExternalUserName: "alice@canonical.com",
+	}
+	c.Assert(errors.ErrorCode(j.Database.GetUserMapping(ctx, &mapping)), qt.Equals, errors.CodeNotFound)
+	model := dbmodel.Model{UUID: mapping.ModelUUID}
+	c.Assert(errors.ErrorCode(j.Database.GetModel(ctx, &model)), qt.Equals, errors.CodeNotFound)
+}
+
+func TestCleanupPartialModelMigrations_DeleteFailure(t *testing.T) {
+	c := qt.New(t)
+	ctx := t.Context()
+	failedUUID := "00000000-0000-0000-0000-000000000002"
+	var aborted []string
+	dialer := &jimmtest.Dialer{
+		API: &jimmtest.API{
+			Abort_: func(uuid string) error {
+				aborted = append(aborted, uuid)
+				return nil
+			},
+		},
+	}
+	j := newTestJujuManager(c, &parameters{Dialer: dialer})
+	env := jimmtest.ParseEnvironment(c, testCleanupEnv)
+	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+	const callback = "test:fail_model_delete"
+	err := j.Database.DB.Callback().Delete().Before("gorm:delete").Register(callback, func(tx *gorm.DB) {
+		model, ok := tx.Statement.Dest.(*dbmodel.Model)
+		if ok && model.UUID.String == failedUUID {
+			_ = tx.AddError(errors.Codef(errors.CodeServerError, "delete failure"))
+		}
+	})
+	c.Assert(err, qt.IsNil)
+	t.Cleanup(func() {
+		c.Check(j.Database.DB.Callback().Delete().Remove(callback), qt.IsNil)
+	})
+
+	err = j.CleanupPartialModelMigrations(ctx)
+	var cleanupErr *errors.Error
+	c.Assert(stderr.As(err, &cleanupErr), qt.IsTrue)
+	c.Assert(errors.ErrorCode(cleanupErr), qt.Equals, errors.CodeServerError)
+	c.Assert(dialer.IsClosed(), qt.IsTrue)
+	c.Assert(aborted, qt.ContentEquals, []string{
+		env.IncomingMigrations[1].ModelUUID,
+		env.IncomingMigrations[2].ModelUUID,
+		env.IncomingMigrations[3].ModelUUID,
+	})
+
+	// A failed database cleanup must retain all records for the next attempt.
+	incoming := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{String: failedUUID, Valid: true},
+	}
+	c.Assert(j.Database.GetIncomingModelMigration(ctx, &incoming), qt.IsNil)
+	mapping := dbmodel.UserMapping{
+		ModelUUID:        incoming.ModelUUID,
+		LocalUser:        "bob",
+		ExternalUserName: "alice@canonical.com",
+	}
+	c.Assert(j.Database.GetUserMapping(ctx, &mapping), qt.IsNil)
+	model := dbmodel.Model{UUID: incoming.ModelUUID}
+	c.Assert(j.Database.GetModel(ctx, &model), qt.IsNil)
+
+	// Failure for one migration must not prevent cleanup of the others.
+	for _, migration := range env.IncomingMigrations[2:] {
+		incoming := dbmodel.IncomingModelMigration{
+			ModelUUID: sql.NullString{String: migration.ModelUUID, Valid: true},
+		}
+		c.Assert(errors.ErrorCode(j.Database.GetIncomingModelMigration(ctx, &incoming)), qt.Equals, errors.CodeNotFound)
+	}
 }

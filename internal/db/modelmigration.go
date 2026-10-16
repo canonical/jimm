@@ -142,6 +142,7 @@ func (d *Database) GetIncomingModelMigrationsCreatedBefore(ctx context.Context, 
 	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
 
 	db := d.DB.WithContext(ctx)
+	db = db.Preload("TargetController")
 
 	if err := db.Where("created_at < ?", createBefore).Find(&migrations).Error; err != nil {
 		return nil, dbError(err)
