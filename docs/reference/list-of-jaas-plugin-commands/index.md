@@ -816,15 +816,19 @@ List all permissions
 
     juju list-permissions
 
-List directly assigned permissions for an entity across resource types
+List permissions directly assigned to Alice across resource types
 
     juju list-permissions --object user-alice@canonical.com
 
-List permissions where the target object match
+List permissions that grant access to a model
 
     juju list-permissions --target model-mymodel
 
-List permissions where the target object and relation match
+List permissions between Alice and a specific model
+
+    juju list-permissions --object user-alice@canonical.com --target model-mymodel
+
+List permissions on a model where the relation is administrator
 
     juju list-permissions --target model-mymodel --relation administrator
 
