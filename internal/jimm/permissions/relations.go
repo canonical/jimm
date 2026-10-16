@@ -263,13 +263,22 @@ func (j *PermissionManager) CheckRelations(ctx context.Context, user *openfga.Us
 }
 
 // ListRelationshipTuples checks user permission and lists relationship tuples based of tuple struct with pagination.
-// Listing filters can be relaxed: optionally exclude tuple.Relation or tuple.Object or specify only tuple.TargetObject.Kind.
+// Listing filters can be relaxed: optionally exclude tuple.Relation or tuple.Object,
+// specify only tuple.TargetObject.Kind, or list an object's direct relations across resource kinds.
 func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *openfga.User, tuple apiparams.RelationshipTuple, pageSize int32, continuationToken string) ([]openfga.Tuple, string, error) {
 
 	if !user.JimmAdmin {
 		return nil, "", errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
-	// if targetObject is not specified returns all tuples.
+	if tuple.TargetObject == "" && tuple.Object != "" {
+		relation, err := ofganames.ParseRelation(tuple.Relation)
+		if err != nil {
+			return nil, "", errors.Codef(errors.CodeBadRequest, "%w", err)
+		}
+		tuples, token, err := j.listObjectRelations(ctx, user, tuple.Object, relation, pageSize, pagination.NewEntitlementToken(continuationToken))
+		return tuples, token.String(), err
+	}
+	// Without an object or target, return all tuples.
 	parsedTuple := &openfga.Tuple{}
 	var err error
 	if tuple.TargetObject != "" {
@@ -277,8 +286,6 @@ func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *op
 		if err != nil {
 			return nil, "", err
 		}
-	} else if tuple.Object != "" {
-		return nil, "", errors.Codef(errors.CodeBadRequest, "it is invalid to pass an object without a target object.")
 	}
 
 	responseTuples, ct, err := j.authSvc.ReadRelatedObjects(ctx, *parsedTuple, pageSize, continuationToken)
@@ -293,18 +300,21 @@ func (j *PermissionManager) ListRelationshipTuples(ctx context.Context, user *op
 //
 // This functions provides a slightly higher-level abstraction in favor of ListRelationshipTuples.
 func (j *PermissionManager) ListObjectRelations(ctx context.Context, user *openfga.User, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+	return j.listObjectRelations(ctx, user, object, "", pageSize, entitlementToken)
+}
 
+func (j *PermissionManager) listObjectRelations(ctx context.Context, user *openfga.User, object string, relation openfga.Relation, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
 	var e pagination.EntitlementToken
 	if !user.JimmAdmin {
 		return nil, e, errors.Codef(errors.CodeUnauthorized, "unauthorized")
 	}
-	responseTuples, nextToken, err := j.getObjectRelationsPage(ctx, object, pageSize, entitlementToken)
+	responseTuples, nextToken, err := j.getObjectRelationsPage(ctx, object, relation, pageSize, entitlementToken)
 	if err != nil {
 		return nil, e, err
 	}
 	// verify next page contains some entries. Otherwise return empty nextToken.
 	if len(responseTuples) == int(pageSize) && nextToken.String() != "" {
-		responseTuples, _, err := j.getObjectRelationsPage(ctx, object, 1, nextToken)
+		responseTuples, _, err := j.getObjectRelationsPage(ctx, object, relation, 1, nextToken)
 		if err != nil {
 			return nil, e, fmt.Errorf("error getting next page to verify it cointains something: %w", err)
 		}
@@ -325,10 +335,10 @@ func (j *PermissionManager) ListResources(ctx context.Context, user *openfga.Use
 	return j.store.ListResources(ctx, filter.Limit(), filter.Offset(), namePrefixFilter, typeFilter)
 }
 
-func (j *PermissionManager) getObjectRelationsPage(ctx context.Context, object string, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
+func (j *PermissionManager) getObjectRelationsPage(ctx context.Context, object string, relation openfga.Relation, pageSize int32, entitlementToken pagination.EntitlementToken) ([]openfga.Tuple, pagination.EntitlementToken, error) {
 	var err error
 	var e pagination.EntitlementToken
-	tuple := &openfga.Tuple{}
+	tuple := &openfga.Tuple{Relation: relation}
 	tuple.Object, err = j.parseAndValidateTag(ctx, object)
 	if err != nil {
 		return nil, e, err

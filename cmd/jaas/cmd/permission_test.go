@@ -260,6 +260,30 @@ func TestListPermissionsTabular(t *testing.T) {
 	c.Assert(output, qt.Contains, "\nuser-alice@canonical.com\tmember  \tgroup-mygroup")
 }
 
+func TestListPermissionsObjectOnly(t *testing.T) {
+	c := qt.New(t)
+	cmdMocks := setupCmdMocks(c)
+	command := &listPermissionsCommand{}
+	command.SetClientStore(cmdMocks.store)
+	command.setJIMMAPI(cmdMocks.client)
+	initCommand(c, command, "--object", "user-alice@canonical.com")
+	ctx := newTestContext(c)
+
+	cmdMocks.client.EXPECT().
+		ListRelationshipTuples(gomock.Any()).
+		DoAndReturn(func(req *params.ListRelationshipTuplesRequest) (*params.ListRelationshipTuplesResponse, error) {
+			c.Assert(req.Tuple, qt.Equals, params.RelationshipTuple{Object: "user-alice@canonical.com"})
+			c.Assert(req.PageSize, qt.Equals, int32(defaultPageSize))
+			return &params.ListRelationshipTuplesResponse{Tuples: []params.RelationshipTuple{{
+				Object: "user-alice@canonical.com", Relation: "administrator", TargetObject: "controller-example",
+			}}}, nil
+		})
+	cmdMocks.client.EXPECT().Close()
+
+	c.Assert(command.Run(ctx), qt.IsNil)
+	c.Assert(ctx.Stdout.(*bytes.Buffer).String(), qt.Contains, "controller-example")
+}
+
 func makeTempFile(c *qt.C, name, contents string) string {
 	tmpDir := os.TempDir()
 	c.Cleanup(func() {
