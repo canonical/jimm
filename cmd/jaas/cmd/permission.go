@@ -143,6 +143,9 @@ Verifies access to a resource.
 	listPermissionsDoc = `
 List permissions known to JIMM. Using the "target", "relation" and "object" flags,
 only those permissions matching the filter will be returned.
+Only directly stored relations are listed; inherited permissions are not expanded.
+For example, a controller administrator may have effective writer access to its
+models, but this command shows only the administrator relation on the controller.
 `
 
 	listPermissionsExample = `
@@ -150,13 +153,21 @@ List all permissions
 
     juju list-permissions
 
+List directly assigned permissions for an entity across resource types
+
+    juju list-permissions --object user-alice@canonical.com
+
 List permissions where the target object match
 
     juju list-permissions --target model-mymodel
 
 List permissions where the target object and relation match
 
-    juju list-permissions --target model-mymodel  --relation admin
+    juju list-permissions --target model-mymodel --relation administrator
+
+List grants assigned to a group's members
+
+    juju list-permissions --object 'group-admin#member'
 `
 )
 

@@ -219,6 +219,30 @@ func (s *permissionManagerSuite) TestCheckRelationUsesUserIDPGroupsAsContextualT
 	c.Assert(results[0].Error, qt.IsNil)
 }
 
+func (s *permissionManagerSuite) TestListRelationshipTuplesObjectOnly(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+	user, _, controller, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	tuples := []apiparams.RelationshipTuple{
+		{Object: user.Tag().String(), Relation: "administrator", TargetObject: controller.ResourceTag().String()},
+		{Object: user.Tag().String(), Relation: "reader", TargetObject: model.ResourceTag().String()},
+	}
+	c.Assert(s.manager.AddRelation(ctx, s.adminUser, tuples), qt.IsNil)
+
+	got, _, err := s.manager.ListRelationshipTuples(ctx, s.adminUser, apiparams.RelationshipTuple{
+		Object: user.Tag().String(),
+	}, 10, "")
+	c.Assert(err, qt.IsNil)
+	c.Assert(got, qt.HasLen, 2)
+	c.Assert(got[0].Object.ID, qt.Equals, user.Name)
+	c.Assert(got[1].Object.ID, qt.Equals, user.Name)
+	targetIDs := []string{got[0].Target.ID, got[1].Target.ID}
+	slices.Sort(targetIDs)
+	wantTargetIDs := []string{controller.UUID, model.UUID.String}
+	slices.Sort(wantTargetIDs)
+	c.Assert(targetIDs, qt.DeepEquals, wantTargetIDs)
+}
+
 func (s *permissionManagerSuite) TestCheckRelationFetchesTargetUserIDPGroups(c *qt.C) {
 	c.Parallel()
 	ctx := context.Background()
