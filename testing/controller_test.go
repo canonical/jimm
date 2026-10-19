@@ -191,6 +191,12 @@ func TestControllerConfig(t *testing.T) {
 	c.Assert(config["ssh-host-key"], qt.Equals, s.JIMM.ControllerConfig.SSHPublicHostKey)
 	// the reason we need to cast to float64 is because it is a map[string]interface{} and the json marshaller defaults to float64.
 	c.Assert(config[jujucontroller.SSHServerPort], qt.Equals, float64(s.JIMM.ControllerConfig.SSHPort))
+
+	var sshPort jujuparams.SSHControllerSSHPortResult
+	err = base.NewFacadeCaller(conn, "Controller").FacadeCall(t.Context(), "SSHServerPort", nil, &sshPort)
+	c.Assert(err, qt.Equals, nil)
+	c.Assert(sshPort.Error == nil, qt.IsTrue)
+	c.Assert(sshPort.Port, qt.Equals, s.JIMM.ControllerConfig.SSHPort)
 }
 
 func TestWatchModelSummaries(t *testing.T) {

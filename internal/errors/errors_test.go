@@ -80,3 +80,13 @@ func TestErrorCodeWithJujuRPC(t *testing.T) {
 	c.Check(string(errors.ErrorCode(wrappedErr)), qt.Equals, "my-code")
 	c.Check(errors.ErrorInfo(wrappedErr), qt.DeepEquals, map[string]any{"key": "value"})
 }
+
+func TestErrorCodePreservedByFmtWrap(t *testing.T) {
+	c := qt.New(t)
+
+	dbErr := errors.Codef(errors.CodeNotFound, "model not found")
+	err := fmt.Errorf("failed to find model: %w", dbErr)
+
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeNotFound)
+	c.Check(stderr.Is(err, dbErr), qt.IsTrue)
+}

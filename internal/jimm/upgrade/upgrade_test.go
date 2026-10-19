@@ -20,6 +20,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	jimmerrors "github.com/canonical/jimm/v3/internal/errors"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade/mocks"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
@@ -383,7 +384,7 @@ func TestUpgradeModel_RejectsZeroTargetVersion(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, ".*target version cannot be zero.*")
 }
 
-func TestUpgradeModel_ModelNotFound(t *testing.T) {
+func TestUpgradeModel_GetModelError(t *testing.T) {
 	s := setupTest(t)
 	c := qt.New(t)
 
@@ -400,10 +401,32 @@ func TestUpgradeModel_ModelNotFound(t *testing.T) {
 	)
 	c.Assert(err, qt.IsNil)
 
-	s.store.EXPECT().GetModel(gomock.Any(), gomock.Any()).Return(errors.New("db error"))
+	tests := []struct {
+		about string
+		err   error
+		code  jimmerrors.Code
+	}{
+		{
+			about: "not found",
+			err:   jimmerrors.Codef(jimmerrors.CodeNotFound, "not found"),
+			code:  jimmerrors.CodeNotFound,
+		},
+		{
+			about: "database failure",
+			err:   errors.New("db error"),
+			code:  "",
+		},
+	}
 
-	err = upgradeMgr.UpgradeModel(ctx, modelUUID, targetVersion)
-	c.Assert(err, qt.ErrorMatches, ".*model not found.*")
+	for _, test := range tests {
+		c.Run(test.about, func(c *qt.C) {
+			s.store.EXPECT().GetModel(gomock.Any(), gomock.Any()).Return(test.err)
+
+			err = upgradeMgr.UpgradeModel(ctx, modelUUID, targetVersion)
+			c.Assert(jimmerrors.ErrorCode(err), qt.Equals, test.code)
+			c.Assert(err, qt.ErrorMatches, ".*"+test.err.Error()+".*")
+		})
+	}
 }
 
 func TestUpgradeModel_AlreadyAtTargetDoesNotCallUpgrade(t *testing.T) {

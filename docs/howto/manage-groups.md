@@ -115,11 +115,23 @@ juju add-permission idpgroup-canonical#member administrator model-mycontroller/m
 
 > See more: {doc}`juju add-permission <../reference/jaas-plugin>`
 
-### Limitations when checking indirect access
+### Hook-service group lookup
 
-IdP group membership is provided in the group claim when a user logs in. As a result, commands that need to evaluate another user's permissions cannot determine that user's indirect access through an IdP. 
+The hook-service is a separate service in the Identity Platform's infrastructure cluster. It exposes a gRPC API that JIMM can call to retrieve a user's current IdP group memberships. JIMM obtains an access token from the IdP using the client ID and secret for JIMM's OAuth client and the client-credentials grant, then sends that token as a bearer token to the hook-service. The client ID and secret are used with the IdP; they are not sent to the hook-service. JIMM's current hook-service client uses gRPC without TLS, so configure a direct route to the hook-service over a protected internal network.
 
-For example, `juju jaas check-permission` cannot reliably check a user's access inherited from an IdP group, and `juju show-model` does not list users whose access comes through IdP group membership. The same limitation applies to any command that relies on another user's permissions.
+### Where JIMM uses the hook-service
+
+The hook-service provides JIMM with a user's current IdP groups when JIMM needs to evaluate that user outside their own login session. JIMM calls the hook-service in these cases:
+
+- When JIMM checks a different user's permissions from those of the logged-in user. This includes permission or relationship checks, such as `juju check-permission`, and looking up that user's JIMM controller access.
+- When JIMM authorizes an SSH user, so that access granted through the user's IdP groups can be considered.
+- When JIMM checks whether a user may consume a cross-model application offer during offer discharge.
+
+For each lookup, JIMM asks the hook-service for groups associated with the user's identifier and uses them for authorization checks. JIMM does not create or persist the groups.
+
+If a lookup fails during a permission or relationship check, controller access lookup, or SSH authorization, that operation fails before it can complete the authorization check. A hook-service outage can therefore interrupt these operations even if the user might otherwise have direct access. Offer discharge is an exception: if a lookup fails, JIMM logs the failure and continues without the user's group memberships, so group-based access cannot be established for that check.
+
+The remaining known limitation is `juju show-model`, which does not list users whose access comes through IdP group membership.
 
 (configure-jimm-IdP-groups)=
 ## Configure JIMM's charm to accept group claims
@@ -127,10 +139,23 @@ There are two ways to configure JIMM's charm for IdP group claims, and it depend
 If the identity platform was configured to emit the group claim by default you will need to change the `oauth-group-claim-key` charm config with the key where JIMM will find the group claim (e.g. `groups`).
 If the identity platform is configured to _optionally_ offer the group claim then additionally configure both `oauth-client-credential-scopes` and `oauth-optional-scopes` (e.g. `groups`) to request group claims when authenticating client-credentials and users, respectively.
 
+### Configure the hook-service connection
+
+Configure these JIMM charm options to enable the hook-service fetcher and tell JIMM where to connect:
+
+```yaml
+idp-group-fetcher-type: hook-service
+idp-hook-service-address: hook-service.internal:9090
+```
+
+`idp-group-fetcher-type` selects the group lookup implementation; set it to `hook-service`. Leave it empty to disable hook-service group fetching. `idp-hook-service-address` is the hook-service gRPC address in `host:port` form and is required when the fetcher type is `hook-service`. Replace the example address with the address of the hook-service that is reachable from JIMM.
+
+The `client_credentials` grant must be enabled on the IdP side for JIMM's OAuth client. It is not a JIMM charm option.
+
 (migrate-to-IdP-groups)=
 ## Migrate from JAAS groups to IdP groups
 
-JAAS groups are deprecated and will be removed in the `v4` release of JAAS. To migrate, move group membership management to your IdP and replace JAAS group permission assignments with IdP-group permission assignments.
+To migrate from JAAS groups to IdP groups, move group membership management to your IdP and replace JAAS group permission assignments with IdP-group permission assignments.
 
 The high-level migration steps are:
 
@@ -143,7 +168,7 @@ The high-level migration steps are:
 
 The following example shows how to migrate a typical local-group setup to IdP groups using the [Terraform Provider for Juju](https://documentation.ubuntu.com/terraform-provider-juju/).
 
-**Before — JAAS groups (deprecated, `v3` only):**
+**Before — JAAS groups:**
 
 ```hcl
 # Create a group in JAAS:
