@@ -88,13 +88,8 @@ func TestPrechecksV2_ModifiesEnvelope(t *testing.T) {
 			c.Check(envelope.ModelInfo.CredentialOwner, qt.Equals, "alice@canonical.com")
 			c.Check(envelope.ModelCredential.Owner, qt.Equals, "alice@canonical.com")
 
-			// Model permissions are dropped and offer permissions are remapped.
-			c.Check(envelope.Permissions, qt.DeepEquals, []params.ModelPermission{{
-				ObjectType:  "offer",
-				GrantOn:     offerUUID,
-				SubjectName: "alice@canonical.com",
-				Access:      "admin",
-			}})
+			// All permissions are dropped.
+			c.Check(envelope.Permissions, qt.HasLen, 0)
 
 			// SSH keys are dropped.
 			c.Check(envelope.AuthorizedKeys, qt.HasLen, 0)
@@ -164,28 +159,16 @@ func TestPrechecksV2_ValidatesUserMapping(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jack\" who has consume access to offer "test-offer"$.*`)
 }
 
-func TestPrechecksV2_SkipsEveryoneUser(t *testing.T) {
+func TestPrechecksV2_ExternalUsersNotInMapping(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	// Validate that permissions for the everyone user are kept as-is
-	// and the everyone user is not added to the user list.
+	// Validate that external users with access to the model or its offers,
+	// including the everyone user, don't need to be in the user mapping.
+	prechecksCalled := false
 	api := &jimmtest.API{
 		PrechecksV2_: func(_ context.Context, envelope params.SerializedModelV2) error {
-			c.Check(envelope.Permissions, qt.ContentEquals, []params.ModelPermission{{
-				ObjectType:  "offer",
-				GrantOn:     offerUUID,
-				SubjectName: "alice@canonical.com",
-				Access:      "admin",
-			}, {
-				ObjectType:  "offer",
-				GrantOn:     offerUUID,
-				SubjectName: "everyone@external",
-				Access:      "read",
-			}})
-			for _, u := range envelope.Users {
-				c.Check(u.Name, qt.Not(qt.Equals), "everyone@external")
-			}
+			prechecksCalled = true
 			return nil
 		},
 	}
@@ -204,6 +187,16 @@ func TestPrechecksV2_SkipsEveryoneUser(t *testing.T) {
 
 	envelope := newTestEnvelope()
 	envelope.Permissions = append(envelope.Permissions, params.ModelPermission{
+		ObjectType:  "model",
+		GrantOn:     migratingModelUUID,
+		SubjectName: "dave@ubuntu.com",
+		Access:      "read",
+	}, params.ModelPermission{
+		ObjectType:  "offer",
+		GrantOn:     offerUUID,
+		SubjectName: "dave@ubuntu.com",
+		Access:      "consume",
+	}, params.ModelPermission{
 		ObjectType:  "offer",
 		GrantOn:     offerUUID,
 		SubjectName: "everyone@external",
@@ -212,22 +205,18 @@ func TestPrechecksV2_SkipsEveryoneUser(t *testing.T) {
 
 	err := j.PrechecksV2(ctx, user, envelope)
 	c.Assert(err, qt.IsNil)
+	c.Assert(prechecksCalled, qt.IsTrue)
 }
 
 func TestPrechecksV2_SkippedUser(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
-	// Validate that a local user intentionally left unmapped loses
-	// their offer permissions.
+	// Validate that a local user intentionally left unmapped passes the user
+	// mapping validation, and isn't added to the user list.
 	api := &jimmtest.API{
 		PrechecksV2_: func(_ context.Context, envelope params.SerializedModelV2) error {
-			c.Check(envelope.Permissions, qt.DeepEquals, []params.ModelPermission{{
-				ObjectType:  "offer",
-				GrantOn:     offerUUID,
-				SubjectName: "alice@canonical.com",
-				Access:      "admin",
-			}})
+			c.Check(envelope.Permissions, qt.HasLen, 0)
 			for _, u := range envelope.Users {
 				c.Check(u.Name, qt.Not(qt.Equals), "jack")
 			}
@@ -269,8 +258,8 @@ func TestPrechecksV2_UserListDeduplicated(t *testing.T) {
 	ctx := context.Background()
 
 	// Validate that when several local users are mapped to the same external
-	// user, that user appears only once in the envelope's user list. The model
-	// owner, credential owner and offer users below all map to it.
+	// user, that user appears only once in the envelope's user list. Below, the
+	// model owner (bob) and credential owner (carol) both map to it.
 	api := &jimmtest.API{
 		PrechecksV2_: func(_ context.Context, envelope params.SerializedModelV2) error {
 			c.Check(envelope.Users, qt.HasLen, 1)
@@ -301,12 +290,8 @@ func TestPrechecksV2_UserListDeduplicated(t *testing.T) {
 
 	envelope := newTestEnvelope()
 	envelope.Users = append(envelope.Users, params.ModelUser{Name: "carol"})
-	envelope.Permissions = append(envelope.Permissions, params.ModelPermission{
-		ObjectType:  "offer",
-		GrantOn:     offerUUID,
-		SubjectName: "carol",
-		Access:      "consume",
-	})
+	envelope.ModelInfo.CredentialOwner = "carol"
+	envelope.ModelCredential.Owner = "carol"
 
 	err = j.PrechecksV2(ctx, user, envelope)
 	c.Assert(err, qt.IsNil)

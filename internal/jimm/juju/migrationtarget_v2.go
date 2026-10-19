@@ -17,7 +17,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/db"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
 	"github.com/canonical/jimm/v3/internal/openfga"
-	ofganames "github.com/canonical/jimm/v3/internal/openfga/names"
 )
 
 // The methods in this file implement model migration into JIMM for Juju 4.1+
@@ -201,8 +200,9 @@ func offersFromPayload(payload []byte) ([]importingOffer, error) {
 	return offers, nil
 }
 
-// validateUserMappingV2 checks that the provided user mapping contains all the users
-// that either have access to the model or have access to any application offers in the model.
+// validateUserMappingV2 checks that the provided user mapping contains all the local
+// users that either have access to the model or have access to any application offers
+// in the model. External users don't need a mapping.
 func validateUserMappingV2(envelope jujuparams.SerializedModelV2, offers []importingOffer, userMapping dbmodel.StringMap) error {
 	offerNames := make(map[string]string, len(offers))
 	for _, o := range offers {
@@ -211,7 +211,8 @@ func validateUserMappingV2(envelope jujuparams.SerializedModelV2, offers []impor
 
 	var missingUserMessages []string
 	for _, p := range envelope.Permissions {
-		if p.SubjectName == ofganames.EveryoneUser {
+		if names.IsValidUser(p.SubjectName) && !names.NewUserTag(p.SubjectName).IsLocal() {
+			// External users, including everyone@external, don't need a mapping.
 			continue
 		}
 		if _, ok := userMapping[p.SubjectName]; ok {
@@ -233,15 +234,13 @@ func validateUserMappingV2(envelope jujuparams.SerializedModelV2, offers []impor
 // modifyEnvelope is the SerializedModelV2 equivalent of modifyModelDescription.
 // It replaces local user references with their external mapping:
 //   - the model qualifier (the model owner in Juju 4),
-//   - the cloud credential owner,
-//   - users with access to application offers.
+//   - the cloud credential owner.
 //
-// Only offer permissions are kept. Model and any other permissions, and SSH
-// keys, are dropped, as access is managed by JIMM.
+// All permissions and SSH keys are dropped, as access is managed by JIMM.
 //
-// A Juju 4.1 target only accepts permissions for users it knows, and it learns
-// users from the envelope's user list. So the user list is replaced with an
-// entry for every user referenced after mapping.
+// A Juju 4.1 target creates the model's cloud credential under its owner, and
+// requires that user to exist. It learns users from the envelope's user list, so
+// the user list is replaced with the mapped model owner and credential owner.
 //
 // The returned envelope shares no modified slices with the given envelope.
 func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.StringMap) (jujuparams.SerializedModelV2, error) {
@@ -267,35 +266,14 @@ func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.S
 	users.add(owner)
 	users.add(credentialOwner)
 
-	var permissions []jujuparams.ModelPermission
-	for _, p := range envelope.Permissions {
-		switch permission.ObjectType(p.ObjectType) {
-		case permission.Offer:
-			// Offer permissions can't simply be dropped, as existing
-			// consumers of an offer hold macaroons that can still encode
-			// the local user. So local users are mapped to their external
-			// user instead, or dropped if they were intentionally not mapped.
-			if p.SubjectName != ofganames.EveryoneUser {
-				subject, ok := mapUser(p.SubjectName, userMapping)
-				if !ok {
-					// The local user was intentionally not mapped.
-					continue
-				}
-				p.SubjectName = subject
-				users.add(subject)
-			}
-		default:
-			// All other permissions, including model permissions, are
-			// dropped, as v6 does. JIMM doesn't have local users as
-			// identities, and access is managed in OpenFGA instead. The
-			// import gives the user running the migration admin on the
-			// model, and they can grant any other access needed in JAAS,
-			// including to everyone@external.
-			continue
-		}
-		permissions = append(permissions, p)
-	}
-	envelope.Permissions = permissions
+	// All permissions are dropped. JIMM doesn't have local users as identities,
+	// and access to models and offers is managed by JIMM in OpenFGA instead.
+	// Offer access is checked by JIMM when consumers' macaroons are discharged,
+	// using the user mapping for local users, so the target controller doesn't
+	// need its own offer permissions. The import gives the user running the
+	// migration admin on the model, and they can grant any other access needed
+	// in JAAS, including to everyone@external.
+	envelope.Permissions = nil
 
 	// SSH keys are dropped. JAAS stores SSH keys per external identity in its
 	// own key store, so keys on the target controller wouldn't be visible or
@@ -313,11 +291,10 @@ func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.S
 // a valid user, or if a local user has no valid mapping, including when it was
 // intentionally left unmapped.
 func mapUser(name string, userMapping dbmodel.StringMap) (string, bool) {
-	tag, err := names.ParseUserTag(names.UserTagKind + "-" + name)
-	if err != nil {
+	if !names.IsValidUser(name) {
 		return "", false
 	}
-	if !tag.IsLocal() {
+	if !names.NewUserTag(name).IsLocal() {
 		return name, true
 	}
 	mapped := userMapping[name]
