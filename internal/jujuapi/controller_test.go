@@ -44,6 +44,24 @@ func TestSSHServerHostKey(t *testing.T) {
 	c.Check(parsedKey.Marshal(), qt.DeepEquals, publicKey.Marshal())
 }
 
+func TestSSHServerPort(t *testing.T) {
+	c := qt.New(t)
+	configManager, err := config.NewConfigManager(config.ControllerConfig{
+		SSHPort: 17022,
+	})
+	c.Assert(err, qt.IsNil)
+
+	cr := jujuapi.NewControllerRoot(&jimmtest.JIMM{
+		ConfigManager_: func() jujuapi.ConfigManager {
+			return configManager
+		},
+	}, jujuapi.Params{})
+
+	result, err := cr.SSHServerPort(context.Background())
+	c.Assert(err, qt.IsNil)
+	c.Check(result.Port, qt.Equals, 17022)
+}
+
 func TestInitiateMigration(t *testing.T) {
 	c := qt.New(t)
 

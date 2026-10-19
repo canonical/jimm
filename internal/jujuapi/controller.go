@@ -32,6 +32,7 @@ func init() {
 		modelStatusMethod := rpc.Method(r.ModelStatus)
 		mongoVersionMethod := rpc.Method(r.MongoVersion)
 		sshServerHostKeyMethod := rpc.Method(r.SSHServerHostKey)
+		sshServerPortMethod := rpc.Method(r.SSHServerPort)
 		watchModelSummariesMethod := rpc.Method(r.WatchModelSummaries)
 		watchAllModelSummariesMethod := rpc.Method(r.WatchAllModelSummaries)
 		initiateMigrationMethod := rpc.Method(r.InitiateMigration)
@@ -75,6 +76,7 @@ func init() {
 		r.AddMethod("Controller", 15, "ModelStatus", modelStatusMethod)
 		r.AddMethod("Controller", 15, "MongoVersion", mongoVersionMethod)
 		r.AddMethod("Controller", 15, "SSHServerHostKey", sshServerHostKeyMethod)
+		r.AddMethod("Controller", 15, "SSHServerPort", sshServerPortMethod)
 		r.AddMethod("Controller", 15, "WatchModelSummaries", watchModelSummariesMethod)
 		r.AddMethod("Controller", 15, "WatchAllModelSummaries", watchAllModelSummariesMethod)
 		r.AddMethod("Controller", 15, "InitiateMigration", initiateMigrationMethod)
@@ -289,6 +291,15 @@ func (r *controllerRoot) SSHServerHostKey(ctx context.Context) (jujuparams.SSHCo
 		return jujuparams.SSHControllerPublicKeyResult{Error: r.mapError(ctx, fmt.Errorf("parsing controller SSH server host key: %w", err))}, nil
 	}
 	return jujuparams.SSHControllerPublicKeyResult{PublicKey: publicKey.Marshal()}, nil
+}
+
+// SSHServerPort returns the port the controller SSH jump server listens on.
+func (r *controllerRoot) SSHServerPort(ctx context.Context) (jujuparams.SSHControllerSSHPortResult, error) {
+	config, err := r.jimm.ConfigManager().GetConfig()
+	if err != nil {
+		return jujuparams.SSHControllerSSHPortResult{Error: r.mapError(ctx, err)}, nil
+	}
+	return jujuparams.SSHControllerSSHPortResult{Port: config.SSHPort}, nil
 }
 
 // GetControllerAccess returns the access level on the controller for
