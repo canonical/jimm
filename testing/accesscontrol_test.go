@@ -918,6 +918,27 @@ func TestListRelationshipTuples(t *testing.T) {
 	c.Assert(response.Tuples, qt.DeepEquals, []apiparams.RelationshipTuple{tuples[3]})
 	c.Assert(len(response.Errors), qt.Equals, 0)
 
+	var objectTuples []apiparams.RelationshipTuple
+	token := ""
+	for page := 0; ; page++ {
+		c.Assert(page < 2, qt.IsTrue, qt.Commentf("pagination did not terminate"))
+		response, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
+			Tuple:             apiparams.RelationshipTuple{Object: "group-orange#member"},
+			PageSize:          1,
+			ContinuationToken: token,
+			ResolveUUIDs:      true,
+		})
+		c.Assert(err, qt.IsNil)
+		c.Assert(response.Errors, qt.HasLen, 0)
+		c.Assert(response.Tuples, qt.HasLen, 1)
+		objectTuples = append(objectTuples, response.Tuples...)
+		if response.ContinuationToken == "" {
+			break
+		}
+		token = response.ContinuationToken
+	}
+	c.Assert(objectTuples, qt.ContentEquals, []apiparams.RelationshipTuple{tuples[0], tuples[3]})
+
 	// Test error message when a resource is not found
 	_, err = client.ListRelationshipTuples(&apiparams.ListRelationshipTuplesRequest{
 		Tuple: apiparams.RelationshipTuple{
@@ -964,6 +985,7 @@ func TestListRelationshipTuplesNoUUIDResolution(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(response.Tuples, qt.DeepEquals, expected)
 	c.Assert(len(response.Errors), qt.Equals, 0)
+
 }
 
 func TestListRelationshipTuplesAfterDeletingGroup(t *testing.T) {
