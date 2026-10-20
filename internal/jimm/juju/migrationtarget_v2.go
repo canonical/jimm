@@ -223,6 +223,10 @@ func validateUserMappingV2(envelope jujuparams.SerializedModelV2, offers []impor
 			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to the model", p.SubjectName, p.Access))
 		case permission.Offer:
 			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to offer %q", p.SubjectName, p.Access, offerNames[p.GrantOn]))
+		default:
+			// Require a mapping for local users with access to object types
+			// added in future Juju versions too.
+			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to %s %q", p.SubjectName, p.Access, p.ObjectType, p.GrantOn))
 		}
 	}
 	if len(missingUserMessages) > 0 {

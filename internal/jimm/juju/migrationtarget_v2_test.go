@@ -140,7 +140,8 @@ func TestPrechecksV2_ValidatesUserMapping(t *testing.T) {
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	// Add a model user and an offer user that are not mapped.
+	// Add a model user, an offer user and a user with access to another
+	// object type that are not mapped.
 	envelope := newTestEnvelope()
 	envelope.Permissions = append(envelope.Permissions, params.ModelPermission{
 		ObjectType:  "model",
@@ -152,11 +153,17 @@ func TestPrechecksV2_ValidatesUserMapping(t *testing.T) {
 		GrantOn:     offerUUID,
 		SubjectName: "jack",
 		Access:      "consume",
+	}, params.ModelPermission{
+		ObjectType:  "future-object",
+		GrantOn:     "some-object",
+		SubjectName: "jill",
+		Access:      "read",
 	})
 
 	err := j.PrechecksV2(ctx, user, envelope)
 	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jane\" who has admin access to the model$.*`)
 	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jack\" who has consume access to offer "test-offer"$.*`)
+	c.Assert(err, qt.ErrorMatches, `(?ms).*^expected user \"jill\" who has read access to future-object "some-object"$.*`)
 }
 
 func TestPrechecksV2_ExternalUsersNotInMapping(t *testing.T) {
