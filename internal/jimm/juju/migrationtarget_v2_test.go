@@ -215,6 +215,41 @@ func TestPrechecksV2_ExternalUsersNotInMapping(t *testing.T) {
 	c.Assert(prechecksCalled, qt.IsTrue)
 }
 
+// testEnvV2 holds the resources the tests below need, without an incoming
+// migration. Tests that need a specific user mapping add their own
+// incoming migration to it.
+const testEnvV2 = `clouds:
+- name: test
+  type: test
+  regions:
+  - name: test-region
+cloud-credentials:
+- owner: alice@canonical.com
+  name: test-cred
+  cloud: test
+controllers:
+- name: test1
+  uuid: 00000001-0000-0000-0000-000000000001
+  cloud: test
+  region: test-region-1
+  agent-version: 3.6.9
+  public-address: foo.com
+users:
+- username: alice@canonical.com
+  controller-access: superuser
+`
+
+// testEnvWithSkippedUser has an incoming migration where jack is intentionally left unmapped.
+const testEnvWithSkippedUser = testEnvV2 + `incoming-migrations:
+- model-uuid: ` + migratingModelUUID + `
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+  - local-user: jack
+    external-user: ""
+`
+
 func TestPrechecksV2_SkippedUser(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
@@ -237,13 +272,8 @@ func TestPrechecksV2_SkippedUser(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env := jimmtest.ParseEnvironment(c, testEnvWithSkippedUser)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	incomingModel := env.IncomingMigrations[0].DBObject(c, j.Database)
-	incomingModel.UserMapping["jack"] = ""
-	err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &incomingModel)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
@@ -256,9 +286,20 @@ func TestPrechecksV2_SkippedUser(t *testing.T) {
 		Access:      "consume",
 	})
 
-	err = j.PrechecksV2(ctx, user, envelope)
+	err := j.PrechecksV2(ctx, user, envelope)
 	c.Assert(err, qt.IsNil)
 }
+
+// testEnvWithDuplicateMapping has an incoming migration where bob and carol are both mapped to alice@canonical.com.
+const testEnvWithDuplicateMapping = testEnvV2 + `incoming-migrations:
+- model-uuid: ` + migratingModelUUID + `
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: alice@canonical.com
+  - local-user: carol
+    external-user: alice@canonical.com
+`
 
 func TestPrechecksV2_UserListDeduplicated(t *testing.T) {
 	c := qt.New(t)
@@ -283,14 +324,8 @@ func TestPrechecksV2_UserListDeduplicated(t *testing.T) {
 		},
 	})
 
-	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env := jimmtest.ParseEnvironment(c, testEnvWithDuplicateMapping)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	// Map carol to the same external user as bob.
-	incomingModel := env.IncomingMigrations[0].DBObject(c, j.Database)
-	incomingModel.UserMapping["carol"] = "alice@canonical.com"
-	err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &incomingModel)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
@@ -300,7 +335,7 @@ func TestPrechecksV2_UserListDeduplicated(t *testing.T) {
 	envelope.ModelInfo.CredentialOwner = "carol"
 	envelope.ModelCredential.Owner = "carol"
 
-	err = j.PrechecksV2(ctx, user, envelope)
+	err := j.PrechecksV2(ctx, user, envelope)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -370,25 +405,28 @@ func TestPrechecksV2_NoCloudCredential(t *testing.T) {
 	c.Assert(err, qt.ErrorMatches, `failed to modify migration info: model must have a cloud credential`)
 }
 
+// testEnvWithUnmappedOwner has an incoming migration where the model owner, bob, is left unmapped.
+const testEnvWithUnmappedOwner = testEnvV2 + `incoming-migrations:
+- model-uuid: ` + migratingModelUUID + `
+  target-controller: test1
+  user-mapping:
+  - local-user: bob
+    external-user: ""
+`
+
 func TestPrechecksV2_InvalidOwner(t *testing.T) {
 	c := qt.New(t)
 	ctx := context.Background()
 
 	j := newTestJujuManager(c, nil)
 
-	env := jimmtest.ParseEnvironment(c, testEnvWithIncomingMigration)
+	env := jimmtest.ParseEnvironment(c, testEnvWithUnmappedOwner)
 	env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
-
-	// The model owner cannot be left unmapped.
-	incomingModel := env.IncomingMigrations[0].DBObject(c, j.Database)
-	incomingModel.UserMapping["bob"] = ""
-	err := j.Database.AddOrUpdateIncomingModelMigration(ctx, &incomingModel)
-	c.Assert(err, qt.IsNil)
 
 	dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
 	user := openfga.NewUser(&dbUser, nil)
 
-	err = j.PrechecksV2(ctx, user, newTestEnvelope())
+	err := j.PrechecksV2(ctx, user, newTestEnvelope())
 	c.Assert(err, qt.ErrorMatches, `failed to modify migration info: cannot map model owner "bob" to an external user: not a valid user or no external user mapping found`)
 }
 
