@@ -1,0 +1,348 @@
+// Copyright 2026 Canonical.
+
+package juju
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/juju/juju/core/permission"
+	jujuparams "github.com/juju/juju/rpc/params"
+	"github.com/juju/names/v6"
+	"gopkg.in/yaml.v3"
+
+	"github.com/canonical/jimm/v3/internal/db"
+	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/openfga"
+)
+
+// The methods in this file implement model migration into JIMM for Juju 4.1+
+// source controllers. These send a SerializedModelV2 envelope (MigrationTarget
+// facade v8) instead of a model description. The envelope carries the model's
+// identity and controller scoped data (users, credential, permissions, keys) as
+// typed fields, and the model database as an opaque, versioned payload.
+//
+// JIMM applies the user mapping to the typed fields only. The payload is passed
+// to the target controller untouched. The target ctrl takes the model's identity
+// from the typed fields rather than the payload.
+
+// PrechecksV2 is the SerializedModelV2 equivalent of Prechecks.
+// It checks the cloud, cloud region and cloud credential exist in JIMM, then
+// calls the method of the same name on the target Juju controller.
+func (j *JujuManager) PrechecksV2(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+	incomingModel := dbmodel.IncomingModelMigration{
+		ModelUUID: sql.NullString{
+			String: envelope.ModelInfo.UUID,
+			Valid:  true,
+		},
+	}
+	err := j.Database.GetIncomingModelMigration(ctx, &incomingModel)
+	if err != nil {
+		return fmt.Errorf("failed to get model migration %q: %w", envelope.ModelInfo.UUID, err)
+	}
+
+	offers, err := offersFromPayload(envelope.Payload)
+	if err != nil {
+		return err
+	}
+
+	err = validateUserMappingV2(envelope, offers, incomingModel.UserMapping)
+	if err != nil {
+		return fmt.Errorf("failed to validate user mapping: %w", err)
+	}
+
+	envelope, err = modifyEnvelope(envelope, incomingModel.UserMapping)
+	if err != nil {
+		return fmt.Errorf("failed to modify migration info: %w", err)
+	}
+
+	info := envelope.ModelInfo
+	_, err = j.Database.FindRegionByCloudName(ctx, info.Cloud, info.CloudRegion)
+	if err != nil {
+		return fmt.Errorf("failed to find region for cloud %q: %w", info.Cloud, err)
+	}
+
+	cloudCredential := &dbmodel.CloudCredential{
+		CloudName:         info.Cloud,
+		OwnerIdentityName: info.CredentialOwner,
+		Name:              info.CredentialName,
+	}
+	err = j.Database.GetCloudCredential(ctx, cloudCredential)
+	if err != nil {
+		return err
+	}
+
+	api, err := j.dialControllerAsSuperuser(ctx, user, &incomingModel.TargetController)
+	if err != nil {
+		return fmt.Errorf("failed to dial controller: %w", err)
+	}
+	defer api.Close()
+
+	err = api.PrechecksV2(ctx, envelope)
+	if err != nil {
+		return fmt.Errorf("failed to run pre-checks for migration: %w", err)
+	}
+	return nil
+}
+
+// ImportV2 is the SerializedModelV2 equivalent of Import.
+//   - Checks the incoming model migration record in the database.
+//   - Modifies the envelope to replace local user references with their external mapping.
+//   - Imports the model and its application offers into JIMM's state.
+//   - Adds permissions for the model and application offers.
+//   - Calls the import method on the target Juju controller to import the model.
+func (j *JujuManager) ImportV2(ctx context.Context, user *openfga.User, envelope jujuparams.SerializedModelV2) error {
+	var (
+		model             *dbmodel.Model
+		dbOffers          []*dbmodel.ApplicationOffer
+		incomingMigration *dbmodel.IncomingModelMigration
+	)
+
+	// Start a transaction to acquire the incoming model migration record with a
+	// lock to prevent it from being modified while we are importing the model.
+	// Then import the model and app offers into JIMM's state - the existence
+	// of the model implies that the migration record can no longer be modified.
+	err := j.Database.Transaction(func(d *db.Database) error {
+		incomingMigration = &dbmodel.IncomingModelMigration{
+			ModelUUID: sql.NullString{String: envelope.ModelInfo.UUID, Valid: true},
+		}
+
+		// Set noWait to false to allow the transaction to wait for the lock.
+		noWait := false
+		err := d.GetIncomingModelMigrationWithLock(ctx, incomingMigration, noWait)
+		if err != nil {
+			return fmt.Errorf("failed to get incoming model migration: %w", err)
+		}
+
+		envelope, err = modifyEnvelope(envelope, incomingMigration.UserMapping)
+		if err != nil {
+			return fmt.Errorf("failed to modify migration info: %w", err)
+		}
+
+		model, dbOffers, err = importFromEnvelope(ctx, d, incomingMigration.TargetController.ID, envelope)
+		if err != nil {
+			return fmt.Errorf("failed to import model from envelope: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// Pass the controller tag as the controller details
+	// are not populated on the model after creation.
+	controllerTag := incomingMigration.TargetController.ResourceTag()
+	err = j.addModelAndOfferPermissions(ctx, user, model, dbOffers, controllerTag)
+	if err != nil {
+		return fmt.Errorf("failed to add resource permissions: %w", err)
+	}
+
+	api, err := j.dialControllerAsSuperuser(ctx, user, &incomingMigration.TargetController)
+	if err != nil {
+		return fmt.Errorf("failed to dial controller: %w", err)
+	}
+	defer api.Close()
+
+	err = api.ImportV2(ctx, envelope)
+	if err != nil {
+		return fmt.Errorf("failed to import model: %w", err)
+	}
+	return nil
+}
+
+// importFromEnvelope is the SerializedModelV2 equivalent of importFromDescription.
+// It imports resources into JIMM's state from a model envelope that has already had
+// the user mapping applied. It creates a new model record in the database with the
+// given target controller ID and sets the migration mode to importing.
+// Application offers are created for any offers in the envelope's payload.
+// It also ensures that the cloud credential and region are present in the database.
+func importFromEnvelope(ctx context.Context, tx *db.Database, targetControllerID uint, envelope jujuparams.SerializedModelV2) (*dbmodel.Model, []*dbmodel.ApplicationOffer, error) {
+	offers, err := offersFromPayload(envelope.Payload)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	info := envelope.ModelInfo
+	return addImportingModel(ctx, tx, importingModel{
+		UUID:               info.UUID,
+		Name:               info.Name,
+		Owner:              info.Qualifier,
+		TargetControllerID: targetControllerID,
+		Cloud:              info.Cloud,
+		CloudRegion:        info.CloudRegion,
+		CredentialOwner:    info.CredentialOwner,
+		CredentialName:     info.CredentialName,
+		Offers:             offers,
+	})
+}
+
+// offersFromPayload reads the application offers from an envelope's model
+// database payload. Only offer[].uuid and offer[].name are read, so JIMM
+// doesn't depend on the rest of Juju's versioned schema. Juju doesn't
+// guarantee this shape stays the same across versions. If it changes, we'd
+// read no offers from those payloads and this needs updating.
+func offersFromPayload(payload []byte) ([]importingOffer, error) {
+	var p struct {
+		Offer []struct {
+			UUID string `yaml:"uuid"`
+			Name string `yaml:"name"`
+		} `yaml:"offer"`
+	}
+	if err := yaml.Unmarshal(payload, &p); err != nil {
+		return nil, fmt.Errorf("failed to read offers from model payload: %w", err)
+	}
+	offers := make([]importingOffer, 0, len(p.Offer))
+	for _, o := range p.Offer {
+		offers = append(offers, importingOffer{UUID: o.UUID, Name: o.Name})
+	}
+	return offers, nil
+}
+
+// validateUserMappingV2 checks that the provided user mapping contains all the local
+// users that either have access to the model or have access to any application offers
+// in the model. External users don't need a mapping.
+func validateUserMappingV2(envelope jujuparams.SerializedModelV2, offers []importingOffer, userMapping dbmodel.StringMap) error {
+	offerNames := make(map[string]string, len(offers))
+	for _, o := range offers {
+		offerNames[o.UUID] = o.Name
+	}
+
+	var missingUserMessages []string
+	for _, p := range envelope.Permissions {
+		if names.IsValidUser(p.SubjectName) && !names.NewUserTag(p.SubjectName).IsLocal() {
+			// External users, including everyone@external, don't need a mapping.
+			continue
+		}
+		if _, ok := userMapping[p.SubjectName]; ok {
+			continue
+		}
+		switch permission.ObjectType(p.ObjectType) {
+		case permission.Model:
+			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to the model", p.SubjectName, p.Access))
+		case permission.Offer:
+			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to offer %q", p.SubjectName, p.Access, offerNames[p.GrantOn]))
+		default:
+			// Require a mapping for local users with access to object types
+			// added in future Juju versions too.
+			missingUserMessages = append(missingUserMessages, fmt.Sprintf("expected user %q who has %s access to %s %q", p.SubjectName, p.Access, p.ObjectType, p.GrantOn))
+		}
+	}
+	if len(missingUserMessages) > 0 {
+		return fmt.Errorf("user mapping is missing the following users:\n%s", strings.Join(missingUserMessages, "\n"))
+	}
+	return nil
+}
+
+// modifyEnvelope is the SerializedModelV2 equivalent of modifyModelDescription.
+// It replaces local user references with their external mapping:
+//   - the model qualifier (the model owner in Juju 4),
+//   - the cloud credential owner.
+//
+// All permissions and SSH keys are dropped, as access is managed by JIMM.
+//
+// A Juju 4.1 target creates the model's cloud credential under its owner, and
+// requires that user to exist. It learns users from the envelope's user list, so
+// the user list is replaced with the mapped model owner and credential owner.
+//
+// The returned envelope shares no modified slices with the given envelope.
+func modifyEnvelope(envelope jujuparams.SerializedModelV2, userMapping dbmodel.StringMap) (jujuparams.SerializedModelV2, error) {
+	owner, ok := mapUser(envelope.ModelInfo.Qualifier, userMapping)
+	if !ok {
+		return jujuparams.SerializedModelV2{}, fmt.Errorf("cannot map model owner %q to an external user: not a valid user or no external user mapping found", envelope.ModelInfo.Qualifier)
+	}
+	envelope.ModelInfo.Qualifier = owner
+
+	if envelope.ModelCredential == nil {
+		return jujuparams.SerializedModelV2{}, fmt.Errorf("model must have a cloud credential")
+	}
+	credentialOwner, ok := mapUser(envelope.ModelCredential.Owner, userMapping)
+	if !ok {
+		return jujuparams.SerializedModelV2{}, fmt.Errorf("cannot map cloud credential owner %q to an external user: not a valid user or no external user mapping found", envelope.ModelCredential.Owner)
+	}
+	credential := *envelope.ModelCredential
+	credential.Owner = credentialOwner
+	envelope.ModelCredential = &credential
+	envelope.ModelInfo.CredentialOwner = credentialOwner
+
+	users := newModelUserList(envelope.Users)
+	users.add(owner)
+	users.add(credentialOwner)
+
+	// All permissions are dropped. JIMM doesn't have local users as identities,
+	// and access to models and offers is managed by JIMM in OpenFGA instead.
+	// Offer access is checked by JIMM when consumers' macaroons are discharged,
+	// using the user mapping for local users, so the target controller doesn't
+	// need its own offer permissions. The import gives the user running the
+	// migration admin on the model, and they can grant any other access needed
+	// in JAAS, including to everyone@external.
+	envelope.Permissions = nil
+
+	// SSH keys are dropped. JAAS stores SSH keys per external identity in its
+	// own key store, so keys on the target controller wouldn't be visible or
+	// manageable through JAAS, and keys belonging to local users would keep
+	// access for identities JAAS doesn't know about. Users re-add their keys
+	// through JAAS after migrating.
+	envelope.AuthorizedKeys = nil
+
+	envelope.Users = users.list
+	return envelope, nil
+}
+
+// mapUser returns the external user that a local user is mapped to.
+// Non-local users are returned unchanged. It returns false if the name is not
+// a valid user, or if a local user has no valid mapping, including when it was
+// intentionally left unmapped.
+func mapUser(name string, userMapping dbmodel.StringMap) (string, bool) {
+	if !names.IsValidUser(name) {
+		return "", false
+	}
+	if !names.NewUserTag(name).IsLocal() {
+		return name, true
+	}
+	mapped := userMapping[name]
+	if mapped == "" || !names.IsValidUser(mapped) {
+		return "", false
+	}
+	return mapped, true
+}
+
+// modelUserList builds the user list of an envelope from mapped user names,
+// adding each user once. A new external user entry is created for each name,
+// except where the source already listed a user under that same name (i.e.
+// the user was already external in the source because the model is from a previous
+// JAAS controller), in which case the source's entry is kept to preserve its details
+type modelUserList struct {
+	original map[string]jujuparams.ModelUser
+	seen     map[string]bool
+	list     []jujuparams.ModelUser
+}
+
+func newModelUserList(original []jujuparams.ModelUser) *modelUserList {
+	l := &modelUserList{
+		original: make(map[string]jujuparams.ModelUser, len(original)),
+		seen:     make(map[string]bool),
+	}
+	for _, u := range original {
+		l.original[u.Name] = u
+	}
+	return l
+}
+
+func (l *modelUserList) add(name string) {
+	if l.seen[name] {
+		return
+	}
+	l.seen[name] = true
+	if u, ok := l.original[name]; ok {
+		l.list = append(l.list, u)
+		return
+	}
+	l.list = append(l.list, jujuparams.ModelUser{
+		Name:      name,
+		CreatedAt: time.Now().UTC(),
+		External:  names.IsValidUser(name) && !names.NewUserTag(name).IsLocal(),
+	})
+}
