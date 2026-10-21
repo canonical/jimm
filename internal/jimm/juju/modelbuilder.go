@@ -12,6 +12,7 @@ import (
 	"github.com/juju/juju/api/base"
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
+	"github.com/juju/version/v2"
 	"github.com/juju/zaputil"
 	"github.com/juju/zaputil/zapctx"
 	"go.uber.org/zap"
@@ -21,6 +22,14 @@ import (
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
+
+// minJujuVersionWithoutModelAdminGrant is the first Juju controller version
+// that redirects external users of a migrated model without requiring them
+// to be stored model users.
+//
+// TODO: Set this to the released Juju 3.6 version containing the fix. It is
+// currently the version built from the unreleased fix branch.
+var minJujuVersionWithoutModelAdminGrant = version.MustParse("3.6.30")
 
 type candidateController struct {
 	// controller is a candidate controller for the new model.
@@ -590,16 +599,27 @@ func (b *modelBuilder) CreateControllerModel() *modelBuilder {
 	// will remain on the controller and will trigger the "already exists
 	// in the backend controller" message above when the user
 	// attempts to create a model with the same name again.
-	// TODO(JUJU-8869): We need to keep this despite encoding permissions in
-	// JWTs because Juju returns a different result on migrated models otherwise.
-	if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
-		zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
-		b.err = err
-		return b
+	//
+	// Older controllers only redirect a migrated model for users stored in
+	// their database, so JIMM needs the grant to see the redirect.
+	if needsJIMMModelAdminGrant(b.controller) {
+		if err := api.GrantJIMMModelAdmin(b.ctx, names.NewModelTag(info.UUID)); err != nil {
+			zapctx.Error(b.ctx, "leaked model", zap.String("model", info.UUID), zaputil.Error(err))
+			b.err = err
+			return b
+		}
 	}
 
 	b.modelInfo = info
 	return b
+}
+
+// needsJIMMModelAdminGrant returns true if the controller only redirects
+// external users of a migrated model when they are stored model users.
+// Controllers with an unknown version are assumed to need the grant.
+func needsJIMMModelAdminGrant(ctl *dbmodel.Controller) bool {
+	v, err := version.Parse(ctl.AgentVersion)
+	return err != nil || v.Compare(minJujuVersionWithoutModelAdminGrant) < 0
 }
 
 func (b *modelBuilder) updateCredential(ctx context.Context, api API, cred *dbmodel.CloudCredential) error {
