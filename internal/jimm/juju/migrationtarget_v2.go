@@ -148,7 +148,6 @@ func (j *JujuManager) ImportV2(ctx context.Context, user *openfga.User, envelope
 
 	err = api.ImportV2(ctx, envelope)
 	if err != nil {
-		// TODO: handle migration failure in a cleanup routine.
 		return fmt.Errorf("failed to import model: %w", err)
 	}
 	return nil
@@ -180,9 +179,11 @@ func importFromEnvelope(ctx context.Context, tx *db.Database, targetControllerID
 	})
 }
 
-// offersFromPayload extracts the application offers from an envelope's
-// model database payload. Only the "offer" table is decoded so that JIMM
-// does not depend on Juju's versioned model database schema.
+// offersFromPayload reads the application offers from an envelope's model
+// database payload. Only offer[].uuid and offer[].name are read, so JIMM
+// doesn't depend on the rest of Juju's versioned schema. Juju doesn't
+// guarantee this shape stays the same across versions. If it changes, we'd
+// read no offers from those payloads and this needs updating.
 func offersFromPayload(payload []byte) ([]importingOffer, error) {
 	var p struct {
 		Offer []struct {
