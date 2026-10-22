@@ -344,6 +344,104 @@ func TestInternalMigrationSuccess(t *testing.T) {
 	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
 }
 
+// TestInternalMigrationSuccessJuju4 checks that an internal migration from a
+// Juju 4 controller is detected. Juju 4 returns not found from ModelInfo for a
+// model that has migrated away, and only returns the redirect from ModelStatus.
+func TestInternalMigrationSuccessJuju4(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
+	ctx := context.Background()
+
+	model := s.env.Models[0].DBObject(c, s.jujuManager.Database)
+	model.MigrationMode = dbmodel.MigrationModeMigrateInternal
+	err := s.jujuManager.Database.UpdateModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+
+	sourceController := s.env.Controllers[0].DBObject(c, s.jujuManager.Database)
+	targetController := s.env.Controllers[1].DBObject(c, s.jujuManager.Database)
+	c.Assert(model.ControllerID, qt.Equals, sourceController.ID)
+
+	s.jujuManager.Dialer = &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+				return jujuclient.ModelInfo{}, &jujurpc.RequestError{
+					Message: "model not found",
+					Code:    jujuparams.CodeNotFound,
+				}
+			},
+			ModelStatus_: func(ctx context.Context, model names.ModelTag) (base.ModelStatus, error) {
+				return base.ModelStatus{}, &jujurpc.RequestError{
+					Message: "redirect",
+					Code:    jujuparams.CodeRedirect,
+					Info: jujuparams.RedirectErrorInfo{
+						ControllerAlias: s.env.Controllers[1].Name,
+					}.AsMap(),
+				}
+			},
+		},
+	}
+
+	err = s.jujuManager.PollModels(ctx)
+	c.Assert(err, qt.IsNil)
+
+	model = dbmodel.Model{
+		UUID: sql.NullString{
+			String: s.env.Models[0].UUID,
+			Valid:  true,
+		},
+	}
+	err = s.jujuManager.Database.GetModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+	c.Assert(model.ControllerID, qt.Equals, targetController.ID)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeNone)
+}
+
+// TestInternalMigrationNotFoundWithoutRedirect checks that a model in an
+// internal migration is left as is when ModelInfo returns not found but
+// ModelStatus doesn't return a redirect.
+func TestInternalMigrationNotFoundWithoutRedirect(t *testing.T) {
+	c := qt.New(t)
+	s := setupModelPollerTest(c)
+	ctx := context.Background()
+
+	model := s.env.Models[0].DBObject(c, s.jujuManager.Database)
+	model.MigrationMode = dbmodel.MigrationModeMigrateInternal
+	err := s.jujuManager.Database.UpdateModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+
+	sourceController := s.env.Controllers[0].DBObject(c, s.jujuManager.Database)
+	c.Assert(model.ControllerID, qt.Equals, sourceController.ID)
+
+	notFound := &jujurpc.RequestError{
+		Message: "model not found",
+		Code:    jujuparams.CodeNotFound,
+	}
+	s.jujuManager.Dialer = &jimmtest.Dialer{
+		API: &jimmtest.API{
+			ModelInfo_: func(ctx context.Context, model names.ModelTag) (jujuclient.ModelInfo, error) {
+				return jujuclient.ModelInfo{}, notFound
+			},
+			ModelStatus_: func(ctx context.Context, model names.ModelTag) (base.ModelStatus, error) {
+				return base.ModelStatus{}, notFound
+			},
+		},
+	}
+
+	err = s.jujuManager.PollModels(ctx)
+	c.Assert(err, qt.IsNil)
+
+	model = dbmodel.Model{
+		UUID: sql.NullString{
+			String: s.env.Models[0].UUID,
+			Valid:  true,
+		},
+	}
+	err = s.jujuManager.Database.GetModel(ctx, &model)
+	c.Assert(err, qt.IsNil)
+	c.Assert(model.ControllerID, qt.Equals, sourceController.ID)
+	c.Assert(model.MigrationMode, qt.Equals, dbmodel.MigrationModeMigrateInternal)
+}
+
 func TestInternalMigrationFailure(t *testing.T) {
 	c := qt.New(t)
 	s := setupModelPollerTest(c)

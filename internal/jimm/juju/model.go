@@ -245,11 +245,11 @@ func (j *JujuManager) modelInfo(ctx context.Context, user *openfga.User, model *
 	if errFromAPI == nil {
 		return j.reactToModelInfoSuccess(ctx, model, modelInfo)
 	} else {
-		return j.reactToModelInfoError(ctx, user, errFromAPI, model)
+		return j.reactToModelInfoError(ctx, user, errFromAPI, model, api)
 	}
 }
 
-func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.User, errFromAPI error, model *dbmodel.Model) (jujuclient.ModelInfo, error) {
+func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.User, errFromAPI error, model *dbmodel.Model, api API) (jujuclient.ModelInfo, error) {
 	switch model.MigrationMode {
 	case dbmodel.MigrationModeNone:
 		err := j.maybeCleanupModel(ctx, errFromAPI, model)
@@ -260,6 +260,14 @@ func (j *JujuManager) reactToModelInfoError(ctx context.Context, user *openfga.U
 		// propagate the error to the caller.
 		return jujuclient.ModelInfo{}, errFromAPI
 	case dbmodel.MigrationModeMigrateInternal:
+		// Juju 4 controllers return not found from ModelInfo for a model that
+		// has migrated away, only ModelStatus (and login) return the redirect.
+		if errors.ErrorCode(errFromAPI) == errors.CodeNotFound {
+			_, statusErr := api.ModelStatus(ctx, model.ResourceTag())
+			if errors.ErrorCode(statusErr) == errors.CodeRedirect {
+				errFromAPI = statusErr
+			}
+		}
 		err := j.checkModelMigratedInternal(ctx, errFromAPI, model)
 		if err != nil {
 			zapctx.Error(ctx, "error checking model migration", zap.Error(err))
