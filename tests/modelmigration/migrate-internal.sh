@@ -12,6 +12,9 @@
 # is not supported, so the script will create a new model each time with a
 # random suffix.
 #
+# The controller name can be overridden via INTERNAL_MIGRATION_CONTROLLER, and
+# its Juju version via JUJU_BOOTSTRAP_BINARY.
+#
 # Usage: ./tests/modelmigration/migrate-internal.sh 
 
 set -euo pipefail
@@ -30,15 +33,14 @@ source "local/jimm/detect-jaas.sh"
 # already exist. This is done to allow the script to be partially idempotent.
 
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
-INTERNAL_MIGRATION_CONTROLLER="internal-migration-controller"
+INTERNAL_MIGRATION_CONTROLLER="${INTERNAL_MIGRATION_CONTROLLER:-internal-migration-controller}"
 # Generate a random 4-character suffix for the model name.
 RAND_SUFFIX=$(tr -dc 'a-z0-9' </dev/urandom | head -c 4 || true)
 MIGRATING_MODEL_NAME="internal-migration-model-$RAND_SUFFIX"
 
 # Call add-controller.sh to add the controller to JIMM.
 echo
-controller_exists=$(juju controllers | grep -c "$INTERNAL_MIGRATION_CONTROLLER" || true)
-if [[ "$controller_exists" -gt 0 ]]; then
+if juju controllers --format json | jq -e --arg n "$INTERNAL_MIGRATION_CONTROLLER" '.controllers | has($n)' > /dev/null; then
     echo "Controller $INTERNAL_MIGRATION_CONTROLLER already exists, switching to $INTERNAL_MIGRATION_CONTROLLER and skipping setup."
     juju switch "$INTERNAL_MIGRATION_CONTROLLER"
 else
