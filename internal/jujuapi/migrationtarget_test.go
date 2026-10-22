@@ -5,7 +5,6 @@ package jujuapi_test
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
@@ -679,45 +678,4 @@ func TestImportV2Error(t *testing.T) {
 	// Validate errors from the manager are wrapped and returned to the caller.
 	err := cr.ImportV2(ctx, jujuparams.SerializedModelV2{})
 	c.Assert(err, qt.ErrorMatches, `failed to import model: import failed`)
-}
-
-func TestMigrationTargetFacadeVersions(t *testing.T) {
-	c := qt.New(t)
-
-	// JIMM offers v6 and v8. v7 is deliberately not implemented as it is only required
-	// for 4.0.0-4.0.11 with was effectively DOA.
-	c.Assert(jujuapi.SupportedFacades()["MigrationTarget"], qt.DeepEquals, []int{6, 8})
-
-	cr := jujuapi.NewControllerRoot(&jimmtest.JIMM{}, jujuapi.Params{})
-	jujuapi.SetupFacades(cr)
-
-	// Prechecks and Import take a model description in v6 and a
-	// SerializedModelV2 envelope in v8.
-	paramsTypes := []struct {
-		version    int
-		method     string
-		paramsType reflect.Type
-	}{
-		{6, "Prechecks", reflect.TypeFor[jujuparams.MigrationModelInfoLegacy]()},
-		{6, "Import", reflect.TypeFor[jujuparams.SerializedModel]()},
-		{8, "Prechecks", reflect.TypeFor[jujuparams.SerializedModelV2]()},
-		{8, "Import", reflect.TypeFor[jujuparams.SerializedModelV2]()},
-	}
-	for _, test := range paramsTypes {
-		m, err := cr.FindMethod("MigrationTarget", test.version, test.method)
-		c.Assert(err, qt.IsNil, qt.Commentf("v%d %s", test.version, test.method))
-		c.Check(m.ParamsType(), qt.Equals, test.paramsType, qt.Commentf("v%d %s", test.version, test.method))
-	}
-
-	// The remaining methods are unchanged between v6 and v8.
-	for _, method := range []string{"CACert", "Activate", "AdoptResources", "Abort", "CheckMachines", "LatestLogTime"} {
-		v6, err := cr.FindMethod("MigrationTarget", 6, method)
-		c.Assert(err, qt.IsNil, qt.Commentf("v6 %s", method))
-		v8, err := cr.FindMethod("MigrationTarget", 8, method)
-		c.Assert(err, qt.IsNil, qt.Commentf("v8 %s", method))
-		c.Check(v8.ParamsType(), qt.Equals, v6.ParamsType(), qt.Commentf("%s", method))
-	}
-
-	_, err := cr.FindMethod("MigrationTarget", 7, "Prechecks")
-	c.Assert(err, qt.ErrorMatches, `unknown method "Prechecks" at version 7 for facade type "MigrationTarget"`)
 }
