@@ -3,9 +3,13 @@
 # This script assumes that you have JIMM running with a controller
 # named "qa-lxd" attached (can be overriden via BACKING_CONTROLLER_NAME).
 #
-# This script creates a controller called source-controller and 
-# then creates two models: source-model and sink-model, 
+# This script creates a controller called source-controller and
+# then creates two models: source-model and sink-model,
 # relates them, and then migrates the source model to JIMM.
+#
+# The controller and model names can be overridden via SOURCE_CONTROLLER_NAME,
+# PROVIDER_MODEL_NAME and CONSUMER_MODEL_NAME, and the Juju version of the
+# source controller via JUJU_BOOTSTRAP_BINARY.
 #
 # Usage: ./tests/modelmigration/migrate-providing-model.sh 
 set -euo pipefail
@@ -19,21 +23,20 @@ set -euo pipefail
 # if a command has non-zero exit code, used to check if certain resources
 # already exist. This is done to allow the script to be partially idempotent.
 
-SOURCE_CONTROLLER_NAME="source-controller"
-PROVIDER_MODEL_NAME="source-model"
-CONSUMER_MODEL_NAME="sink-model"
+SOURCE_CONTROLLER_NAME="${SOURCE_CONTROLLER_NAME:-source-controller}"
+PROVIDER_MODEL_NAME="${PROVIDER_MODEL_NAME:-source-model}"
+CONSUMER_MODEL_NAME="${CONSUMER_MODEL_NAME:-sink-model}"
 JIMM_CONTROLLER_NAME="${JIMM_CONTROLLER_NAME:-jimm-dev}"
 BACKING_CONTROLLER_NAME="${BACKING_CONTROLLER_NAME:-qa-lxd}"
 
 # Call add-controller.sh and avoid connecting 
 # the controller to JIMM. The controller does 
 # however need to be able to route requests to JIMM.
-model_exists=$(juju controllers | grep -c "$SOURCE_CONTROLLER_NAME" || true)
-if [[ "$model_exists" -gt 0 ]]; then
-    echo "Controller source-controller already exists, switching to $SOURCE_CONTROLLER_NAME and skipping setup."
+if juju controllers --format json | jq -e --arg n "$SOURCE_CONTROLLER_NAME" '.controllers | has($n)' > /dev/null; then
+    echo "Controller $SOURCE_CONTROLLER_NAME already exists, switching to $SOURCE_CONTROLLER_NAME and skipping setup."
     juju switch "$SOURCE_CONTROLLER_NAME"
 else
-    echo "Setting up source-controller"
+    echo "Setting up $SOURCE_CONTROLLER_NAME"
     SKIP_CONNECT_JIMM="true" CONTROLLER_NAME="$SOURCE_CONTROLLER_NAME" local/jimm/setup-controller.sh
 fi
 
@@ -56,8 +59,7 @@ echo
 echo "Using the following cloud-init config for models"
 echo "$CLOUDINIT_CONFIG"
 
-model_exists=$(juju models | grep -c "$PROVIDER_MODEL_NAME" || true)
-if [[ "$model_exists" -gt 0 ]]; then
+if juju models --format json | jq -e --arg n "$PROVIDER_MODEL_NAME" 'any(.models[]; ."short-name" == $n)' > /dev/null; then
     echo "Model $PROVIDER_MODEL_NAME already exists, skipping creation and app deploy."
 else
     echo "Creating $PROVIDER_MODEL_NAME"
@@ -68,8 +70,7 @@ else
 fi
 
 echo
-model_exists=$(juju models | grep -c "$CONSUMER_MODEL_NAME" || true)
-if [[ "$model_exists" -gt 0 ]]; then
+if juju models --format json | jq -e --arg n "$CONSUMER_MODEL_NAME" 'any(.models[]; ."short-name" == $n)' > /dev/null; then
     echo "Model $CONSUMER_MODEL_NAME already exists, skipping creation and app deploy."
 else
     echo "Adding sink model"
