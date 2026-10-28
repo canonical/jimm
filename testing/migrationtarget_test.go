@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/juju/description/v10"
+	"github.com/juju/description/v11"
 	"github.com/juju/juju/api/controller/migrationtarget"
 	"github.com/juju/juju/core/migration"
 	jujuparams "github.com/juju/juju/rpc/params"
