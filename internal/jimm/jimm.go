@@ -27,7 +27,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/offer"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
-	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jimm/upgrade"
 	"github.com/canonical/jimm/v3/internal/jimmjwx"
@@ -226,21 +225,6 @@ func New(p Parameters) (*JIMM, error) {
 	}
 	j.SSHKeyManager = sshKeyManager
 
-	sshParams := ssh.SSHManagerParams{
-		IdentityManager: j.IdentityManager,
-		JujuManager:     j.JujuManager,
-		SSHKeyManager:   j.SSHKeyManager,
-		IdPGroupFetcher: p.IdPGroupFetcher,
-		OpenFGAClient:   j.OpenFGAClient,
-		JWTFactory:      j.JujuAuthFactory,
-		Dialer:          &ssh.BasicDialer{},
-	}
-	sshManager, err := ssh.NewSSHManager(sshParams)
-	if err != nil {
-		return nil, err
-	}
-	j.SSHManager = sshManager
-
 	configManager, err := config.NewConfigManager(p.ControllerConfig)
 	if err != nil {
 		return nil, err
@@ -324,9 +308,6 @@ type JIMM struct {
 
 	// SSHKeyManager provides a means to manage SSH keys within JIMM.
 	SSHKeyManager *sshkeys.SSHKeyManager
-
-	// SSHManager provides a means to manage SSH operations withing JIMM.
-	SSHManager *ssh.SSHManager
 
 	// ConfigManager provides a means to retrieve the controller config to expose via facade method.
 	ConfigManager *config.ConfigManager
