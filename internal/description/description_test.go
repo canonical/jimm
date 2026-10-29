@@ -3,6 +3,7 @@
 package description
 
 import (
+	"fmt"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -363,6 +364,21 @@ func TestMigrationDescriptionVersion(t *testing.T) {
 			expected: 10,
 		},
 		{
+			name:     "version 3.6.22 returns 10",
+			version:  "3.6.22",
+			expected: 10,
+		},
+		{
+			name:     "version 3.6.23 returns 11",
+			version:  "3.6.23",
+			expected: 11,
+		},
+		{
+			name:     "version 3.6.24 returns 11",
+			version:  "3.6.24",
+			expected: 11,
+		},
+		{
 			name:     "version 3.7.0 returns latest (11)",
 			version:  "3.7.0",
 			expected: latestDescriptionVersion,
@@ -385,5 +401,86 @@ func TestMigrationDescriptionVersion(t *testing.T) {
 			c.Assert(err, qt.IsNil)
 			c.Assert(result, qt.Equals, tt.expected)
 		})
+	}
+}
+
+// TestDeserializeOlderSourceVersion checks that a description produced by an
+// older source controller is readable by the wrapper for a newer target.
+func TestDeserializeOlderSourceVersion(t *testing.T) {
+	c := qt.New(t)
+
+	ownerTag := names.NewUserTag("admin")
+	userTag := names.NewUserTag("user1")
+
+	sources := []struct {
+		name      string
+		version   int
+		serialize func(*qt.C) []byte
+	}{
+		{
+			name:    "v9",
+			version: 9,
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv9.NewModel(descriptionv9.ModelArgs{
+					Owner:        ownerTag,
+					Config:       map[string]any{"uuid": "model-uuid"},
+					AgentVersion: "3.6.12",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv9.StatusArgs{Value: "available"})
+				m.AddUser(descriptionv9.UserArgs{Name: userTag, Access: "read"})
+				bytes, err := descriptionv9.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+		},
+		{
+			name:    "v10",
+			version: 10,
+			serialize: func(c *qt.C) []byte {
+				m := descriptionv10.NewModel(descriptionv10.ModelArgs{
+					Owner:        ownerTag,
+					Config:       map[string]any{"uuid": "model-uuid"},
+					AgentVersion: "3.6.13",
+					Type:         "iaas",
+				})
+				m.SetStatus(descriptionv10.StatusArgs{Value: "available"})
+				m.AddUser(descriptionv10.UserArgs{Name: userTag, Access: "read"})
+				bytes, err := descriptionv10.Serialize(m)
+				c.Assert(err, qt.IsNil)
+				return bytes
+			},
+		},
+	}
+
+	targets := []struct {
+		version           int
+		controllerVersion version.Number
+	}{
+		{version: 10, controllerVersion: version.MustParse("3.6.13")},
+		{version: 11, controllerVersion: version.MustParse("3.6.24")},
+	}
+
+	for _, source := range sources {
+		for _, target := range targets {
+			if target.version <= source.version {
+				continue
+			}
+			c.Run(fmt.Sprintf("v%d to v%d", source.version, target.version), func(c *qt.C) {
+				wrapper, err := Deserialize(source.serialize(c), target.controllerVersion)
+				c.Assert(err, qt.IsNil)
+				c.Check(wrapper.Owner(), qt.Equals, ownerTag)
+				c.Check(wrapper.Config()["uuid"], qt.Equals, "model-uuid")
+				users := wrapper.Users()
+				c.Assert(users, qt.HasLen, 1)
+				c.Check(users[0].Name(), qt.Equals, userTag)
+
+				// The wrapper must still serialise and deserialise at the target version.
+				roundTrip, err := wrapper.Serialize()
+				c.Assert(err, qt.IsNil)
+				_, err = Deserialize(roundTrip, target.controllerVersion)
+				c.Assert(err, qt.IsNil)
+			})
+		}
 	}
 }
