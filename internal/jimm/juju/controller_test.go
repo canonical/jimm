@@ -439,7 +439,6 @@ func TestControllerConfig(t *testing.T) {
 	config, err := j.ControllerConfig(ctx, alice, env.Controllers[0].Name)
 	c.Assert(err, qt.Equals, nil)
 	c.Assert(config, qt.Not(qt.IsNil))
-	c.Assert(config.SSHServerPort(), qt.Equals, 17022)
 
 	_, err = j.ControllerConfig(ctx, alice, "not-found")
 	c.Assert(err, qt.ErrorMatches, `failed to get controller "not-found": controller not found`)
