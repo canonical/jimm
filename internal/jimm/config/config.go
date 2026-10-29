@@ -19,12 +19,6 @@ type ControllerConfig struct {
 	// PublicDNSName is returned to Juju clients on login.
 	// It is the hostname that will be used during TLS verification.
 	PublicDNSName string
-
-	// SSHPort is the port for SSH connections.
-	SSHPort int
-
-	// SSHPublicHostKey is the host key for SSH connections.
-	SSHPublicHostKey string
 }
 
 // NewConfigManager creates a new config manager with the given configuration.
