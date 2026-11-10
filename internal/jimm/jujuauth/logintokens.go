@@ -23,6 +23,8 @@ import (
 	"github.com/canonical/jimm/v3/internal/openfga"
 )
 
+const maxCallCount = 20
+
 // GeneratorDatabase specifies the database interface used by the
 // JWT generator.
 type GeneratorDatabase interface {
@@ -248,7 +250,7 @@ func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap ma
 	auth.mu.Lock()
 	defer auth.mu.Unlock()
 
-	if auth.callCount >= 10 {
+	if auth.callCount >= maxCallCount {
 		return nil, errors.New("Permission check limit exceeded")
 	}
 	auth.callCount++
@@ -256,6 +258,13 @@ func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap ma
 		return nil, errors.New("User authorization missing.")
 	}
 	if permissionMap != nil {
+		// if the permission was challenged by the Juju controller,
+		// we remove it from the cache so that it will be re-checked against
+		// OpenFGA. This is to avoid retrying the same cached permission that was
+		// previously challenged and failed.
+		for entity := range permissionMap {
+			delete(auth.accessMapCache, entity)
+		}
 		var err error
 		auth.accessMapCache, err = auth.accessChecker.CheckPermission(ctx, auth.user, auth.accessMapCache, permissionMap)
 		if err != nil {
