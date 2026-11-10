@@ -16,6 +16,7 @@ import (
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
 	"github.com/canonical/jimm/v3/internal/dbmodel"
+	"github.com/canonical/jimm/v3/internal/errors"
 	offermocks "github.com/canonical/jimm/v3/internal/jimm/offer/mocks"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -312,6 +313,24 @@ func (s *permissionManagerSuite) TestCheckPermissionUsesUserIDPGroupsAsContextua
 	})
 	c.Assert(err, qt.IsNil)
 	c.Assert(cachedPerms, qt.DeepEquals, map[string]string{model.ResourceTag().String(): "read"})
+}
+
+func (s *permissionManagerSuite) TestCheckPermissionDenied(c *qt.C) {
+	c.Parallel()
+	ctx := context.Background()
+	identity, err := dbmodel.NewIdentity(fmt.Sprintf("subject-%s", petname.Generate(2, "-")))
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.db.DB.Create(identity).Error, qt.IsNil)
+	user := openfga.NewUser(identity, s.ofgaClient)
+	_, _, _, model, _, _, _, _ := jimmtest.CreateTestControllerEnvironment(ctx, c, s.db)
+	c.Assert(user.SetModelAccess(ctx, model.ResourceTag(), names.ReaderRelation), qt.IsNil)
+
+	cachedPerms, err := s.manager.CheckPermission(ctx, user, map[string]string{}, map[string]any{
+		model.ResourceTag().String(): "write",
+	})
+	c.Assert(err, qt.ErrorMatches, "permission denied")
+	c.Assert(errors.ErrorCode(err), qt.Equals, errors.CodeUnauthorized)
+	c.Assert(cachedPerms, qt.HasLen, 0)
 }
 
 func (s *permissionManagerSuite) TestResourceAdminCheckUsesUserIDPGroupsAsContextualTuples(c *qt.C) {
