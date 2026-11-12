@@ -9,6 +9,7 @@ description: |
 license: GPL-3.0
 platforms:
     amd64:
+    arm64:
 
 parts:
     ca-certs:
