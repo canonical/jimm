@@ -7,6 +7,10 @@ base: bare
 build-base: core24
 confinement: strict
 
+platforms:
+  amd64:
+  arm64:
+
 slots:
   jaas-plugin:
     interface: content
