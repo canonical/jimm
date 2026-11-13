@@ -12,7 +12,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/juju/errors"
 	"github.com/juju/juju/api"
+	"github.com/juju/juju/api/client/action"
 	"github.com/juju/juju/api/client/client"
+	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 
 	"github.com/canonical/jimm/v3/internal/dbmodel"
@@ -131,6 +133,31 @@ func TestProxyModelStatus(t *testing.T) {
 	c.Check(err, qt.IsNil)
 	c.Check(status, qt.Not(qt.IsNil))
 	c.Check(status.Model.Name, qt.Equals, model.Name)
+}
+
+func TestProxyActionsReaderPermissionDenied(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	s := jimmtest.SetupJimmWithControllers(c)
+	model := s.CreateModelForBob(c)
+	s.DeployApplication(c, s.AdminUser, model.ResourceTag(), jimmtest.DeployApplicationParams{
+		App:   "hello-juju",
+		Charm: "juju-qa-dummy-sink",
+	})
+
+	ownerConn := s.Open(c, &api.Info{ModelTag: model.ResourceTag()}, "bob@canonical.com", nil)
+	defer ownerConn.Close()
+	_, err := action.NewClient(ownerConn).ApplicationCharmActions("hello-juju")
+	c.Assert(err, qt.IsNil)
+
+	reader := openfga.NewUser(&dbmodel.Identity{Name: "reader@canonical.com"}, s.JIMM.OpenFGAClient)
+	c.Assert(reader.SetModelAccess(ctx, model.ResourceTag(), ofganames.ReaderRelation), qt.IsNil)
+	c.Assert(reader.GetModelAccess(ctx, model.ResourceTag()), qt.Equals, ofganames.ReaderRelation)
+	conn := s.Open(c, &api.Info{ModelTag: model.ResourceTag()}, reader.Name, nil)
+	defer conn.Close()
+	_, err = action.NewClient(conn).ApplicationCharmActions("hello-juju")
+	c.Assert(err, qt.ErrorMatches, `permission denied.*`)
+	c.Assert(jujuparams.IsCodeUnauthorized(err), qt.IsTrue)
 }
 
 func TestProxyModelStatusWithoutPermission(t *testing.T) {

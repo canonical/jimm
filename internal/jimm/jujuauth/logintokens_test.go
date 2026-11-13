@@ -46,6 +46,7 @@ type testAccessChecker struct {
 	cloudAccessCheckErr      error
 	permissions              map[string]string
 	permissionCheckErr       error
+	checkPermissionCache     func(map[string]string)
 }
 
 // GetUserModelAccess implements the GetUserModelAccess method of the JWTGeneratorAccessChecker interface.
@@ -82,6 +83,9 @@ func (tac *testAccessChecker) GetUserCloudAccess(ctx context.Context, user *open
 
 // CheckPermission implements the CheckPermission methods of the JWTGeneratorAccessChecker interface.
 func (tac *testAccessChecker) CheckPermission(ctx context.Context, user *openfga.User, accessMap map[string]string, permissions map[string]any) (map[string]string, error) {
+	if tac.checkPermissionCache != nil {
+		tac.checkPermissionCache(accessMap)
+	}
 	if tac.permissionCheckErr != nil {
 		return nil, tac.permissionCheckErr
 	}
@@ -273,6 +277,7 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		about                 string
 		checkPermissions      map[string]string
 		checkPermissionsError error
+		checkPermissionCache  func(map[string]string)
 		jwtService            *testJWTService
 		expectedError         string
 		permissions           map[string]any
@@ -297,6 +302,30 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 		},
 		checkPermissionsError: errors.New("a test error"),
 		expectedError:         "a test error",
+	}, {
+		about:      "cached permission is challenged, unrelated permissions remain cached",
+		jwtService: &testJWTService{},
+		permissions: map[string]any{
+			mt.String(): "write",
+		},
+		checkPermissionCache: func(accessMap map[string]string) {
+			c.Assert(accessMap, qt.DeepEquals, map[string]string{
+				ct.String():                              "superuser",
+				names.NewCloudTag("test-cloud").String(): "add-model",
+			})
+		},
+		checkPermissions: map[string]string{
+			mt.String(): "write",
+		},
+		expectedJWTParams: jimmjwx.JWTParams{
+			Controller: ct.Id(),
+			User:       names.NewUserTag("eve@canonical.com").String(),
+			Access: map[string]string{
+				ct.String():                              "superuser",
+				mt.String():                              "write",
+				names.NewCloudTag("test-cloud").String(): "add-model",
+			},
+		},
 	}, {
 		about:      "additional permissions need checking",
 		jwtService: &testJWTService{},
@@ -342,8 +371,9 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 				cloudAccess: map[string]string{
 					names.NewCloudTag("test-cloud").String(): "add-model",
 				},
-				permissions:        test.checkPermissions,
-				permissionCheckErr: test.checkPermissionsError,
+				permissions:          test.checkPermissions,
+				permissionCheckErr:   test.checkPermissionsError,
+				checkPermissionCache: test.checkPermissionCache,
 			},
 		)
 		generator := authFactory.NewLoginGenerator()
@@ -364,4 +394,56 @@ func TestJWTGeneratorMakeToken(t *testing.T) {
 			c.Assert(test.jwtService.params, qt.DeepEquals, test.expectedJWTParams)
 		}
 	}
+}
+
+func TestJWTGeneratorRefreshCachedPermission(t *testing.T) {
+	c := qt.New(t)
+	ctx := context.Background()
+	ct := names.NewControllerTag(uuid.New().String())
+	mt := names.NewModelTag(uuid.New().String())
+	permissionChecks := 0
+	accessChecker := &testAccessChecker{
+		modelAccess: map[string]string{
+			mt.String(): "read",
+		},
+		controllerAccess: map[string]string{
+			ct.String(): "login",
+		},
+		permissions: map[string]string{
+			mt.String(): "write",
+		},
+		checkPermissionCache: func(accessMap map[string]string) {
+			permissionChecks++
+			c.Assert(accessMap, qt.DeepEquals, map[string]string{
+				ct.String(): "login",
+			})
+		},
+	}
+	jwtService := &testJWTService{}
+	authFactory := jujuauth.NewFactory(&testDatabase{}, jwtService, accessChecker)
+	generator := authFactory.NewLoginGenerator()
+	generator.SetTags(mt, ct)
+	identity, err := dbmodel.NewIdentity("eve@canonical.com")
+	c.Assert(err, qt.IsNil)
+	_, err = generator.MakeLoginToken(ctx, &openfga.User{Identity: identity})
+	c.Assert(err, qt.IsNil)
+	c.Assert(jwtService.params.Access, qt.DeepEquals, map[string]string{
+		ct.String(): "login",
+		mt.String(): "read",
+	})
+	c.Assert(permissionChecks, qt.Equals, 0)
+
+	_, err = generator.MakeToken(ctx, map[string]any{mt.String(): "write"})
+	c.Assert(err, qt.IsNil)
+	expectedAccess := map[string]string{
+		ct.String(): "login",
+		mt.String(): "write",
+	}
+	c.Assert(jwtService.params.Access, qt.DeepEquals, expectedAccess)
+	c.Assert(permissionChecks, qt.Equals, 1)
+
+	_, err = generator.MakeToken(ctx, nil)
+	c.Assert(err, qt.IsNil)
+	c.Assert(jwtService.params.Access, qt.DeepEquals, expectedAccess)
+	c.Assert(permissionChecks, qt.Equals, 1)
 }
