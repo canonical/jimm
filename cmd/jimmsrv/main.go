@@ -23,7 +23,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/idpgroupfetcher"
 	"github.com/canonical/jimm/v3/internal/logger"
 	"github.com/canonical/jimm/v3/internal/river"
-	"github.com/canonical/jimm/v3/internal/ssh"
 	"github.com/canonical/jimm/v3/version"
 )
 
@@ -152,20 +151,6 @@ func start(ctx context.Context, s *service.Service) error {
 		return errors.New("jimm session store secret must be at least 64 characters")
 	}
 
-	hostKeyRaw := os.Getenv("JIMM_SSH_HOST_KEY")
-	if hostKeyRaw == "" {
-		return errors.New("empty hostkey from env variable")
-	}
-	maxConcurrentConnections, _ := strconv.Atoi(os.Getenv("JIMM_SSH_MAX_CONCURRENT_CONNECTIONS"))
-	publicHostKey, err := ssh.GetPublicKeyFromPrivateKey([]byte(hostKeyRaw))
-	if err != nil {
-		return errors.New("cannot parse hostkey from env variable")
-	}
-	fingerprints, err := ssh.GetFingerprintsFromPrivateKey([]byte(hostKeyRaw))
-	if err != nil {
-		return errors.New("cannot parse hostkey from env variable")
-	}
-
 	// CORS_ALLOWED_ORIGINS is used to set the CORS and CSFR middleware for JIMM's
 	// HTTP and WS server.
 	corsAllowedOrigins := strings.Fields(os.Getenv("CORS_ALLOWED_ORIGINS"))
@@ -176,14 +161,6 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 	logSQL, _ := strconv.ParseBool(os.Getenv("JIMM_LOG_SQL"))
 
-	sshPort := os.Getenv("JIMM_SSH_PORT")
-	if sshPort == "" {
-		return errors.New("empty ssh port from env variable")
-	}
-	sshPortInt, err := strconv.Atoi(sshPort)
-	if err != nil {
-		return fmt.Errorf("failed to parse ssh port: %w", err)
-	}
 	jimmUUID := os.Getenv("JIMM_UUID")
 	publicDnsName := os.Getenv("JIMM_DNS_NAME")
 	crossModelQueryTimeout := 5 * time.Second
@@ -212,15 +189,14 @@ func start(ctx context.Context, s *service.Service) error {
 	}
 
 	jimmsvc, err := jimmsvc.NewService(ctx, jimmsvc.Params{
-		ControllerUUID:      jimmUUID,
-		DSN:                 os.Getenv("JIMM_DSN"),
-		HostKeyFingerprints: fingerprints,
-		ControllerAdmins:    strings.Fields(os.Getenv("JIMM_ADMINS")),
-		VaultRoleID:         os.Getenv("VAULT_ROLE_ID"),
-		VaultRoleSecretID:   os.Getenv("VAULT_ROLE_SECRET_ID"),
-		VaultAddress:        os.Getenv("VAULT_ADDR"),
-		VaultPath:           os.Getenv("VAULT_PATH"),
-		PublicDNSName:       publicDnsName,
+		ControllerUUID:    jimmUUID,
+		DSN:               os.Getenv("JIMM_DSN"),
+		ControllerAdmins:  strings.Fields(os.Getenv("JIMM_ADMINS")),
+		VaultRoleID:       os.Getenv("VAULT_ROLE_ID"),
+		VaultRoleSecretID: os.Getenv("VAULT_ROLE_SECRET_ID"),
+		VaultAddress:      os.Getenv("VAULT_ADDR"),
+		VaultPath:         os.Getenv("VAULT_PATH"),
+		PublicDNSName:     publicDnsName,
 		OpenFGAParams: jimmsvc.OpenFGAParams{
 			Scheme:    os.Getenv("OPENFGA_SCHEME"),
 			Host:      os.Getenv("OPENFGA_HOST"),
@@ -257,10 +233,8 @@ func start(ctx context.Context, s *service.Service) error {
 		LogLevel:                  logLevel,
 		IsLeader:                  os.Getenv("JIMM_IS_LEADER") != "",
 		ControllerConfig: config.ControllerConfig{
-			ControllerUUID:   jimmUUID,
-			PublicDNSName:    publicDnsName,
-			SSHPort:          sshPortInt,
-			SSHPublicHostKey: publicHostKey,
+			ControllerUUID: jimmUUID,
+			PublicDNSName:  publicDnsName,
 		},
 		CrossModelQueryTimeout:        crossModelQueryTimeout,
 		BootstrapLoginTokenRefreshURL: os.Getenv("JIMM_BOOTSTRAP_LOGIN_TOKEN_REFRESH_URL"),
@@ -279,15 +253,6 @@ func start(ctx context.Context, s *service.Service) error {
 		Addr:              addr,
 		Handler:           jimmsvc,
 		ReadHeaderTimeout: time.Second * 30,
-	}
-
-	sshServer, err := ssh.NewJumpServer(ctx, ssh.Config{
-		Port:                     sshPort,
-		HostKey:                  []byte(hostKeyRaw),
-		MaxConcurrentConnections: maxConcurrentConnections,
-	}, jimmsvc.JIMM().SSHManager)
-	if err != nil {
-		return err
 	}
 
 	err = river.MigrateRiver(ctx, jimmsvc.JIMM().Database)
@@ -323,12 +288,6 @@ func start(ctx context.Context, s *service.Service) error {
 			zapctx.Error(ctx, "failed to shutdown internal HTTP server gracefully", zap.Error(err))
 		}
 
-		zapctx.Warn(ctx, "SSH server shutdown triggered")
-		err = sshServer.Shutdown(ctx)
-		if err != nil {
-			zapctx.Error(ctx, "failed to shutdown SSH server gracefully", zap.Error(err))
-		}
-
 		zapctx.Warn(ctx, "River client shutdown triggered")
 		if err := riverClient.StopAndCancel(ctx); err != nil {
 			zapctx.Error(ctx, "failed to shutdown River client", zap.Error(err))
@@ -342,7 +301,5 @@ func start(ctx context.Context, s *service.Service) error {
 	zapctx.Info(ctx, "Started JIMM HTTP server")
 	s.Go(internalSrv.ListenAndServe)
 	zapctx.Info(ctx, "Started JIMM internal HTTP server")
-	s.Go(sshServer.ListenAndServe)
-	zapctx.Info(ctx, "Started JIMM SSH server")
 	return nil
 }

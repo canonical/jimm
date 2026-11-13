@@ -7,7 +7,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -217,9 +216,6 @@ type Params struct {
 	// Setting this to "debug" enables the requests logger as well.
 	LogLevel string
 
-	// HostKeyFingerprints is the fingerprint of the SSH public host key.
-	HostKeyFingerprints map[string]string
-
 	// ControllerConfig is the configuration to expose when the ControllerConfig
 	// facade is called.
 	ControllerConfig config.ControllerConfig
@@ -259,7 +255,6 @@ type ServiceDependencies struct {
 	CrossModelQueryTimeout        time.Duration
 	DischargerPrivateKey          string
 	DischargerPublicKey           string
-	HostKeyFingerprints           map[string]string
 	IsLeader                      bool
 	MacaroonExpiryDuration        time.Duration
 	PublicDNSName                 string
@@ -494,7 +489,6 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 		PublicDNSName:                 p.PublicDNSName,
 		PublicDNSHost:                 publicDNS.Host,
 		CorsAllowedOrigins:            append([]string(nil), p.CorsAllowedOrigins...),
-		HostKeyFingerprints:           maps.Clone(p.HostKeyFingerprints),
 		ControllerConfig:              p.ControllerConfig,
 		CrossModelQueryTimeout:        p.CrossModelQueryTimeout,
 		BootstrapLoginTokenRefreshURL: p.BootstrapLoginTokenRefreshURL,
@@ -699,9 +693,6 @@ func NewServiceFromDependencies(ctx context.Context, deps *ServiceDependencies) 
 	mountHandler("/migrate", jimmhttp.NewMigrationHTTPProxyHandler(s.jimm.LoginManager, s.jimm.JujuManager, s.jimm.JujuAuthFactory))
 	// Log transfer endpoint
 	s.mux.Handle("/migrate/logtransfer", jujuapi.LogTransferHandler(ctx, s.jimm, params))
-
-	// serve the ssh public key fingerprint
-	s.mux.Get("/ssh/public-key-fingerprints", jimmhttp.WriteFingerprints(deps.HostKeyFingerprints))
 
 	s.isLeader = deps.IsLeader
 
