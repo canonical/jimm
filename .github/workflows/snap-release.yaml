@@ -11,6 +11,14 @@ on:
       release-channel:
         required: true
         type: string
+      architecture:
+        required: false
+        type: string
+        default: amd64
+      runner:
+        required: false
+        type: string
+        default: ubuntu-latest
     secrets:
       STORE_LOGIN:
         required: true
@@ -24,7 +32,7 @@ jobs:
   build:
     outputs:
       snap: ${{ steps.snapcraft.outputs.snap }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -37,6 +45,8 @@ jobs:
         cp ./snaps/${{ inputs.folder }}/snapcraft.yaml ./snap/
     - uses: snapcore/action-build@v1
       id: snapcraft
+      with:
+        snapcraft-args: --build-for=${{ inputs.architecture }}
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.snapcraft.outputs.snap }} 
