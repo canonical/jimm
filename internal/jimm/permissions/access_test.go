@@ -366,6 +366,9 @@ cloud-credentials:
 - owner: alice@canonical.com
   name: cred-1
   cloud: test-cloud
+- owner: eve@canonical.com
+  name: cred-2
+  cloud: test-cloud
 controllers:
 - name: controller-1
   uuid: 00000001-0000-0000-0000-000000000001
@@ -400,6 +403,27 @@ models:
     access: admin
   - user: earl@canonical.com
     access: admin
+- name: model-3
+  uuid: 00000002-0000-0000-0000-000000000003
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  cloud-credential: cred-2
+  owner: alice@canonical.com
+  users:
+  - user: alice@canonical.com
+    access: admin
+- name: model-4
+  uuid: 00000002-0000-0000-0000-000000000004
+  controller: controller-1
+  cloud: test-cloud
+  region: test-cloud-region
+  owner: alice@canonical.com
+  users:
+  - user: alice@canonical.com
+    access: admin
+  - user: daphne@canonical.com
+    access: read
 `
 
 var revokeModelAccessTests = []struct {
@@ -910,6 +934,99 @@ var revokeModelAccessTests = []struct {
 		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
 		Relation: ofganames.ReaderRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	// eve owns cred-2 on model-3; full access removal blocked regardless of access level.
+	name:           "cannot revoke read from credential owner (admin access)",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@canonical.com",
+	uuid:           "00000002-0000-0000-0000-000000000003",
+	targetUsername: "eve@canonical.com",
+	access:         "read",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000003")),
+	}},
+	expectError:     `cannot revoke model access: model uses a cloud credential owned by "eve@canonical.com"; update the model credential before revoking access`,
+	expectErrorCode: errors.CodeBadRequest,
+}, {
+	name:           "cannot revoke read from credential owner (write access)",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@canonical.com",
+	uuid:           "00000002-0000-0000-0000-000000000003",
+	targetUsername: "eve@canonical.com",
+	access:         "read",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000003")),
+	}},
+	expectError:     `cannot revoke model access: model uses a cloud credential owned by "eve@canonical.com"; update the model credential before revoking access`,
+	expectErrorCode: errors.CodeBadRequest,
+}, {
+	name:           "cannot revoke read from credential owner (reader access)",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@canonical.com",
+	uuid:           "00000002-0000-0000-0000-000000000003",
+	targetUsername: "eve@canonical.com",
+	access:         "read",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000003")),
+	}},
+	expectError:     `cannot revoke model access: model uses a cloud credential owned by "eve@canonical.com"; update the model credential before revoking access`,
+	expectErrorCode: errors.CodeBadRequest,
+}, {
+	// Downgrading (admin→write) is still allowed; only full removal is blocked.
+	name:           "can downgrade credential owner from admin to write",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@canonical.com",
+	uuid:           "00000002-0000-0000-0000-000000000003",
+	targetUsername: "eve@canonical.com",
+	access:         "admin",
+	extraInitialTuples: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000003")),
+	}},
+	expectRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
+		Relation: ofganames.WriterRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000003")),
+	}},
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("eve@canonical.com")),
+		Relation: ofganames.AdministratorRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000003")),
+	}},
+}, {
+	// model-1 uses cred-1 owned by alice; daphne does not own the credential so revoke proceeds normally.
+	name:           "can fully revoke access from non-credential-owner",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@canonical.com",
+	uuid:           "00000002-0000-0000-0000-000000000001",
+	targetUsername: "daphne@canonical.com",
+	access:         "read",
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
+	}},
+}, {
+	// model-4 has no credential; GetModelCredentialOwner returns "" which never
+	// matches a real username, so the revoke proceeds normally.
+	name:           "can fully revoke access on model with no credential",
+	env:            revokeModelAccessTestEnv,
+	username:       "alice@canonical.com",
+	uuid:           "00000002-0000-0000-0000-000000000004",
+	targetUsername: "daphne@canonical.com",
+	access:         "read",
+	expectRemovedRelations: []openfga.Tuple{{
+		Object:   ofganames.ConvertTag(names.NewUserTag("daphne@canonical.com")),
+		Relation: ofganames.ReaderRelation,
+		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000004")),
 	}},
 }, {
 	name:            "UserNotAuthorized",

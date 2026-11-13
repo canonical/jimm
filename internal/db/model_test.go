@@ -471,6 +471,87 @@ func (s *dbSuite) TestGetModelsUsingCredential(c *qt.C) {
 	c.Assert(models, qt.HasLen, 0)
 }
 
+func TestGetModelCredentialOwnerUnconfiguredDatabase(t *testing.T) {
+	c := qt.New(t)
+	var d db.Database
+	_, err := d.GetModelCredentialOwner(context.Background(), "00000001-0000-0000-0000-000000000001")
+	c.Check(err, qt.ErrorMatches, `database not configured`)
+	c.Check(errors.ErrorCode(err), qt.Equals, errors.CodeServerConfiguration)
+}
+
+func (s *dbSuite) TestGetModelCredentialOwner(c *qt.C) {
+	err := s.Database.Migrate(context.Background())
+	c.Assert(err, qt.Equals, nil)
+
+	i, err := dbmodel.NewIdentity("bob@canonical.com")
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.Database.DB.Create(i).Error, qt.IsNil)
+
+	cloud := dbmodel.Cloud{
+		Name: "test-cloud",
+		Type: "test-provider",
+		Regions: []dbmodel.CloudRegion{{
+			Name: "test-region",
+		}},
+	}
+	c.Assert(s.Database.DB.Create(&cloud).Error, qt.IsNil)
+
+	cred := dbmodel.CloudCredential{
+		Name:     "test-cred",
+		Cloud:    cloud,
+		Owner:    *i,
+		AuthType: "empty",
+	}
+	c.Assert(s.Database.DB.Create(&cred).Error, qt.IsNil)
+
+	controller := dbmodel.Controller{
+		Name:        "test-controller",
+		UUID:        "00000000-0000-0000-0000-0000-0000000000001",
+		CloudName:   "test-cloud",
+		CloudRegion: "test-region",
+	}
+	err = s.Database.AddController(context.Background(), &controller)
+	c.Assert(err, qt.Equals, nil)
+
+	modelWithCred := dbmodel.Model{
+		Name:              "model-with-cred",
+		UUID:              sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
+		OwnerIdentityName: i.Name,
+		ControllerID:      controller.ID,
+		CloudRegionID:     cloud.Regions[0].ID,
+		CloudCredentialID: cred.ID,
+		Life:              state.Alive.String(),
+	}
+	err = s.Database.AddModel(context.Background(), &modelWithCred)
+	c.Assert(err, qt.Equals, nil)
+
+	modelNoCred := dbmodel.Model{
+		Name:              "model-no-cred",
+		UUID:              sql.NullString{String: "00000001-0000-0000-0000-000000000002", Valid: true},
+		OwnerIdentityName: i.Name,
+		ControllerID:      controller.ID,
+		CloudRegionID:     cloud.Regions[0].ID,
+		Life:              state.Alive.String(),
+	}
+	err = s.Database.AddModel(context.Background(), &modelNoCred)
+	c.Assert(err, qt.Equals, nil)
+
+	// model with a credential returns the credential owner's identity name.
+	owner, err := s.Database.GetModelCredentialOwner(context.Background(), "00000001-0000-0000-0000-000000000001")
+	c.Assert(err, qt.IsNil)
+	c.Assert(owner, qt.Equals, "bob@canonical.com")
+
+	// model with no credential (CloudCredentialID == 0) returns empty string.
+	owner, err = s.Database.GetModelCredentialOwner(context.Background(), "00000001-0000-0000-0000-000000000002")
+	c.Assert(err, qt.IsNil)
+	c.Assert(owner, qt.Equals, "")
+
+	// unknown UUID returns empty string without error (LEFT JOIN produces no rows).
+	owner, err = s.Database.GetModelCredentialOwner(context.Background(), "00000001-0000-0000-0000-000000000099")
+	c.Assert(err, qt.IsNil)
+	c.Assert(owner, qt.Equals, "")
+}
+
 func TestForEachModelUnconfiguredDatabase(t *testing.T) {
 	c := qt.New(t)
 
