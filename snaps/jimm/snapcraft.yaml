@@ -6,6 +6,10 @@ base: core24
 confinement: strict
 version: git
 
+platforms:
+  amd64:
+  arm64:
+
 apps:
   jimm:
     command: bin/jimmsrv
