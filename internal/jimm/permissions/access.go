@@ -564,6 +564,21 @@ func (j *PermissionManager) RevokeModelAccess(ctx context.Context, user *openfga
 		case ofganames.NoRelation:
 			return nil
 		default:
+			// Before fully removing access, check whether this model uses the
+			// target user's cloud credential. If so, revoking their last access
+			// would leave the credential silently locked (the owner can no longer
+			// see the model, but cannot delete the credential either).
+			credOwner, err := j.store.GetModelCredentialOwner(ctx, mt.Id())
+			if err != nil {
+				return err
+			}
+			if credOwner == targetUser.Name {
+				return errors.Codef(
+					errors.CodeBadRequest,
+					"cannot revoke model access: model uses a cloud credential owned by %q; update the model credential before revoking access",
+					targetUser.Name,
+				)
+			}
 			relationsToRevoke = []openfga.Relation{
 				ofganames.ReaderRelation,
 				ofganames.WriterRelation,

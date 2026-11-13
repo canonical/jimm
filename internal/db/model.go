@@ -99,6 +99,33 @@ func (d *Database) GetModelsUsingCredential(ctx context.Context, credentialID ui
 	return models, nil
 }
 
+// GetModelCredentialOwner returns the identity name of the cloud credential
+// owner for the model with the given UUID. Returns an empty string if the
+// model has no credential set (CloudCredentialID == 0) or the UUID is unknown.
+// Callers comparing the result to a user identity name are safe because valid
+// identity names are always non-empty (user@domain form).
+func (d *Database) GetModelCredentialOwner(ctx context.Context, modelUUID string) (_ string, err error) {
+	const op = "db.GetModelCredentialOwner"
+	if err := d.ready(); err != nil {
+		return "", err
+	}
+
+	durationObserver := servermon.DurationObserver(servermon.DBQueryDurationHistogram, op)
+	defer durationObserver()
+	defer servermon.ErrorCounter(servermon.DBQueryErrorCount, &err, op)
+
+	var ownerName string
+	result := d.DB.WithContext(ctx).
+		Model(&dbmodel.Model{}).
+		Joins("LEFT JOIN cloud_credentials ON cloud_credentials.id = models.cloud_credential_id").
+		Where("models.uuid = ?", modelUUID).
+		Pluck("cloud_credentials.owner_identity_name", &ownerName)
+	if result.Error != nil {
+		return "", dbError(result.Error)
+	}
+	return ownerName, nil
+}
+
 // UpdateModel updates the model information.
 func (d *Database) UpdateModel(ctx context.Context, model *dbmodel.Model) (err error) {
 	const op = "db.UpdateModel"
