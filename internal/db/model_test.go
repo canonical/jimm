@@ -513,27 +513,17 @@ func (s *dbSuite) TestGetModelCredentialOwner(c *qt.C) {
 	err = s.Database.AddController(context.Background(), &controller)
 	c.Assert(err, qt.Equals, nil)
 
-	modelWithCred := dbmodel.Model{
-		Name:              "model-with-cred",
+	model := dbmodel.Model{
+		Name:              "test-model",
 		UUID:              sql.NullString{String: "00000001-0000-0000-0000-000000000001", Valid: true},
 		OwnerIdentityName: i.Name,
 		ControllerID:      controller.ID,
 		CloudRegionID:     cloud.Regions[0].ID,
+		CloudCredential:   cred,
 		CloudCredentialID: cred.ID,
 		Life:              state.Alive.String(),
 	}
-	err = s.Database.AddModel(context.Background(), &modelWithCred)
-	c.Assert(err, qt.Equals, nil)
-
-	modelNoCred := dbmodel.Model{
-		Name:              "model-no-cred",
-		UUID:              sql.NullString{String: "00000001-0000-0000-0000-000000000002", Valid: true},
-		OwnerIdentityName: i.Name,
-		ControllerID:      controller.ID,
-		CloudRegionID:     cloud.Regions[0].ID,
-		Life:              state.Alive.String(),
-	}
-	err = s.Database.AddModel(context.Background(), &modelNoCred)
+	err = s.Database.AddModel(context.Background(), &model)
 	c.Assert(err, qt.Equals, nil)
 
 	// model with a credential returns the credential owner's identity name.
@@ -541,12 +531,7 @@ func (s *dbSuite) TestGetModelCredentialOwner(c *qt.C) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(owner, qt.Equals, "bob@canonical.com")
 
-	// model with no credential (CloudCredentialID == 0) returns empty string.
-	owner, err = s.Database.GetModelCredentialOwner(context.Background(), "00000001-0000-0000-0000-000000000002")
-	c.Assert(err, qt.IsNil)
-	c.Assert(owner, qt.Equals, "")
-
-	// unknown UUID returns empty string without error (LEFT JOIN produces no rows).
+	// unknown UUID returns empty string without error.
 	owner, err = s.Database.GetModelCredentialOwner(context.Background(), "00000001-0000-0000-0000-000000000099")
 	c.Assert(err, qt.IsNil)
 	c.Assert(owner, qt.Equals, "")

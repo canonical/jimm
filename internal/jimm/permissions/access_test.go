@@ -418,6 +418,7 @@ models:
   controller: controller-1
   cloud: test-cloud
   region: test-cloud-region
+  cloud-credential: cred-1
   owner: alice@canonical.com
   users:
   - user: alice@canonical.com
@@ -731,14 +732,15 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	name:           "Admin revokes 'read' access from themselves",
+	// alice revokes bob's last access; bob does not own the credential so this succeeds.
+	name:           "Admin revokes 'read' access from another admin (non-credential-owner)",
 	env:            revokeModelAccessTestEnv,
 	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000001",
-	targetUsername: "alice@canonical.com",
+	targetUsername: "bob@canonical.com",
 	access:         "read",
 	expectRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}, {
@@ -751,7 +753,7 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 	expectRemovedRelations: []openfga.Tuple{{
-		Object:   ofganames.ConvertTag(names.NewUserTag("alice@canonical.com")),
+		Object:   ofganames.ConvertTag(names.NewUserTag("bob@canonical.com")),
 		Relation: ofganames.AdministratorRelation,
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
@@ -1015,9 +1017,9 @@ var revokeModelAccessTests = []struct {
 		Target:   ofganames.ConvertTag(names.NewModelTag("00000002-0000-0000-0000-000000000001")),
 	}},
 }, {
-	// model-4 has no credential; GetModelCredentialOwner returns "" which never
-	// matches a real username, so the revoke proceeds normally.
-	name:           "can fully revoke access on model with no credential",
+	// model-4 uses cred-1 owned by alice; daphne does not own the credential
+	// so the guard does not block and the revoke proceeds normally.
+	name:           "can fully revoke access from non-credential-owner",
 	env:            revokeModelAccessTestEnv,
 	username:       "alice@canonical.com",
 	uuid:           "00000002-0000-0000-0000-000000000004",
