@@ -6,14 +6,32 @@ on:
 
 jobs:
   build-and-release-jaas-plugin:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
     uses: ./.github/workflows/snap-release.yaml
     with:
       folder: jaas
       release-channel: 3/edge
+      architecture: ${{ matrix.arch }}
+      runner: ${{ matrix.runner }}
     secrets: inherit
 
   build-jimm-server:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -26,6 +44,8 @@ jobs:
         cp ./snaps/jimm/snapcraft.yaml ./snap/
     - uses: snapcore/action-build@v1
       id: snapcraft
+      with:
+        snapcraft-args: --build-for=${{ matrix.arch }}
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.snapcraft.outputs.snap }} 
