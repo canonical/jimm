@@ -249,7 +249,7 @@ func (j *PermissionManager) CheckPermission(ctx context.Context, user *openfga.U
 	}
 	for n := range batch {
 		if !allowed[batch[n].CorrelationId] {
-			return cachedPerms, fmt.Errorf("missing permission for %s:%s", checks[n].key, checks[n].value)
+			return cachedPerms, errors.Codef(errors.CodeUnauthorized, "permission denied")
 		}
 		cachedPerms[checks[n].key] = checks[n].value
 	}

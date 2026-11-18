@@ -11,6 +11,7 @@ package jujuauth
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/juju/names/v5"
@@ -256,11 +257,24 @@ func (auth *LoginTokenGenerator) MakeToken(ctx context.Context, permissionMap ma
 		return nil, errors.New("User authorization missing.")
 	}
 	if permissionMap != nil {
-		var err error
-		auth.accessMapCache, err = auth.accessChecker.CheckPermission(ctx, auth.user, auth.accessMapCache, permissionMap)
+		// A non-nil permissionMap means the Juju controller challenged the JWT we
+		// previously sent: it replied with an "access required" error listing the
+		// permissions it needs. CheckPermission skips entities already in the cache,
+		// so we drop the challenged entities from a copy to force a re-check against
+		// OpenFGA. Otherwise we would keep resending the same insufficient permission.
+		// The copy replaces the cache only if the check succeeds, so a denied check
+		// doesn't remove entries..
+		zapctx.Debug(ctx, "permissions challenged by controller", zap.Any("permissions", permissionMap))
+		cache := maps.Clone(auth.accessMapCache)
+		for entity := range permissionMap {
+			delete(cache, entity)
+		}
+		cache, err := auth.accessChecker.CheckPermission(ctx, auth.user, cache, permissionMap)
 		if err != nil {
+			zapctx.Warn(ctx, "permission check failed", zap.Any("permissions", permissionMap), zap.Error(err))
 			return nil, err
 		}
+		auth.accessMapCache = cache
 	}
 	jwt, err := auth.jwtService.NewJWT(ctx, jimmjwx.JWTParams{
 		Controller: auth.ct.Id(),
