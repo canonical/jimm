@@ -492,7 +492,7 @@ func NewServiceDependencies(ctx context.Context, p Params) (*ServiceDependencies
 	deps := &ServiceDependencies{
 		ControllerUUID:                controllerUUID,
 		PublicDNSName:                 p.PublicDNSName,
-		PublicDNSHost:                 publicDNS.Host,
+		PublicDNSHost:                 publicDNS.Hostname(),
 		CorsAllowedOrigins:            append([]string(nil), p.CorsAllowedOrigins...),
 		HostKeyFingerprints:           maps.Clone(p.HostKeyFingerprints),
 		ControllerConfig:              p.ControllerConfig,
