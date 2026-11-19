@@ -652,6 +652,49 @@ func TestModifyModelAccessErrors(t *testing.T) {
 	}
 }
 
+// TestModifyModelAccessCredentialOwnerBlocked verifies that revoking the last
+// access of a user who owns the model's cloud credential is refused at the
+// facade level and that the error is not masked by the NotFound→unauthorized
+// rewrite in ModifyModelAccess.
+func TestModifyModelAccessCredentialOwnerBlocked(t *testing.T) {
+	c := qt.New(t)
+	s := jimmtest.SetupJimmWithControllers(c)
+
+	// bob owns the model and its credential.
+	model := s.CreateModelForBob(c)
+
+	// grant charlie admin access so he can attempt the revoke.
+	err := s.JIMM.PermissionManager.GrantModelAccess(
+		c.Context(),
+		s.AdminUser,
+		model.ResourceTag(),
+		names.NewUserTag("charlie@canonical.com"),
+		jujuparams.ModelAdminAccess,
+	)
+	c.Assert(err, qt.IsNil)
+
+	// charlie tries to fully revoke bob's access — bob owns the credential.
+	conn := s.Open(c, nil, "charlie@canonical.com", nil)
+	defer conn.Close()
+
+	var res jujuparams.ErrorResults
+	err = conn.APICall("ModelManager", 10, "", "ModifyModelAccess", jujuparams.ModifyModelAccessRequest{
+		Changes: []jujuparams.ModifyModelAccess{{
+			UserTag:  names.NewUserTag("bob@canonical.com").String(),
+			Action:   jujuparams.RevokeModelAccess,
+			Access:   jujuparams.ModelReadAccess,
+			ModelTag: model.ResourceTag().String(),
+		}},
+	}, &res)
+	c.Assert(err, qt.IsNil)
+	c.Assert(res.Results, qt.HasLen, 1)
+	c.Assert(res.Results[0].Error, qt.IsNotNil)
+	c.Assert(res.Results[0].Error.Code, qt.Equals, string(errors.CodeBadRequest))
+	c.Assert(res.Results[0].Error.Message, qt.Matches,
+		`cannot revoke model access: model uses a cloud credential owned by "bob@canonical.com"; update the model credential before revoking access`,
+	)
+}
+
 var zeroDuration = time.Duration(0)
 
 func TestDestroyModel(t *testing.T) {
