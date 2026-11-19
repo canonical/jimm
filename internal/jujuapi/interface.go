@@ -16,7 +16,6 @@ import (
 	jujuparams "github.com/juju/juju/rpc/params"
 	"github.com/juju/names/v5"
 	"github.com/juju/version/v2"
-	gossh "golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 
 	"github.com/canonical/jimm/v3/internal/common/pagination"
@@ -25,7 +24,6 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/bootstrap"
 	"github.com/canonical/jimm/v3/internal/jimm/config"
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
-	"github.com/canonical/jimm/v3/internal/jimm/ssh"
 	"github.com/canonical/jimm/v3/internal/jimm/sshkeys"
 	"github.com/canonical/jimm/v3/internal/jujuclient"
 	"github.com/canonical/jimm/v3/internal/openfga"
@@ -191,20 +189,6 @@ type SSHKeyManager interface {
 	RemoveUserKeyByFingerprint(ctx context.Context, user *openfga.User, model db.SSHKeyModelFilter, fingerprint string) error
 	// VerifyPublicKey lists the key for a user and compares the key to find a match.
 	VerifyPublicKey(ctx context.Context, claimUser string, publicKey []byte) (bool, error)
-}
-
-// SSHManager is the interface to enable the ssh server to operate. Performing public key verification and
-// resolving addresses from model uuids.
-type SSHManager interface {
-	// PublicKeyHandler is the method to verify the public key of the user. It returns a user if successful.
-	PublicKeyHandler(ctx context.Context, claimUser string, key []byte) (*openfga.User, error)
-
-	// DialInfo resolves the address of the controller to contact given the model UUID and
-	// returns a struct with parameters to connect and authenticate to the controller.
-	DialInfo(ctx context.Context, modelUUID string, user *openfga.User) (ssh.DialInfo, error)
-
-	// DialController dials a controller's SSH server using the provided details.
-	DialController(ctx context.Context, ctrlInfo ssh.DialInfo, user *openfga.User) (*gossh.Client, error)
 }
 
 // ConfigManager provides a means to retrieve the JIMM controller config to expose via facade method.
