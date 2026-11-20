@@ -1471,6 +1471,96 @@ func TestAddModel(t *testing.T) {
 	}
 }
 
+func TestAddModelGrantJIMMModelAdminByControllerVersion(t *testing.T) {
+	c := qt.New(t)
+
+	tests := []struct {
+		name         string
+		agentVersion string
+		expectGrant  bool
+	}{
+		{name: "older version", agentVersion: "3.6.29", expectGrant: true},
+		{name: "unknown version", agentVersion: "", expectGrant: true},
+		{name: "minimum version", agentVersion: "3.6.30", expectGrant: false},
+		{name: "newer version", agentVersion: "4.0.3", expectGrant: false},
+	}
+	for _, test := range tests {
+		c.Run(test.name, func(c *qt.C) {
+			granted := false
+			j := newTestJujuManager(c, &parameters{
+				Dialer: &jimmtest.Dialer{
+					API: &jimmtest.API{
+						UpdateCloudsCredentialForce_: func(_ context.Context, _ jujuparams.TaggedCredential) ([]jujuparams.UpdateCredentialResult, error) {
+							return []jujuparams.UpdateCredentialResult{{}}, nil
+						},
+						GrantJIMMModelAdmin_: func(_ context.Context, _ names.ModelTag) error {
+							granted = true
+							return nil
+						},
+						CreateModel_: createModel(`
+uuid: 00000001-0000-0000-0000-0000-000000000001
+status:
+  status: started
+  info: running a test
+life: alive
+users:
+- user: alice@canonical.com
+  access: admin
+`[1:]),
+					},
+				},
+			})
+
+			env := jimmtest.ParseEnvironment(c, fmt.Sprintf(`
+clouds:
+- name: test-cloud
+  type: test-provider
+  regions:
+  - name: test-region-1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+cloud-credentials:
+- name: test-credential-1
+  owner: alice@canonical.com
+  cloud: test-cloud
+  auth-type: empty
+controllers:
+- name: controller-1
+  uuid: 00000000-0000-0000-0000-0000-0000000000001
+  agent-version: %q
+  cloud: test-cloud
+  region: test-region-1
+  cloud-regions:
+  - cloud: test-cloud
+    region: test-region-1
+    priority: 1
+  users:
+  - user: alice@canonical.com
+    access: add-model
+`[1:], test.agentVersion))
+			env.PopulateDBAndPermissions(c, j.ResourceTag(), j.Database, j.OpenFGAClient)
+
+			credTag := names.NewCloudCredentialTag("test-cloud/alice@canonical.com/test-credential-1")
+			err := j.CredentialStore.Put(context.Background(), credTag, map[string]string{"key": "value"})
+			c.Assert(err, qt.IsNil)
+
+			dbUser := env.User("alice@canonical.com").DBObject(c, j.Database)
+			user := openfga.NewUser(&dbUser, j.OpenFGAClient)
+
+			_, err = j.AddModel(context.Background(), user, &juju.ModelCreateArgs{
+				Name:            "test-model",
+				Owner:           names.NewUserTag("alice@canonical.com"),
+				Cloud:           names.NewCloudTag("test-cloud"),
+				CloudRegion:     "test-region-1",
+				CloudCredential: credTag,
+			})
+			c.Assert(err, qt.IsNil)
+			c.Assert(granted, qt.Equals, test.expectGrant)
+		})
+	}
+}
+
 // convertParamsModelInfo converts a params.ModelInfo to a base.ModelInfo.
 // It is copy/pasted from the juju params package and adjusted to fit the needs
 // of this test where not all values need to be filled in.
