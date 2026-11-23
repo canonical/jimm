@@ -31,9 +31,8 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
           version: 'v0.74.0'
-        env:
-          TRIVY_DB_REPOSITORY: ghcr.io/canonical/comsys-build-tools/trivy-db:2
-  
+          cache: false
+
       - name: Upload trivy scan results as artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -55,6 +54,7 @@ jobs:
         with:
           output-format: 'sarif'
           output-file: 'govuln-results.sarif'
+          go-version-input: ''
           go-version-file: go.mod
           repo-checkout: false
   
@@ -137,8 +137,7 @@ jobs:
           format: 'sarif'
           output: 'jimm-container-trivy-results.sarif'
           version: 'v0.74.0'
-        env:
-          TRIVY_DB_REPOSITORY: ghcr.io/canonical/comsys-build-tools/trivy-db:2
+          cache: false
 
       - name: Upload container scan results as artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

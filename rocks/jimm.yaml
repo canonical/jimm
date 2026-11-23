@@ -40,5 +40,5 @@ parts:
             # Used by the charm to apply to the OpenFGA server, not by the container itself
             mkdir -p $CRAFT_PART_INSTALL/root/openfga/
             # Note that we can't use go run directly (https://github.com/canonical/rockcraft/issues/755)
-            go install github.com/openfga/cli/cmd/fga@latest
-            $GOBIN/fga model transform --file ./openfga/authorisation_model.fga --output-format json > $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json
+            GOBIN="$CRAFT_PART_BUILD/fga-tools" go install github.com/openfga/cli/cmd/fga@v0.9.0
+            "$CRAFT_PART_BUILD/fga-tools/fga" model transform --file ./openfga/authorisation_model.fga --output-format json > $CRAFT_PART_INSTALL/root/openfga/authorisation_model.json

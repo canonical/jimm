@@ -51,9 +51,11 @@ jobs:
         run: make load-rock
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: 'jimm:latest'
+          version: 'v0.74.0'
+          cache: false
 
       - name: Push to github package
         run: |
