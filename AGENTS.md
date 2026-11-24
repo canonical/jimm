@@ -14,7 +14,8 @@ JIMM (Juju Intelligent Model Manager) is a Go service that manages multiple Juju
 - Keep changes focused, follow nearby conventions, and run `gofmt` on changed Go files. Use `testing.T` for new Go tests and `quicktest` for assertions.
 - Run the narrowest relevant tests. Before running service-backed or end-to-end tests, follow the [spin-up-test-env skill](./.github/skills/spin-up-test-env/SKILL.md).
 - Prefer adding tests to the [`testing/`](./testing) folder where tests are written in Go and reserve [`tests/`](./tests) for exceptional cases where we need to use bash.
-- Run `make lint` for Go linting. If a change affects generated code or JAAS CLI reference docs, run `make generate` and include the relevant generated updates.
+- For Go linting, run `golangci-lint run --timeout 5m --new-from-patch <patch> --whole-files <packages>` on only the packages containing Go files touched by the task. Use a patch covering those files, including new files, so diagnostics are limited to the touched files. Skip Go lint when no Go files changed; use repository-wide `make lint` only when explicitly requested.
+- If a change affects generated code or JAAS CLI reference docs, run `make generate` and include the relevant generated updates.
 
 ## Things to keep in mind
 
