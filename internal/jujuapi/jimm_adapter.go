@@ -69,6 +69,10 @@ func (j *JIMMAdapter) ControllerProfileManager() ControllerProfileManager {
 	return j.j.ControllerProfileManager
 }
 
+func (j *JIMMAdapter) MetadataManager() MetadataManager {
+	return j.j.MetadataManager
+}
+
 // UpgradeManager returns the upgrade manager from the underlying JIMM instance.
 func (j *JIMMAdapter) UpgradeManager() UpgradeManager {
 	return j.j.UpgradeManager

@@ -28,6 +28,7 @@ type JIMM struct {
 	OfferAuthorizer_          func() jujuapi.OfferAuthorizer
 	BootstapManager_          func() jujuapi.BootstrapManager
 	ControllerProfileManager_ func() jujuapi.ControllerProfileManager
+	MetadataManager_          func() jujuapi.MetadataManager
 	UpgradeManager_           func() jujuapi.UpgradeManager
 	JobManager_               func() jujuapi.JobManager
 }
@@ -121,6 +122,13 @@ func (j *JIMM) ControllerProfileManager() jujuapi.ControllerProfileManager {
 		return nil
 	}
 	return j.ControllerProfileManager_()
+}
+
+func (j *JIMM) MetadataManager() jujuapi.MetadataManager {
+	if j.MetadataManager_ == nil {
+		return nil
+	}
+	return j.MetadataManager_()
 }
 
 func (j *JIMM) UpgradeManager() jujuapi.UpgradeManager {

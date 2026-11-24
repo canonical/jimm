@@ -24,6 +24,7 @@ import (
 	"github.com/canonical/jimm/v3/internal/jimm/juju"
 	"github.com/canonical/jimm/v3/internal/jimm/jujuauth"
 	"github.com/canonical/jimm/v3/internal/jimm/login"
+	"github.com/canonical/jimm/v3/internal/jimm/metadata"
 	"github.com/canonical/jimm/v3/internal/jimm/offer"
 	"github.com/canonical/jimm/v3/internal/jimm/permissions"
 	"github.com/canonical/jimm/v3/internal/jimm/role"
@@ -262,6 +263,7 @@ func New(p Parameters) (*JIMM, error) {
 	}
 
 	j.ControllerProfileManager = controllerProfileManager
+	j.MetadataManager = metadata.NewManager(j.Database)
 
 	upgradeManager, err := upgrade.NewUpgradeManager(j.JujuManager, j.Database, j.Dialer, j.RiverClient)
 	if err != nil {
@@ -323,6 +325,8 @@ type JIMM struct {
 
 	// ControllerProfileManager provides a means to manage saved controller profiles.
 	ControllerProfileManager *controllerprofile.ControllerProfileManager
+
+	MetadataManager *metadata.Manager
 
 	// UpgradeManager provides a means to manage controller cloning and model automated upgrades.
 	UpgradeManager *upgrade.UpgradeManager
