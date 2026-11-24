@@ -44,6 +44,7 @@ type JIMM interface {
 	ConfigManager() ConfigManager
 	BootstrapManager() BootstrapManager
 	ControllerProfileManager() ControllerProfileManager
+	MetadataManager() MetadataManager
 	UpgradeManager() UpgradeManager
 	JobManager() JobManager
 
@@ -323,6 +324,13 @@ type ControllerProfileManager interface {
 	GetControllerProfile(ctx context.Context, name string) (*dbmodel.ControllerProfile, error)
 	ListControllerProfiles(ctx context.Context, jujuVersion string) ([]dbmodel.ControllerProfile, error)
 	RemoveControllerProfile(ctx context.Context, name string) error
+}
+
+type MetadataManager interface {
+	GetMetadata(context.Context, *openfga.User, dbmodel.EntityMetadataTarget) (map[string]string, error)
+	SetMetadata(context.Context, *openfga.User, dbmodel.EntityMetadataTarget, map[string]string) (map[string]string, error)
+	RemoveMetadata(context.Context, *openfga.User, dbmodel.EntityMetadataTarget, bool, []string) error
+	QueryMetadata(context.Context, *openfga.User, *db.EntityMetadataMatcher) ([]dbmodel.EntityMetadata, error)
 }
 
 // UpgradeManager provides methods to manage controller cloning and model automated upgrades.
